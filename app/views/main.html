@@ -1,0 +1,37 @@
+
+<h1 class="text-center">Adder/Subtractor</h1>
+
+<div class="jumbotron">
+  <form>
+    <div class="row">
+      <div class="col-sm-12">
+          <label>X = </label><input placeholder=" type an integer!" type="number" ng-pattern="/^-?[0-9]\d*(\.\d+)?$/" ng-model="int.x" required/></h1>
+      </div>
+    </div>
+    <br>
+    <div class="row">
+      <div class="col-sm-12">
+          <label>y = </label><input placeholder=" type an integer!" type="number" ng-pattern="/^-?[0-9]\d*(\.\d+)?$/" ng-model="int.y" required/></h1>
+      </div>
+    </div>
+    <br>
+    <div class="row">
+        <div class="col-sm-6"><input type="submit" value="+" class="pull-right btn btn-lg btn-success" ng-click="submitAdd()"></div>
+    <div class="col-sm-6"><input type="submit" value="-" class="pull-left btn btn-lg btn-danger" ng-click="submitSubtract()"></div>
+
+    </div>
+    </form>
+    <br>
+</div>
+
+<div class="row text-center">
+  <div ng-show="add">
+    <div class="row"><span class="integer">{{int.x}}  + </span> <span class="integer">{{int.y}}  is  </span><span class="integer"> {{(int.x)  + (int.y)}}</span></div>
+
+  </div>
+  <div ng-show="subtract">
+    <span class="integer">{{int.x}} - </span>  <span class="integer">{{int.y}}  is </span> <span class="integer">{{(int.x) - (int.y)}}</span>
+  </div>
+</div>
+
+
