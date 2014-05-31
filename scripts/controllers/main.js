@@ -1,7 +1,10 @@
 'use strict';
 
-angular.module('addSubtractApp')
-  .controller('MainCtrl', function ($scope) {
+window.Abhi
+  .controller('MainCtrl', [ '$scope', function ($scope, Service) {
+
+    $scope.parseFloat = parseFloat;
+    $scope.parseInt = parseInt;
   	$scope.add = false;
   	$scope.subtract = false;
 
@@ -17,4 +20,5 @@ angular.module('addSubtractApp')
 
 
  
-  });
+  }]);
+

@@ -26,11 +26,11 @@
 
 <div class="row text-center">
   <div ng-show="add">
-    <div class="row"><span class="integer">{{int.x}}  + </span> <span class="integer">{{int.y}}  is  </span><span class="integer"> {{(int.x)  + (int.y)}}</span></div>
+    <div class="row"><span class="integer">{{parseFloat(int.x)}}  + </span> <span class="integer">{{parseFloat(int.y)}}  is  </span><span class="integer"> {{(parseInt(int.x))  + (parseInt(int.y))}}</span></div>
 
   </div>
   <div ng-show="subtract">
-    <span class="integer">{{int.x}} - </span>  <span class="integer">{{int.y}}  is </span> <span class="integer">{{(int.x) - (int.y)}}</span>
+    <span class="integer">{{parseFloat(int.x)}} - </span>  <span class="integer">{{parseFloat(int.y)}}  is </span> <span class="integer">{{(parseInt(int.x))  - (parseInt(int.y))}}</span>
   </div>
 </div>
 
