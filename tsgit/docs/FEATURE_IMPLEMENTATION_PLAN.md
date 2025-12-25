@@ -4,14 +4,14 @@ This document outlines all missing features needed to achieve feature parity wit
 
 ## Overview
 
-| Workstream | Priority | Complexity | Dependencies |
-|------------|----------|------------|--------------|
-| 1. Local Commands | High | Medium | None |
-| 2. Remote Infrastructure | Critical | High | None |
-| 3. Remote Commands | Critical | High | Workstream 2 |
-| 4. History Rewriting | High | High | None |
-| 5. Plumbing Commands | Medium | Low | None |
-| 6. Advanced Features | Low | Medium | Various |
+| Workstream | Priority | Complexity | Dependencies | Status |
+|------------|----------|------------|--------------|--------|
+| 1. Local Commands | High | Medium | None | 🟡 In Progress |
+| 2. Remote Infrastructure | Critical | High | None | ✅ **Complete** |
+| 3. Remote Commands | Critical | High | Workstream 2 | 🔵 Ready to Start |
+| 4. History Rewriting | High | High | None | ⚪ Not Started |
+| 5. Plumbing Commands | Medium | Low | None | ⚪ Not Started |
+| 6. Advanced Features | Low | Medium | Various | ⚪ Not Started |
 
 ---
 
@@ -130,179 +130,119 @@ tsgit show <tag>                // Show tag info
 
 ---
 
-## Workstream 2: Remote Infrastructure
+## Workstream 2: Remote Infrastructure ✅ COMPLETE
 
-**Owner:** _Unassigned_  
-**Estimated Effort:** 3-4 days  
+**Owner:** Completed  
+**Actual Effort:** ~3 hours  
 **Dependencies:** None
 
-Core infrastructure needed for all remote operations.
+Core infrastructure needed for all remote operations. **All components implemented and tested.**
 
-### 2.1 Remote Configuration
+### 2.1 Remote Configuration ✅
 **File:** `src/core/remote.ts`
 
 ```typescript
-export interface Remote {
-  name: string;
-  url: string;
-  fetch: string;  // Refspec for fetching
-  push?: string;  // Refspec for pushing
-}
+import { RemoteManager } from 'tsgit/core/remote';
 
-export interface RemoteConfig {
-  remotes: Map<string, Remote>;
-}
+const remotes = new RemoteManager(gitDir);
 
-export class RemoteManager {
-  constructor(gitDir: string);
-  
-  // CRUD operations
-  add(name: string, url: string): void;
-  remove(name: string): void;
-  rename(oldName: string, newName: string): void;
-  setUrl(name: string, url: string): void;
-  
-  // Queries
-  get(name: string): Remote | null;
-  list(): Remote[];
-  getDefault(): Remote | null;
-}
+// CRUD operations
+remotes.add('origin', 'https://github.com/user/repo.git');
+remotes.remove('origin');
+remotes.rename('origin', 'upstream');
+remotes.setUrl('origin', 'https://github.com/user/new-repo.git');
+
+// Queries
+const origin = remotes.get('origin');
+const allRemotes = remotes.list();
+const defaultRemote = remotes.getDefault();
+
+// Remote tracking refs
+remotes.updateRemoteRef('origin', 'main', commitHash);
+const refs = remotes.listRemoteRefs('origin');
+
+// Refspec utilities
+const { force, src, dst } = RemoteManager.parseRefspec('+refs/heads/*:refs/remotes/origin/*');
+const localRef = RemoteManager.applyRefspec(refspec, 'refs/heads/main');
 ```
 
 **Storage:** `.tsgit/config` (INI format, Git-compatible)
 
-```ini
-[remote "origin"]
-    url = https://github.com/user/repo.git
-    fetch = +refs/heads/*:refs/remotes/origin/*
-```
-
-### 2.2 Git Protocol Implementation
+### 2.2 Git Protocol Implementation ✅
 **File:** `src/core/protocol/`
 
 ```
 src/core/protocol/
-├── index.ts           # Export all protocols
-├── types.ts           # Common types
-├── smart-http.ts      # Smart HTTP protocol
-├── pack.ts            # Pack file format
-├── packfile-parser.ts # Parse incoming packs
-├── packfile-writer.ts # Create outgoing packs
-└── refs-discovery.ts  # Ref advertisement parsing
+├── index.ts           # Export all protocols ✅
+├── types.ts           # Common types (Capabilities, RefInfo, PackObject, etc.) ✅
+├── smart-http.ts      # Smart HTTP protocol client ✅
+├── pack.ts            # Pack file format utilities ✅
+├── packfile-parser.ts # Parse incoming packs with delta resolution ✅
+├── packfile-writer.ts # Create outgoing packs with delta compression ✅
+└── refs-discovery.ts  # Ref advertisement parsing ✅
 ```
 
-#### 2.2.1 Types (`types.ts`)
+**Usage Example:**
 ```typescript
-export interface RefAdvertisement {
-  refs: Map<string, string>;  // ref name -> hash
-  capabilities: string[];
-  head?: string;
-}
+import { SmartHttpClient, parsePackfile, createPackfile } from 'tsgit/core/protocol';
 
-export interface WantHave {
-  wants: string[];     // Commits we want
-  haves: string[];     // Commits we have
-  done: boolean;
-}
+// Discover remote refs
+const client = new SmartHttpClient('https://github.com/user/repo.git', credentials);
+const refs = await client.discoverRefs('upload-pack');
 
-export interface PackNegotiation {
-  commonBase: string[];
-  objectsNeeded: string[];
-}
+// Fetch objects
+const packData = await client.fetchPack(wants, haves, { progress: console.log });
+const parsed = parsePackfile(packData);
+
+// Push objects
+const pack = createPackfile(objects, { useDelta: true });
+const result = await client.pushPack(refUpdates, pack);
 ```
 
-#### 2.2.2 Smart HTTP Protocol (`smart-http.ts`)
-```typescript
-export class SmartHttpClient {
-  constructor(baseUrl: string);
-  
-  // Discovery
-  async discoverRefs(service: 'upload-pack' | 'receive-pack'): Promise<RefAdvertisement>;
-  
-  // Fetching (upload-pack)
-  async fetchPack(wants: string[], haves: string[]): Promise<Buffer>;
-  
-  // Pushing (receive-pack)  
-  async pushPack(refs: RefUpdate[], pack: Buffer): Promise<PushResult>;
-}
-```
-
-**HTTP Endpoints:**
-- `GET /info/refs?service=git-upload-pack` - Ref discovery for fetch
-- `POST /git-upload-pack` - Fetch pack negotiation
-- `GET /info/refs?service=git-receive-pack` - Ref discovery for push
-- `POST /git-receive-pack` - Push pack data
-
-#### 2.2.3 Pack File Format (`pack.ts`)
-```typescript
-export interface PackHeader {
-  signature: 'PACK';
-  version: 2 | 3;
-  objectCount: number;
-}
-
-export interface PackObject {
-  type: 'commit' | 'tree' | 'blob' | 'tag' | 'ofs_delta' | 'ref_delta';
-  size: number;
-  data: Buffer;
-  // For deltas:
-  baseOffset?: number;
-  baseHash?: string;
-}
-
-export class PackfileParser {
-  parse(data: Buffer): PackObject[];
-}
-
-export class PackfileWriter {
-  constructor(objects: ObjectStore);
-  
-  // Create pack from object list
-  createPack(objectHashes: string[]): Buffer;
-  
-  // Delta compression
-  createDelta(base: Buffer, target: Buffer): Buffer;
-}
-```
-
-**Pack Format:**
-```
-PACK (4 bytes signature)
-Version (4 bytes, network order)
-Object count (4 bytes, network order)
-[Objects...]
-SHA-1 checksum of entire pack (20 bytes)
-```
-
-### 2.3 Authentication
+### 2.3 Authentication ✅
 **File:** `src/core/auth.ts`
 
 ```typescript
-export interface Credentials {
-  username?: string;
-  password?: string;
-  token?: string;
-}
+import { CredentialManager, createGitHubCredentials } from 'tsgit/core/auth';
 
-export class CredentialManager {
-  // Try to get credentials from various sources
-  async getCredentials(url: string): Promise<Credentials | null>;
-  
-  // Sources (in order):
-  // 1. Environment: TSGIT_TOKEN, GIT_TOKEN, GITHUB_TOKEN
-  // 2. Git credential helper (if available)
-  // 3. .netrc file
-  // 4. Interactive prompt (if TTY)
-}
+const manager = new CredentialManager();
+
+// Automatic lookup (env vars → git credential helper → .netrc → interactive)
+const creds = await manager.getCredentials('https://github.com/user/repo.git');
+
+// Manual creation
+const githubCreds = createGitHubCredentials(process.env.GITHUB_TOKEN!);
+
+// Store/reject for credential helper integration
+await manager.storeCredentials(url, creds);
+await manager.rejectCredentials(url);
 ```
+
+**Environment Variables Supported:**
+- `TSGIT_TOKEN` - Universal token
+- `GITHUB_TOKEN` / `GH_TOKEN` - GitHub
+- `GITLAB_TOKEN` / `GL_TOKEN` - GitLab  
+- `GIT_TOKEN` - Generic
+- `GIT_USERNAME` + `GIT_PASSWORD` - Basic auth
+
+### Tests ✅
+**File:** `src/__tests__/remote.test.ts` - 26 tests covering:
+- RemoteManager CRUD operations
+- Refspec parsing and application
+- PKT-LINE encoding/decoding
+- Pack file headers and delta application
+- Credential management
 
 ---
 
-## Workstream 3: Remote Commands
+## Workstream 3: Remote Commands 🔵 READY TO START
 
 **Owner:** _Unassigned_  
 **Estimated Effort:** 4-5 days  
-**Dependencies:** Workstream 2 (Remote Infrastructure)
+**Dependencies:** Workstream 2 (Remote Infrastructure) ✅ **Complete**
+
+> **Note:** All infrastructure is now in place! This workstream can begin immediately.
+> Use `SmartHttpClient`, `RemoteManager`, `CredentialManager`, and pack utilities from Workstream 2.
 
 ### 3.1 Remote Command
 **File:** `src/commands/remote.ts`
@@ -698,21 +638,27 @@ Each command should have corresponding tests:
 
 ```
 src/__tests__/
-├── stash.test.ts
-├── tag.test.ts
-├── reset.test.ts
-├── cherry-pick.test.ts
-├── rebase.test.ts
-├── remote.test.ts
-├── clone.test.ts
-├── fetch.test.ts
-├── pull.test.ts
-├── push.test.ts
-└── protocol/
-    ├── smart-http.test.ts
-    ├── pack.test.ts
-    └── packfile.test.ts
+├── amend.test.ts        ✅ (8 tests)
+├── blame.test.ts        ✅ (9 tests)
+├── cleanup.test.ts      ✅ (9 tests)
+├── fixup.test.ts        ✅ (9 tests)
+├── remote.test.ts       ✅ (26 tests) - NEW: Remote infrastructure tests
+├── snapshot.test.ts     ✅ (17 tests)
+├── stats.test.ts        ✅ (15 tests)
+├── uncommit.test.ts     ✅ (8 tests)
+├── wip.test.ts          ✅ (8 tests)
+├── stash.test.ts        (TODO)
+├── tag.test.ts          (TODO)
+├── reset.test.ts        (TODO)
+├── cherry-pick.test.ts  (TODO)
+├── rebase.test.ts       (TODO)
+├── clone.test.ts        (TODO)
+├── fetch.test.ts        (TODO)
+├── pull.test.ts         (TODO)
+└── push.test.ts         (TODO)
 ```
+
+**Current Test Count:** 109 tests passing
 
 **Test Patterns:**
 ```typescript
@@ -746,31 +692,98 @@ describe('command-name', () => {
 
 Recommended implementation order for maximum impact:
 
-1. **Phase 1 - Local Essentials** (Week 1)
+1. **Phase 1 - Local Essentials** 🟡 In Progress
    - [x] Stash (started)
    - [x] Tag (started)
    - [x] Reset (started)
    - [ ] Cherry-pick
    - [ ] Rebase
 
-2. **Phase 2 - Remote Infrastructure** (Week 2)
-   - [ ] Remote configuration
-   - [ ] Smart HTTP protocol
-   - [ ] Pack file parsing/writing
-   - [ ] Authentication
+2. **Phase 2 - Remote Infrastructure** ✅ **COMPLETE**
+   - [x] Remote configuration (`src/core/remote.ts`)
+   - [x] Smart HTTP protocol (`src/core/protocol/smart-http.ts`)
+   - [x] Pack file parsing/writing (`src/core/protocol/packfile-*.ts`)
+   - [x] Authentication (`src/core/auth.ts`)
+   - [x] Tests (`src/__tests__/remote.test.ts` - 26 tests)
 
-3. **Phase 3 - Remote Commands** (Week 3)
-   - [ ] Remote command
-   - [ ] Clone
-   - [ ] Fetch
-   - [ ] Pull
-   - [ ] Push
+3. **Phase 3 - Remote Commands** 🔵 **READY TO START** (Dependencies Complete!)
+   - [ ] Remote command (`tsgit remote add/remove/list`)
+   - [ ] Clone (`tsgit clone <url>`)
+   - [ ] Fetch (`tsgit fetch`)
+   - [ ] Pull (`tsgit pull`)
+   - [ ] Push (`tsgit push`)
 
-4. **Phase 4 - Polish** (Week 4)
+4. **Phase 4 - Polish**
    - [ ] Bisect
    - [ ] Plumbing commands
    - [ ] Hooks
-   - [ ] Tests & documentation
+   - [ ] Additional tests & documentation
+
+---
+
+## Quick Start: Implementing Remote Commands
+
+With Workstream 2 complete, here's how to implement the remote commands:
+
+### Clone Command Example
+```typescript
+import { Repository } from '../core/repository';
+import { RemoteManager } from '../core/remote';
+import { SmartHttpClient, parsePackfile } from '../core/protocol';
+import { getCredentialManager } from '../core/auth';
+
+export async function clone(url: string, targetDir: string): Promise<void> {
+  // 1. Get credentials
+  const credManager = getCredentialManager();
+  const creds = await credManager.getCredentials(url);
+  
+  // 2. Discover refs
+  const client = new SmartHttpClient(url, creds ?? undefined);
+  const refs = await client.discoverRefs('upload-pack');
+  
+  // 3. Initialize repository
+  const repo = Repository.init(targetDir);
+  
+  // 4. Add remote
+  const remotes = new RemoteManager(repo.gitDir);
+  remotes.add('origin', url);
+  
+  // 5. Fetch all objects
+  const wants = refs.refs.map(r => r.hash);
+  const packData = await client.fetchPack(wants, []);
+  const parsed = parsePackfile(packData);
+  
+  // 6. Store objects
+  for (const obj of parsed.objects) {
+    // Write to object store...
+  }
+  
+  // 7. Update refs and checkout
+  // ...
+}
+```
+
+### Fetch Command Example
+```typescript
+export async function fetch(remoteName: string = 'origin'): Promise<void> {
+  const repo = Repository.find();
+  const remotes = new RemoteManager(repo.gitDir);
+  const remote = remotes.get(remoteName);
+  
+  const client = new SmartHttpClient(remote.url, credentials);
+  const refs = await client.discoverRefs('upload-pack');
+  
+  // Determine what we need (wants) vs what we have (haves)
+  const wants = refs.refs.filter(r => !repo.objects.hasObject(r.hash)).map(r => r.hash);
+  const haves = repo.objects.listObjects();
+  
+  if (wants.length > 0) {
+    const packData = await client.fetchPack(wants, haves);
+    const parsed = parsePackfile(packData);
+    // Store objects and update remote refs...
+  }
+}
+```
 
 ---
 
