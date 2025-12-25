@@ -5,9 +5,38 @@ import { Refs } from './refs';
 import { Tree, Commit, Blob } from './object';
 import { Author, TreeEntry, IndexEntry } from './types';
 import { exists, mkdirp, writeFile, readFile, walkDir, readFileText } from '../utils/fs';
+import { Journal } from './journal';
+import { LargeFileHandler, CHUNK_THRESHOLD } from './large-file';
+import { BranchStateManager } from './branch-state';
+import { MergeManager } from './merge';
+import { ScopeManager } from './scope';
+import { PartialCloneManager, SparseCheckoutManager } from './partial-clone';
+import { setHashAlgorithm, getHashAlgorithm, HashAlgorithm } from '../utils/hash';
+
+/**
+ * Repository configuration
+ */
+export interface RepositoryConfig {
+  hashAlgorithm: HashAlgorithm;
+  largeFileThreshold: number;
+  autoStashOnSwitch: boolean;
+}
+
+const DEFAULT_CONFIG: RepositoryConfig = {
+  hashAlgorithm: 'sha256',
+  largeFileThreshold: CHUNK_THRESHOLD,
+  autoStashOnSwitch: true,
+};
 
 /**
  * Main Repository class - the entry point for all Git operations
+ * 
+ * Improvements over Git:
+ * - SHA-256 hashing by default (more secure)
+ * - Large file chunking for better binary handling
+ * - Operation journal for undo/history
+ * - Branch state management (auto-stash)
+ * - Monorepo scope support
  */
 export class Repository {
   readonly gitDir: string;
@@ -15,13 +44,53 @@ export class Repository {
   readonly objects: ObjectStore;
   readonly index: Index;
   readonly refs: Refs;
+  
+  // New features
+  readonly journal: Journal;
+  readonly largeFiles: LargeFileHandler;
+  readonly branchState: BranchStateManager;
+  readonly mergeManager: MergeManager;
+  readonly scopeManager: ScopeManager;
+  readonly partialClone: PartialCloneManager;
+  readonly sparseCheckout: SparseCheckoutManager;
 
-  constructor(workDir: string) {
+  private config: RepositoryConfig;
+
+  constructor(workDir: string, config: Partial<RepositoryConfig> = {}) {
     this.workDir = path.resolve(workDir);
     this.gitDir = path.join(this.workDir, '.tsgit');
+    this.config = { ...DEFAULT_CONFIG, ...config };
+    
+    // Set hash algorithm
+    setHashAlgorithm(this.config.hashAlgorithm);
+    
+    // Core components
     this.objects = new ObjectStore(this.gitDir);
     this.index = new Index(this.gitDir);
     this.refs = new Refs(this.gitDir);
+    
+    // New feature components
+    this.journal = new Journal(this.gitDir);
+    this.largeFiles = new LargeFileHandler(this.gitDir);
+    this.branchState = new BranchStateManager(this.gitDir, this.workDir);
+    this.mergeManager = new MergeManager(this, this.gitDir);
+    this.scopeManager = new ScopeManager(this.gitDir, this.workDir);
+    this.partialClone = new PartialCloneManager(this.gitDir, this.objects);
+    this.sparseCheckout = new SparseCheckoutManager(this.gitDir);
+  }
+
+  /**
+   * Get repository configuration
+   */
+  getConfig(): RepositoryConfig {
+    return { ...this.config };
+  }
+
+  /**
+   * Get hash algorithm
+   */
+  getHashAlgorithm(): HashAlgorithm {
+    return getHashAlgorithm();
   }
 
   /**
@@ -34,8 +103,8 @@ export class Repository {
   /**
    * Initialize a new repository
    */
-  static init(workDir: string): Repository {
-    const repo = new Repository(workDir);
+  static init(workDir: string, options: { hashAlgorithm?: HashAlgorithm } = {}): Repository {
+    const repo = new Repository(workDir, options);
 
     if (repo.isValid()) {
       throw new Error(`Repository already exists at ${workDir}`);
@@ -45,15 +114,21 @@ export class Repository {
     mkdirp(path.join(repo.gitDir, 'objects'));
     mkdirp(path.join(repo.gitDir, 'refs', 'heads'));
     mkdirp(path.join(repo.gitDir, 'refs', 'tags'));
+    mkdirp(path.join(repo.gitDir, 'info'));
 
     // Create HEAD pointing to main branch
     writeFile(path.join(repo.gitDir, 'HEAD'), 'ref: refs/heads/main\n');
 
-    // Create config file
+    // Create config file with tsgit improvements
+    const hashAlgo = options.hashAlgorithm || 'sha256';
     const config = `[core]
-    repositoryformatversion = 0
+    repositoryformatversion = 1
     filemode = true
     bare = false
+[tsgit]
+    hashAlgorithm = ${hashAlgo}
+    largeFileThreshold = ${CHUNK_THRESHOLD}
+    autoStashOnSwitch = true
 `;
     writeFile(path.join(repo.gitDir, 'config'), config);
 
@@ -62,6 +137,14 @@ export class Repository {
       path.join(repo.gitDir, 'description'),
       'Unnamed repository; edit this file to name the repository.\n'
     );
+
+    // Initialize new feature directories
+    repo.journal.init();
+    repo.largeFiles.init();
+    repo.branchState.init();
+    repo.scopeManager.init();
+
+    console.log(`Initialized tsgit repository with ${hashAlgo} hashing`);
 
     return repo;
   }
