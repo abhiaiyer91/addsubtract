@@ -38,7 +38,22 @@ export { hashObjectCommand } from './hash-object';
 export { lsFiles } from './ls-files';
 export { lsTree } from './ls-tree';
 
+// Additional plumbing commands
+export { revParse, handleRevParse } from './rev-parse';
+export { updateRef, deleteRef, handleUpdateRef } from './update-ref';
+export { readSymbolicRef, setSymbolicRef, deleteSymbolicRef, handleSymbolicRef } from './symbolic-ref';
+export { forEachRef, formatRef, handleForEachRef } from './for-each-ref';
+export { showRef, verifyRef, handleShowRef } from './show-ref';
+export { fsck, handleFsck } from './fsck';
+
 // New commands (bridging the gap with Git)
 export { handleStash, StashManager } from './stash';
 export { handleTag, createLightweightTag, createAnnotatedTag, listTags, deleteTag } from './tag';
 export { handleReset, reset, resetFile, parseRevision } from './reset';
+
+// Remote commands
+export { handleRemote, listRemotes, addRemote, removeRemote, renameRemote, getRemoteUrl, setRemoteUrl } from './remote';
+export { handleClone, clone, parseRepoUrl } from './clone';
+export { handleFetch, fetch } from './fetch';
+export { handlePull, pull } from './pull';
+export { handlePush, push } from './push';
