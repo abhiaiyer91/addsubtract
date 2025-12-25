@@ -1,0 +1,30 @@
+{
+  "name": "tsgit",
+  "version": "1.0.0",
+  "description": "A Git implementation in TypeScript - built from the ground up",
+  "main": "dist/index.js",
+  "bin": {
+    "tsgit": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/cli.js",
+    "dev": "ts-node src/cli.ts",
+    "test": "jest",
+    "lint": "eslint src/**/*.ts"
+  },
+  "keywords": [
+    "git",
+    "version-control",
+    "typescript"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
