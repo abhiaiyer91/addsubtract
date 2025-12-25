@@ -4,10 +4,12 @@
  * For file restoration, use the 'restore' command
  */
 
+import * as path from 'path';
 import { Repository } from '../core/repository';
 import { BranchStateManager } from '../core/branch-state';
 import { Journal, StateSnapshot } from '../core/journal';
 import { TsgitError, Errors } from '../core/errors';
+import { readFile, exists } from '../utils/fs';
 
 /**
  * Options for switch command
@@ -29,6 +31,93 @@ export interface SwitchResult {
   stashedChanges: boolean;
   restoredChanges: boolean;
   message: string;
+}
+
+/**
+ * Check which files would conflict when switching branches
+ * 
+ * A file conflicts if:
+ * - It exists on the target branch with different content than in our working tree
+ * - It doesn't exist on the target branch but would need to be removed (deleted from index)
+ * 
+ * A file does NOT conflict if:
+ * - It doesn't exist on the target branch (new files can be carried over)
+ * - It exists identically on both branches
+ */
+function getConflictingFiles(
+  repo: Repository,
+  targetBranch: string,
+  changedFiles: string[]
+): string[] {
+  const conflicts: string[] = [];
+  
+  // Get the target branch's tree
+  const targetHash = repo.refs.resolve(targetBranch);
+  if (!targetHash) {
+    return []; // Branch doesn't exist yet, will be caught elsewhere
+  }
+
+  // Build map of target branch files
+  const targetTree = new Map<string, string>();
+  try {
+    const commit = repo.objects.readCommit(targetHash);
+    flattenTree(repo, commit.treeHash, '', targetTree);
+  } catch {
+    return []; // No commits on target branch
+  }
+
+  // Check each changed file
+  for (const file of changedFiles) {
+    // Skip files marked as deleted in status display
+    const cleanPath = file.replace(' (deleted)', '');
+    
+    // Get file's hash on target branch
+    const targetBlobHash = targetTree.get(cleanPath);
+    
+    if (!targetBlobHash) {
+      // File doesn't exist on target branch - no conflict
+      // (new file can be safely carried over)
+      continue;
+    }
+
+    // File exists on target branch - check if it differs from working tree
+    const fullPath = path.join(repo.workDir, cleanPath);
+    
+    if (!exists(fullPath)) {
+      // File was deleted but exists on target - this is a conflict
+      conflicts.push(cleanPath);
+      continue;
+    }
+
+    // Compare working tree content with target branch content
+    const workingContent = readFile(fullPath);
+    const targetBlob = repo.objects.readBlob(targetBlobHash);
+    
+    if (!workingContent.equals(targetBlob.content)) {
+      // Content differs - this would be overwritten
+      conflicts.push(cleanPath);
+    }
+    // If content is the same, no conflict
+  }
+
+  return conflicts;
+}
+
+/**
+ * Flatten a tree into a map of path -> blob hash
+ */
+function flattenTree(repo: Repository, treeHash: string, prefix: string, result: Map<string, string>): void {
+  const tree = repo.objects.readTree(treeHash);
+
+  for (const entry of tree.entries) {
+    const fullPath = prefix ? prefix + '/' + entry.name : entry.name;
+
+    if (entry.mode === '40000') {
+      flattenTree(repo, entry.hash, fullPath, result);
+    } else {
+      result.set(fullPath, entry.hash);
+    }
+  }
 }
 
 /**
@@ -66,13 +155,19 @@ export function switchBranch(
                      status.staged.length > 0 || 
                      status.deleted.length > 0;
 
-  // Handle uncommitted changes
+  // Handle uncommitted changes - but only if they would be overwritten
   if (hasChanges && !options.force && !options.autoStash) {
-    throw Errors.uncommittedChanges([
-      ...status.modified,
-      ...status.staged,
-      ...status.deleted,
-    ]);
+    // Check if the target branch would overwrite any of our changes
+    const conflictingFiles = getConflictingFiles(
+      repo,
+      branchName,
+      [...status.modified, ...status.staged.filter(f => !f.endsWith(' (deleted)')), ...status.deleted]
+    );
+
+    if (conflictingFiles.length > 0) {
+      throw Errors.uncommittedChanges(conflictingFiles);
+    }
+    // If no conflicts, allow the switch with changes carried over
   }
 
   let stashedChanges = false;
