@@ -90,12 +90,30 @@ tsgit web --port 8080   # Custom port
 ```
 
 Features:
-- 📊 Visual status overview
-- 📁 File staging with one click
-- 📜 Commit history browser
-- ⎇ Branch management
-- ↩ One-click undo
-- 🌙 Beautiful dark theme
+- 📊 **Commit graph visualization** - Visual branch history with SVG rendering
+- 📝 **Side-by-side diff viewer** - Syntax highlighted, split view diffs
+- 📁 **File tree browser** - Navigate repository with icons and status badges
+- 🔍 **Powerful search** - Search commits, files, and content
+- ⎇ **Branch management** - Switch branches with one click
+- ↩ **Operation history** - Undo any operation
+- 🌙 **Beautiful dark theme** - Easy on the eyes
+- ⌨️ **Keyboard shortcuts** - Ctrl+P search, Ctrl+Enter commit, R refresh
+
+### Terminal Graph
+
+View commit history as a colorful ASCII graph:
+
+```bash
+tsgit graph              # Show graph in terminal
+tsgit graph -n 30        # Show last 30 commits
+```
+
+Output:
+```
+● a1b2c3d4 (main) Latest commit - Alice, 2 hours ago
+● e5f6g7h8 Add feature - Bob, yesterday
+● i9j0k1l2 Initial commit - Alice, 3 days ago
+```
 
 ## 🆕 New Commands
 
@@ -251,14 +269,19 @@ tsgit/
 │   │   └── scope.ts          # Monorepo scope support
 │   ├── commands/
 │   │   ├── init.ts, add.ts, commit.ts, ...
-│   │   ├── switch.ts         # New: dedicated branch switching
-│   │   ├── restore.ts        # New: dedicated file restoration
-│   │   ├── undo.ts           # New: undo/history commands
-│   │   ├── merge.ts          # New: merge with conflicts
-│   │   └── scope.ts          # New: monorepo scope
+│   │   ├── switch.ts         # Dedicated branch switching
+│   │   ├── restore.ts        # Dedicated file restoration
+│   │   ├── undo.ts           # Undo/history commands
+│   │   ├── merge.ts          # Merge with conflicts
+│   │   └── scope.ts          # Monorepo scope
 │   ├── ui/
 │   │   ├── tui.ts            # Terminal User Interface
-│   │   ├── web.ts            # Web-based UI
+│   │   ├── web.ts            # Basic Web UI
+│   │   ├── web-enhanced.ts   # Enhanced Web Dashboard
+│   │   ├── graph.ts          # Commit graph visualization
+│   │   ├── diff-viewer.ts    # Side-by-side diff viewer
+│   │   ├── file-tree.ts      # File tree browser
+│   │   ├── search.ts         # Search functionality
 │   │   └── index.ts          # UI exports
 │   ├── utils/
 │   │   ├── hash.ts           # SHA-256/SHA-1 hashing

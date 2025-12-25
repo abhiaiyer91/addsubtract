@@ -23,8 +23,11 @@ import {
   handleScope,
 } from './commands';
 import { TsgitError, findSimilar } from './core/errors';
+import { Repository } from './core/repository';
 import { launchTUI } from './ui/tui';
 import { launchWebUI } from './ui/web';
+import { launchEnhancedWebUI } from './ui/web-enhanced';
+import { printGraph } from './ui/graph';
 
 const VERSION = '2.0.0';
 
@@ -45,7 +48,8 @@ Usage: tsgit <command> [<args>]
 
 Visual Interface:
   ui                    Launch interactive terminal UI (TUI)
-  web [--port <n>]      Launch web-based UI in browser
+  web [--port <n>]      Launch enhanced web UI in browser
+  graph                 Show commit graph in terminal
 
 Core Commands:
   init                  Create an empty tsgit repository
@@ -104,7 +108,7 @@ const COMMANDS = [
   'init', 'add', 'commit', 'status', 'log', 'diff',
   'branch', 'switch', 'checkout', 'restore',
   'merge', 'undo', 'history',
-  'scope',
+  'scope', 'graph',
   'ui', 'web',
   'cat-file', 'hash-object', 'ls-files', 'ls-tree',
   'help',
@@ -299,7 +303,20 @@ function main(): void {
 
       case 'web': {
         const port = options.port ? parseInt(options.port as string, 10) : 3847;
-        launchWebUI(port);
+        if (options.basic) {
+          launchWebUI(port);
+        } else {
+          launchEnhancedWebUI(port);
+        }
+        break;
+      }
+
+      case 'graph': {
+        const repo = Repository.find();
+        printGraph(repo, { 
+          useColors: true, 
+          maxCommits: options.n ? parseInt(options.n as string, 10) : 20 
+        });
         break;
       }
 
