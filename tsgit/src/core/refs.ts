@@ -76,10 +76,11 @@ export class Refs {
 
   /**
    * Resolve a ref to a commit hash
+   * Note: For ancestor syntax (HEAD~N, HEAD^), use Repository.resolveRef() instead
    */
   resolve(ref: string): string | null {
-    // Check if it's already a hash (40 hex chars)
-    if (/^[0-9a-f]{40}$/.test(ref)) {
+    // Check if it's already a hash (40 hex chars for SHA-1 or 64 for SHA-256)
+    if (/^[0-9a-f]{40}$/.test(ref) || /^[0-9a-f]{64}$/.test(ref)) {
       return ref;
     }
 

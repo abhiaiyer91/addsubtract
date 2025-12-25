@@ -587,4 +587,53 @@ export class Repository {
     
     return null;
   }
+
+  /**
+   * Resolve a ref with ancestor syntax support (HEAD~N, HEAD^, etc.)
+   */
+  resolveRef(ref: string): string | null {
+    // Handle HEAD~N or ref~N syntax (ancestor reference)
+    const ancestorMatch = ref.match(/^(.+)~(\d+)$/);
+    if (ancestorMatch) {
+      const baseRef = ancestorMatch[1];
+      const count = parseInt(ancestorMatch[2], 10);
+      let hash = this.resolveRef(baseRef);
+      
+      if (!hash) return null;
+      
+      // Walk back N commits
+      for (let i = 0; i < count; i++) {
+        try {
+          const commit = this.objects.readCommit(hash);
+          if (commit.parentHashes.length === 0) return null;
+          hash = commit.parentHashes[0];
+        } catch {
+          return null;
+        }
+      }
+      
+      return hash;
+    }
+
+    // Handle HEAD^ or ref^ syntax (first parent)
+    const caretMatch = ref.match(/^(.+)\^(\d*)$/);
+    if (caretMatch) {
+      const baseRef = caretMatch[1];
+      const parentNum = caretMatch[2] ? parseInt(caretMatch[2], 10) : 1;
+      const hash = this.resolveRef(baseRef);
+      
+      if (!hash) return null;
+      
+      try {
+        const commit = this.objects.readCommit(hash);
+        if (parentNum > commit.parentHashes.length) return null;
+        return commit.parentHashes[parentNum - 1] || null;
+      } catch {
+        return null;
+      }
+    }
+
+    // Fall back to refs.resolve for simple refs
+    return this.refs.resolve(ref);
+  }
 }

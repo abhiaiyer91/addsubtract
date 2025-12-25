@@ -178,3 +178,14 @@ export function readDir(dirPath: string): string[] {
 export function isDirectory(filePath: string): boolean {
   return exists(filePath) && fs.statSync(filePath).isDirectory();
 }
+
+/**
+ * Recursively remove a directory and all its contents
+ */
+export function rmrf(dirPath: string): void {
+  if (!exists(dirPath)) {
+    return;
+  }
+  
+  fs.rmSync(dirPath, { recursive: true, force: true });
+}

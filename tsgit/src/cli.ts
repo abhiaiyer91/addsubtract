@@ -21,6 +21,7 @@ import {
   handleMerge,
   handleCommit,
   handleScope,
+  handleBisect,
 } from './commands';
 import { TsgitError, findSimilar } from './core/errors';
 import { Repository } from './core/repository';
@@ -75,6 +76,15 @@ Undo & History:
   undo                  Undo the last operation
   history               Show operation history
 
+Bisect (Enhanced):
+  bisect start <bad> <good>   Start binary search for bug
+  bisect good [commit]        Mark commit as good
+  bisect bad [commit]         Mark commit as bad
+  bisect skip [commit]        Skip untestable commit
+  bisect run <cmd>            Auto-test with command
+  bisect status               Show progress visualization
+  bisect reset                Stop bisecting
+
 Monorepo Support:
   scope                 Show current repository scope
   scope set <path>...   Limit operations to specific paths
@@ -102,12 +112,21 @@ Examples:
   tsgit merge feature
   tsgit undo
   tsgit scope use frontend
+  
+  # Enhanced bisect (better than git!)
+  tsgit bisect start HEAD v1.0.0           # Start bisect
+  tsgit bisect start HEAD v1.0.0 --focus src/auth  # Focus on specific path
+  tsgit bisect start HEAD v1.0.0 --run "npm test"  # Auto-run tests
+  tsgit bisect good                         # Mark as good
+  tsgit bisect bad                          # Mark as bad
+  tsgit bisect status                       # Show visual progress
 `;
 
 const COMMANDS = [
   'init', 'add', 'commit', 'status', 'log', 'diff',
   'branch', 'switch', 'checkout', 'restore',
   'merge', 'undo', 'history',
+  'bisect',
   'scope', 'graph',
   'ui', 'web',
   'cat-file', 'hash-object', 'ls-files', 'ls-tree',
@@ -290,6 +309,14 @@ function main(): void {
       case 'history':
         handleHistory(cmdArgs.concat(
           options.limit ? ['-n', options.limit as string] : []
+        ));
+        break;
+
+      case 'bisect':
+        handleBisect(cmdArgs.concat(
+          options.focus ? ['--focus', options.focus as string] : [],
+          options.run ? ['--run', options.run as string] : [],
+          options.auto ? ['--auto'] : []
         ));
         break;
 

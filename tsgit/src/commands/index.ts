@@ -14,6 +14,7 @@ export { restore, handleRestore } from './restore';
 export { undo, history, handleUndo, handleHistory } from './undo';
 export { merge, mergeAbort, mergeContinue, showConflicts, handleMerge } from './merge';
 export { handleScope } from './scope';
+export { handleBisect } from './bisect';
 
 // Plumbing commands (low-level)
 export { catFile } from './cat-file';
