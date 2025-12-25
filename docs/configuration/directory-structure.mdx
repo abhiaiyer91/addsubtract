@@ -1,16 +1,16 @@
 ---
 title: Directory Structure
-description: "Understanding the .tsgit directory"
+description: "Understanding the .wit directory"
 ---
 
 # Directory Structure
 
-The `.tsgit` directory contains all repository data and metadata.
+The `.wit` directory contains all repository data and metadata.
 
 ## Overview
 
 ```
-.tsgit/
+.wit/
 ├── HEAD                    # Current branch reference
 ├── config                  # Repository configuration
 ├── index                   # Staging area (JSON)
@@ -63,7 +63,7 @@ Repository configuration in INI format:
 ```ini
 [core]
     repositoryformatversion = 1
-[tsgit]
+[wit]
     hashAlgorithm = sha256
 [user]
     name = Your Name
@@ -90,7 +90,7 @@ The staging area in JSON format:
 
 ### journal.json
 
-Operation history for `tsgit undo`:
+Operation history for `wit undo`:
 
 ```json
 {
@@ -171,7 +171,7 @@ hooks/
 
 ### branch-states/
 
-Auto-stashed changes per branch (tsgit-specific):
+Auto-stashed changes per branch (wit-specific):
 
 ```json
 {
@@ -245,13 +245,13 @@ Manifest:
 
 ## Comparison with Git
 
-| tsgit | Git | Notes |
+| wit | Git | Notes |
 |-------|-----|-------|
-| `index` (JSON) | `index` (binary) | tsgit is human-readable |
-| `journal.json` | (none) | tsgit tracks all operations |
-| `branch-states/` | (none) | tsgit auto-stash |
-| SHA-256 | SHA-1 | tsgit uses secure hashes |
-| Large file chunks | (external LFS) | tsgit is built-in |
+| `index` (JSON) | `index` (binary) | wit is human-readable |
+| `journal.json` | (none) | wit tracks all operations |
+| `branch-states/` | (none) | wit auto-stash |
+| SHA-256 | SHA-1 | wit uses secure hashes |
+| Large file chunks | (external LFS) | wit is built-in |
 
 ## Troubleshooting
 
@@ -259,7 +259,7 @@ Manifest:
   <Accordion title="Corrupt repository">
     Run integrity check:
     ```bash
-    tsgit fsck
+    wit fsck
     ```
     This verifies all objects.
   </Accordion>
@@ -267,18 +267,18 @@ Manifest:
   <Accordion title="Lost commits">
     Check the reflog:
     ```bash
-    tsgit reflog
+    wit reflog
     ```
     Or the journal:
     ```bash
-    cat .tsgit/journal.json
+    cat .wit/journal.json
     ```
   </Accordion>
   
   <Accordion title="Repository too large">
     Run garbage collection:
     ```bash
-    tsgit gc --aggressive
+    wit gc --aggressive
     ```
   </Accordion>
 </AccordionGroup>

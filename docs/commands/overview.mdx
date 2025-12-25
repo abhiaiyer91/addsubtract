@@ -1,11 +1,11 @@
 ---
 title: Commands Overview
-description: "Complete reference of all tsgit commands"
+description: "Complete reference of all wit commands"
 ---
 
 # Commands Overview
 
-tsgit provides a comprehensive set of commands organized by functionality. Many commands are familiar from Git, while others are unique improvements.
+wit provides a comprehensive set of commands organized by functionality. Many commands are familiar from Git, while others are unique improvements.
 
 ## Command Categories
 
@@ -36,35 +36,35 @@ tsgit provides a comprehensive set of commands organized by functionality. Many 
 
 | Command | Description |
 |---------|-------------|
-| `tsgit init` | Create a new repository |
-| `tsgit add <files>` | Stage files for commit |
-| `tsgit commit -m "msg"` | Create a commit |
-| `tsgit status` | Show working tree status |
-| `tsgit log` | Show commit history |
-| `tsgit switch <branch>` | Switch branches |
-| `tsgit undo` | Undo the last operation |
-| `tsgit wip` | Quick WIP commit |
+| `wit init` | Create a new repository |
+| `wit add <files>` | Stage files for commit |
+| `wit commit -m "msg"` | Create a commit |
+| `wit status` | Show working tree status |
+| `wit log` | Show commit history |
+| `wit switch <branch>` | Switch branches |
+| `wit undo` | Undo the last operation |
+| `wit wip` | Quick WIP commit |
 
-### tsgit-Exclusive Commands
+### wit-Exclusive Commands
 
-These commands are unique to tsgit and don't exist in Git:
+These commands are unique to wit and don't exist in Git:
 
 | Command | Description |
 |---------|-------------|
-| `tsgit undo` | Undo any operation (commit, branch, merge, etc.) |
-| `tsgit wip` | Create WIP commit with auto-generated message |
-| `tsgit amend` | Simpler interface for amending commits |
-| `tsgit uncommit` | Undo commits, keep changes staged |
-| `tsgit cleanup` | Find and remove merged/stale branches |
-| `tsgit stats` | Repository statistics and insights |
-| `tsgit snapshot` | Quick checkpoints without full commits |
-| `tsgit scope` | Limit operations to specific paths (monorepo) |
-| `tsgit history` | Show operation history (what undo uses) |
+| `wit undo` | Undo any operation (commit, branch, merge, etc.) |
+| `wit wip` | Create WIP commit with auto-generated message |
+| `wit amend` | Simpler interface for amending commits |
+| `wit uncommit` | Undo commits, keep changes staged |
+| `wit cleanup` | Find and remove merged/stale branches |
+| `wit stats` | Repository statistics and insights |
+| `wit snapshot` | Quick checkpoints without full commits |
+| `wit scope` | Limit operations to specific paths (monorepo) |
+| `wit history` | Show operation history (what undo uses) |
 
 ## Command Syntax
 
 ```bash
-tsgit <command> [options] [arguments]
+wit <command> [options] [arguments]
 ```
 
 ### Common Options
@@ -74,28 +74,28 @@ Most commands support these options:
 | Option | Description |
 |--------|-------------|
 | `--help`, `-h` | Show help for a command |
-| `--version`, `-v` | Show tsgit version |
+| `--version`, `-v` | Show wit version |
 
 ### Getting Help
 
 ```bash
 # General help
-tsgit --help
+wit --help
 
 # Help for specific command
-tsgit commit --help
-tsgit undo --help
+wit commit --help
+wit undo --help
 ```
 
 ## Differences from Git
 
-tsgit aims to be more intuitive than Git:
+wit aims to be more intuitive than Git:
 
-| Git | tsgit | Improvement |
+| Git | wit | Improvement |
 |-----|-------|-------------|
-| `git checkout <branch>` | `tsgit switch <branch>` | Clear intent |
-| `git checkout -- <file>` | `tsgit restore <file>` | Clear intent |
-| `git commit --amend` | `tsgit amend` | Simpler syntax |
-| `git reset HEAD~1` | `tsgit uncommit` | Clear intent |
+| `git checkout <branch>` | `wit switch <branch>` | Clear intent |
+| `git checkout -- <file>` | `wit restore <file>` | Clear intent |
+| `git commit --amend` | `wit amend` | Simpler syntax |
+| `git reset HEAD~1` | `wit uncommit` | Clear intent |
 | `git stash` (manual) | Auto-stash on switch | Automatic |
-| `git reflog` (cryptic) | `tsgit undo` | Simple undo |
+| `git reflog` (cryptic) | `wit undo` | Simple undo |

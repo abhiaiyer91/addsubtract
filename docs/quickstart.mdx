@@ -1,11 +1,11 @@
 ---
 title: Quick Start
-description: "Get up and running with tsgit in 5 minutes"
+description: "Get up and running with wit in 5 minutes"
 ---
 
 # Quick Start
 
-This guide will help you get started with tsgit in just a few minutes.
+This guide will help you get started with wit in just a few minutes.
 
 ## Prerequisites
 
@@ -15,12 +15,12 @@ This guide will help you get started with tsgit in just a few minutes.
 ## Installation
 
 ```bash
-# Clone and build tsgit
-git clone https://github.com/your-username/tsgit.git
-cd tsgit
+# Clone and build wit
+git clone https://github.com/nicholasgriffintn/wit.git
+cd wit
 npm install
 npm run build
-npm link   # Makes 'tsgit' available globally
+npm link   # Makes 'wit' available globally
 ```
 
 ## Your First Repository
@@ -30,12 +30,12 @@ npm link   # Makes 'tsgit' available globally
 ```bash
 mkdir my-project
 cd my-project
-tsgit init
+wit init
 ```
 
 You'll see:
 ```
-Initialized empty tsgit repository in /path/to/my-project/.tsgit
+Initialized empty wit repository in /path/to/my-project/.wit
 ```
 
 ### Add and Commit Files
@@ -45,22 +45,22 @@ Initialized empty tsgit repository in /path/to/my-project/.tsgit
 echo "# My Project" > README.md
 
 # Stage the file
-tsgit add README.md
+wit add README.md
 
 # Commit with a message
-tsgit commit -m "Initial commit"
+wit commit -m "Initial commit"
 ```
 
 ### Check Status
 
 ```bash
-tsgit status
+wit status
 ```
 
 ### View History
 
 ```bash
-tsgit log
+wit log
 ```
 
 ## Essential Commands
@@ -69,38 +69,38 @@ tsgit log
 
 ```bash
 # Stage all tracked files and commit
-tsgit commit -a -m "Update everything"
+wit commit -a -m "Update everything"
 ```
 
 ### Quick WIP Save
 
 ```bash
 # Save work-in-progress with auto-generated message
-tsgit wip -a
+wit wip -a
 ```
 
 ### Switch Branches
 
 ```bash
 # Create and switch to a new branch
-tsgit switch -c feature-branch
+wit switch -c feature-branch
 
 # Switch back to main
-tsgit switch main
+wit switch main
 ```
 
 <Note>
-tsgit automatically saves your uncommitted changes when switching branches, so you never lose work!
+wit automatically saves your uncommitted changes when switching branches, so you never lose work!
 </Note>
 
 ### Undo Mistakes
 
 ```bash
 # Undo the last operation (commit, branch creation, etc.)
-tsgit undo
+wit undo
 
 # Undo the last 3 operations
-tsgit undo --steps 3
+wit undo --steps 3
 ```
 
 ## Visual Interfaces
@@ -108,7 +108,7 @@ tsgit undo --steps 3
 ### Web UI
 
 ```bash
-tsgit web
+wit web
 ```
 
 Opens a modern dashboard at `http://localhost:3847` with:
@@ -120,7 +120,7 @@ Opens a modern dashboard at `http://localhost:3847` with:
 ### Terminal UI
 
 ```bash
-tsgit ui
+wit ui
 ```
 
 Interactive terminal interface with keyboard navigation.
@@ -128,7 +128,7 @@ Interactive terminal interface with keyboard navigation.
 ### ASCII Graph
 
 ```bash
-tsgit graph
+wit graph
 ```
 
 ```
@@ -150,6 +150,6 @@ tsgit graph
     Generate commit messages with AI
   </Card>
   <Card title="Configuration" icon="gear" href="/configuration/overview">
-    Customize tsgit behavior
+    Customize wit behavior
   </Card>
 </CardGroup>

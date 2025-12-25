@@ -1,6 +1,6 @@
 {
   "$schema": "https://mintlify.com/schema.json",
-  "name": "tsgit",
+  "name": "wit",
   "logo": {
     "dark": "/logo/dark.svg",
     "light": "/logo/light.svg"
@@ -18,7 +18,7 @@
   "topbarLinks": [
     {
       "name": "GitHub",
-      "url": "https://github.com/your-username/tsgit"
+      "url": "https://github.com/nicholasgriffintn/wit"
     }
   ],
   "topbarCtaButton": {
@@ -39,12 +39,12 @@
     {
       "name": "GitHub",
       "icon": "github",
-      "url": "https://github.com/your-username/tsgit"
+      "url": "https://github.com/nicholasgriffintn/wit"
     },
     {
       "name": "Community",
       "icon": "discord",
-      "url": "https://discord.gg/tsgit"
+      "url": "https://discord.gg/wit"
     }
   ],
   "navigation": [
@@ -106,6 +106,6 @@
     }
   ],
   "footerSocials": {
-    "github": "https://github.com/your-username/tsgit"
+    "github": "https://github.com/nicholasgriffintn/wit"
   }
 }
