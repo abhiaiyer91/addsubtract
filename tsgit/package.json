@@ -30,6 +30,7 @@
     "typescript": "^5.3.0"
   },
   "dependencies": {
+    "@mastra/core": "^0.24.9",
     "@types/blessed": "^0.1.27",
     "blessed": "^0.1.81"
   },
