@@ -36,6 +36,9 @@ import {
   handleStash,
   handleTag,
   handleReset,
+  handleBisect,
+  handleClean,
+  handleShow,
 } from './commands';
 import { TsgitError, findSimilar } from './core/errors';
 import { Repository } from './core/repository';
@@ -94,6 +97,14 @@ Undo & History:
   uncommit              Undo last commit, keep changes staged
   reset [--soft|--hard] Reset HEAD to a specific state
   stash                 Save working directory changes temporarily
+
+Debugging & Inspection:
+  show <commit>         Show commit details and diff
+  show <commit>:<file>  Show file at specific commit
+  bisect start          Start binary search for bug
+  bisect good/bad       Mark commits during bisect
+  clean -n              Preview untracked files to delete
+  clean -f              Delete untracked files
 
 Tags:
   tag                   List all tags
@@ -166,7 +177,7 @@ const COMMANDS = [
   'ai',
   'cat-file', 'hash-object', 'ls-files', 'ls-tree',
   // New Git-compatible commands
-  'stash', 'tag', 'reset',
+  'stash', 'tag', 'reset', 'bisect', 'clean', 'show',
   'help',
 ];
 
@@ -237,6 +248,9 @@ function main(): void {
   }
 
   const { command, args: cmdArgs, options } = parseArgs(args);
+  
+  // For commands that do their own argument parsing, use raw args after command
+  const rawArgs = args.slice(1);
 
   if (options.help || command === 'help') {
     console.log(HELP);
@@ -475,17 +489,29 @@ function main(): void {
         handleSnapshot(cmdArgs);
         break;
 
-      // New Git-compatible commands
+      // New Git-compatible commands (these parse their own arguments)
       case 'stash':
-        handleStash(cmdArgs);
+        handleStash(rawArgs);
         break;
 
       case 'tag':
-        handleTag(cmdArgs);
+        handleTag(rawArgs);
         break;
 
       case 'reset':
-        handleReset(cmdArgs);
+        handleReset(rawArgs);
+        break;
+
+      case 'bisect':
+        handleBisect(rawArgs);
+        break;
+
+      case 'clean':
+        handleClean(rawArgs);
+        break;
+
+      case 'show':
+        handleShow(rawArgs);
         break;
 
       default: {
