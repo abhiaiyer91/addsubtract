@@ -449,15 +449,15 @@ tsgit gc --prune=now            // Prune immediately
 
 ---
 
-## Testing Backlog
+## Testing ✅ Complete
 
-Tests needed for completed features:
+All commands now have comprehensive tests:
 
-| Command | Test File                     | Priority |
-| ------- | ----------------------------- | -------- |
-| stash   | `src/__tests__/stash.test.ts` | Medium   |
-| tag     | `src/__tests__/tag.test.ts`   | Medium   |
-| reset   | `src/__tests__/reset.test.ts` | Medium   |
+| Command | Test File                     | Status  |
+| ------- | ----------------------------- | ------- |
+| stash   | `src/__tests__/stash.test.ts` | ✅ Done |
+| tag     | `src/__tests__/tag.test.ts`   | ✅ Done |
+| reset   | `src/__tests__/reset.test.ts` | ✅ Done |
 
 ---
 

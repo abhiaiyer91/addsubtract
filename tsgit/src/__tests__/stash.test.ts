@@ -293,7 +293,9 @@ describe('stash command', () => {
   });
 
   describe('stash with new files', () => {
-    it('should stash untracked files', () => {
+    it('should stash untracked files along with modified files', () => {
+      // Need a modified tracked file to trigger stash (untracked alone isn't enough)
+      createTestFile(testDir!, 'README.md', '# Modified\n');
       createTestFile(testDir!, 'brand-new.ts', 'brand new file');
 
       const entry = stashManager.stash();
@@ -303,6 +305,8 @@ describe('stash command', () => {
     });
 
     it('should restore untracked files on apply', () => {
+      // Need a modified tracked file to trigger stash
+      createTestFile(testDir!, 'README.md', '# Modified\n');
       createTestFile(testDir!, 'untracked.ts', 'untracked content');
       stashManager.stash();
 
