@@ -36,6 +36,10 @@ import {
   handleStash,
   handleTag,
   handleReset,
+  // History rewriting commands
+  handleCherryPick,
+  handleRebase,
+  handleRevert,
 } from './commands';
 import { TsgitError, findSimilar } from './core/errors';
 import { Repository } from './core/repository';
@@ -100,6 +104,18 @@ Tags:
   tag <name>            Create a lightweight tag
   tag -a <name> -m ""   Create an annotated tag
   tag -d <name>         Delete a tag
+
+History Rewriting:
+  cherry-pick <commit>  Apply changes from specific commits
+  cherry-pick --continue Continue after conflict resolution
+  cherry-pick --abort   Abort the operation
+  rebase <branch>       Rebase current branch onto another
+  rebase --onto <new>   Rebase onto specific base
+  rebase --continue     Continue after conflict resolution
+  rebase --abort        Abort the rebase
+  revert <commit>       Create commit that undoes changes
+  revert -n <commit>    Revert without committing
+  revert --continue     Continue after conflict resolution
 
 Quality of Life:
   amend                 Quickly fix the last commit
@@ -167,6 +183,8 @@ const COMMANDS = [
   'cat-file', 'hash-object', 'ls-files', 'ls-tree',
   // New Git-compatible commands
   'stash', 'tag', 'reset',
+  // History rewriting commands
+  'cherry-pick', 'rebase', 'revert',
   'help',
 ];
 
@@ -486,6 +504,34 @@ function main(): void {
 
       case 'reset':
         handleReset(cmdArgs);
+        break;
+
+      // History rewriting commands
+      case 'cherry-pick':
+        handleCherryPick(cmdArgs.concat(
+          options.continue ? ['--continue'] : [],
+          options.abort ? ['--abort'] : [],
+          options.skip ? ['--skip'] : [],
+          options['no-commit'] ? ['--no-commit'] : []
+        ));
+        break;
+
+      case 'rebase':
+        handleRebase(cmdArgs.concat(
+          options.continue ? ['--continue'] : [],
+          options.abort ? ['--abort'] : [],
+          options.skip ? ['--skip'] : [],
+          options.onto ? ['--onto', options.onto as string] : []
+        ));
+        break;
+
+      case 'revert':
+        handleRevert(cmdArgs.concat(
+          options.continue ? ['--continue'] : [],
+          options.abort ? ['--abort'] : [],
+          options['no-commit'] ? ['--no-commit'] : [],
+          options.mainline ? ['-m', options.mainline as string] : []
+        ));
         break;
 
       default: {

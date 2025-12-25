@@ -27,6 +27,11 @@ export { collectStats, handleStats } from './stats';
 export { fixup, handleFixup } from './fixup';
 export { handleSnapshot, SnapshotManager } from './snapshot';
 
+// History rewriting commands
+export { handleCherryPick, CherryPickManager } from './cherry-pick';
+export { handleRebase, RebaseManager } from './rebase';
+export { handleRevert, RevertManager } from './revert';
+
 // Plumbing commands (low-level)
 export { catFile } from './cat-file';
 export { hashObjectCommand } from './hash-object';

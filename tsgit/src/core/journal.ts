@@ -280,6 +280,9 @@ export const UNDOABLE_OPERATIONS = [
   'reset',
   'stash',
   'merge',
+  'cherry-pick',
+  'rebase',
+  'revert',
 ];
 
 /**
