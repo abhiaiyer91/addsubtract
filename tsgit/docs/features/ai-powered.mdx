@@ -1,0 +1,208 @@
+---
+title: AI-Powered Features
+description: "AI-generated commit messages and intelligent assistance"
+---
+
+# AI-Powered Features
+
+tsgit includes built-in AI capabilities powered by modern LLM technology.
+
+## Overview
+
+AI features in tsgit help you:
+- Generate meaningful commit messages
+- Get intelligent code review suggestions
+- Understand complex diffs
+- Navigate your repository with natural language
+
+## AI Commands
+
+```bash
+tsgit ai <command>
+```
+
+### Generate Commit Messages
+
+```bash
+# Stage your changes
+tsgit add .
+
+# Generate a commit message
+tsgit ai commit
+```
+
+The AI analyzes your staged changes and suggests a descriptive commit message.
+
+**Example:**
+
+```bash
+$ tsgit add src/auth.ts src/login.tsx
+$ tsgit ai commit
+
+Suggested message:
+  "Add user authentication with login form
+
+   - Implement auth module with JWT token handling
+   - Create login form component with validation
+   - Add password strength indicator"
+
+Use this message? [Y/n]
+```
+
+### Code Review
+
+```bash
+# Review staged changes
+tsgit ai review
+```
+
+Get AI-powered feedback on your changes:
+- Potential bugs
+- Style suggestions
+- Security concerns
+- Performance improvements
+
+### Explain Changes
+
+```bash
+# Understand a diff
+tsgit ai explain HEAD~3..HEAD
+```
+
+Get a plain-English explanation of what changed.
+
+## Configuration
+
+### Set Up API Key
+
+AI features require an API key:
+
+```bash
+# Set your API key
+export MASTRA_API_KEY="your-api-key"
+```
+
+Or add to your shell profile:
+
+```bash
+# ~/.bashrc or ~/.zshrc
+export MASTRA_API_KEY="your-api-key"
+```
+
+### Configuration Options
+
+```ini
+# .tsgit/config
+[ai]
+    enabled = true
+    model = gpt-4
+    autoSuggest = false
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `enabled` | Enable AI features | `true` |
+| `model` | AI model to use | `gpt-4` |
+| `autoSuggest` | Auto-suggest on commit | `false` |
+
+## AI Tools
+
+tsgit's AI system includes specialized tools:
+
+| Tool | Purpose |
+|------|---------|
+| `get-status` | Understand repository state |
+| `get-diff` | Analyze changes |
+| `get-log` | Review history |
+| `get-branches` | Navigate branches |
+| `stage-files` | Smart staging |
+| `create-commit` | Generate commits |
+| `search` | Intelligent search |
+
+## Examples
+
+### Smart Commit Workflow
+
+```bash
+# Make your changes...
+
+# Let AI suggest a commit message
+tsgit ai commit
+
+# Or use the message directly
+tsgit ai commit --apply
+```
+
+### Review Before Push
+
+```bash
+# Review all changes on your branch
+tsgit ai review main..HEAD
+
+# Get specific feedback
+tsgit ai review --focus security
+```
+
+### Understand History
+
+```bash
+# What happened in the last week?
+tsgit ai explain --since="1 week ago"
+
+# Summarize a branch
+tsgit ai summarize feature-branch
+```
+
+## Privacy & Security
+
+<Note>
+AI features send code to external APIs. Consider:
+- Don't use on sensitive/proprietary code
+- Review AI suggestions before applying
+- Use local models for sensitive projects (coming soon)
+</Note>
+
+### What's Sent
+
+- Diff content (staged changes)
+- Commit messages (for context)
+- File paths (not full file contents)
+
+### What's NOT Sent
+
+- Unstaged file contents
+- Repository history (unless explicitly requested)
+- Configuration files
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="AI features not working">
+    Check your API key:
+    ```bash
+    echo $MASTRA_API_KEY
+    ```
+    Make sure it's set and valid.
+  </Accordion>
+  
+  <Accordion title="Rate limiting">
+    If you hit rate limits:
+    - Wait a few minutes
+    - Consider upgrading your API plan
+    - Use local models (coming soon)
+  </Accordion>
+  
+  <Accordion title="Poor suggestions">
+    Help the AI with context:
+    ```bash
+    tsgit ai commit --context "Fixing bug #123"
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Coming Soon
+
+- Local model support (Ollama, LM Studio)
+- Custom prompts
+- Team-specific conventions
+- Commit message templates

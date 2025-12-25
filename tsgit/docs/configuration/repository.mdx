@@ -1,0 +1,285 @@
+---
+title: Repository Configuration
+description: "Configure individual repository settings"
+---
+
+# Repository Configuration
+
+Each repository has its own configuration in `.tsgit/config`.
+
+## Core Settings
+
+### Repository Format
+
+```ini
+[core]
+    repositoryformatversion = 1
+```
+
+The repository format version. tsgit uses version 1 by default.
+
+### File Mode
+
+```ini
+[core]
+    filemode = true
+```
+
+Whether to track file permission changes.
+
+| Value | Description |
+|-------|-------------|
+| `true` | Track executable bit changes |
+| `false` | Ignore permission changes |
+
+**When to disable:**
+- Windows systems (no execute bit)
+- Shared folders with permission issues
+
+### Bare Repository
+
+```ini
+[core]
+    bare = false
+```
+
+Bare repositories have no working directory (used for servers).
+
+## tsgit-Specific Settings
+
+### Hash Algorithm
+
+```ini
+[tsgit]
+    hashAlgorithm = sha256
+```
+
+| Value | Description |
+|-------|-------------|
+| `sha256` | Secure, modern (default) |
+| `sha1` | Git-compatible, deprecated |
+
+<Warning>
+SHA-1 is cryptographically broken. Only use for Git compatibility.
+</Warning>
+
+### Auto-Stash on Switch
+
+```ini
+[tsgit]
+    autoStashOnSwitch = true
+```
+
+When enabled:
+- Uncommitted changes are saved when switching branches
+- Restored automatically when switching back
+
+### Large File Handling
+
+```ini
+[tsgit]
+    largeFileThreshold = 2097152
+    chunkSize = 2097152
+```
+
+| Key | Description |
+|-----|-------------|
+| `largeFileThreshold` | Files larger than this are chunked (bytes) |
+| `chunkSize` | Size of each chunk (bytes) |
+
+**Common values:**
+
+| Size | Bytes |
+|------|-------|
+| 1 MB | 1048576 |
+| 2 MB | 2097152 |
+| 5 MB | 5242880 |
+| 10 MB | 10485760 |
+
+## User Information
+
+```ini
+[user]
+    name = Your Name
+    email = you@example.com
+    signingkey = ABC123
+```
+
+| Key | Description |
+|-----|-------------|
+| `name` | Your display name for commits |
+| `email` | Your email for commits |
+| `signingkey` | GPG key for signing (optional) |
+
+## Remote Configuration
+
+```ini
+[remote "origin"]
+    url = git@github.com:user/repo.git
+    fetch = +refs/heads/*:refs/remotes/origin/*
+    pushurl = git@github.com:user/repo.git
+```
+
+| Key | Description |
+|-----|-------------|
+| `url` | Repository URL for fetch/push |
+| `fetch` | Refspec for fetching |
+| `pushurl` | Alternative URL for pushing (optional) |
+
+### Multiple Remotes
+
+```ini
+[remote "origin"]
+    url = git@github.com:user/repo.git
+    fetch = +refs/heads/*:refs/remotes/origin/*
+
+[remote "upstream"]
+    url = git@github.com:original/repo.git
+    fetch = +refs/heads/*:refs/remotes/upstream/*
+```
+
+## Branch Configuration
+
+```ini
+[branch "main"]
+    remote = origin
+    merge = refs/heads/main
+    rebase = true
+
+[branch "develop"]
+    remote = origin
+    merge = refs/heads/develop
+```
+
+| Key | Description |
+|-----|-------------|
+| `remote` | Default remote for this branch |
+| `merge` | Default branch to merge from |
+| `rebase` | Rebase instead of merge on pull |
+
+## Scope Presets
+
+```ini
+[scope "frontend"]
+    paths = packages/frontend/
+
+[scope "backend"]
+    paths = packages/backend/,packages/api/
+
+[scope "docs"]
+    paths = docs/,*.md,README*
+```
+
+Use with:
+```bash
+tsgit scope use frontend
+```
+
+## AI Configuration
+
+```ini
+[ai]
+    enabled = true
+    model = gpt-4
+    autoSuggest = false
+```
+
+| Key | Description | Default |
+|-----|-------------|---------|
+| `enabled` | Enable AI features | `true` |
+| `model` | AI model to use | `gpt-4` |
+| `autoSuggest` | Auto-suggest on commit | `false` |
+
+## Web UI Configuration
+
+```ini
+[web]
+    port = 3847
+    openBrowser = true
+```
+
+| Key | Description | Default |
+|-----|-------------|---------|
+| `port` | Web UI port | `3847` |
+| `openBrowser` | Open browser on start | `true` |
+
+## Editing Configuration
+
+### Using Commands
+
+```bash
+# View
+tsgit config --list
+tsgit config user.name
+
+# Set
+tsgit config user.name "New Name"
+tsgit config --global user.email "new@email.com"
+
+# Unset
+tsgit config --unset user.name
+
+# Edit directly
+tsgit config --edit
+```
+
+### Manual Editing
+
+Open `.tsgit/config` in your editor:
+
+```bash
+code .tsgit/config
+```
+
+## Example: Complete Configuration
+
+```ini
+[core]
+    repositoryformatversion = 1
+    filemode = true
+    bare = false
+    ignorecase = false
+
+[tsgit]
+    hashAlgorithm = sha256
+    largeFileThreshold = 5242880
+    autoStashOnSwitch = true
+    chunkSize = 2097152
+
+[user]
+    name = Alice Developer
+    email = alice@company.com
+
+[init]
+    defaultBranch = main
+
+[remote "origin"]
+    url = git@github.com:company/project.git
+    fetch = +refs/heads/*:refs/remotes/origin/*
+
+[remote "upstream"]
+    url = git@github.com:opensource/project.git
+    fetch = +refs/heads/*:refs/remotes/upstream/*
+
+[branch "main"]
+    remote = origin
+    merge = refs/heads/main
+
+[branch "develop"]
+    remote = origin
+    merge = refs/heads/develop
+
+[scope "frontend"]
+    paths = packages/frontend/,packages/shared-ui/
+
+[scope "backend"]
+    paths = packages/backend/,packages/api/,packages/shared/
+
+[ai]
+    enabled = true
+    model = gpt-4
+
+[web]
+    port = 3847
+    openBrowser = true
+```

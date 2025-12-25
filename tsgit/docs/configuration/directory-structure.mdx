@@ -1,0 +1,284 @@
+---
+title: Directory Structure
+description: "Understanding the .tsgit directory"
+---
+
+# Directory Structure
+
+The `.tsgit` directory contains all repository data and metadata.
+
+## Overview
+
+```
+.tsgit/
+├── HEAD                    # Current branch reference
+├── config                  # Repository configuration
+├── index                   # Staging area (JSON)
+├── journal.json            # Operation history (for undo)
+├── objects/                # Content-addressable storage
+│   ├── 2f/                 # Object files by hash prefix
+│   │   └── 3a4b5c6d...     # Object data
+│   └── pack/               # Packed objects (optimization)
+├── refs/                   # References
+│   ├── heads/              # Branch references
+│   │   ├── main            # Main branch
+│   │   └── feature         # Feature branch
+│   ├── tags/               # Tag references
+│   │   └── v1.0.0          # Version tag
+│   └── remotes/            # Remote tracking refs
+│       └── origin/
+│           └── main
+├── hooks/                  # Hook scripts
+│   ├── pre-commit          # Pre-commit hook
+│   └── post-commit         # Post-commit hook
+├── branch-states/          # Auto-stashed changes
+│   ├── main.json           # Stashed state for main
+│   └── feature.json        # Stashed state for feature
+├── logs/                   # Reference logs (reflog)
+│   └── HEAD                # HEAD history
+└── info/                   # Additional info
+    └── exclude             # Local excludes
+```
+
+## Key Files
+
+### HEAD
+
+Points to the current branch or commit.
+
+**When on a branch:**
+```
+ref: refs/heads/main
+```
+
+**Detached HEAD:**
+```
+a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6...
+```
+
+### config
+
+Repository configuration in INI format:
+
+```ini
+[core]
+    repositoryformatversion = 1
+[tsgit]
+    hashAlgorithm = sha256
+[user]
+    name = Your Name
+```
+
+### index
+
+The staging area in JSON format:
+
+```json
+{
+  "version": 1,
+  "entries": [
+    {
+      "path": "src/index.ts",
+      "hash": "a1b2c3d4...",
+      "mode": "100644",
+      "size": 1234,
+      "mtime": 1705312345
+    }
+  ]
+}
+```
+
+### journal.json
+
+Operation history for `tsgit undo`:
+
+```json
+{
+  "entries": [
+    {
+      "type": "commit",
+      "timestamp": 1705312345,
+      "data": {
+        "hash": "a1b2c3d4...",
+        "message": "Add feature",
+        "parentHash": "e5f6g7h8..."
+      }
+    }
+  ]
+}
+```
+
+## Directories
+
+### objects/
+
+Content-addressable storage for all data.
+
+**Object types:**
+- **blob** - File contents
+- **tree** - Directory listings
+- **commit** - Commit metadata
+- **large-file** - Large file manifest
+
+**Organization:**
+```
+objects/
+├── 2f/
+│   └── 3a4b5c...   # Object with hash starting with 2f3a4b5c...
+├── a1/
+│   └── b2c3d4...   # Object with hash starting with a1b2c3d4...
+└── pack/
+    └── pack-xxx.pack  # Packed objects
+```
+
+### refs/
+
+References to commits (branches and tags).
+
+**heads/** - Local branches:
+```
+refs/heads/
+├── main            # Contains: a1b2c3d4...
+├── develop         # Contains: e5f6g7h8...
+└── feature-auth    # Contains: i9j0k1l2...
+```
+
+**tags/** - Tags:
+```
+refs/tags/
+├── v1.0.0          # Contains: commit hash or tag object hash
+└── v1.1.0
+```
+
+**remotes/** - Remote tracking branches:
+```
+refs/remotes/origin/
+├── main
+└── develop
+```
+
+### hooks/
+
+Executable scripts triggered by operations.
+
+```
+hooks/
+├── pre-commit      # Runs before commit
+├── post-commit     # Runs after commit
+├── pre-merge       # Runs before merge
+└── post-merge      # Runs after merge
+```
+
+### branch-states/
+
+Auto-stashed changes per branch (tsgit-specific):
+
+```json
+{
+  "branch": "feature",
+  "timestamp": 1705312345,
+  "staged": [
+    {"path": "file.ts", "hash": "abc..."}
+  ],
+  "unstaged": [
+    {"path": "other.ts", "content": "..."}
+  ]
+}
+```
+
+### logs/
+
+Reference logs (reflog) for recovery:
+
+```
+# logs/HEAD
+a1b2c3d4 e5f6g7h8 1705312345 commit: Add feature
+e5f6g7h8 i9j0k1l2 1705312340 switch: from main to feature
+```
+
+## Object Storage Details
+
+### Object Format
+
+Objects are compressed and stored by hash:
+
+```
+[type] [size]\0[content]
+```
+
+**Example blob:**
+```
+blob 12\0Hello World!
+```
+
+**Example tree:**
+```
+tree 45\0100644 README.md\0[20-byte hash]
+100644 src/\0[20-byte hash]
+```
+
+### Large File Storage
+
+Files above threshold are stored as chunks:
+
+```
+objects/
+├── ab/  # Large file manifest
+│   └── c123...
+├── de/  # Chunk 1
+│   └── f456...
+├── gh/  # Chunk 2
+│   └── i789...
+```
+
+Manifest:
+```json
+{
+  "type": "large-file",
+  "size": 10485760,
+  "chunks": [
+    {"hash": "def456...", "size": 2097152},
+    {"hash": "ghi789...", "size": 2097152}
+  ]
+}
+```
+
+## Comparison with Git
+
+| tsgit | Git | Notes |
+|-------|-----|-------|
+| `index` (JSON) | `index` (binary) | tsgit is human-readable |
+| `journal.json` | (none) | tsgit tracks all operations |
+| `branch-states/` | (none) | tsgit auto-stash |
+| SHA-256 | SHA-1 | tsgit uses secure hashes |
+| Large file chunks | (external LFS) | tsgit is built-in |
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Corrupt repository">
+    Run integrity check:
+    ```bash
+    tsgit fsck
+    ```
+    This verifies all objects.
+  </Accordion>
+  
+  <Accordion title="Lost commits">
+    Check the reflog:
+    ```bash
+    tsgit reflog
+    ```
+    Or the journal:
+    ```bash
+    cat .tsgit/journal.json
+    ```
+  </Accordion>
+  
+  <Accordion title="Repository too large">
+    Run garbage collection:
+    ```bash
+    tsgit gc --aggressive
+    ```
+  </Accordion>
+</AccordionGroup>

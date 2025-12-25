@@ -1,0 +1,86 @@
+---
+title: Visual Interfaces Overview
+description: "Built-in visual tools for version control"
+---
+
+# Visual Interfaces
+
+tsgit includes powerful visual interfaces out of the box - no external tools required.
+
+## Available Interfaces
+
+<CardGroup cols={3}>
+  <Card title="Web UI" icon="window" href="/visual/web-ui">
+    Modern web dashboard with full-featured interface
+  </Card>
+  <Card title="Terminal UI" icon="terminal" href="/visual/terminal-ui">
+    Interactive terminal interface for keyboard-driven workflows
+  </Card>
+  <Card title="ASCII Graph" icon="diagram-project" href="/visual/graph">
+    Quick commit visualization in the terminal
+  </Card>
+</CardGroup>
+
+## Quick Start
+
+```bash
+# Launch web UI (opens browser)
+tsgit web
+
+# Launch terminal UI
+tsgit ui
+
+# Show ASCII graph
+tsgit graph
+```
+
+## Comparison
+
+| Feature | Web UI | Terminal UI | Graph |
+|---------|--------|-------------|-------|
+| Visual commit graph | ✓ | - | ✓ |
+| Side-by-side diff | ✓ | ✓ | - |
+| File browser | ✓ | ✓ | - |
+| Search | ✓ | - | - |
+| One-click staging | ✓ | ✓ | - |
+| Keyboard navigation | ✓ | ✓ | - |
+| Works over SSH | - | ✓ | ✓ |
+| Mouse support | ✓ | ✓ | - |
+
+## When to Use Each
+
+<AccordionGroup>
+  <Accordion title="Web UI - Best for visual exploration">
+    Use when you want:
+    - Full visual commit graph
+    - Side-by-side diffs with syntax highlighting
+    - Easy file browsing and searching
+    - Mouse-driven workflow
+    
+    ```bash
+    tsgit web
+    ```
+  </Accordion>
+  
+  <Accordion title="Terminal UI - Best for keyboard workflows">
+    Use when you want:
+    - Stay in the terminal
+    - Fast keyboard-driven interaction
+    - Works over SSH
+    
+    ```bash
+    tsgit ui
+    ```
+  </Accordion>
+  
+  <Accordion title="Graph - Best for quick visualization">
+    Use when you want:
+    - Quick view of commit history
+    - See branch structure at a glance
+    - Minimal overhead
+    
+    ```bash
+    tsgit graph
+    ```
+  </Accordion>
+</AccordionGroup>

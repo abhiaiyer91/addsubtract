@@ -1,0 +1,101 @@
+---
+title: Commands Overview
+description: "Complete reference of all tsgit commands"
+---
+
+# Commands Overview
+
+tsgit provides a comprehensive set of commands organized by functionality. Many commands are familiar from Git, while others are unique improvements.
+
+## Command Categories
+
+<CardGroup cols={2}>
+  <Card title="Basic Workflow" icon="code-commit" href="/commands/basic-workflow">
+    Essential commands for daily use: init, add, commit, status, log, diff
+  </Card>
+  <Card title="Branches" icon="code-branch" href="/commands/branches">
+    Branch management: branch, switch, checkout
+  </Card>
+  <Card title="Undo & History" icon="rotate-left" href="/commands/undo-history">
+    Powerful undo capabilities: undo, history, restore, uncommit
+  </Card>
+  <Card title="Quality of Life" icon="wand-magic-sparkles" href="/commands/quality-of-life">
+    Productivity boosters: wip, amend, fixup, snapshot, cleanup, stats
+  </Card>
+  <Card title="Merge" icon="code-merge" href="/commands/merge">
+    Merging and conflict resolution
+  </Card>
+  <Card title="Advanced" icon="gear" href="/commands/advanced">
+    Hooks, submodules, worktrees, reflog, garbage collection
+  </Card>
+</CardGroup>
+
+## Quick Reference
+
+### Most Used Commands
+
+| Command | Description |
+|---------|-------------|
+| `tsgit init` | Create a new repository |
+| `tsgit add <files>` | Stage files for commit |
+| `tsgit commit -m "msg"` | Create a commit |
+| `tsgit status` | Show working tree status |
+| `tsgit log` | Show commit history |
+| `tsgit switch <branch>` | Switch branches |
+| `tsgit undo` | Undo the last operation |
+| `tsgit wip` | Quick WIP commit |
+
+### tsgit-Exclusive Commands
+
+These commands are unique to tsgit and don't exist in Git:
+
+| Command | Description |
+|---------|-------------|
+| `tsgit undo` | Undo any operation (commit, branch, merge, etc.) |
+| `tsgit wip` | Create WIP commit with auto-generated message |
+| `tsgit amend` | Simpler interface for amending commits |
+| `tsgit uncommit` | Undo commits, keep changes staged |
+| `tsgit cleanup` | Find and remove merged/stale branches |
+| `tsgit stats` | Repository statistics and insights |
+| `tsgit snapshot` | Quick checkpoints without full commits |
+| `tsgit scope` | Limit operations to specific paths (monorepo) |
+| `tsgit history` | Show operation history (what undo uses) |
+
+## Command Syntax
+
+```bash
+tsgit <command> [options] [arguments]
+```
+
+### Common Options
+
+Most commands support these options:
+
+| Option | Description |
+|--------|-------------|
+| `--help`, `-h` | Show help for a command |
+| `--version`, `-v` | Show tsgit version |
+
+### Getting Help
+
+```bash
+# General help
+tsgit --help
+
+# Help for specific command
+tsgit commit --help
+tsgit undo --help
+```
+
+## Differences from Git
+
+tsgit aims to be more intuitive than Git:
+
+| Git | tsgit | Improvement |
+|-----|-------|-------------|
+| `git checkout <branch>` | `tsgit switch <branch>` | Clear intent |
+| `git checkout -- <file>` | `tsgit restore <file>` | Clear intent |
+| `git commit --amend` | `tsgit amend` | Simpler syntax |
+| `git reset HEAD~1` | `tsgit uncommit` | Clear intent |
+| `git stash` (manual) | Auto-stash on switch | Automatic |
+| `git reflog` (cryptic) | `tsgit undo` | Simple undo |

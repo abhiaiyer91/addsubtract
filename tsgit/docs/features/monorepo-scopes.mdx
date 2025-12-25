@@ -1,0 +1,222 @@
+---
+title: Monorepo Scopes
+description: "Limit operations to specific paths in your repository"
+---
+
+# Monorepo Scopes
+
+Scopes let you focus on specific parts of a large repository, making tsgit faster and less noisy.
+
+## Overview
+
+In a monorepo, you often only care about one package or service. Scopes limit all tsgit operations to the paths you specify.
+
+```bash
+# Set scope to frontend package
+tsgit scope set packages/frontend/
+
+# Now all commands are scoped
+tsgit status   # Only shows frontend files
+tsgit add .    # Only stages frontend files
+tsgit log      # Only shows frontend commits
+```
+
+## Commands
+
+### View Current Scope
+
+```bash
+tsgit scope
+```
+
+Output:
+```
+Current scope: packages/frontend/
+```
+
+Or if no scope:
+```
+Current scope: (entire repository)
+```
+
+### Set Scope
+
+```bash
+tsgit scope set <path>
+```
+
+**Examples:**
+
+```bash
+# Scope to a directory
+tsgit scope set packages/frontend/
+
+# Scope to multiple paths (comma-separated)
+tsgit scope set packages/frontend/,packages/shared/
+
+# Scope to a pattern
+tsgit scope set "src/**/*.ts"
+```
+
+### Use Preset
+
+```bash
+tsgit scope use <preset>
+```
+
+Presets are predefined scopes in your config:
+
+```bash
+tsgit scope use frontend
+tsgit scope use backend
+tsgit scope use docs
+```
+
+### Clear Scope
+
+```bash
+tsgit scope clear
+```
+
+Returns to operating on the entire repository.
+
+## Configuration
+
+Define presets in `.tsgit/config`:
+
+```ini
+[scope "frontend"]
+    paths = packages/frontend/
+    
+[scope "backend"]
+    paths = packages/backend/,packages/api/
+    
+[scope "docs"]
+    paths = docs/,*.md
+```
+
+## Effect on Commands
+
+When a scope is set, these commands are affected:
+
+| Command | Effect |
+|---------|--------|
+| `status` | Only shows scoped files |
+| `add .` | Only stages scoped files |
+| `log` | Only shows commits affecting scoped paths |
+| `diff` | Only shows changes in scoped files |
+| `commit` | Commits all staged files (scope affects staging) |
+| `blame` | Works on any file (not affected) |
+
+## Example Monorepo Structure
+
+```
+my-monorepo/
+├── packages/
+│   ├── frontend/
+│   │   ├── src/
+│   │   └── package.json
+│   ├── backend/
+│   │   ├── src/
+│   │   └── package.json
+│   └── shared/
+│       └── src/
+├── docs/
+├── scripts/
+└── package.json
+```
+
+### Working on Frontend
+
+```bash
+# Set scope
+tsgit scope set packages/frontend/
+
+# Work normally - only frontend files
+tsgit status
+tsgit add src/components/Button.tsx
+tsgit commit -m "Update Button component"
+
+# Clear when done
+tsgit scope clear
+```
+
+### Using Presets
+
+```bash
+# Quick scope switching
+tsgit scope use frontend
+# ... work on frontend ...
+
+tsgit scope use backend
+# ... work on backend ...
+
+tsgit scope clear
+# ... work on everything ...
+```
+
+## Use Cases
+
+### Focus During Development
+
+```bash
+# Focus on what you're working on
+tsgit scope set packages/auth/
+
+# Less noise in status
+tsgit status
+# Only shows auth package files
+```
+
+### Scoped Commits
+
+```bash
+# Ensure you only commit frontend changes
+tsgit scope set packages/frontend/
+tsgit add .
+tsgit commit -m "Frontend: Update styles"
+```
+
+### Scoped History
+
+```bash
+# What changed in the API recently?
+tsgit scope set packages/api/
+tsgit log --oneline -n 20
+```
+
+### CI/CD Pipelines
+
+```bash
+# Only run tests if package changed
+tsgit scope set packages/auth/
+if [ "$(tsgit status --porcelain)" ]; then
+    npm run test:auth
+fi
+```
+
+## Tips
+
+<Tip>
+Set scope in your terminal profile for focused work:
+```bash
+alias fe='tsgit scope use frontend'
+alias be='tsgit scope use backend'
+alias all='tsgit scope clear'
+```
+</Tip>
+
+<Tip>
+Use scopes with other commands:
+```bash
+tsgit scope set packages/frontend/
+tsgit stats  # Stats for frontend only
+tsgit cleanup  # Branches affecting frontend
+```
+</Tip>
+
+## Limitations
+
+- Scopes are session-based (not persisted)
+- Some commands ignore scopes (e.g., `branch`, `switch`)
+- Scopes don't affect file system operations

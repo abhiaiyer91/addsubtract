@@ -1,0 +1,244 @@
+---
+title: Basic Workflow
+description: "Essential commands for daily version control"
+---
+
+# Basic Workflow Commands
+
+These are the commands you'll use most often for day-to-day version control.
+
+## init
+
+Create a new tsgit repository.
+
+```bash
+tsgit init [path]
+```
+
+### Arguments
+
+| Argument | Description |
+|----------|-------------|
+| `path` | Optional. Directory to initialize. Defaults to current directory. |
+
+### Examples
+
+```bash
+# Initialize in current directory
+tsgit init
+
+# Initialize in a new directory
+tsgit init my-project
+```
+
+---
+
+## add
+
+Stage files for the next commit.
+
+```bash
+tsgit add <files...>
+```
+
+### Arguments
+
+| Argument | Description |
+|----------|-------------|
+| `files` | Files or directories to stage. Use `.` for all files. |
+
+### Examples
+
+```bash
+# Stage a single file
+tsgit add README.md
+
+# Stage multiple files
+tsgit add src/index.ts src/utils.ts
+
+# Stage all files
+tsgit add .
+
+# Stage all TypeScript files
+tsgit add "*.ts"
+```
+
+---
+
+## commit
+
+Create a new commit with the staged changes.
+
+```bash
+tsgit commit -m <message> [options]
+```
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `-m <message>` | Commit message (required) |
+| `-a`, `--all` | Stage all tracked files before committing |
+
+### Examples
+
+```bash
+# Commit staged changes
+tsgit commit -m "Add user authentication"
+
+# Stage all tracked files and commit
+tsgit commit -a -m "Update configuration"
+```
+
+<Tip>
+Use `tsgit wip` for quick work-in-progress commits with auto-generated messages.
+</Tip>
+
+---
+
+## status
+
+Show the working tree status.
+
+```bash
+tsgit status
+```
+
+### Output Explanation
+
+- **Staged changes**: Files ready to be committed
+- **Unstaged changes**: Modified files not yet staged
+- **Untracked files**: New files not tracked by tsgit
+
+### Example Output
+
+```
+On branch main
+
+Staged changes:
+  modified: src/index.ts
+  new file: src/utils.ts
+
+Unstaged changes:
+  modified: README.md
+
+Untracked files:
+  notes.txt
+```
+
+---
+
+## log
+
+Show commit history.
+
+```bash
+tsgit log [options]
+```
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `--oneline` | Compact one-line format |
+| `-n <number>` | Limit to last N commits |
+
+### Examples
+
+```bash
+# Full log
+tsgit log
+
+# Compact format
+tsgit log --oneline
+
+# Last 5 commits
+tsgit log -n 5
+```
+
+### Example Output
+
+```
+commit a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6
+Author: Alice <alice@example.com>
+Date:   2024-01-15 10:30:00
+
+    Add user authentication
+
+commit q7r8s9t0u1v2w3x4y5z6a7b8c9d0e1f2
+Author: Bob <bob@example.com>
+Date:   2024-01-14 15:45:00
+
+    Initial commit
+```
+
+---
+
+## diff
+
+Show changes between commits, or between the working tree and a commit.
+
+```bash
+tsgit diff [options] [path]
+```
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `--staged` | Show staged changes |
+| `--cached` | Alias for `--staged` |
+
+### Examples
+
+```bash
+# Show unstaged changes
+tsgit diff
+
+# Show staged changes
+tsgit diff --staged
+
+# Show changes in specific file
+tsgit diff src/index.ts
+```
+
+### Example Output
+
+```diff
+diff --git a/src/index.ts b/src/index.ts
+--- a/src/index.ts
++++ b/src/index.ts
+@@ -10,6 +10,7 @@ export function main() {
+   console.log("Starting application");
++  initializeDatabase();
+   startServer();
+ }
+```
+
+---
+
+## Workflow Example
+
+Here's a typical workflow using these commands:
+
+```bash
+# 1. Check current status
+tsgit status
+
+# 2. Make some changes to files...
+
+# 3. Review your changes
+tsgit diff
+
+# 4. Stage specific files
+tsgit add src/feature.ts
+
+# 5. Review what's staged
+tsgit diff --staged
+
+# 6. Commit
+tsgit commit -m "Add new feature"
+
+# 7. View history
+tsgit log --oneline
+```

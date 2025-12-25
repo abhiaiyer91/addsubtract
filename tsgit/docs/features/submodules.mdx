@@ -1,0 +1,280 @@
+---
+title: Submodules
+description: "Manage nested repositories within your project"
+---
+
+# Submodules
+
+Submodules let you include other repositories inside your project while keeping them separate.
+
+## Overview
+
+Use submodules when you need to:
+- Include a library as a subdirectory
+- Share code between projects
+- Pin external dependencies to specific versions
+- Keep separate repositories for components
+
+## Commands
+
+### Add Submodule
+
+```bash
+tsgit submodule add <url> <path>
+```
+
+**Example:**
+
+```bash
+tsgit submodule add https://github.com/lib/utils.git vendor/utils
+```
+
+This:
+1. Clones the repository to `vendor/utils`
+2. Records the submodule in `.tsgitmodules`
+3. Stages the changes
+
+### Initialize Submodules
+
+After cloning a repo with submodules:
+
+```bash
+tsgit submodule init
+```
+
+This registers submodules from `.tsgitmodules`.
+
+### Update Submodules
+
+```bash
+tsgit submodule update
+```
+
+Fetch and checkout the recorded commits for all submodules.
+
+**Combined initialize and update:**
+
+```bash
+tsgit submodule init
+tsgit submodule update
+
+# Or in one command
+tsgit submodule update --init
+```
+
+### Status
+
+```bash
+tsgit submodule status
+```
+
+Output:
+```
+ a1b2c3d vendor/utils (v1.2.3)
+ e5f6g7h vendor/logger (heads/main)
++i9j0k1l vendor/config (modified)
+```
+
+| Prefix | Meaning |
+|--------|---------|
+| (none) | Checked out at recorded commit |
+| `+` | Different commit than recorded |
+| `-` | Not initialized |
+| `U` | Has merge conflicts |
+
+### Run Command in Submodules
+
+```bash
+tsgit submodule foreach <command>
+```
+
+**Examples:**
+
+```bash
+# Install dependencies in all submodules
+tsgit submodule foreach "npm install"
+
+# Pull latest in all submodules
+tsgit submodule foreach "tsgit pull"
+
+# Check status
+tsgit submodule foreach "tsgit status"
+```
+
+## Configuration File
+
+Submodules are recorded in `.tsgitmodules`:
+
+```ini
+[submodule "vendor/utils"]
+    path = vendor/utils
+    url = https://github.com/lib/utils.git
+    branch = main
+
+[submodule "vendor/logger"]
+    path = vendor/logger
+    url = https://github.com/lib/logger.git
+```
+
+## Workflow
+
+### Adding a Submodule
+
+```bash
+# Add the submodule
+tsgit submodule add https://github.com/org/lib.git libs/mylib
+
+# Commit the addition
+tsgit commit -m "Add mylib submodule"
+```
+
+### Cloning a Repo with Submodules
+
+```bash
+# Clone the main repo
+tsgit clone https://github.com/org/project.git
+
+# Initialize and update submodules
+cd project
+tsgit submodule init
+tsgit submodule update
+```
+
+### Updating a Submodule
+
+```bash
+# Enter the submodule
+cd vendor/utils
+
+# Pull latest changes
+tsgit pull
+
+# Go back to main repo
+cd ../..
+
+# Commit the update
+tsgit add vendor/utils
+tsgit commit -m "Update utils submodule"
+```
+
+### Removing a Submodule
+
+```bash
+# Remove from index and config
+tsgit submodule deinit vendor/utils
+tsgit rm vendor/utils
+
+# Commit the removal
+tsgit commit -m "Remove utils submodule"
+```
+
+## Directory Structure
+
+```
+my-project/
+├── .tsgit/
+├── .tsgitmodules          # Submodule configuration
+├── src/
+├── vendor/
+│   ├── utils/             # Submodule (its own .tsgit)
+│   │   ├── .tsgit/
+│   │   └── src/
+│   └── logger/            # Another submodule
+│       ├── .tsgit/
+│       └── src/
+└── package.json
+```
+
+## Use Cases
+
+### Shared Libraries
+
+```bash
+# Add your shared library
+tsgit submodule add git@github.com:company/shared-ui.git packages/shared-ui
+
+# Use in your code
+import { Button } from './packages/shared-ui';
+```
+
+### Pinned Dependencies
+
+```bash
+# Add at specific version
+tsgit submodule add https://github.com/lib/framework.git vendor/framework
+cd vendor/framework
+tsgit checkout v2.1.0
+cd ../..
+tsgit commit -m "Pin framework to v2.1.0"
+```
+
+### Multi-repo Project
+
+```
+project/
+├── frontend/     # submodule: git@company:frontend.git
+├── backend/      # submodule: git@company:backend.git
+├── shared/       # submodule: git@company:shared.git
+└── deploy/       # main repo scripts
+```
+
+## Best Practices
+
+<Tip>
+**Always commit submodule updates**
+
+When you update a submodule, commit the change to the parent:
+```bash
+tsgit add vendor/lib
+tsgit commit -m "Update lib to v2.0"
+```
+</Tip>
+
+<Tip>
+**Use branches for tracking**
+
+In `.tsgitmodules`, specify a branch:
+```ini
+[submodule "vendor/lib"]
+    branch = main
+```
+</Tip>
+
+<Warning>
+**Be careful with submodule changes**
+
+Changes inside a submodule must be committed there first, then recorded in the parent.
+</Warning>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Submodule is empty">
+    Run init and update:
+    ```bash
+    tsgit submodule init
+    tsgit submodule update
+    ```
+  </Accordion>
+  
+  <Accordion title="Submodule has modifications">
+    Either commit them in the submodule:
+    ```bash
+    cd vendor/lib
+    tsgit commit -am "Fix bug"
+    ```
+    Or discard:
+    ```bash
+    cd vendor/lib
+    tsgit restore .
+    ```
+  </Accordion>
+  
+  <Accordion title="Can't push submodule changes">
+    Ensure you have push access to the submodule's repository, then push from within the submodule:
+    ```bash
+    cd vendor/lib
+    tsgit push
+    ```
+  </Accordion>
+</AccordionGroup>

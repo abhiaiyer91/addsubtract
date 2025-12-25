@@ -1,0 +1,226 @@
+---
+title: Undo & History
+description: "Powerful undo capabilities for any operation"
+---
+
+# Undo & History Commands
+
+tsgit provides the most powerful undo capabilities of any version control system. Made a mistake? Just undo it.
+
+## undo
+
+Undo the last operation(s). This is tsgit's superpower.
+
+```bash
+tsgit undo [options]
+```
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `--steps <n>` | Number of operations to undo (default: 1) |
+| `--dry-run` | Show what would be undone without doing it |
+
+### What Can Be Undone?
+
+- Commits
+- Branch creation/deletion
+- Merges
+- File staging
+- And more...
+
+### Examples
+
+```bash
+# Undo the last operation
+tsgit undo
+
+# Undo the last 3 operations
+tsgit undo --steps 3
+
+# Preview what would be undone
+tsgit undo --dry-run
+```
+
+### Example Scenarios
+
+**Undo an accidental commit:**
+```bash
+tsgit commit -m "Wrong message"
+tsgit undo  # Commit is undone, changes are back
+```
+
+**Undo branch creation:**
+```bash
+tsgit branch wrong-name
+tsgit undo  # Branch is deleted
+```
+
+**Undo a merge:**
+```bash
+tsgit merge feature
+# Realized you merged the wrong branch
+tsgit undo  # Merge is reverted
+```
+
+---
+
+## history
+
+Show the operation history (what undo uses).
+
+```bash
+tsgit history [options]
+```
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `-n <number>` | Limit to last N operations |
+
+### Examples
+
+```bash
+# Show operation history
+tsgit history
+
+# Show last 5 operations
+tsgit history -n 5
+```
+
+### Example Output
+
+```
+1. commit "Add user authentication" (2 minutes ago)
+2. add src/auth.ts (5 minutes ago)
+3. switch to feature-auth (10 minutes ago)
+4. branch create feature-auth (10 minutes ago)
+5. commit "Initial commit" (1 hour ago)
+```
+
+---
+
+## restore
+
+Restore files from the index or a commit.
+
+```bash
+tsgit restore <file> [options]
+```
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `--staged` | Unstage a file (keep working tree changes) |
+| `--source <commit>` | Restore from a specific commit |
+
+### Examples
+
+```bash
+# Discard changes to a file (restore from index)
+tsgit restore src/index.ts
+
+# Unstage a file
+tsgit restore --staged src/index.ts
+
+# Restore file from a specific commit
+tsgit restore --source HEAD~2 src/index.ts
+```
+
+### Difference from Git
+
+| Git Command | tsgit Command |
+|-------------|---------------|
+| `git checkout -- file` | `tsgit restore file` |
+| `git reset HEAD file` | `tsgit restore --staged file` |
+
+---
+
+## uncommit
+
+Undo commits while keeping changes staged.
+
+```bash
+tsgit uncommit [count]
+```
+
+### Arguments
+
+| Argument | Description |
+|----------|-------------|
+| `count` | Number of commits to undo (default: 1) |
+
+### Examples
+
+```bash
+# Undo last commit, keep changes staged
+tsgit uncommit
+
+# Undo last 3 commits
+tsgit uncommit 3
+```
+
+### Use Cases
+
+**Fix a commit message:**
+```bash
+tsgit uncommit
+tsgit commit -m "Better message"
+```
+
+**Add a forgotten file:**
+```bash
+tsgit uncommit
+tsgit add forgotten-file.ts
+tsgit commit -m "Same message, now with forgotten file"
+```
+
+<Tip>
+For simpler cases, use `tsgit amend` instead:
+```bash
+tsgit amend -m "New message"
+tsgit add forgotten-file.ts && tsgit amend
+```
+</Tip>
+
+---
+
+## Comparison: undo vs uncommit vs restore
+
+| Command | Purpose | Scope |
+|---------|---------|-------|
+| `undo` | Reverse any operation | Operations (commits, branches, etc.) |
+| `uncommit` | Remove commits, keep changes | Commits only |
+| `restore` | Discard/unstage file changes | Files only |
+
+### Decision Guide
+
+- **"I want to undo the last thing I did"** → `tsgit undo`
+- **"I want to redo my last commit differently"** → `tsgit uncommit`
+- **"I want to discard changes to a file"** → `tsgit restore <file>`
+- **"I want to unstage a file"** → `tsgit restore --staged <file>`
+
+---
+
+## Workflow Example
+
+```bash
+# You made a commit with a typo
+tsgit commit -m "Add usr authentication"
+
+# Option 1: Use undo
+tsgit undo
+tsgit commit -m "Add user authentication"
+
+# Option 2: Use amend (simpler for this case)
+tsgit amend -m "Add user authentication"
+
+# Later, you realize you modified the wrong file
+tsgit restore wrong-file.ts  # Discard changes
+
+# You staged a file by mistake
+tsgit restore --staged accidental-file.ts
+```

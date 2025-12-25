@@ -1,0 +1,111 @@
+{
+  "$schema": "https://mintlify.com/schema.json",
+  "name": "tsgit",
+  "logo": {
+    "dark": "/logo/dark.svg",
+    "light": "/logo/light.svg"
+  },
+  "favicon": "/favicon.svg",
+  "colors": {
+    "primary": "#6366F1",
+    "light": "#818CF8",
+    "dark": "#4F46E5",
+    "anchors": {
+      "from": "#6366F1",
+      "to": "#8B5CF6"
+    }
+  },
+  "topbarLinks": [
+    {
+      "name": "GitHub",
+      "url": "https://github.com/your-username/tsgit"
+    }
+  ],
+  "topbarCtaButton": {
+    "name": "Get Started",
+    "url": "/quickstart"
+  },
+  "tabs": [
+    {
+      "name": "Documentation",
+      "url": "/"
+    },
+    {
+      "name": "API Reference",
+      "url": "/api-reference"
+    }
+  ],
+  "anchors": [
+    {
+      "name": "GitHub",
+      "icon": "github",
+      "url": "https://github.com/your-username/tsgit"
+    },
+    {
+      "name": "Community",
+      "icon": "discord",
+      "url": "https://discord.gg/tsgit"
+    }
+  ],
+  "navigation": [
+    {
+      "group": "Getting Started",
+      "pages": [
+        "introduction",
+        "quickstart",
+        "installation"
+      ]
+    },
+    {
+      "group": "Commands",
+      "pages": [
+        "commands/overview",
+        "commands/basic-workflow",
+        "commands/branches",
+        "commands/undo-history",
+        "commands/quality-of-life",
+        "commands/merge",
+        "commands/advanced"
+      ]
+    },
+    {
+      "group": "Visual Interfaces",
+      "pages": [
+        "visual/overview",
+        "visual/web-ui",
+        "visual/terminal-ui",
+        "visual/graph"
+      ]
+    },
+    {
+      "group": "Features",
+      "pages": [
+        "features/ai-powered",
+        "features/monorepo-scopes",
+        "features/large-files",
+        "features/hooks",
+        "features/submodules",
+        "features/worktrees"
+      ]
+    },
+    {
+      "group": "Configuration",
+      "pages": [
+        "configuration/overview",
+        "configuration/repository",
+        "configuration/directory-structure"
+      ]
+    },
+    {
+      "group": "API Reference",
+      "pages": [
+        "api-reference/overview",
+        "api-reference/repository",
+        "api-reference/search"
+      ]
+    }
+  ],
+  "footerSocials": {
+    "github": "https://github.com/your-username/tsgit"
+  }
+}

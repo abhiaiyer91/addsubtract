@@ -1,0 +1,253 @@
+---
+title: Worktrees
+description: "Work on multiple branches simultaneously"
+---
+
+# Worktrees
+
+Worktrees let you have multiple working directories for the same repository, each on a different branch.
+
+## Overview
+
+Instead of:
+- Stashing changes
+- Switching branches
+- Switching back
+- Restoring stash
+
+You can:
+- Create a worktree on another branch
+- Work on both simultaneously
+- No context switching overhead
+
+## Commands
+
+### Add Worktree
+
+```bash
+tsgit worktree add <path> <branch>
+```
+
+**Examples:**
+
+```bash
+# Create worktree for existing branch
+tsgit worktree add ../feature-worktree feature-branch
+
+# Create worktree with new branch
+tsgit worktree add ../hotfix-worktree -b hotfix-123
+```
+
+### List Worktrees
+
+```bash
+tsgit worktree list
+```
+
+Output:
+```
+/home/user/project         a1b2c3d [main]
+/home/user/feature-wt      e5f6g7h [feature-branch]
+/home/user/hotfix-wt       i9j0k1l [hotfix-123]
+```
+
+### Remove Worktree
+
+```bash
+tsgit worktree remove <path>
+```
+
+**Example:**
+
+```bash
+tsgit worktree remove ../feature-worktree
+```
+
+### Prune Stale Entries
+
+```bash
+tsgit worktree prune
+```
+
+Removes worktree entries where the directory no longer exists.
+
+## Workflow Example
+
+### Scenario: Working on Feature, Need to Hotfix
+
+You're deep in feature development when a critical bug is reported.
+
+**Without worktrees:**
+```bash
+tsgit stash
+tsgit switch main
+# fix bug...
+tsgit commit -m "Hotfix"
+tsgit switch feature
+tsgit stash pop
+```
+
+**With worktrees:**
+```bash
+# Create a worktree for the hotfix
+tsgit worktree add ../hotfix main
+
+# Work on hotfix in separate directory
+cd ../hotfix
+# fix bug...
+tsgit commit -m "Hotfix"
+tsgit push
+
+# Back to feature (no context switch!)
+cd ../project
+# Continue exactly where you left off
+
+# Clean up
+tsgit worktree remove ../hotfix
+```
+
+## Directory Structure
+
+```
+~/code/
+├── my-project/              # Main worktree (main branch)
+│   ├── .tsgit/              # The actual repository
+│   ├── src/
+│   └── package.json
+├── my-project-feature/      # Linked worktree (feature branch)
+│   ├── .tsgit -> link       # Links to main .tsgit
+│   ├── src/
+│   └── package.json
+└── my-project-hotfix/       # Linked worktree (hotfix branch)
+    ├── .tsgit -> link
+    ├── src/
+    └── package.json
+```
+
+## Use Cases
+
+### Parallel Development
+
+```bash
+# Work on two features simultaneously
+tsgit worktree add ../feature-a feature-a
+tsgit worktree add ../feature-b feature-b
+
+# Now you have three directories:
+# - Main repo (can stay on main)
+# - feature-a worktree
+# - feature-b worktree
+```
+
+### Testing Branches
+
+```bash
+# Create worktree to test a PR
+tsgit worktree add ../pr-123 origin/pr-123
+
+# Test in that directory
+cd ../pr-123
+npm install
+npm test
+
+# Clean up
+cd ../project
+tsgit worktree remove ../pr-123
+```
+
+### Long-running Operations
+
+```bash
+# Run a long build in a worktree
+tsgit worktree add ../build-wt main
+cd ../build-wt
+npm run build:production &
+
+# Continue working in main worktree
+cd ../project
+# Edit files, make commits, etc.
+```
+
+### Code Review
+
+```bash
+# Review someone's branch
+tsgit worktree add ../review origin/teammate-feature
+
+# Open in IDE, review, then clean up
+tsgit worktree remove ../review
+```
+
+## Best Practices
+
+<Tip>
+**Use consistent naming**
+
+Name worktrees clearly:
+```bash
+tsgit worktree add ../project-feature feature-x
+tsgit worktree add ../project-hotfix hotfix-123
+```
+</Tip>
+
+<Tip>
+**Clean up when done**
+
+Don't leave worktrees lying around:
+```bash
+tsgit worktree list
+tsgit worktree remove ../old-worktree
+```
+</Tip>
+
+<Tip>
+**Share node_modules (optional)**
+
+For JavaScript projects, symlink node_modules:
+```bash
+cd ../new-worktree
+ln -s ../main-project/node_modules node_modules
+```
+</Tip>
+
+## Limitations
+
+- Each branch can only be checked out in one worktree
+- The main worktree cannot be removed
+- All worktrees share the same `.tsgit` directory
+
+## Worktrees vs Other Approaches
+
+| Approach | Pros | Cons |
+|----------|------|------|
+| **Worktrees** | No context switch, parallel work | Disk space |
+| **Stashing** | No extra directories | Manual, error-prone |
+| **Clone** | Complete isolation | Separate repo, sync issues |
+| **Auto-stash** | Automatic | Still switches context |
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Branch already checked out">
+    A branch can only be in one worktree:
+    ```
+    fatal: 'feature' is already checked out at '/path/to/worktree'
+    ```
+    Remove the existing worktree or use a different branch.
+  </Accordion>
+  
+  <Accordion title="Worktree directory exists">
+    Remove or choose a different path:
+    ```bash
+    rm -rf ../old-worktree
+    tsgit worktree add ../old-worktree branch
+    ```
+  </Accordion>
+  
+  <Accordion title="Stale worktree entries">
+    If you deleted a worktree directory manually:
+    ```bash
+    tsgit worktree prune
+    ```
+  </Accordion>
+</AccordionGroup>

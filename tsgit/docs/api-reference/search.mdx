@@ -1,0 +1,431 @@
+---
+title: SearchEngine
+description: "SearchEngine class API reference"
+---
+
+# SearchEngine
+
+The `SearchEngine` class provides powerful search capabilities across your repository.
+
+## Import
+
+```typescript
+import { Repository, SearchEngine } from 'tsgit';
+```
+
+## Constructor
+
+```typescript
+const repo = Repository.open('.');
+const search = new SearchEngine(repo);
+```
+
+## Methods
+
+### search()
+
+General-purpose search.
+
+```typescript
+async search(query: string, options?: SearchOptions): Promise<SearchResults>
+```
+
+**Parameters:**
+
+| Name | Type | Description |
+|------|------|-------------|
+| `query` | `string` | Search query |
+| `options` | `SearchOptions` | Search options |
+
+**Options:**
+
+```typescript
+interface SearchOptions {
+  type?: 'all' | 'commits' | 'files' | 'content';
+  limit?: number;
+  caseSensitive?: boolean;
+  regex?: boolean;
+  path?: string;  // Limit to path
+}
+```
+
+**Returns:**
+
+```typescript
+interface SearchResults {
+  commits: CommitMatch[];
+  files: FileMatch[];
+  content: ContentMatch[];
+  totalCount: number;
+}
+```
+
+**Example:**
+
+```typescript
+const search = new SearchEngine(repo);
+
+// Search everything
+const results = await search.search('authentication');
+
+// Search commits only
+const commits = await search.search('fix bug', { type: 'commits' });
+
+// Search with regex
+const todos = await search.search('TODO:', { regex: true });
+```
+
+---
+
+### searchCommits()
+
+Search commit messages.
+
+```typescript
+async searchCommits(query: string, options?: CommitSearchOptions): Promise<CommitMatch[]>
+```
+
+**Options:**
+
+```typescript
+interface CommitSearchOptions {
+  limit?: number;
+  since?: Date;
+  until?: Date;
+  author?: string;
+  caseSensitive?: boolean;
+}
+```
+
+**Returns:**
+
+```typescript
+interface CommitMatch {
+  commit: Commit;
+  matches: TextMatch[];
+}
+
+interface TextMatch {
+  text: string;      // Matched text
+  start: number;     // Start position
+  end: number;       // End position
+  context: string;   // Surrounding text
+}
+```
+
+**Example:**
+
+```typescript
+// Find commits about authentication
+const commits = await search.searchCommits('auth');
+
+// Find commits by specific author
+const aliceCommits = await search.searchCommits('', { 
+  author: 'alice' 
+});
+
+// Recent commits mentioning 'bug'
+const bugs = await search.searchCommits('bug', {
+  since: new Date('2024-01-01'),
+  limit: 20
+});
+```
+
+---
+
+### searchFiles()
+
+Search for files by name.
+
+```typescript
+async searchFiles(pattern: string, options?: FileSearchOptions): Promise<FileMatch[]>
+```
+
+**Options:**
+
+```typescript
+interface FileSearchOptions {
+  limit?: number;
+  glob?: boolean;    // Treat pattern as glob
+  extension?: string; // Filter by extension
+}
+```
+
+**Returns:**
+
+```typescript
+interface FileMatch {
+  path: string;
+  name: string;
+  extension: string;
+  size: number;
+  lastModified: Date;
+}
+```
+
+**Example:**
+
+```typescript
+// Find files named 'index'
+const indexFiles = await search.searchFiles('index');
+
+// Find all TypeScript files
+const tsFiles = await search.searchFiles('*.ts', { glob: true });
+
+// Find test files
+const tests = await search.searchFiles('test', { 
+  extension: '.ts' 
+});
+```
+
+---
+
+### searchContent()
+
+Search file contents.
+
+```typescript
+async searchContent(query: string, options?: ContentSearchOptions): Promise<ContentMatch[]>
+```
+
+**Options:**
+
+```typescript
+interface ContentSearchOptions {
+  limit?: number;
+  caseSensitive?: boolean;
+  regex?: boolean;
+  path?: string;       // Limit to path
+  extension?: string;  // Limit to extension
+  contextLines?: number; // Lines of context
+}
+```
+
+**Returns:**
+
+```typescript
+interface ContentMatch {
+  path: string;
+  matches: LineMatch[];
+}
+
+interface LineMatch {
+  line: number;
+  content: string;
+  matchStart: number;
+  matchEnd: number;
+  context: {
+    before: string[];
+    after: string[];
+  };
+}
+```
+
+**Example:**
+
+```typescript
+// Find TODO comments
+const todos = await search.searchContent('TODO', {
+  contextLines: 2
+});
+
+// Find function definitions
+const functions = await search.searchContent(
+  'function\\s+\\w+',
+  { regex: true, extension: '.ts' }
+);
+
+// Find in specific directory
+const apiCalls = await search.searchContent('fetch', {
+  path: 'src/api/'
+});
+```
+
+---
+
+### searchBlame()
+
+Find who last modified specific lines.
+
+```typescript
+async searchBlame(path: string, query: string): Promise<BlameMatch[]>
+```
+
+**Returns:**
+
+```typescript
+interface BlameMatch {
+  line: number;
+  content: string;
+  commit: Commit;
+  author: string;
+}
+```
+
+**Example:**
+
+```typescript
+// Find who wrote TODO comments
+const todos = await search.searchBlame('src/index.ts', 'TODO');
+
+for (const match of todos) {
+  console.log(`Line ${match.line}: ${match.content}`);
+  console.log(`  by ${match.author} in ${match.commit.hash}`);
+}
+```
+
+---
+
+## Advanced Examples
+
+### Search and Replace Across Repository
+
+```typescript
+async function findAndReplace(
+  search: SearchEngine,
+  repo: Repository,
+  find: string,
+  replace: string
+) {
+  const matches = await search.searchContent(find);
+  
+  const affectedFiles = new Set<string>();
+  
+  for (const file of matches) {
+    console.log(`Found ${file.matches.length} matches in ${file.path}`);
+    affectedFiles.add(file.path);
+  }
+  
+  return Array.from(affectedFiles);
+}
+```
+
+### Find Dead Code
+
+```typescript
+async function findUnusedExports(search: SearchEngine) {
+  // Find all exports
+  const exports = await search.searchContent(
+    'export (const|function|class) (\\w+)',
+    { regex: true }
+  );
+  
+  const unusedExports = [];
+  
+  for (const file of exports) {
+    for (const match of file.matches) {
+      const exportName = match.content.match(/export \w+ (\w+)/)?.[1];
+      if (!exportName) continue;
+      
+      // Search for usage
+      const usage = await search.searchContent(exportName);
+      
+      // If only found in the export file, might be unused
+      if (usage.length === 1 && usage[0].path === file.path) {
+        unusedExports.push({ file: file.path, export: exportName });
+      }
+    }
+  }
+  
+  return unusedExports;
+}
+```
+
+### Commit History Analysis
+
+```typescript
+async function analyzeCommitPatterns(search: SearchEngine) {
+  const bugFixes = await search.searchCommits('fix', { limit: 1000 });
+  const features = await search.searchCommits('add|feat', { 
+    regex: true, 
+    limit: 1000 
+  });
+  
+  console.log(`Bug fixes: ${bugFixes.length}`);
+  console.log(`Features: ${features.length}`);
+  
+  // Analyze by author
+  const authorStats: Record<string, number> = {};
+  for (const match of bugFixes) {
+    const author = match.commit.author;
+    authorStats[author] = (authorStats[author] || 0) + 1;
+  }
+  
+  console.log('Bug fixes by author:', authorStats);
+}
+```
+
+### Find Sensitive Information
+
+```typescript
+async function findSecrets(search: SearchEngine) {
+  const patterns = [
+    { name: 'API Key', pattern: 'api[_-]?key[\\s]*[=:][\\s]*["\']?[\\w-]+' },
+    { name: 'Password', pattern: 'password[\\s]*[=:][\\s]*["\'][^"\']+' },
+    { name: 'Token', pattern: 'token[\\s]*[=:][\\s]*["\']?[\\w-]+' },
+  ];
+  
+  const findings = [];
+  
+  for (const { name, pattern } of patterns) {
+    const matches = await search.searchContent(pattern, {
+      regex: true,
+      caseSensitive: false
+    });
+    
+    for (const file of matches) {
+      findings.push({
+        type: name,
+        file: file.path,
+        count: file.matches.length
+      });
+    }
+  }
+  
+  return findings;
+}
+```
+
+## Performance Tips
+
+<Tip>
+**Use specific search types**
+
+If you only need commits, use `searchCommits()` instead of `search()` with `type: 'commits'`. Direct methods are faster.
+</Tip>
+
+<Tip>
+**Limit results**
+
+Always set a reasonable `limit` for large repositories:
+```typescript
+const results = await search.search('query', { limit: 100 });
+```
+</Tip>
+
+<Tip>
+**Use path filters**
+
+Narrow searches to specific directories:
+```typescript
+const results = await search.searchContent('TODO', {
+  path: 'src/components/'
+});
+```
+</Tip>
+
+<Tip>
+**Cache the SearchEngine**
+
+Create one instance and reuse it:
+```typescript
+// Good
+const search = new SearchEngine(repo);
+await search.search('one');
+await search.search('two');
+
+// Avoid
+await new SearchEngine(repo).search('one');
+await new SearchEngine(repo).search('two');
+```
+</Tip>

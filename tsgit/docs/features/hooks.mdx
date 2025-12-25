@@ -1,0 +1,313 @@
+---
+title: Hooks
+description: "Customize behavior at key points in the workflow"
+---
+
+# Hooks
+
+Hooks let you run custom scripts at key points in the version control workflow.
+
+## Overview
+
+tsgit supports hooks similar to Git, allowing you to:
+- Validate commits before they're created
+- Run tests automatically
+- Format code on commit
+- Send notifications after actions
+- Enforce team policies
+
+## Available Hooks
+
+| Hook | Triggered |
+|------|-----------|
+| `pre-commit` | Before commit is created |
+| `post-commit` | After commit is created |
+| `pre-merge` | Before merge starts |
+| `post-merge` | After merge completes |
+| `pre-push` | Before push (future) |
+| `post-checkout` | After branch switch |
+
+## Commands
+
+### List Hooks
+
+```bash
+tsgit hooks
+```
+
+Output:
+```
+Installed hooks:
+  ✓ pre-commit
+  ✓ post-commit
+  
+Available templates:
+  • pre-push
+  • pre-merge
+  • post-merge
+```
+
+### Install Hook
+
+```bash
+tsgit hooks install <hook-name>
+```
+
+**Examples:**
+
+```bash
+tsgit hooks install pre-commit
+tsgit hooks install post-commit
+```
+
+### Remove Hook
+
+```bash
+tsgit hooks remove <hook-name>
+```
+
+### Run Hook Manually
+
+```bash
+tsgit hooks run <hook-name>
+```
+
+Useful for testing hooks:
+
+```bash
+tsgit hooks run pre-commit
+```
+
+## Hook Location
+
+Hooks are stored in `.tsgit/hooks/`:
+
+```
+.tsgit/
+└── hooks/
+    ├── pre-commit
+    └── post-commit
+```
+
+## Writing Hooks
+
+### Basic Structure
+
+Hooks are executable scripts:
+
+```bash
+#!/bin/bash
+# .tsgit/hooks/pre-commit
+
+# Your logic here
+npm run lint
+
+# Exit 0 = success (allow operation)
+# Exit non-zero = failure (block operation)
+exit 0
+```
+
+### Pre-commit Hook
+
+Block commits that don't meet criteria:
+
+```bash
+#!/bin/bash
+# Run linter
+npm run lint
+if [ $? -ne 0 ]; then
+    echo "Lint failed. Please fix errors before committing."
+    exit 1
+fi
+
+# Run tests
+npm test
+if [ $? -ne 0 ]; then
+    echo "Tests failed. Please fix before committing."
+    exit 1
+fi
+
+exit 0
+```
+
+### Post-commit Hook
+
+Actions after commit succeeds:
+
+```bash
+#!/bin/bash
+# Send notification
+curl -X POST https://slack.webhook.url \
+  -d '{"text": "New commit: '"$(tsgit log -1 --oneline)"'"}'
+
+# Update documentation
+npm run docs:build
+```
+
+### Pre-merge Hook
+
+Validate before merge:
+
+```bash
+#!/bin/bash
+# Ensure tests pass on both branches
+npm test
+if [ $? -ne 0 ]; then
+    echo "Tests must pass before merging."
+    exit 1
+fi
+```
+
+## Examples
+
+### Lint Staged Files
+
+```bash
+#!/bin/bash
+# pre-commit: Only lint staged files
+
+STAGED_FILES=$(tsgit diff --staged --name-only | grep -E '\.(ts|tsx|js|jsx)$')
+
+if [ -n "$STAGED_FILES" ]; then
+    echo "Linting staged files..."
+    npx eslint $STAGED_FILES
+    if [ $? -ne 0 ]; then
+        exit 1
+    fi
+fi
+
+exit 0
+```
+
+### Prevent WIP Commits on Main
+
+```bash
+#!/bin/bash
+# pre-commit: Block WIP commits on main
+
+BRANCH=$(tsgit rev-parse --abbrev-ref HEAD)
+COMMIT_MSG_FILE="$1"
+
+if [ "$BRANCH" = "main" ]; then
+    if grep -qi "^WIP" "$COMMIT_MSG_FILE" 2>/dev/null; then
+        echo "WIP commits not allowed on main branch."
+        exit 1
+    fi
+fi
+
+exit 0
+```
+
+### Format on Commit
+
+```bash
+#!/bin/bash
+# pre-commit: Auto-format staged files
+
+# Get staged files
+STAGED=$(tsgit diff --staged --name-only)
+
+# Format them
+echo "$STAGED" | xargs npx prettier --write
+
+# Re-stage formatted files
+echo "$STAGED" | xargs tsgit add
+
+exit 0
+```
+
+### Commit Message Validation
+
+```bash
+#!/bin/bash
+# commit-msg: Validate commit message format
+
+MSG=$(cat "$1")
+
+# Check for conventional commit format
+if ! echo "$MSG" | grep -qE "^(feat|fix|docs|style|refactor|test|chore)(\(.+\))?: .+"; then
+    echo "Commit message must follow conventional commits format:"
+    echo "  feat: add new feature"
+    echo "  fix: resolve bug"
+    echo "  docs: update documentation"
+    exit 1
+fi
+
+exit 0
+```
+
+## Hook Environment
+
+Hooks have access to:
+
+| Variable | Description |
+|----------|-------------|
+| `$PWD` | Repository root |
+| `$TSGIT_DIR` | `.tsgit` directory |
+| `$1`, `$2`, etc. | Hook-specific arguments |
+
+## Best Practices
+
+<Tip>
+**Keep hooks fast**
+
+Long-running hooks slow down your workflow. For expensive operations:
+- Run only on changed files
+- Use background jobs for non-blocking tasks
+- Consider CI for comprehensive checks
+</Tip>
+
+<Tip>
+**Make hooks shareable**
+
+Store hook scripts in the repository:
+```
+scripts/
+└── hooks/
+    └── pre-commit
+```
+
+Then install:
+```bash
+cp scripts/hooks/pre-commit .tsgit/hooks/
+chmod +x .tsgit/hooks/pre-commit
+```
+</Tip>
+
+<Tip>
+**Handle errors gracefully**
+
+Always provide clear error messages:
+```bash
+if [ $? -ne 0 ]; then
+    echo "❌ Lint failed. Run 'npm run lint' to see errors."
+    exit 1
+fi
+```
+</Tip>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Hook not running">
+    Ensure the hook is executable:
+    ```bash
+    chmod +x .tsgit/hooks/pre-commit
+    ```
+  </Accordion>
+  
+  <Accordion title="Hook blocking commits">
+    Test the hook manually:
+    ```bash
+    tsgit hooks run pre-commit
+    ```
+    Check its exit code.
+  </Accordion>
+  
+  <Accordion title="Bypassing hooks temporarily">
+    Use the `--no-verify` flag:
+    ```bash
+    tsgit commit -m "WIP" --no-verify
+    ```
+  </Accordion>
+</AccordionGroup>

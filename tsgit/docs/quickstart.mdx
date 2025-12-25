@@ -1,0 +1,155 @@
+---
+title: Quick Start
+description: "Get up and running with tsgit in 5 minutes"
+---
+
+# Quick Start
+
+This guide will help you get started with tsgit in just a few minutes.
+
+## Prerequisites
+
+- Node.js 22.13.0 or higher
+- npm or yarn
+
+## Installation
+
+```bash
+# Clone and build tsgit
+git clone https://github.com/your-username/tsgit.git
+cd tsgit
+npm install
+npm run build
+npm link   # Makes 'tsgit' available globally
+```
+
+## Your First Repository
+
+### Initialize a Repository
+
+```bash
+mkdir my-project
+cd my-project
+tsgit init
+```
+
+You'll see:
+```
+Initialized empty tsgit repository in /path/to/my-project/.tsgit
+```
+
+### Add and Commit Files
+
+```bash
+# Create a file
+echo "# My Project" > README.md
+
+# Stage the file
+tsgit add README.md
+
+# Commit with a message
+tsgit commit -m "Initial commit"
+```
+
+### Check Status
+
+```bash
+tsgit status
+```
+
+### View History
+
+```bash
+tsgit log
+```
+
+## Essential Commands
+
+### Stage and Commit in One Step
+
+```bash
+# Stage all tracked files and commit
+tsgit commit -a -m "Update everything"
+```
+
+### Quick WIP Save
+
+```bash
+# Save work-in-progress with auto-generated message
+tsgit wip -a
+```
+
+### Switch Branches
+
+```bash
+# Create and switch to a new branch
+tsgit switch -c feature-branch
+
+# Switch back to main
+tsgit switch main
+```
+
+<Note>
+tsgit automatically saves your uncommitted changes when switching branches, so you never lose work!
+</Note>
+
+### Undo Mistakes
+
+```bash
+# Undo the last operation (commit, branch creation, etc.)
+tsgit undo
+
+# Undo the last 3 operations
+tsgit undo --steps 3
+```
+
+## Visual Interfaces
+
+### Web UI
+
+```bash
+tsgit web
+```
+
+Opens a modern dashboard at `http://localhost:3847` with:
+- Visual commit graph
+- Side-by-side diffs
+- One-click staging
+- Search across commits and files
+
+### Terminal UI
+
+```bash
+tsgit ui
+```
+
+Interactive terminal interface with keyboard navigation.
+
+### ASCII Graph
+
+```bash
+tsgit graph
+```
+
+```
+● a1b2c3d4 (main) Latest commit - Alice, today
+● e5f6g7h8 Add feature - Bob, yesterday
+● i9j0k1l2 Initial commit - Alice, last week
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Commands Reference" icon="terminal" href="/commands/overview">
+    Learn all available commands
+  </Card>
+  <Card title="Web UI Guide" icon="window" href="/visual/web-ui">
+    Master the visual interface
+  </Card>
+  <Card title="AI Features" icon="robot" href="/features/ai-powered">
+    Generate commit messages with AI
+  </Card>
+  <Card title="Configuration" icon="gear" href="/configuration/overview">
+    Customize tsgit behavior
+  </Card>
+</CardGroup>
