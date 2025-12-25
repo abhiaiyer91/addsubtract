@@ -9,10 +9,10 @@ These are the commands you'll use most often for day-to-day version control.
 
 ## init
 
-Create a new tsgit repository.
+Create a new wit repository.
 
 ```bash
-tsgit init [path]
+wit init [path]
 ```
 
 ### Arguments
@@ -25,10 +25,10 @@ tsgit init [path]
 
 ```bash
 # Initialize in current directory
-tsgit init
+wit init
 
 # Initialize in a new directory
-tsgit init my-project
+wit init my-project
 ```
 
 ---
@@ -38,7 +38,7 @@ tsgit init my-project
 Stage files for the next commit.
 
 ```bash
-tsgit add <files...>
+wit add <files...>
 ```
 
 ### Arguments
@@ -51,16 +51,16 @@ tsgit add <files...>
 
 ```bash
 # Stage a single file
-tsgit add README.md
+wit add README.md
 
 # Stage multiple files
-tsgit add src/index.ts src/utils.ts
+wit add src/index.ts src/utils.ts
 
 # Stage all files
-tsgit add .
+wit add .
 
 # Stage all TypeScript files
-tsgit add "*.ts"
+wit add "*.ts"
 ```
 
 ---
@@ -70,7 +70,7 @@ tsgit add "*.ts"
 Create a new commit with the staged changes.
 
 ```bash
-tsgit commit -m <message> [options]
+wit commit -m <message> [options]
 ```
 
 ### Options
@@ -84,14 +84,14 @@ tsgit commit -m <message> [options]
 
 ```bash
 # Commit staged changes
-tsgit commit -m "Add user authentication"
+wit commit -m "Add user authentication"
 
 # Stage all tracked files and commit
-tsgit commit -a -m "Update configuration"
+wit commit -a -m "Update configuration"
 ```
 
 <Tip>
-Use `tsgit wip` for quick work-in-progress commits with auto-generated messages.
+Use `wit wip` for quick work-in-progress commits with auto-generated messages.
 </Tip>
 
 ---
@@ -101,14 +101,14 @@ Use `tsgit wip` for quick work-in-progress commits with auto-generated messages.
 Show the working tree status.
 
 ```bash
-tsgit status
+wit status
 ```
 
 ### Output Explanation
 
 - **Staged changes**: Files ready to be committed
 - **Unstaged changes**: Modified files not yet staged
-- **Untracked files**: New files not tracked by tsgit
+- **Untracked files**: New files not tracked by wit
 
 ### Example Output
 
@@ -133,7 +133,7 @@ Untracked files:
 Show commit history.
 
 ```bash
-tsgit log [options]
+wit log [options]
 ```
 
 ### Options
@@ -147,13 +147,13 @@ tsgit log [options]
 
 ```bash
 # Full log
-tsgit log
+wit log
 
 # Compact format
-tsgit log --oneline
+wit log --oneline
 
 # Last 5 commits
-tsgit log -n 5
+wit log -n 5
 ```
 
 ### Example Output
@@ -179,7 +179,7 @@ Date:   2024-01-14 15:45:00
 Show changes between commits, or between the working tree and a commit.
 
 ```bash
-tsgit diff [options] [path]
+wit diff [options] [path]
 ```
 
 ### Options
@@ -193,13 +193,13 @@ tsgit diff [options] [path]
 
 ```bash
 # Show unstaged changes
-tsgit diff
+wit diff
 
 # Show staged changes
-tsgit diff --staged
+wit diff --staged
 
 # Show changes in specific file
-tsgit diff src/index.ts
+wit diff src/index.ts
 ```
 
 ### Example Output
@@ -223,22 +223,22 @@ Here's a typical workflow using these commands:
 
 ```bash
 # 1. Check current status
-tsgit status
+wit status
 
 # 2. Make some changes to files...
 
 # 3. Review your changes
-tsgit diff
+wit diff
 
 # 4. Stage specific files
-tsgit add src/feature.ts
+wit add src/feature.ts
 
 # 5. Review what's staged
-tsgit diff --staged
+wit diff --staged
 
 # 6. Commit
-tsgit commit -m "Add new feature"
+wit commit -m "Add new feature"
 
 # 7. View history
-tsgit log --oneline
+wit log --oneline
 ```

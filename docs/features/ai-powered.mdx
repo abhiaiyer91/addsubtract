@@ -5,11 +5,11 @@ description: "AI-generated commit messages and intelligent assistance"
 
 # AI-Powered Features
 
-tsgit includes built-in AI capabilities powered by modern LLM technology.
+wit includes built-in AI capabilities powered by modern LLM technology.
 
 ## Overview
 
-AI features in tsgit help you:
+AI features in wit help you:
 - Generate meaningful commit messages
 - Get intelligent code review suggestions
 - Understand complex diffs
@@ -18,17 +18,17 @@ AI features in tsgit help you:
 ## AI Commands
 
 ```bash
-tsgit ai <command>
+wit ai <command>
 ```
 
 ### Generate Commit Messages
 
 ```bash
 # Stage your changes
-tsgit add .
+wit add .
 
 # Generate a commit message
-tsgit ai commit
+wit ai commit
 ```
 
 The AI analyzes your staged changes and suggests a descriptive commit message.
@@ -36,8 +36,8 @@ The AI analyzes your staged changes and suggests a descriptive commit message.
 **Example:**
 
 ```bash
-$ tsgit add src/auth.ts src/login.tsx
-$ tsgit ai commit
+$ wit add src/auth.ts src/login.tsx
+$ wit ai commit
 
 Suggested message:
   "Add user authentication with login form
@@ -53,7 +53,7 @@ Use this message? [Y/n]
 
 ```bash
 # Review staged changes
-tsgit ai review
+wit ai review
 ```
 
 Get AI-powered feedback on your changes:
@@ -66,7 +66,7 @@ Get AI-powered feedback on your changes:
 
 ```bash
 # Understand a diff
-tsgit ai explain HEAD~3..HEAD
+wit ai explain HEAD~3..HEAD
 ```
 
 Get a plain-English explanation of what changed.
@@ -92,7 +92,7 @@ export MASTRA_API_KEY="your-api-key"
 ### Configuration Options
 
 ```ini
-# .tsgit/config
+# .wit/config
 [ai]
     enabled = true
     model = gpt-4
@@ -107,7 +107,7 @@ export MASTRA_API_KEY="your-api-key"
 
 ## AI Tools
 
-tsgit's AI system includes specialized tools:
+wit's AI system includes specialized tools:
 
 | Tool | Purpose |
 |------|---------|
@@ -127,30 +127,30 @@ tsgit's AI system includes specialized tools:
 # Make your changes...
 
 # Let AI suggest a commit message
-tsgit ai commit
+wit ai commit
 
 # Or use the message directly
-tsgit ai commit --apply
+wit ai commit --apply
 ```
 
 ### Review Before Push
 
 ```bash
 # Review all changes on your branch
-tsgit ai review main..HEAD
+wit ai review main..HEAD
 
 # Get specific feedback
-tsgit ai review --focus security
+wit ai review --focus security
 ```
 
 ### Understand History
 
 ```bash
 # What happened in the last week?
-tsgit ai explain --since="1 week ago"
+wit ai explain --since="1 week ago"
 
 # Summarize a branch
-tsgit ai summarize feature-branch
+wit ai summarize feature-branch
 ```
 
 ## Privacy & Security
@@ -195,7 +195,7 @@ AI features send code to external APIs. Consider:
   <Accordion title="Poor suggestions">
     Help the AI with context:
     ```bash
-    tsgit ai commit --context "Fixing bug #123"
+    wit ai commit --context "Fixing bug #123"
     ```
   </Accordion>
 </AccordionGroup>

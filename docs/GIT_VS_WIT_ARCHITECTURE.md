@@ -924,7 +924,7 @@ wit provides **structured errors with actionable suggestions**:
 
 ```typescript
 // src/core/errors.ts
-export class TsgitError extends Error {
+export class WitError extends Error {
   public readonly code: ErrorCode;
   public readonly suggestions: string[];
   public readonly context: ErrorContext;
@@ -944,7 +944,7 @@ export class TsgitError extends Error {
 
 // Factory for common errors
 export const Errors = {
-  branchNotFound(name: string, existingBranches: string[]): TsgitError {
+  branchNotFound(name: string, existingBranches: string[]): WitError {
     const similar = findSimilar(name, existingBranches);  // Levenshtein distance
     const suggestions: string[] = [];
 
@@ -953,7 +953,7 @@ export const Errors = {
     }
     suggestions.push(`wit branch create ${name}    # Create new branch`);
 
-    return new TsgitError(
+    return new WitError(
       `Branch '${name}' not found`,
       ErrorCode.BRANCH_NOT_FOUND,
       suggestions,

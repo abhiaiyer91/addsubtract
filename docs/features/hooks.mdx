@@ -9,7 +9,7 @@ Hooks let you run custom scripts at key points in the version control workflow.
 
 ## Overview
 
-tsgit supports hooks similar to Git, allowing you to:
+wit supports hooks similar to Git, allowing you to:
 - Validate commits before they're created
 - Run tests automatically
 - Format code on commit
@@ -32,7 +32,7 @@ tsgit supports hooks similar to Git, allowing you to:
 ### List Hooks
 
 ```bash
-tsgit hooks
+wit hooks
 ```
 
 Output:
@@ -50,40 +50,40 @@ Available templates:
 ### Install Hook
 
 ```bash
-tsgit hooks install <hook-name>
+wit hooks install <hook-name>
 ```
 
 **Examples:**
 
 ```bash
-tsgit hooks install pre-commit
-tsgit hooks install post-commit
+wit hooks install pre-commit
+wit hooks install post-commit
 ```
 
 ### Remove Hook
 
 ```bash
-tsgit hooks remove <hook-name>
+wit hooks remove <hook-name>
 ```
 
 ### Run Hook Manually
 
 ```bash
-tsgit hooks run <hook-name>
+wit hooks run <hook-name>
 ```
 
 Useful for testing hooks:
 
 ```bash
-tsgit hooks run pre-commit
+wit hooks run pre-commit
 ```
 
 ## Hook Location
 
-Hooks are stored in `.tsgit/hooks/`:
+Hooks are stored in `.wit/hooks/`:
 
 ```
-.tsgit/
+.wit/
 └── hooks/
     ├── pre-commit
     └── post-commit
@@ -97,7 +97,7 @@ Hooks are executable scripts:
 
 ```bash
 #!/bin/bash
-# .tsgit/hooks/pre-commit
+# .wit/hooks/pre-commit
 
 # Your logic here
 npm run lint
@@ -138,7 +138,7 @@ Actions after commit succeeds:
 #!/bin/bash
 # Send notification
 curl -X POST https://slack.webhook.url \
-  -d '{"text": "New commit: '"$(tsgit log -1 --oneline)"'"}'
+  -d '{"text": "New commit: '"$(wit log -1 --oneline)"'"}'
 
 # Update documentation
 npm run docs:build
@@ -166,7 +166,7 @@ fi
 #!/bin/bash
 # pre-commit: Only lint staged files
 
-STAGED_FILES=$(tsgit diff --staged --name-only | grep -E '\.(ts|tsx|js|jsx)$')
+STAGED_FILES=$(wit diff --staged --name-only | grep -E '\.(ts|tsx|js|jsx)$')
 
 if [ -n "$STAGED_FILES" ]; then
     echo "Linting staged files..."
@@ -185,7 +185,7 @@ exit 0
 #!/bin/bash
 # pre-commit: Block WIP commits on main
 
-BRANCH=$(tsgit rev-parse --abbrev-ref HEAD)
+BRANCH=$(wit rev-parse --abbrev-ref HEAD)
 COMMIT_MSG_FILE="$1"
 
 if [ "$BRANCH" = "main" ]; then
@@ -205,13 +205,13 @@ exit 0
 # pre-commit: Auto-format staged files
 
 # Get staged files
-STAGED=$(tsgit diff --staged --name-only)
+STAGED=$(wit diff --staged --name-only)
 
 # Format them
 echo "$STAGED" | xargs npx prettier --write
 
 # Re-stage formatted files
-echo "$STAGED" | xargs tsgit add
+echo "$STAGED" | xargs wit add
 
 exit 0
 ```
@@ -243,7 +243,7 @@ Hooks have access to:
 | Variable | Description |
 |----------|-------------|
 | `$PWD` | Repository root |
-| `$TSGIT_DIR` | `.tsgit` directory |
+| `$WIT_DIR` | `.wit` directory |
 | `$1`, `$2`, etc. | Hook-specific arguments |
 
 ## Best Practices
@@ -269,8 +269,8 @@ scripts/
 
 Then install:
 ```bash
-cp scripts/hooks/pre-commit .tsgit/hooks/
-chmod +x .tsgit/hooks/pre-commit
+cp scripts/hooks/pre-commit .wit/hooks/
+chmod +x .wit/hooks/pre-commit
 ```
 </Tip>
 
@@ -292,14 +292,14 @@ fi
   <Accordion title="Hook not running">
     Ensure the hook is executable:
     ```bash
-    chmod +x .tsgit/hooks/pre-commit
+    chmod +x .wit/hooks/pre-commit
     ```
   </Accordion>
   
   <Accordion title="Hook blocking commits">
     Test the hook manually:
     ```bash
-    tsgit hooks run pre-commit
+    wit hooks run pre-commit
     ```
     Check its exit code.
   </Accordion>
@@ -307,7 +307,7 @@ fi
   <Accordion title="Bypassing hooks temporarily">
     Use the `--no-verify` flag:
     ```bash
-    tsgit commit -m "WIP" --no-verify
+    wit commit -m "WIP" --no-verify
     ```
   </Accordion>
 </AccordionGroup>

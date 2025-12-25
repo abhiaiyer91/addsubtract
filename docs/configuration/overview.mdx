@@ -1,19 +1,19 @@
 ---
 title: Configuration Overview
-description: "Configure tsgit to match your workflow"
+description: "Configure wit to match your workflow"
 ---
 
 # Configuration
 
-tsgit stores configuration in `.tsgit/config` using an INI-like format, similar to Git.
+wit stores configuration in `.wit/config` using an INI-like format, similar to Git.
 
 ## Configuration Levels
 
 | Level | Location | Scope |
 |-------|----------|-------|
-| Repository | `.tsgit/config` | This repository only |
-| Global | `~/.tsgitconfig` | All your repositories |
-| System | `/etc/tsgitconfig` | All users (rare) |
+| Repository | `.wit/config` | This repository only |
+| Global | `~/.witconfig` | All your repositories |
+| System | `/etc/witconfig` | All users (rare) |
 
 Lower levels override higher levels: Repository > Global > System.
 
@@ -21,34 +21,34 @@ Lower levels override higher levels: Repository > Global > System.
 
 ```bash
 # View all settings
-tsgit config --list
+wit config --list
 
 # View specific setting
-tsgit config core.hashAlgorithm
+wit config core.hashAlgorithm
 
 # View with source location
-tsgit config --list --show-origin
+wit config --list --show-origin
 ```
 
 ## Setting Configuration
 
 ```bash
 # Set repository config
-tsgit config <key> <value>
+wit config <key> <value>
 
 # Set global config
-tsgit config --global <key> <value>
+wit config --global <key> <value>
 ```
 
 **Examples:**
 
 ```bash
 # Set user info (global)
-tsgit config --global user.name "Your Name"
-tsgit config --global user.email "you@example.com"
+wit config --global user.name "Your Name"
+wit config --global user.email "you@example.com"
 
 # Set repository-specific setting
-tsgit config tsgit.autoStashOnSwitch false
+wit config wit.autoStashOnSwitch false
 ```
 
 ## Configuration Sections
@@ -68,10 +68,10 @@ tsgit config tsgit.autoStashOnSwitch false
 | `filemode` | Track file permissions | `true` |
 | `bare` | Is this a bare repository | `false` |
 
-### tsgit Settings
+### wit Settings
 
 ```ini
-[tsgit]
+[wit]
     hashAlgorithm = sha256
     largeFileThreshold = 2097152
     autoStashOnSwitch = true
@@ -115,27 +115,27 @@ tsgit config tsgit.autoStashOnSwitch false
 
 ```bash
 # Your identity
-tsgit config --global user.name "Your Name"
-tsgit config --global user.email "you@example.com"
+wit config --global user.name "Your Name"
+wit config --global user.email "you@example.com"
 
 # Editor
-tsgit config --global core.editor "code --wait"
+wit config --global core.editor "code --wait"
 
 # Default branch
-tsgit config --global init.defaultBranch main
+wit config --global init.defaultBranch main
 ```
 
-### tsgit-Specific Settings
+### wit-Specific Settings
 
 ```bash
 # Disable auto-stash
-tsgit config tsgit.autoStashOnSwitch false
+wit config wit.autoStashOnSwitch false
 
 # Change large file threshold to 5MB
-tsgit config tsgit.largeFileThreshold 5242880
+wit config wit.largeFileThreshold 5242880
 
 # Use SHA-1 for Git compatibility (not recommended)
-tsgit config tsgit.hashAlgorithm sha1
+wit config wit.hashAlgorithm sha1
 ```
 
 ## Configuration File Format
@@ -161,7 +161,7 @@ tsgit config tsgit.hashAlgorithm sha1
 
 ## Example Configuration
 
-Complete `.tsgit/config`:
+Complete `.wit/config`:
 
 ```ini
 [core]
@@ -169,7 +169,7 @@ Complete `.tsgit/config`:
     filemode = true
     bare = false
 
-[tsgit]
+[wit]
     hashAlgorithm = sha256
     largeFileThreshold = 2097152
     autoStashOnSwitch = true
@@ -204,6 +204,6 @@ Complete `.tsgit/config`:
     Deep dive into repository configuration
   </Card>
   <Card title="Directory Structure" icon="folder-tree" href="/configuration/directory-structure">
-    Understanding .tsgit directory
+    Understanding .wit directory
   </Card>
 </CardGroup>

@@ -1,22 +1,22 @@
 ---
 title: API Reference Overview
-description: "Use tsgit programmatically in your Node.js projects"
+description: "Use wit programmatically in your Node.js projects"
 ---
 
 # API Reference
 
-tsgit can be used as a library in your Node.js applications, giving you programmatic access to all version control operations.
+wit can be used as a library in your Node.js applications, giving you programmatic access to all version control operations.
 
 ## Installation
 
 ```bash
-npm install tsgit
+npm install wit
 ```
 
 ## Quick Start
 
 ```typescript
-import { Repository } from 'tsgit';
+import { Repository } from 'wit';
 
 // Initialize a new repository
 const repo = Repository.init('/path/to/project');
@@ -70,7 +70,7 @@ import {
   Blob,
   Status,
   DiffResult,
-} from 'tsgit';
+} from 'wit';
 ```
 
 ## Common Patterns
@@ -78,7 +78,7 @@ import {
 ### Error Handling
 
 ```typescript
-import { Repository, TsgitError, NotFoundError } from 'tsgit';
+import { Repository, WitError, NotFoundError } from 'wit';
 
 try {
   const repo = Repository.open('/path/to/repo');
@@ -86,8 +86,8 @@ try {
 } catch (error) {
   if (error instanceof NotFoundError) {
     console.error('Commit not found');
-  } else if (error instanceof TsgitError) {
-    console.error('tsgit error:', error.message);
+  } else if (error instanceof WitError) {
+    console.error('wit error:', error.message);
   } else {
     throw error;
   }
@@ -229,7 +229,7 @@ interface DiffLine {
 ## Example: Build Tool Integration
 
 ```typescript
-import { Repository } from 'tsgit';
+import { Repository } from 'wit';
 
 async function buildIfChanged(paths: string[]) {
   const repo = Repository.open('.');
@@ -259,7 +259,7 @@ buildIfChanged(['src/', 'lib/']);
 ## Example: Commit Hook
 
 ```typescript
-import { Repository } from 'tsgit';
+import { Repository } from 'wit';
 
 function preCommitHook() {
   const repo = Repository.open('.');

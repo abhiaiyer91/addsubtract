@@ -12,7 +12,7 @@ These commands provide powerful capabilities for advanced workflows.
 Customize behavior at key points in the version control workflow.
 
 ```bash
-tsgit hooks <command> [hook-name]
+wit hooks <command> [hook-name]
 ```
 
 ### Commands
@@ -38,21 +38,21 @@ tsgit hooks <command> [hook-name]
 
 ```bash
 # List installed hooks
-tsgit hooks
+wit hooks
 
 # Install pre-commit hook
-tsgit hooks install pre-commit
+wit hooks install pre-commit
 
 # Test the hook
-tsgit hooks run pre-commit
+wit hooks run pre-commit
 
 # Remove a hook
-tsgit hooks remove pre-commit
+wit hooks remove pre-commit
 ```
 
 ### Hook Location
 
-Hooks are stored in `.tsgit/hooks/`. Edit them to customize behavior:
+Hooks are stored in `.wit/hooks/`. Edit them to customize behavior:
 
 ```bash
 # Example pre-commit hook
@@ -68,7 +68,7 @@ npm run test
 Manage nested repositories within your project.
 
 ```bash
-tsgit submodule <command> [options]
+wit submodule <command> [options]
 ```
 
 ### Commands
@@ -85,19 +85,19 @@ tsgit submodule <command> [options]
 
 ```bash
 # Add a submodule
-tsgit submodule add https://github.com/lib/utils.git vendor/utils
+wit submodule add https://github.com/lib/utils.git vendor/utils
 
 # Initialize after cloning
-tsgit submodule init
+wit submodule init
 
 # Update to latest recorded commits
-tsgit submodule update
+wit submodule update
 
 # Check status
-tsgit submodule status
+wit submodule status
 
 # Run a command in all submodules
-tsgit submodule foreach "npm install"
+wit submodule foreach "npm install"
 ```
 
 ---
@@ -107,7 +107,7 @@ tsgit submodule foreach "npm install"
 Work on multiple branches simultaneously with multiple working directories.
 
 ```bash
-tsgit worktree <command> [options]
+wit worktree <command> [options]
 ```
 
 ### Commands
@@ -123,16 +123,16 @@ tsgit worktree <command> [options]
 
 ```bash
 # Create worktree for feature development
-tsgit worktree add ../feature-worktree feature-branch
+wit worktree add ../feature-worktree feature-branch
 
 # List all worktrees
-tsgit worktree list
+wit worktree list
 
 # Remove when done
-tsgit worktree remove ../feature-worktree
+wit worktree remove ../feature-worktree
 
 # Clean up stale entries
-tsgit worktree prune
+wit worktree prune
 ```
 
 ### Example Output
@@ -150,7 +150,7 @@ Worktrees:
 # You're working on a feature but need to hotfix main
 # Instead of stashing or switching, create a worktree
 
-tsgit worktree add ../hotfix main
+wit worktree add ../hotfix main
 
 # Now you have two directories:
 # - /project (your feature work, untouched)
@@ -158,14 +158,14 @@ tsgit worktree add ../hotfix main
 
 cd ../hotfix
 # Fix the bug...
-tsgit commit -a -m "Hotfix: critical bug"
+wit commit -a -m "Hotfix: critical bug"
 
 # Go back to feature work
 cd ../project
 # Your feature branch is exactly as you left it!
 
 # Clean up
-tsgit worktree remove ../hotfix
+wit worktree remove ../hotfix
 ```
 
 ---
@@ -175,7 +175,7 @@ tsgit worktree remove ../hotfix
 View reference history for recovery.
 
 ```bash
-tsgit reflog [ref] [options]
+wit reflog [ref] [options]
 ```
 
 ### Options
@@ -188,13 +188,13 @@ tsgit reflog [ref] [options]
 
 ```bash
 # Show HEAD reflog
-tsgit reflog
+wit reflog
 
 # Show reflog for specific branch
-tsgit reflog main
+wit reflog main
 
 # Prune old entries
-tsgit reflog expire
+wit reflog expire
 ```
 
 ### Example Output
@@ -208,7 +208,7 @@ HEAD@{4}: commit: Initial setup
 ```
 
 <Note>
-The reflog is what powers `tsgit undo`. Every operation is recorded and can be reversed.
+The reflog is what powers `wit undo`. Every operation is recorded and can be reversed.
 </Note>
 
 ---
@@ -218,7 +218,7 @@ The reflog is what powers `tsgit undo`. Every operation is recorded and can be r
 Clean up and optimize the repository.
 
 ```bash
-tsgit gc [options]
+wit gc [options]
 ```
 
 ### Options
@@ -233,13 +233,13 @@ tsgit gc [options]
 
 ```bash
 # Standard garbage collection
-tsgit gc
+wit gc
 
 # Aggressive optimization
-tsgit gc --aggressive
+wit gc --aggressive
 
 # Prune immediately
-tsgit gc --prune=now
+wit gc --prune=now
 ```
 
 ### When to Run
@@ -256,7 +256,7 @@ tsgit gc --prune=now
 Limit operations to specific paths in a monorepo.
 
 ```bash
-tsgit scope <command> [path]
+wit scope <command> [path]
 ```
 
 ### Commands
@@ -270,7 +270,7 @@ tsgit scope <command> [path]
 
 ### Presets
 
-Presets are defined in `.tsgit/config`:
+Presets are defined in `.wit/config`:
 - `frontend` - Frontend code
 - `backend` - Backend code
 - `docs` - Documentation
@@ -279,16 +279,16 @@ Presets are defined in `.tsgit/config`:
 
 ```bash
 # Check current scope
-tsgit scope
+wit scope
 
 # Limit to src directory
-tsgit scope set src/
+wit scope set src/
 
 # Use preset
-tsgit scope use frontend
+wit scope use frontend
 
 # Clear scope
-tsgit scope clear
+wit scope clear
 ```
 
 ### Effect on Commands
@@ -296,12 +296,12 @@ tsgit scope clear
 When a scope is set:
 
 ```bash
-tsgit scope set packages/frontend/
+wit scope set packages/frontend/
 
-tsgit status    # Shows only frontend files
-tsgit add .     # Stages only frontend files
-tsgit log       # Shows commits affecting frontend
-tsgit diff      # Shows changes in frontend only
+wit status    # Shows only frontend files
+wit add .     # Stages only frontend files
+wit log       # Shows commits affecting frontend
+wit diff      # Shows changes in frontend only
 ```
 
 ---
@@ -313,7 +313,7 @@ Low-level commands for scripting and advanced use.
 ### hash-object
 
 ```bash
-tsgit hash-object <file>
+wit hash-object <file>
 ```
 
 Calculate the hash of a file.
@@ -321,7 +321,7 @@ Calculate the hash of a file.
 ### cat-file
 
 ```bash
-tsgit cat-file <hash>
+wit cat-file <hash>
 ```
 
 Display contents of an object.
@@ -329,7 +329,7 @@ Display contents of an object.
 ### ls-tree
 
 ```bash
-tsgit ls-tree <tree-hash>
+wit ls-tree <tree-hash>
 ```
 
 List contents of a tree object.
@@ -337,7 +337,7 @@ List contents of a tree object.
 ### ls-files
 
 ```bash
-tsgit ls-files
+wit ls-files
 ```
 
 List files in the index.
@@ -345,7 +345,7 @@ List files in the index.
 ### rev-parse
 
 ```bash
-tsgit rev-parse <rev>
+wit rev-parse <rev>
 ```
 
 Parse a revision to its hash.
@@ -353,7 +353,7 @@ Parse a revision to its hash.
 ### for-each-ref
 
 ```bash
-tsgit for-each-ref
+wit for-each-ref
 ```
 
 Iterate over references.
@@ -361,7 +361,7 @@ Iterate over references.
 ### update-ref
 
 ```bash
-tsgit update-ref <ref> <hash>
+wit update-ref <ref> <hash>
 ```
 
 Update a reference.
@@ -369,7 +369,7 @@ Update a reference.
 ### symbolic-ref
 
 ```bash
-tsgit symbolic-ref <name>
+wit symbolic-ref <name>
 ```
 
 Read or set a symbolic reference.
@@ -377,7 +377,7 @@ Read or set a symbolic reference.
 ### show-ref
 
 ```bash
-tsgit show-ref
+wit show-ref
 ```
 
 List references.
@@ -385,7 +385,7 @@ List references.
 ### fsck
 
 ```bash
-tsgit fsck
+wit fsck
 ```
 
 Verify repository integrity.
