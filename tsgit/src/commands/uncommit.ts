@@ -7,6 +7,9 @@
 
 import { Repository } from '../core/repository';
 import { TsgitError, ErrorCode } from '../core/errors';
+import { walkDir, exists } from '../utils/fs';
+import * as path from 'path';
+import * as fs from 'fs';
 
 const colors = {
   green: (s: string) => `\x1b[32m${s}\x1b[0m`,
@@ -140,10 +143,6 @@ export function uncommit(options: UncommitOptions = {}): { originalHash: string;
  * Reset index and working directory to match a tree
  */
 function resetToTree(repo: Repository, treeHash: string): void {
-  const { walkDir, exists } = require('../utils/fs');
-  const path = require('path');
-  const fs = require('fs');
-  
   // Clear index
   repo.index.clear();
   

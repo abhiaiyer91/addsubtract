@@ -5,7 +5,11 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { vi } from 'vitest';
 import { Repository } from '../core/repository';
+
+// Track the original cwd to restore after tests
+let originalCwd: string = process.cwd();
 
 /**
  * Create a temporary directory for testing
@@ -18,9 +22,13 @@ export function createTempDir(): string {
 /**
  * Clean up a temporary directory
  */
-export function cleanupTempDir(dir: string): void {
-  if (dir.includes('tsgit-test-') && fs.existsSync(dir)) {
-    fs.rmSync(dir, { recursive: true, force: true });
+export function cleanupTempDir(dir: string | undefined): void {
+  if (dir && dir.includes('tsgit-test-') && fs.existsSync(dir)) {
+    try {
+      fs.rmSync(dir, { recursive: true, force: true });
+    } catch {
+      // Ignore cleanup errors
+    }
   }
 }
 
@@ -28,7 +36,11 @@ export function cleanupTempDir(dir: string): void {
  * Create a test repository with some initial content
  */
 export function createTestRepo(dir?: string): { repo: Repository; dir: string } {
+  originalCwd = process.cwd();
   const testDir = dir || createTempDir();
+  
+  // Change to the test directory before initializing
+  process.chdir(testDir);
   
   // Initialize repository
   const repo = Repository.init(testDir);
@@ -41,10 +53,10 @@ export function createTestRepo(dir?: string): { repo: Repository; dir: string } 
  */
 export function createTestFile(repoDir: string, filePath: string, content: string): string {
   const fullPath = path.join(repoDir, filePath);
-  const dir = path.dirname(fullPath);
+  const fileDir = path.dirname(fullPath);
   
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+  if (!fs.existsSync(fileDir)) {
+    fs.mkdirSync(fileDir, { recursive: true });
   }
   
   fs.writeFileSync(fullPath, content);
@@ -73,9 +85,13 @@ export function fileExists(repoDir: string, filePath: string): boolean {
 export function createRepoWithCommit(dir?: string): { repo: Repository; dir: string; commitHash: string } {
   const { repo, dir: testDir } = createTestRepo(dir);
   
-  // Create a file and commit
+  // Create a file and commit - ensure we're in the right directory
+  process.chdir(testDir);
   createTestFile(testDir, 'README.md', '# Test Project\n');
-  repo.add('README.md');
+  
+  // Use full path for add
+  const fullPath = path.join(testDir, 'README.md');
+  repo.add(fullPath);
   const commitHash = repo.commit('Initial commit');
   
   return { repo, dir: testDir, commitHash };
@@ -92,9 +108,12 @@ export function createRepoWithMultipleCommits(numCommits: number = 3): {
   const { repo, dir } = createTestRepo();
   const commits: string[] = [];
   
+  process.chdir(dir);
+  
   for (let i = 1; i <= numCommits; i++) {
     createTestFile(dir, `file${i}.txt`, `Content ${i}\n`);
-    repo.add(`file${i}.txt`);
+    const fullPath = path.join(dir, `file${i}.txt`);
+    repo.add(fullPath);
     const hash = repo.commit(`Commit ${i}`);
     commits.push(hash);
   }
@@ -123,6 +142,21 @@ export function createRepoWithBranches(branches: string[]): {
 }
 
 /**
+ * Restore original working directory
+ */
+export function restoreCwd(): void {
+  try {
+    if (originalCwd && fs.existsSync(originalCwd)) {
+      process.chdir(originalCwd);
+    } else {
+      process.chdir('/tmp');
+    }
+  } catch {
+    process.chdir('/tmp');
+  }
+}
+
+/**
  * Suppress console output during tests
  */
 export function suppressConsole(): { restore: () => void } {
@@ -130,9 +164,9 @@ export function suppressConsole(): { restore: () => void } {
   const originalError = console.error;
   const originalWarn = console.warn;
   
-  console.log = jest.fn();
-  console.error = jest.fn();
-  console.warn = jest.fn();
+  console.log = vi.fn();
+  console.error = vi.fn();
+  console.warn = vi.fn();
   
   return {
     restore: () => {

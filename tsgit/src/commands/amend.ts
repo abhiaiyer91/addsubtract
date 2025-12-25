@@ -6,7 +6,7 @@
  */
 
 import { Repository } from '../core/repository';
-import { Commit } from '../core/object';
+import { Commit, Tree } from '../core/object';
 import { TsgitError, ErrorCode } from '../core/errors';
 
 const colors = {
@@ -207,7 +207,6 @@ function buildTree(repo: Repository): string {
     // Sort entries (Git sorts directories and files together by name)
     finalEntries.sort((a, b) => a.name.localeCompare(b.name));
     
-    const { Tree } = require('../core/object');
     const tree = new Tree(finalEntries);
     const hash = repo.objects.writeObject(tree);
     treeHashes.set(treePath, hash);
