@@ -93,7 +93,8 @@
       "pages": [
         "configuration/overview",
         "configuration/repository",
-        "configuration/directory-structure"
+        "configuration/directory-structure",
+        "configuration/shell-integration"
       ]
     },
     {

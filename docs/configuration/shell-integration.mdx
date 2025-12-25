@@ -1,0 +1,284 @@
+---
+title: Shell Integration
+description: "Display the current wit branch in your terminal prompt"
+---
+
+# Shell Integration
+
+Display your current wit branch directly in your terminal prompt, just like you would with Git. This helps you always know which branch you're working on.
+
+## How It Works
+
+wit provides plumbing commands that output the current branch name, which can be used in your shell prompt:
+
+```bash
+# Get the current branch name (returns "HEAD" if detached)
+wit rev-parse --abbrev-ref HEAD
+
+# Alternative: Get the symbolic ref (fails silently if detached)
+wit symbolic-ref --short HEAD 2>/dev/null
+```
+
+## Bash Integration
+
+Add the following to your `~/.bashrc`:
+
+```bash
+# wit branch in prompt
+__wit_branch() {
+  local branch
+  # Try to get the current branch name
+  branch=$(wit rev-parse --abbrev-ref HEAD 2>/dev/null)
+  if [ -n "$branch" ]; then
+    echo " ($branch)"
+  fi
+}
+
+# Customize your prompt - add the branch after the current directory
+PS1='\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[33m\]$(__wit_branch)\[\033[00m\]\$ '
+```
+
+After adding this, reload your shell:
+
+```bash
+source ~/.bashrc
+```
+
+### Example Output
+
+```
+user@hostname:~/my-project (main)$ 
+user@hostname:~/my-project (feature/new-login)$ 
+```
+
+## Zsh Integration
+
+Add the following to your `~/.zshrc`:
+
+```zsh
+# Enable command substitution in prompts
+setopt PROMPT_SUBST
+
+# wit branch function
+__wit_branch() {
+  local branch
+  branch=$(wit rev-parse --abbrev-ref HEAD 2>/dev/null)
+  if [[ -n "$branch" ]]; then
+    echo " ($branch)"
+  fi
+}
+
+# Add to your prompt
+PROMPT='%F{green}%n@%m%f:%F{blue}%~%f%F{yellow}$(__wit_branch)%f$ '
+```
+
+After adding this, reload your shell:
+
+```zsh
+source ~/.zshrc
+```
+
+### With Oh My Zsh
+
+If you use Oh My Zsh, you can create a custom plugin. Create the file `~/.oh-my-zsh/custom/plugins/wit/wit.plugin.zsh`:
+
+```zsh
+# wit integration for Oh My Zsh
+
+# Get current wit branch
+wit_prompt_info() {
+  local branch
+  branch=$(wit rev-parse --abbrev-ref HEAD 2>/dev/null)
+  if [[ -n "$branch" ]]; then
+    echo "%{$fg[yellow]%}($branch)%{$reset_color%}"
+  fi
+}
+
+# Add to right prompt
+RPROMPT='$(wit_prompt_info)'
+```
+
+Then add `wit` to your plugins in `~/.zshrc`:
+
+```zsh
+plugins=(git wit other-plugins)
+```
+
+## Advanced: Detached HEAD State
+
+When you checkout a specific commit (detached HEAD state), the branch name won't be available. You can show the short commit hash instead:
+
+### Bash (with detached HEAD support)
+
+```bash
+__wit_branch() {
+  local branch
+  branch=$(wit symbolic-ref --short HEAD 2>/dev/null)
+  if [ -n "$branch" ]; then
+    echo " ($branch)"
+  else
+    # Detached HEAD - show short commit hash
+    local commit
+    commit=$(wit rev-parse --short HEAD 2>/dev/null)
+    if [ -n "$commit" ]; then
+      echo " (detached:$commit)"
+    fi
+  fi
+}
+```
+
+### Zsh (with detached HEAD support)
+
+```zsh
+__wit_branch() {
+  local branch
+  branch=$(wit symbolic-ref --short HEAD 2>/dev/null)
+  if [[ -n "$branch" ]]; then
+    echo " ($branch)"
+  else
+    # Detached HEAD - show short commit hash
+    local commit
+    commit=$(wit rev-parse --short HEAD 2>/dev/null)
+    if [[ -n "$commit" ]]; then
+      echo " (detached:$commit)"
+    fi
+  fi
+}
+```
+
+## Advanced: Dirty State Indicator
+
+Show an asterisk when you have uncommitted changes:
+
+### Bash
+
+```bash
+__wit_branch() {
+  local branch dirty=""
+  branch=$(wit rev-parse --abbrev-ref HEAD 2>/dev/null)
+  if [ -n "$branch" ]; then
+    # Check for uncommitted changes
+    if ! wit diff --quiet HEAD 2>/dev/null; then
+      dirty="*"
+    fi
+    echo " ($branch$dirty)"
+  fi
+}
+```
+
+### Zsh
+
+```zsh
+__wit_branch() {
+  local branch dirty=""
+  branch=$(wit rev-parse --abbrev-ref HEAD 2>/dev/null)
+  if [[ -n "$branch" ]]; then
+    # Check for uncommitted changes
+    if ! wit diff --quiet HEAD 2>/dev/null; then
+      dirty="*"
+    fi
+    echo " ($branch$dirty)"
+  fi
+}
+```
+
+## Performance Tips
+
+<Note>
+The prompt function runs every time you press Enter, so it's important to keep it fast.
+</Note>
+
+1. **Use `2>/dev/null`** to suppress error messages when not in a wit repository
+2. **Avoid multiple wit calls** - each command spawns a new process
+3. **Consider caching** for very large repositories:
+
+```bash
+# Cache the branch name for 1 second
+__wit_branch_cached() {
+  local cache_file="/tmp/.wit_branch_cache_$$"
+  local cache_age=1
+  
+  if [ -f "$cache_file" ]; then
+    local mod_time=$(stat -c %Y "$cache_file" 2>/dev/null || stat -f %m "$cache_file" 2>/dev/null)
+    local now=$(date +%s)
+    if [ $((now - mod_time)) -lt $cache_age ]; then
+      cat "$cache_file"
+      return
+    fi
+  fi
+  
+  local result=$(__wit_branch)
+  echo "$result" > "$cache_file"
+  echo "$result"
+}
+```
+
+## Fish Shell Integration
+
+For Fish shell users, add this to `~/.config/fish/functions/fish_prompt.fish`:
+
+```fish
+function fish_prompt
+    set -l branch (wit rev-parse --abbrev-ref HEAD 2>/dev/null)
+    
+    set_color green
+    echo -n (whoami)"@"(hostname)
+    set_color normal
+    echo -n ":"
+    set_color blue
+    echo -n (prompt_pwd)
+    
+    if test -n "$branch"
+        set_color yellow
+        echo -n " ($branch)"
+    end
+    
+    set_color normal
+    echo -n '$ '
+end
+```
+
+## Starship Integration
+
+If you use [Starship](https://starship.rs/), add a custom command to `~/.config/starship.toml`:
+
+```toml
+[custom.wit]
+command = "wit rev-parse --abbrev-ref HEAD 2>/dev/null"
+when = "wit rev-parse --git-dir 2>/dev/null"
+format = "on [$output]($style) "
+style = "bold purple"
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Branch not showing in prompt">
+    1. Make sure you're inside a wit repository (has a `.wit` directory)
+    2. Verify wit is installed and in your PATH: `which wit`
+    3. Test the command manually: `wit rev-parse --abbrev-ref HEAD`
+  </Accordion>
+  
+  <Accordion title="Slow prompt">
+    If your prompt is slow:
+    1. Make sure you're not running multiple wit commands in the function
+    2. Consider using the caching approach above
+    3. Check if your repository is very large
+  </Accordion>
+  
+  <Accordion title="Prompt breaks outside wit repositories">
+    Always use `2>/dev/null` to suppress errors when not in a wit repository.
+    The functions above handle this automatically.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Commands Reference" icon="terminal" href="/commands/overview">
+    Learn all available commands
+  </Card>
+  <Card title="Configuration" icon="gear" href="/configuration/overview">
+    Customize wit behavior
+  </Card>
+</CardGroup>
