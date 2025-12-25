@@ -32,6 +32,10 @@ import {
   handleStats,
   handleFixup,
   handleSnapshot,
+  // New Git-compatible commands
+  handleStash,
+  handleTag,
+  handleReset,
 } from './commands';
 import { TsgitError, findSimilar } from './core/errors';
 import { Repository } from './core/repository';
@@ -88,6 +92,14 @@ Undo & History:
   undo                  Undo the last operation
   history               Show operation history
   uncommit              Undo last commit, keep changes staged
+  reset [--soft|--hard] Reset HEAD to a specific state
+  stash                 Save working directory changes temporarily
+
+Tags:
+  tag                   List all tags
+  tag <name>            Create a lightweight tag
+  tag -a <name> -m ""   Create an annotated tag
+  tag -d <name>         Delete a tag
 
 Quality of Life:
   amend                 Quickly fix the last commit
@@ -153,6 +165,8 @@ const COMMANDS = [
   'ui', 'web',
   'ai',
   'cat-file', 'hash-object', 'ls-files', 'ls-tree',
+  // New Git-compatible commands
+  'stash', 'tag', 'reset',
   'help',
 ];
 
@@ -459,6 +473,19 @@ function main(): void {
 
       case 'snapshot':
         handleSnapshot(cmdArgs);
+        break;
+
+      // New Git-compatible commands
+      case 'stash':
+        handleStash(cmdArgs);
+        break;
+
+      case 'tag':
+        handleTag(cmdArgs);
+        break;
+
+      case 'reset':
+        handleReset(cmdArgs);
         break;
 
       default: {

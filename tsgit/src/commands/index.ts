@@ -32,3 +32,8 @@ export { catFile } from './cat-file';
 export { hashObjectCommand } from './hash-object';
 export { lsFiles } from './ls-files';
 export { lsTree } from './ls-tree';
+
+// New commands (bridging the gap with Git)
+export { handleStash, StashManager } from './stash';
+export { handleTag, createLightweightTag, createAnnotatedTag, listTags, deleteTag } from './tag';
+export { handleReset, reset, resetFile, parseRevision } from './reset';
