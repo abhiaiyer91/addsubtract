@@ -1,7 +1,7 @@
 {
   "name": "tsgit",
   "version": "2.0.0",
-  "description": "A modern Git implementation in TypeScript - SHA-256, built-in UI, undo support, and more",
+  "description": "A modern Git implementation in TypeScript with AI-powered features - SHA-256, built-in UI, undo support, AI commit messages, and more",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
@@ -24,7 +24,12 @@
     "vcs",
     "sha256",
     "tui",
-    "cli"
+    "cli",
+    "ai",
+    "llm",
+    "mastra",
+    "commit-message",
+    "code-review"
   ],
   "author": "",
   "license": "MIT",
@@ -34,11 +39,13 @@
     "vitest": "^4.0.16"
   },
   "dependencies": {
+    "@mastra/core": "^1.0.0-beta.17",
     "@types/blessed": "^0.1.27",
-    "blessed": "^0.1.81"
+    "blessed": "^0.1.81",
+    "zod": "^4.2.1"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=22.13.0"
   },
   "repository": {
     "type": "git",

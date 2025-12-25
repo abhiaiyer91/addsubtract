@@ -21,6 +21,8 @@ import {
   handleMerge,
   handleCommit,
   handleScope,
+  // AI commands
+  handleAI,
   // Quality of Life commands
   handleAmend,
   handleWip,
@@ -52,6 +54,7 @@ tsgit improves on Git with:
   • Monorepo scopes (work with subsets of large repos)
   • Better error messages (with suggestions)
   • Built-in visual UI (terminal and web)
+  • AI-powered features (commit messages, code review, conflict resolution)
   • Quality of life commands (amend, wip, uncommit, etc.)
 
 Usage: tsgit <command> [<args>]
@@ -101,6 +104,14 @@ Monorepo Support:
   scope use <preset>    Use a preset scope (frontend, backend, docs)
   scope clear           Clear scope restrictions
 
+AI-Powered Features:
+  ai <query>            Natural language git commands
+  ai commit [-a] [-x]   Generate commit message from changes
+  ai review             AI code review of changes
+  ai explain [ref]      Explain a commit
+  ai resolve [file]     AI-assisted conflict resolution
+  ai status             Show AI configuration
+
 Plumbing Commands:
   cat-file <hash>       Provide content or type info for objects
   hash-object <file>    Compute object ID and create a blob
@@ -112,6 +123,18 @@ Options:
   -v, --version         Show version number
 
 Examples:
+  tsgit ui                    # Launch terminal UI
+  tsgit web                   # Launch web UI
+  tsgit init
+  tsgit add .
+  tsgit commit -m "Initial commit"
+  tsgit commit -a -m "Update all tracked files"
+  tsgit switch -c feature
+  tsgit merge feature
+  tsgit undo
+  tsgit scope use frontend
+  tsgit ai "what files changed?"
+  tsgit ai commit -a -x
   tsgit wip -a                # Quick save all changes
   tsgit amend -m "New msg"    # Fix last commit message
   tsgit uncommit              # Undo commit, keep changes
@@ -128,6 +151,7 @@ const COMMANDS = [
   'amend', 'wip', 'fixup', 'cleanup', 'blame', 'stats', 'snapshot',
   'scope', 'graph',
   'ui', 'web',
+  'ai',
   'cat-file', 'hash-object', 'ls-files', 'ls-tree',
   'help',
 ];
@@ -378,6 +402,13 @@ function main(): void {
         });
         break;
 
+      case 'ai':
+        // AI commands are async, so we need to handle them specially
+        handleAI(cmdArgs).catch((error: Error) => {
+          console.error(`error: ${error.message}`);
+          process.exit(1);
+        });
+        return; // Exit main() to let async handle complete
       // Quality of Life commands
       case 'amend':
         handleAmend(cmdArgs.concat(
