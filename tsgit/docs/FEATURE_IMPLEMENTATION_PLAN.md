@@ -1,6 +1,6 @@
 # tsgit Feature Implementation Plan
 
-This document outlines all missing features needed to achieve feature parity with Git, organized into workstreams that can be tackled independently.
+This document outlines all features implemented in tsgit, organized into workstreams.
 
 ## Overview
 
@@ -346,23 +346,54 @@ tsgit gc --prune=now            // Prune immediately
 
 ---
 
-## Testing ✅ Complete
+## Testing Status
 
-All commands have comprehensive tests:
+### ✅ Commands with Dedicated Tests
 
-| Command     | Test File                           | Status  |
-| ----------- | ----------------------------------- | ------- |
-| stash       | `src/__tests__/stash.test.ts`       | ✅ Done |
-| tag         | `src/__tests__/tag.test.ts`         | ✅ Done |
-| reset       | `src/__tests__/reset.test.ts`       | ✅ Done |
-| bisect      | `src/__tests__/bisect.test.ts`      | ✅ Done |
-| show        | `src/__tests__/show.test.ts`        | ✅ Done |
-| cherry-pick | `src/__tests__/cherry-pick.test.ts` | ✅ Done |
-| rebase      | `src/__tests__/rebase.test.ts`      | ✅ Done |
-| revert      | `src/__tests__/revert.test.ts`      | ✅ Done |
-| plumbing    | `src/__tests__/plumbing.test.ts`    | ✅ Done |
+| Command     | Test File                           | Tests |
+| ----------- | ----------------------------------- | ----- |
+| amend       | `src/__tests__/amend.test.ts`       | 8     |
+| blame       | `src/__tests__/blame.test.ts`       | 9     |
+| bisect      | `src/__tests__/bisect.test.ts`      | ~10   |
+| cherry-pick | `src/__tests__/cherry-pick.test.ts` | ~15   |
+| clean       | `src/__tests__/clean.test.ts`       | ~10   |
+| cleanup     | `src/__tests__/cleanup.test.ts`     | 9     |
+| fixup       | `src/__tests__/fixup.test.ts`       | 9     |
+| plumbing    | `src/__tests__/plumbing.test.ts`    | ~30   |
+| rebase      | `src/__tests__/rebase.test.ts`      | ~15   |
+| remote      | `src/__tests__/remote.test.ts`      | 26    |
+| reset       | `src/__tests__/reset.test.ts`       | ~10   |
+| revert      | `src/__tests__/revert.test.ts`      | ~12   |
+| show        | `src/__tests__/show.test.ts`        | ~10   |
+| snapshot    | `src/__tests__/snapshot.test.ts`    | 17    |
+| stash       | `src/__tests__/stash.test.ts`       | ~12   |
+| stats       | `src/__tests__/stats.test.ts`       | 15    |
+| tag         | `src/__tests__/tag.test.ts`         | ~10   |
+| uncommit    | `src/__tests__/uncommit.test.ts`    | 8     |
+| wip         | `src/__tests__/wip.test.ts`         | 8     |
 
-**Current Test Count:** 299+ tests passing
+**Note:** `plumbing.test.ts` covers rev-parse, update-ref, symbolic-ref, for-each-ref, show-ref, and fsck.
+
+### ✅ Recently Added Tests
+
+| Command   | Test File                         | Tests |
+| --------- | --------------------------------- | ----- |
+| reflog    | `src/__tests__/reflog.test.ts`    | ~15   |
+| gc        | `src/__tests__/gc.test.ts`        | ~12   |
+| hooks     | `src/__tests__/hooks.test.ts`     | ~20   |
+| submodule | `src/__tests__/submodule.test.ts` | ~15   |
+| worktree  | `src/__tests__/worktree.test.ts`  | ~10   |
+
+### ⚠️ Commands Needing Tests (Network-dependent)
+
+| Command | File                    | Priority | Notes                           |
+| ------- | ----------------------- | -------- | ------------------------------- |
+| clone   | `src/commands/clone.ts` | Low      | Requires network for full tests |
+| fetch   | `src/commands/fetch.ts` | Low      | Requires network for full tests |
+| pull    | `src/commands/pull.ts`  | Low      | Requires network for full tests |
+| push    | `src/commands/push.ts`  | Low      | Requires network for full tests |
+
+**Current Test Count:** 397 tests passing
 
 ---
 
