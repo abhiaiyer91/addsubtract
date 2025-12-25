@@ -2,6 +2,75 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 /**
+ * Default patterns that are always ignored
+ */
+const DEFAULT_IGNORE_PATTERNS = ['.tsgit/', '.git/', 'node_modules/'];
+
+/**
+ * Parse a .tsgitignore or .gitignore file into patterns
+ */
+export function parseIgnoreFile(content: string): string[] {
+  return content
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line && !line.startsWith('#')); // Remove empty lines and comments
+}
+
+/**
+ * Load ignore patterns from .tsgitignore (or .gitignore as fallback)
+ */
+export function loadIgnorePatterns(workDir: string): string[] {
+  const patterns = [...DEFAULT_IGNORE_PATTERNS];
+  
+  // Try .tsgitignore first, then .gitignore
+  const ignoreFiles = ['.tsgitignore', '.gitignore'];
+  
+  for (const ignoreFile of ignoreFiles) {
+    const ignorePath = path.join(workDir, ignoreFile);
+    if (fs.existsSync(ignorePath)) {
+      const content = fs.readFileSync(ignorePath, 'utf8');
+      patterns.push(...parseIgnoreFile(content));
+      break; // Only use the first found ignore file
+    }
+  }
+  
+  return patterns;
+}
+
+/**
+ * Check if a path matches an ignore pattern
+ */
+export function matchesIgnorePattern(filePath: string, pattern: string): boolean {
+  // Normalize the pattern
+  const normalizedPattern = pattern.replace(/\\/g, '/');
+  const normalizedPath = filePath.replace(/\\/g, '/');
+  
+  // Directory pattern (ends with /)
+  if (normalizedPattern.endsWith('/')) {
+    const dirName = normalizedPattern.slice(0, -1);
+    // Match directory name anywhere in path
+    return normalizedPath.split('/').includes(dirName);
+  }
+  
+  // Glob pattern with *
+  if (normalizedPattern.includes('*')) {
+    const regex = new RegExp(
+      '^' + normalizedPattern
+        .replace(/\./g, '\\.')
+        .replace(/\*\*/g, '{{GLOBSTAR}}')
+        .replace(/\*/g, '[^/]*')
+        .replace(/\{\{GLOBSTAR\}\}/g, '.*') + '$'
+    );
+    return regex.test(normalizedPath) || regex.test(path.basename(normalizedPath));
+  }
+  
+  // Exact match or basename match
+  return normalizedPath === normalizedPattern || 
+         path.basename(normalizedPath) === normalizedPattern ||
+         normalizedPath.endsWith('/' + normalizedPattern);
+}
+
+/**
  * Recursively create directories
  */
 export function mkdirp(dirPath: string): void {
@@ -46,12 +115,17 @@ export function writeFile(filePath: string, data: Buffer | string): void {
 export function walkDir(dir: string, ignorePatterns: string[] = []): string[] {
   const results: string[] = [];
   
-  function shouldIgnore(name: string): boolean {
+  function shouldIgnore(fullPath: string, name: string): boolean {
+    const relativePath = path.relative(dir, fullPath);
     return ignorePatterns.some(pattern => {
+      // Check directory name for directory patterns
       if (pattern.endsWith('/')) {
-        return name === pattern.slice(0, -1);
+        const dirName = pattern.slice(0, -1);
+        return name === dirName || relativePath.split(path.sep).includes(dirName);
       }
-      return name === pattern || name.startsWith(pattern);
+      // Use the full matching logic
+      return matchesIgnorePattern(relativePath, pattern) || 
+             matchesIgnorePattern(name, pattern);
     });
   }
 
@@ -59,9 +133,9 @@ export function walkDir(dir: string, ignorePatterns: string[] = []): string[] {
     const entries = fs.readdirSync(currentDir, { withFileTypes: true });
     
     for (const entry of entries) {
-      if (shouldIgnore(entry.name)) continue;
-      
       const fullPath = path.join(currentDir, entry.name);
+      
+      if (shouldIgnore(fullPath, entry.name)) continue;
       
       if (entry.isDirectory()) {
         walk(fullPath);

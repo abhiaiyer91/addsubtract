@@ -4,7 +4,7 @@ import { Index, buildTreeFromIndex } from './index';
 import { Refs } from './refs';
 import { Tree, Commit, Blob } from './object';
 import { Author, TreeEntry, IndexEntry } from './types';
-import { exists, mkdirp, writeFile, readFile, walkDir, readFileText } from '../utils/fs';
+import { exists, mkdirp, writeFile, readFile, walkDir, readFileText, loadIgnorePatterns } from '../utils/fs';
 import { Journal } from './journal';
 import { LargeFileHandler, CHUNK_THRESHOLD } from './large-file';
 import { BranchStateManager } from './branch-state';
@@ -190,7 +190,8 @@ export class Repository {
    * Add all files matching a pattern
    */
   addAll(): void {
-    const files = walkDir(this.workDir, ['.tsgit/', 'node_modules/', '.git/']);
+    const ignorePatterns = loadIgnorePatterns(this.workDir);
+    const files = walkDir(this.workDir, ignorePatterns);
     
     for (const file of files) {
       const relativePath = path.relative(this.workDir, file);
@@ -333,7 +334,8 @@ export class Repository {
     }
 
     // Compare working directory with index
-    const workFiles = walkDir(this.workDir, ['.tsgit/', 'node_modules/', '.git/']);
+    const ignorePatterns = loadIgnorePatterns(this.workDir);
+    const workFiles = walkDir(this.workDir, ignorePatterns);
     const workFilesSet = new Set<string>();
 
     for (const file of workFiles) {
