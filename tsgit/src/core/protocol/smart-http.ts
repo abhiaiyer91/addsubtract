@@ -195,9 +195,15 @@ export class SmartHttpClient {
         continue;
       }
 
-      // Check for NAK/ACK
       const lineStr = line.toString('utf8');
+      
+      // Check for NAK/ACK
       if (lineStr.startsWith('NAK') || lineStr.startsWith('ACK')) {
+        continue;
+      }
+      
+      // Check for shallow/unshallow lines (shallow clone response)
+      if (lineStr.startsWith('shallow ') || lineStr.startsWith('unshallow ')) {
         continue;
       }
 
@@ -206,11 +212,11 @@ export class SmartHttpClient {
         const channel = line[0];
 
         if (channel === SideBandChannel.PACK_DATA) {
-          // Pack data
+          // Pack data (sideband channel 1)
           packParts.push(line.slice(1));
           inPack = true;
         } else if (channel === SideBandChannel.PROGRESS) {
-          // Progress message
+          // Progress message (sideband channel 2)
           const msg = line.slice(1).toString('utf8');
           progressMessages.push(msg);
           if (options?.progress) {
@@ -226,12 +232,17 @@ export class SmartHttpClient {
             }
           }
         } else if (channel === SideBandChannel.ERROR) {
-          // Error message
+          // Error message (sideband channel 3)
           const errorMsg = line.slice(1).toString('utf8');
           throw new Error(`Server error: ${errorMsg}`);
         } else if (!inPack) {
-          // Could be pack data without sideband
-          packParts.push(line);
+          // Not in sideband mode - check if this is actual pack data
+          // Pack data starts with 'PACK' signature
+          if (line.length >= 4 && line.slice(0, 4).toString('ascii') === 'PACK') {
+            packParts.push(line);
+            inPack = true;
+          }
+          // Otherwise skip unknown lines
         }
       }
     }

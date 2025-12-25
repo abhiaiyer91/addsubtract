@@ -57,6 +57,29 @@ export class ObjectStore {
   }
 
   /**
+   * Write a raw object (type + data) directly to the store
+   * Used when importing objects from pack files
+   */
+  writeRawObject(type: ObjectType, data: Buffer, expectedHash?: string): string {
+    const hash = hashObject(type, data);
+    
+    // Verify hash if provided (for pack file imports)
+    if (expectedHash && hash !== expectedHash) {
+      throw new Error(`Hash mismatch: expected ${expectedHash}, got ${hash}`);
+    }
+    
+    const objectPath = this.getObjectPath(hash);
+
+    if (!exists(objectPath)) {
+      const buffer = createObjectBuffer(type, data);
+      const compressed = compress(buffer);
+      writeFile(objectPath, compressed);
+    }
+
+    return hash;
+  }
+
+  /**
    * Read a Git object from the store
    */
   readObject(hash: string): GitObject {
