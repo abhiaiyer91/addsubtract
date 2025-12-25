@@ -66,8 +66,7 @@ import { handleWorktree } from './core/worktree';
 import { TsgitError, findSimilar } from './core/errors';
 import { Repository } from './core/repository';
 import { launchTUI } from './ui/tui';
-import { launchWebUI } from './ui/web';
-import { launchEnhancedWebUI } from './ui/web-enhanced';
+import { launchPremiumWebUI } from './ui/web-premium';
 import { printGraph } from './ui/graph';
 
 const VERSION = '2.0.0';
@@ -91,7 +90,7 @@ Usage: tsgit <command> [<args>]
 
 Visual Interface:
   ui                    Launch interactive terminal UI (TUI)
-  web [--port <n>]      Launch enhanced web UI in browser
+  web [--port <n>]      Launch web UI in browser
   graph                 Show commit graph in terminal
 
 Core Commands:
@@ -452,11 +451,7 @@ function main(): void {
 
       case 'web': {
         const port = options.port ? parseInt(options.port as string, 10) : 3847;
-        if (options.basic) {
-          launchWebUI(port);
-        } else {
-          launchEnhancedWebUI(port);
-        }
+        launchPremiumWebUI(port);
         break;
       }
 

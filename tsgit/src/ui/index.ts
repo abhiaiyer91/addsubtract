@@ -8,9 +8,7 @@
 // =============================================================================
 
 export { TsgitTUI, launchTUI } from './tui';
-export { TsgitWebUI, launchWebUI } from './web';
-export { EnhancedWebUI, launchEnhancedWebUI } from './web-enhanced';
-export { UltimateWebUI, launchUltimateWebUI } from './web-ultimate';
+export { PremiumWebUI, launchPremiumWebUI as launchWebUI } from './web-premium';
 
 // =============================================================================
 // Theme System
