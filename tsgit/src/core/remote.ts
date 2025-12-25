@@ -8,14 +8,20 @@ import { exists, readFileText, writeFile, mkdirp, readDir, isDirectory, deleteFi
 import { TsgitError, ErrorCode } from './errors';
 
 /**
- * Remote configuration
+ * Remote repository configuration
  */
-export interface RemoteConfig {
+export interface Remote {
   name: string;
   url: string;
-  pushUrl?: string;
-  fetch: string;  // Refspec for fetching
+  fetch: string; // Refspec for fetching
+  push?: string; // Refspec for pushing
+  pushUrl?: string; // Push URL if different from fetch URL
 }
+
+/**
+ * Alias for Remote for backwards compatibility
+ */
+export type RemoteConfig = Remote;
 
 /**
  * Remote tracking branch info
@@ -36,29 +42,125 @@ export interface BranchTrackingConfig {
 }
 
 /**
- * Remote Manager - handles remote configuration
+ * Parse INI-style config file
+ */
+function parseConfig(content: string): Map<string, Map<string, string>> {
+  const sections = new Map<string, Map<string, string>>();
+  let currentSection = '';
+
+  const lines = content.split('\n');
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    // Skip empty lines and comments
+    if (!trimmed || trimmed.startsWith('#') || trimmed.startsWith(';')) {
+      continue;
+    }
+
+    // Section header: [section] or [section "subsection"]
+    const sectionMatch = trimmed.match(/^\[([^\s\]]+)(?:\s+"([^"]+)")?\]$/);
+    if (sectionMatch) {
+      const sectionName = sectionMatch[1];
+      const subsection = sectionMatch[2];
+      currentSection = subsection ? `${sectionName}.${subsection}` : sectionName;
+      if (!sections.has(currentSection)) {
+        sections.set(currentSection, new Map());
+      }
+      continue;
+    }
+
+    // Key-value pair
+    const kvMatch = trimmed.match(/^([^=]+?)\s*=\s*(.*)$/);
+    if (kvMatch && currentSection) {
+      const key = kvMatch[1].trim();
+      const value = kvMatch[2].trim();
+      const section = sections.get(currentSection) || new Map();
+      section.set(key, value);
+      sections.set(currentSection, section);
+    }
+  }
+
+  return sections;
+}
+
+/**
+ * Serialize sections back to INI format
+ */
+function serializeConfig(sections: Map<string, Map<string, string>>): string {
+  const lines: string[] = [];
+
+  // Group sections by type for better organization
+  const sortedSections = Array.from(sections.keys()).sort();
+
+  for (const sectionKey of sortedSections) {
+    const values = sections.get(sectionKey)!;
+    if (values.size === 0) continue;
+
+    // Parse section key: "type.name" or just "type"
+    const dotIndex = sectionKey.indexOf('.');
+    if (dotIndex !== -1) {
+      const type = sectionKey.slice(0, dotIndex);
+      const name = sectionKey.slice(dotIndex + 1);
+      lines.push(`[${type} "${name}"]`);
+    } else {
+      lines.push(`[${sectionKey}]`);
+    }
+
+    for (const [key, value] of values) {
+      lines.push(`\t${key} = ${value}`);
+    }
+
+    lines.push(''); // Empty line between sections
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * RemoteManager handles remote repository configuration
+ * 
+ * Stores configuration in .tsgit/config using Git-compatible INI format
  */
 export class RemoteManager {
-  private remotesDir: string;
   private configPath: string;
+  private remotesDir: string;
 
   constructor(private gitDir: string) {
-    this.remotesDir = path.join(gitDir, 'refs', 'remotes');
     this.configPath = path.join(gitDir, 'config');
+    this.remotesDir = path.join(gitDir, 'refs', 'remotes');
   }
 
   /**
-   * Initialize remotes directory
+   * Initialize remote infrastructure
    */
   init(): void {
     mkdirp(this.remotesDir);
   }
 
   /**
+   * Load config sections from disk
+   */
+  private loadConfig(): Map<string, Map<string, string>> {
+    if (!exists(this.configPath)) {
+      return new Map();
+    }
+
+    const content = readFileText(this.configPath);
+    return parseConfig(content);
+  }
+
+  /**
+   * Save config sections to disk
+   */
+  private saveConfig(sections: Map<string, Map<string, string>>): void {
+    const content = serializeConfig(sections);
+    writeFile(this.configPath, content);
+  }
+
+  /**
    * Add a new remote
    */
   add(name: string, url: string, options: { fetch?: string } = {}): void {
-    // Validate remote name
     if (!this.isValidRemoteName(name)) {
       throw new TsgitError(
         `'${name}' is not a valid remote name`,
@@ -67,8 +169,8 @@ export class RemoteManager {
       );
     }
 
-    // Check if remote already exists
-    if (this.exists(name)) {
+    const existing = this.get(name);
+    if (existing) {
       throw new TsgitError(
         `remote ${name} already exists`,
         ErrorCode.OPERATION_FAILED,
@@ -79,27 +181,24 @@ export class RemoteManager {
       );
     }
 
-    // Create remote directory
-    const remoteDir = path.join(this.remotesDir, name);
-    mkdirp(remoteDir);
+    const sections = this.loadConfig();
+    const remoteSection = new Map<string, string>();
+    remoteSection.set('url', url);
+    remoteSection.set('fetch', options.fetch || `+refs/heads/*:refs/remotes/${name}/*`);
+    sections.set(`remote.${name}`, remoteSection);
 
-    // Write remote config to config file
-    const config = this.readConfig();
-    const refspec = options.fetch || `+refs/heads/*:refs/remotes/${name}/*`;
-    
-    config[`remote "${name}"`] = {
-      url,
-      fetch: refspec,
-    };
+    this.saveConfig(sections);
 
-    this.writeConfig(config);
+    // Create remotes ref directory
+    mkdirp(path.join(this.remotesDir, name));
   }
 
   /**
    * Remove a remote
    */
   remove(name: string): void {
-    if (!this.exists(name)) {
+    const existing = this.get(name);
+    if (!existing) {
       throw new TsgitError(
         `No such remote: '${name}'`,
         ErrorCode.REF_NOT_FOUND,
@@ -107,48 +206,31 @@ export class RemoteManager {
       );
     }
 
-    // Remove from config
-    const config = this.readConfig();
-    delete config[`remote "${name}"`];
-    this.writeConfig(config);
+    const sections = this.loadConfig();
+    sections.delete(`remote.${name}`);
+
+    // Remove branch tracking configs for this remote
+    for (const [key, values] of sections) {
+      if (key.startsWith('branch.')) {
+        if (values.get('remote') === name) {
+          sections.delete(key);
+        }
+      }
+    }
+
+    this.saveConfig(sections);
 
     // Remove remote refs directory
     const remoteDir = path.join(this.remotesDir, name);
     if (exists(remoteDir)) {
       this.removeDir(remoteDir);
     }
-
-    // Remove branch tracking configs for this remote
-    for (const key of Object.keys(config)) {
-      if (key.startsWith('branch "')) {
-        const branchConfig = config[key] as Record<string, string>;
-        if (branchConfig.remote === name) {
-          delete config[key];
-        }
-      }
-    }
-    this.writeConfig(config);
   }
 
   /**
    * Rename a remote
    */
   rename(oldName: string, newName: string): void {
-    if (!this.exists(oldName)) {
-      throw new TsgitError(
-        `No such remote: '${oldName}'`,
-        ErrorCode.REF_NOT_FOUND,
-        this.getSuggestions(oldName)
-      );
-    }
-
-    if (this.exists(newName)) {
-      throw new TsgitError(
-        `remote ${newName} already exists`,
-        ErrorCode.OPERATION_FAILED
-      );
-    }
-
     if (!this.isValidRemoteName(newName)) {
       throw new TsgitError(
         `'${newName}' is not a valid remote name`,
@@ -156,61 +238,122 @@ export class RemoteManager {
       );
     }
 
-    const config = this.readConfig();
-    
-    // Get old remote config
-    const oldKey = `remote "${oldName}"`;
-    const remoteConfig = config[oldKey] as Record<string, string>;
-    
-    if (!remoteConfig) {
+    const existing = this.get(oldName);
+    if (!existing) {
+      throw new TsgitError(
+        `No such remote: '${oldName}'`,
+        ErrorCode.REF_NOT_FOUND,
+        this.getSuggestions(oldName)
+      );
+    }
+
+    const newExisting = this.get(newName);
+    if (newExisting) {
+      throw new TsgitError(
+        `remote ${newName} already exists`,
+        ErrorCode.OPERATION_FAILED
+      );
+    }
+
+    const sections = this.loadConfig();
+    const remoteSection = sections.get(`remote.${oldName}`);
+    if (!remoteSection) {
       throw new TsgitError(
         `Could not find remote config for '${oldName}'`,
         ErrorCode.OPERATION_FAILED
       );
     }
 
-    // Update fetch refspec
-    const newRefspec = remoteConfig.fetch?.replace(
-      new RegExp(`refs/remotes/${oldName}/`, 'g'),
-      `refs/remotes/${newName}/`
-    );
-
-    // Create new remote config
-    config[`remote "${newName}"`] = {
-      ...remoteConfig,
-      fetch: newRefspec,
-    };
-    delete config[oldKey];
+    // Update the fetch refspec to reflect the new name
+    const fetch = remoteSection.get('fetch');
+    if (fetch) {
+      remoteSection.set('fetch', fetch.replace(
+        new RegExp(`refs/remotes/${oldName}/`),
+        `refs/remotes/${newName}/`
+      ));
+    }
 
     // Update branch tracking configs
-    for (const key of Object.keys(config)) {
-      if (key.startsWith('branch "')) {
-        const branchConfig = config[key] as Record<string, string>;
-        if (branchConfig.remote === oldName) {
-          branchConfig.remote = newName;
+    for (const [key, values] of sections) {
+      if (key.startsWith('branch.')) {
+        if (values.get('remote') === oldName) {
+          values.set('remote', newName);
         }
       }
     }
 
-    this.writeConfig(config);
+    // Remove old and add new
+    sections.delete(`remote.${oldName}`);
+    sections.set(`remote.${newName}`, remoteSection);
+    this.saveConfig(sections);
 
-    // Rename remote refs directory
-    const oldDir = path.join(this.remotesDir, oldName);
-    const newDir = path.join(this.remotesDir, newName);
-    
-    if (exists(oldDir)) {
-      // Copy refs to new directory
-      mkdirp(newDir);
-      this.copyDir(oldDir, newDir);
-      this.removeDir(oldDir);
+    // Rename the remotes ref directory
+    const oldRefsDir = path.join(this.remotesDir, oldName);
+    const newRefsDir = path.join(this.remotesDir, newName);
+    if (exists(oldRefsDir)) {
+      const fs = require('fs');
+      fs.renameSync(oldRefsDir, newRefsDir);
     }
+  }
+
+  /**
+   * Set the URL for a remote
+   */
+  setUrl(name: string, url: string, options: { push?: boolean } = {}): void {
+    const existing = this.get(name);
+    if (!existing) {
+      throw new TsgitError(
+        `No such remote '${name}'`,
+        ErrorCode.REF_NOT_FOUND,
+        this.getSuggestions(name)
+      );
+    }
+
+    const sections = this.loadConfig();
+    const remoteSection = sections.get(`remote.${name}`);
+    if (remoteSection) {
+      if (options.push) {
+        remoteSection.set('pushurl', url);
+      } else {
+        remoteSection.set('url', url);
+      }
+      this.saveConfig(sections);
+    }
+  }
+
+  /**
+   * Get a remote by name
+   */
+  get(name: string): Remote | null {
+    const sections = this.loadConfig();
+    const remoteSection = sections.get(`remote.${name}`);
+
+    if (!remoteSection) {
+      return null;
+    }
+
+    const url = remoteSection.get('url');
+    if (!url) {
+      return null;
+    }
+
+    return {
+      name,
+      url,
+      fetch: remoteSection.get('fetch') || `+refs/heads/*:refs/remotes/${name}/*`,
+      push: remoteSection.get('push'),
+      pushUrl: remoteSection.get('pushurl'),
+    };
   }
 
   /**
    * Get URL for a remote
    */
   getUrl(name: string, push: boolean = false): string {
-    if (!this.exists(name)) {
+    const sections = this.loadConfig();
+    const remoteSection = sections.get(`remote.${name}`);
+
+    if (!remoteSection) {
       throw new TsgitError(
         `No such remote '${name}'`,
         ErrorCode.REF_NOT_FOUND,
@@ -218,78 +361,178 @@ export class RemoteManager {
       );
     }
 
-    const config = this.readConfig();
-    const remoteConfig = config[`remote "${name}"`] as Record<string, string>;
-
-    if (push && remoteConfig.pushurl) {
-      return remoteConfig.pushurl;
+    if (push) {
+      const pushUrl = remoteSection.get('pushurl');
+      if (pushUrl) return pushUrl;
     }
 
-    return remoteConfig.url;
-  }
-
-  /**
-   * Set URL for a remote
-   */
-  setUrl(name: string, url: string, options: { push?: boolean } = {}): void {
-    if (!this.exists(name)) {
-      throw new TsgitError(
-        `No such remote '${name}'`,
-        ErrorCode.REF_NOT_FOUND,
-        this.getSuggestions(name)
-      );
-    }
-
-    const config = this.readConfig();
-    const remoteConfig = config[`remote "${name}"`] as Record<string, string>;
-
-    if (options.push) {
-      remoteConfig.pushurl = url;
-    } else {
-      remoteConfig.url = url;
-    }
-
-    this.writeConfig(config);
-  }
-
-  /**
-   * List all remotes
-   */
-  list(): RemoteConfig[] {
-    const config = this.readConfig();
-    const remotes: RemoteConfig[] = [];
-
-    for (const key of Object.keys(config)) {
-      const match = key.match(/^remote "(.+)"$/);
-      if (match) {
-        const name = match[1];
-        const remoteConfig = config[key] as Record<string, string>;
-        remotes.push({
-          name,
-          url: remoteConfig.url,
-          pushUrl: remoteConfig.pushurl,
-          fetch: remoteConfig.fetch,
-        });
-      }
-    }
-
-    return remotes;
-  }
-
-  /**
-   * Get a specific remote
-   */
-  get(name: string): RemoteConfig | null {
-    const remotes = this.list();
-    return remotes.find(r => r.name === name) || null;
+    return remoteSection.get('url') || '';
   }
 
   /**
    * Check if a remote exists
    */
   exists(name: string): boolean {
-    const config = this.readConfig();
-    return `remote "${name}"` in config;
+    return this.get(name) !== null;
+  }
+
+  /**
+   * List all configured remotes
+   */
+  list(): Remote[] {
+    const sections = this.loadConfig();
+    const remotes: Remote[] = [];
+
+    for (const [key, values] of sections) {
+      if (key.startsWith('remote.')) {
+        const name = key.slice(7); // Remove 'remote.' prefix
+        const url = values.get('url');
+        if (url) {
+          remotes.push({
+            name,
+            url,
+            fetch: values.get('fetch') || `+refs/heads/*:refs/remotes/${name}/*`,
+            push: values.get('push'),
+            pushUrl: values.get('pushurl'),
+          });
+        }
+      }
+    }
+
+    return remotes.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  /**
+   * Get the default remote (usually 'origin')
+   */
+  getDefault(): Remote | null {
+    // First try 'origin' as it's the conventional default
+    const origin = this.get('origin');
+    if (origin) {
+      return origin;
+    }
+
+    // Otherwise return the first remote
+    const remotes = this.list();
+    return remotes.length > 0 ? remotes[0] : null;
+  }
+
+  /**
+   * Set the push URL for a remote (separate from fetch URL)
+   */
+  setPushUrl(name: string, url: string): void {
+    const existing = this.get(name);
+    if (!existing) {
+      throw new TsgitError(
+        `No such remote '${name}'`,
+        ErrorCode.REF_NOT_FOUND,
+        this.getSuggestions(name)
+      );
+    }
+
+    const sections = this.loadConfig();
+    const remoteSection = sections.get(`remote.${name}`);
+    if (remoteSection) {
+      remoteSection.set('pushurl', url);
+      this.saveConfig(sections);
+    }
+  }
+
+  /**
+   * Get the push URL for a remote
+   * Falls back to the regular URL if no push URL is configured
+   */
+  getPushUrl(name: string): string | null {
+    const sections = this.loadConfig();
+    const remoteSection = sections.get(`remote.${name}`);
+
+    if (!remoteSection) {
+      return null;
+    }
+
+    return remoteSection.get('pushurl') || remoteSection.get('url') || null;
+  }
+
+  /**
+   * Update a remote tracking ref
+   */
+  updateRemoteRef(remoteName: string, refName: string, hash: string): void {
+    const refPath = path.join(this.remotesDir, remoteName, refName);
+    mkdirp(path.dirname(refPath));
+    writeFile(refPath, hash + '\n');
+  }
+
+  /**
+   * Get a remote tracking ref
+   */
+  getRemoteRef(remoteName: string, refName: string): string | null {
+    const refPath = path.join(this.remotesDir, remoteName, refName);
+    if (!exists(refPath)) {
+      return null;
+    }
+    return readFileText(refPath).trim();
+  }
+
+  /**
+   * Delete a remote tracking ref
+   */
+  deleteRemoteRef(remoteName: string, refName: string): void {
+    const refPath = path.join(this.remotesDir, remoteName, refName);
+    if (exists(refPath)) {
+      deleteFile(refPath);
+    }
+  }
+
+  /**
+   * Update a remote tracking branch (alias for updateRemoteRef)
+   */
+  updateTrackingBranch(remote: string, branch: string, hash: string): void {
+    this.updateRemoteRef(remote, branch, hash);
+  }
+
+  /**
+   * Get tracking branch hash
+   */
+  getTrackingBranchHash(remote: string, branch: string): string | null {
+    return this.getRemoteRef(remote, branch);
+  }
+
+  /**
+   * Delete a remote tracking branch
+   */
+  deleteTrackingBranch(remote: string, branch: string): void {
+    this.deleteRemoteRef(remote, branch);
+  }
+
+  /**
+   * List all refs for a remote
+   */
+  listRemoteRefs(remoteName: string): Map<string, string> {
+    const refs = new Map<string, string>();
+    const remoteRefDir = path.join(this.remotesDir, remoteName);
+
+    if (!exists(remoteRefDir)) {
+      return refs;
+    }
+
+    const listRefsRecursive = (dir: string, prefix: string): void => {
+      const entries = readDir(dir);
+
+      for (const entry of entries) {
+        const fullPath = path.join(dir, entry);
+        const refName = prefix ? prefix + '/' + entry : entry;
+
+        if (isDirectory(fullPath)) {
+          listRefsRecursive(fullPath, refName);
+        } else {
+          const hash = readFileText(fullPath).trim();
+          refs.set(refName, hash);
+        }
+      }
+    };
+
+    listRefsRecursive(remoteRefDir, '');
+    return refs;
   }
 
   /**
@@ -305,11 +548,8 @@ export class RemoteManager {
     const remotes = remoteName ? [remoteName] : this.listRemoteDirs();
 
     for (const remote of remotes) {
-      const remoteDir = path.join(this.remotesDir, remote);
-      if (!exists(remoteDir) || !isDirectory(remoteDir)) continue;
-
-      const refs = this.listRefsRecursive(remoteDir, '');
-      for (const { name, hash } of refs) {
+      const refs = this.listRemoteRefs(remote);
+      for (const [name, hash] of refs) {
         branches.push({
           remote,
           branch: name,
@@ -323,62 +563,42 @@ export class RemoteManager {
   }
 
   /**
-   * Update a remote tracking branch
-   */
-  updateTrackingBranch(remote: string, branch: string, hash: string): void {
-    const refPath = path.join(this.remotesDir, remote, branch);
-    mkdirp(path.dirname(refPath));
-    writeFile(refPath, hash + '\n');
-  }
-
-  /**
-   * Get tracking branch hash
-   */
-  getTrackingBranchHash(remote: string, branch: string): string | null {
-    const refPath = path.join(this.remotesDir, remote, branch);
-    if (!exists(refPath)) {
-      return null;
-    }
-    return readFileText(refPath).trim();
-  }
-
-  /**
-   * Delete a remote tracking branch
-   */
-  deleteTrackingBranch(remote: string, branch: string): void {
-    const refPath = path.join(this.remotesDir, remote, branch);
-    if (exists(refPath)) {
-      deleteFile(refPath);
-    }
-  }
-
-  /**
    * Set branch tracking configuration
    */
   setTrackingBranch(branch: string, remote: string, remoteBranch: string): void {
-    const config = this.readConfig();
-    config[`branch "${branch}"`] = {
-      remote,
-      merge: `refs/heads/${remoteBranch}`,
-    };
-    this.writeConfig(config);
+    const sections = this.loadConfig();
+    
+    let branchSection = sections.get(`branch.${branch}`);
+    if (!branchSection) {
+      branchSection = new Map();
+      sections.set(`branch.${branch}`, branchSection);
+    }
+    
+    branchSection.set('remote', remote);
+    branchSection.set('merge', `refs/heads/${remoteBranch}`);
+    
+    this.saveConfig(sections);
   }
 
   /**
    * Get branch tracking configuration
    */
   getTrackingConfig(branch: string): BranchTrackingConfig | null {
-    const config = this.readConfig();
-    const branchConfig = config[`branch "${branch}"`] as Record<string, string> | undefined;
+    const sections = this.loadConfig();
+    const branchSection = sections.get(`branch.${branch}`);
     
-    if (!branchConfig || !branchConfig.remote || !branchConfig.merge) {
+    if (!branchSection) {
       return null;
     }
 
-    return {
-      remote: branchConfig.remote,
-      merge: branchConfig.merge,
-    };
+    const remote = branchSection.get('remote');
+    const merge = branchSection.get('merge');
+    
+    if (!remote || !merge) {
+      return null;
+    }
+
+    return { remote, merge };
   }
 
   /**
@@ -398,121 +618,12 @@ export class RemoteManager {
   }
 
   /**
-   * Read config file
-   */
-  private readConfig(): Record<string, Record<string, string> | string> {
-    if (!exists(this.configPath)) {
-      return {};
-    }
-
-    const content = readFileText(this.configPath);
-    return this.parseConfig(content);
-  }
-
-  /**
-   * Write config file
-   */
-  private writeConfig(config: Record<string, Record<string, string> | string>): void {
-    const content = this.serializeConfig(config);
-    writeFile(this.configPath, content);
-  }
-
-  /**
-   * Parse Git-style config file
-   */
-  private parseConfig(content: string): Record<string, Record<string, string> | string> {
-    const config: Record<string, Record<string, string>> = {};
-    let currentSection = '';
-
-    const lines = content.split('\n');
-    for (const line of lines) {
-      const trimmed = line.trim();
-      
-      // Skip empty lines and comments
-      if (!trimmed || trimmed.startsWith('#') || trimmed.startsWith(';')) {
-        continue;
-      }
-
-      // Section header
-      const sectionMatch = trimmed.match(/^\[(.+)\]$/);
-      if (sectionMatch) {
-        currentSection = sectionMatch[1];
-        if (!config[currentSection]) {
-          config[currentSection] = {};
-        }
-        continue;
-      }
-
-      // Key-value pair
-      const kvMatch = trimmed.match(/^(\S+)\s*=\s*(.*)$/);
-      if (kvMatch && currentSection) {
-        const [, key, value] = kvMatch;
-        (config[currentSection] as Record<string, string>)[key.trim()] = value.trim();
-      }
-    }
-
-    return config;
-  }
-
-  /**
-   * Serialize config to Git-style format
-   */
-  private serializeConfig(config: Record<string, Record<string, string> | string>): string {
-    const lines: string[] = [];
-
-    for (const [section, values] of Object.entries(config)) {
-      if (typeof values === 'string') {
-        continue;
-      }
-
-      lines.push(`[${section}]`);
-      for (const [key, value] of Object.entries(values)) {
-        lines.push(`\t${key} = ${value}`);
-      }
-    }
-
-    return lines.join('\n') + '\n';
-  }
-
-  /**
    * Validate remote name
    */
   private isValidRemoteName(name: string): boolean {
-    return /^[a-zA-Z0-9_-]+$/.test(name);
-  }
-
-  /**
-   * List remote directories
-   */
-  private listRemoteDirs(): string[] {
-    if (!exists(this.remotesDir)) {
-      return [];
-    }
-    return readDir(this.remotesDir).filter(name => 
-      isDirectory(path.join(this.remotesDir, name))
-    );
-  }
-
-  /**
-   * List refs recursively
-   */
-  private listRefsRecursive(dir: string, prefix: string): { name: string; hash: string }[] {
-    const refs: { name: string; hash: string }[] = [];
-    const entries = readDir(dir);
-
-    for (const entry of entries) {
-      const fullPath = path.join(dir, entry);
-      const refName = prefix ? `${prefix}/${entry}` : entry;
-
-      if (isDirectory(fullPath)) {
-        refs.push(...this.listRefsRecursive(fullPath, refName));
-      } else {
-        const hash = readFileText(fullPath).trim();
-        refs.push({ name: refName, hash });
-      }
-    }
-
-    return refs;
+    // Remote names should be alphanumeric with hyphens and underscores
+    // They cannot start with a hyphen or contain slashes
+    return /^[a-zA-Z0-9_][a-zA-Z0-9_-]*$/.test(name);
   }
 
   /**
@@ -540,6 +651,18 @@ export class RemoteManager {
   }
 
   /**
+   * List remote directories
+   */
+  private listRemoteDirs(): string[] {
+    if (!exists(this.remotesDir)) {
+      return [];
+    }
+    return readDir(this.remotesDir).filter(name => 
+      isDirectory(path.join(this.remotesDir, name))
+    );
+  }
+
+  /**
    * Remove directory recursively
    */
   private removeDir(dir: string): void {
@@ -550,22 +673,55 @@ export class RemoteManager {
   }
 
   /**
-   * Copy directory recursively
+   * Parse a refspec string
    */
-  private copyDir(src: string, dest: string): void {
-    const fs = require('fs');
-    mkdirp(dest);
-    
-    const entries = readDir(src);
-    for (const entry of entries) {
-      const srcPath = path.join(src, entry);
-      const destPath = path.join(dest, entry);
-      
-      if (isDirectory(srcPath)) {
-        this.copyDir(srcPath, destPath);
-      } else {
-        fs.copyFileSync(srcPath, destPath);
-      }
+  static parseRefspec(refspec: string): { force: boolean; src: string; dst: string } {
+    let force = false;
+    let spec = refspec;
+
+    if (spec.startsWith('+')) {
+      force = true;
+      spec = spec.slice(1);
     }
+
+    const colonIndex = spec.indexOf(':');
+    if (colonIndex === -1) {
+      // Simple refspec without destination
+      return { force, src: spec, dst: spec };
+    }
+
+    return {
+      force,
+      src: spec.slice(0, colonIndex),
+      dst: spec.slice(colonIndex + 1),
+    };
+  }
+
+  /**
+   * Apply a refspec to transform a ref name
+   * Returns null if the ref doesn't match the refspec pattern
+   */
+  static applyRefspec(refspec: string, refName: string): string | null {
+    const { src, dst } = RemoteManager.parseRefspec(refspec);
+
+    // Handle glob patterns (*)
+    if (src.includes('*')) {
+      const srcPattern = new RegExp('^' + src.replace('*', '(.+)') + '$');
+      const match = refName.match(srcPattern);
+
+      if (!match) {
+        return null;
+      }
+
+      // Replace the * in dst with the captured group
+      return dst.replace('*', match[1]);
+    }
+
+    // Exact match
+    if (refName === src) {
+      return dst;
+    }
+
+    return null;
   }
 }
