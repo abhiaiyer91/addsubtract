@@ -15,6 +15,16 @@ export { undo, history, handleUndo, handleHistory } from './undo';
 export { merge, mergeAbort, mergeContinue, showConflicts, handleMerge } from './merge';
 export { handleScope } from './scope';
 
+// Quality of Life commands (new!)
+export { amend, handleAmend } from './amend';
+export { wip, handleWip } from './wip';
+export { uncommit, handleUncommit } from './uncommit';
+export { analyzeBranches, deleteBranches, handleCleanup } from './cleanup';
+export { blame, handleBlame } from './blame';
+export { collectStats, handleStats } from './stats';
+export { fixup, handleFixup } from './fixup';
+export { handleSnapshot, SnapshotManager } from './snapshot';
+
 // Plumbing commands (low-level)
 export { catFile } from './cat-file';
 export { hashObjectCommand } from './hash-object';
