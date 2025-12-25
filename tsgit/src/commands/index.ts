@@ -45,3 +45,10 @@ export { fsck, handleFsck } from './fsck';
 export { handleStash, StashManager } from './stash';
 export { handleTag, createLightweightTag, createAnnotatedTag, listTags, deleteTag } from './tag';
 export { handleReset, reset, resetFile, parseRevision } from './reset';
+
+// Remote commands
+export { handleRemote, listRemotes, addRemote, removeRemote, renameRemote, getRemoteUrl, setRemoteUrl } from './remote';
+export { handleClone, clone, parseRepoUrl } from './clone';
+export { handleFetch, fetch } from './fetch';
+export { handlePull, pull } from './pull';
+export { handlePush, push } from './push';

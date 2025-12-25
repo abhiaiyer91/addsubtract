@@ -36,6 +36,12 @@ import {
   handleStash,
   handleTag,
   handleReset,
+  // Remote commands
+  handleRemote,
+  handleClone,
+  handleFetch,
+  handlePull,
+  handlePush,
   // Plumbing commands
   handleRevParse,
   handleUpdateRef,
@@ -108,6 +114,15 @@ Tags:
   tag -a <name> -m ""   Create an annotated tag
   tag -d <name>         Delete a tag
 
+Remote Operations:
+  remote                List configured remotes
+  remote add <n> <url>  Add a new remote
+  remote remove <name>  Remove a remote
+  clone <url> [<dir>]   Clone a repository
+  fetch [<remote>]      Download objects and refs from remote
+  pull [<remote>]       Fetch and integrate with local branch
+  push [<remote>]       Update remote refs and objects
+
 Quality of Life:
   amend                 Quickly fix the last commit
   wip                   Quick WIP commit with auto-generated message
@@ -167,6 +182,11 @@ Examples:
   tsgit stats                 # View repo statistics
   tsgit snapshot create       # Create checkpoint
   tsgit blame file.ts         # See who changed what
+  tsgit remote add origin /path/to/repo  # Add remote
+  tsgit clone ./source ./dest  # Clone a repository
+  tsgit fetch origin           # Fetch from origin
+  tsgit pull                   # Pull current branch
+  tsgit push -u origin main    # Push and set upstream
 `;
 
 const COMMANDS = [
@@ -182,6 +202,8 @@ const COMMANDS = [
   'rev-parse', 'update-ref', 'symbolic-ref', 'for-each-ref', 'show-ref', 'fsck',
   // New Git-compatible commands
   'stash', 'tag', 'reset',
+  // Remote commands
+  'remote', 'clone', 'fetch', 'pull', 'push',
   'help',
 ];
 
@@ -190,6 +212,8 @@ function parseArgs(args: string[]): { command: string; args: string[]; options: 
   const positional: string[] = [];
   
   let i = 0;
+  let foundCommand = false;
+  
   while (i < args.length) {
     const arg = args[i];
     
@@ -214,9 +238,10 @@ function parseArgs(args: string[]): { command: string; args: string[]; options: 
         i += 2;
       } else {
         // Map short flags to long names
+        // Only map -v to version if no command found yet
         const mapping: Record<string, string> = {
           'h': 'help',
-          'v': 'version',
+          'v': foundCommand ? 'verbose' : 'version',
           'b': 'branch',
           'd': 'delete',
           't': 'type',
@@ -226,12 +251,18 @@ function parseArgs(args: string[]): { command: string; args: string[]; options: 
           's': 'stage',
           'c': 'create',
           'a': 'all',
+          'f': 'force',
+          'u': 'set-upstream',
         };
         options[mapping[key] || key] = true;
         i++;
       }
     } else {
       positional.push(arg);
+      // Mark that we found a command
+      if (!foundCommand && COMMANDS.includes(arg)) {
+        foundCommand = true;
+      }
       i++;
     }
   }
@@ -526,6 +557,32 @@ function main(): void {
 
       case 'reset':
         handleReset(cmdArgs);
+        break;
+
+      // Remote commands
+      case 'remote':
+        // Pass through all remaining args including -v for verbose
+        handleRemote(args.slice(args.indexOf('remote') + 1));
+        break;
+
+      case 'clone':
+        // Pass through all remaining args
+        handleClone(args.slice(args.indexOf('clone') + 1));
+        break;
+
+      case 'fetch':
+        // Pass through all remaining args
+        handleFetch(args.slice(args.indexOf('fetch') + 1));
+        break;
+
+      case 'pull':
+        // Pass through all remaining args
+        handlePull(args.slice(args.indexOf('pull') + 1));
+        break;
+
+      case 'push':
+        // Pass through all remaining args
+        handlePush(args.slice(args.indexOf('push') + 1));
         break;
 
       default: {
