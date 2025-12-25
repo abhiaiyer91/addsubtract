@@ -1,5 +1,11 @@
+/**
+ * Remote Management
+ * Handles remote repository configuration and tracking
+ */
+
 import * as path from 'path';
-import { exists, readFileText, writeFile, mkdirp } from '../utils/fs';
+import { exists, readFileText, writeFile, mkdirp, readDir, isDirectory, deleteFile } from '../utils/fs';
+import { TsgitError, ErrorCode } from './errors';
 
 /**
  * Remote repository configuration
@@ -9,6 +15,30 @@ export interface Remote {
   url: string;
   fetch: string; // Refspec for fetching
   push?: string; // Refspec for pushing
+  pushUrl?: string; // Push URL if different from fetch URL
+}
+
+/**
+ * Alias for Remote for backwards compatibility
+ */
+export type RemoteConfig = Remote;
+
+/**
+ * Remote tracking branch info
+ */
+export interface RemoteTrackingBranch {
+  remote: string;
+  branch: string;
+  localRef: string;
+  hash: string;
+}
+
+/**
+ * Branch tracking configuration
+ */
+export interface BranchTrackingConfig {
+  remote: string;
+  merge: string;  // e.g., refs/heads/main
 }
 
 /**
@@ -130,20 +160,31 @@ export class RemoteManager {
   /**
    * Add a new remote
    */
-  add(name: string, url: string): void {
+  add(name: string, url: string, options: { fetch?: string } = {}): void {
     if (!this.isValidRemoteName(name)) {
-      throw new Error(`Invalid remote name: '${name}'`);
+      throw new TsgitError(
+        `'${name}' is not a valid remote name`,
+        ErrorCode.INVALID_ARGUMENT,
+        ['Remote names should contain only alphanumeric characters, hyphens, and underscores']
+      );
     }
 
     const existing = this.get(name);
     if (existing) {
-      throw new Error(`Remote '${name}' already exists`);
+      throw new TsgitError(
+        `remote ${name} already exists`,
+        ErrorCode.OPERATION_FAILED,
+        [
+          `tsgit remote set-url ${name} ${url}    # Update existing remote URL`,
+          `tsgit remote remove ${name}            # Remove and re-add`,
+        ]
+      );
     }
 
     const sections = this.loadConfig();
     const remoteSection = new Map<string, string>();
     remoteSection.set('url', url);
-    remoteSection.set('fetch', `+refs/heads/*:refs/remotes/${name}/*`);
+    remoteSection.set('fetch', options.fetch || `+refs/heads/*:refs/remotes/${name}/*`);
     sections.set(`remote.${name}`, remoteSection);
 
     this.saveConfig(sections);
@@ -158,15 +199,32 @@ export class RemoteManager {
   remove(name: string): void {
     const existing = this.get(name);
     if (!existing) {
-      throw new Error(`Remote '${name}' does not exist`);
+      throw new TsgitError(
+        `No such remote: '${name}'`,
+        ErrorCode.REF_NOT_FOUND,
+        this.getSuggestions(name)
+      );
     }
 
     const sections = this.loadConfig();
     sections.delete(`remote.${name}`);
+
+    // Remove branch tracking configs for this remote
+    for (const [key, values] of sections) {
+      if (key.startsWith('branch.')) {
+        if (values.get('remote') === name) {
+          sections.delete(key);
+        }
+      }
+    }
+
     this.saveConfig(sections);
 
-    // Note: We don't delete the refs/remotes/<name> directory
-    // to preserve remote tracking refs (similar to Git behavior)
+    // Remove remote refs directory
+    const remoteDir = path.join(this.remotesDir, name);
+    if (exists(remoteDir)) {
+      this.removeDir(remoteDir);
+    }
   }
 
   /**
@@ -174,23 +232,36 @@ export class RemoteManager {
    */
   rename(oldName: string, newName: string): void {
     if (!this.isValidRemoteName(newName)) {
-      throw new Error(`Invalid remote name: '${newName}'`);
+      throw new TsgitError(
+        `'${newName}' is not a valid remote name`,
+        ErrorCode.INVALID_ARGUMENT
+      );
     }
 
     const existing = this.get(oldName);
     if (!existing) {
-      throw new Error(`Remote '${oldName}' does not exist`);
+      throw new TsgitError(
+        `No such remote: '${oldName}'`,
+        ErrorCode.REF_NOT_FOUND,
+        this.getSuggestions(oldName)
+      );
     }
 
     const newExisting = this.get(newName);
     if (newExisting) {
-      throw new Error(`Remote '${newName}' already exists`);
+      throw new TsgitError(
+        `remote ${newName} already exists`,
+        ErrorCode.OPERATION_FAILED
+      );
     }
 
     const sections = this.loadConfig();
     const remoteSection = sections.get(`remote.${oldName}`);
     if (!remoteSection) {
-      throw new Error(`Remote '${oldName}' does not exist in config`);
+      throw new TsgitError(
+        `Could not find remote config for '${oldName}'`,
+        ErrorCode.OPERATION_FAILED
+      );
     }
 
     // Update the fetch refspec to reflect the new name
@@ -200,6 +271,15 @@ export class RemoteManager {
         new RegExp(`refs/remotes/${oldName}/`),
         `refs/remotes/${newName}/`
       ));
+    }
+
+    // Update branch tracking configs
+    for (const [key, values] of sections) {
+      if (key.startsWith('branch.')) {
+        if (values.get('remote') === oldName) {
+          values.set('remote', newName);
+        }
+      }
     }
 
     // Remove old and add new
@@ -219,16 +299,24 @@ export class RemoteManager {
   /**
    * Set the URL for a remote
    */
-  setUrl(name: string, url: string): void {
+  setUrl(name: string, url: string, options: { push?: boolean } = {}): void {
     const existing = this.get(name);
     if (!existing) {
-      throw new Error(`Remote '${name}' does not exist`);
+      throw new TsgitError(
+        `No such remote '${name}'`,
+        ErrorCode.REF_NOT_FOUND,
+        this.getSuggestions(name)
+      );
     }
 
     const sections = this.loadConfig();
     const remoteSection = sections.get(`remote.${name}`);
     if (remoteSection) {
-      remoteSection.set('url', url);
+      if (options.push) {
+        remoteSection.set('pushurl', url);
+      } else {
+        remoteSection.set('url', url);
+      }
       this.saveConfig(sections);
     }
   }
@@ -254,7 +342,38 @@ export class RemoteManager {
       url,
       fetch: remoteSection.get('fetch') || `+refs/heads/*:refs/remotes/${name}/*`,
       push: remoteSection.get('push'),
+      pushUrl: remoteSection.get('pushurl'),
     };
+  }
+
+  /**
+   * Get URL for a remote
+   */
+  getUrl(name: string, push: boolean = false): string {
+    const sections = this.loadConfig();
+    const remoteSection = sections.get(`remote.${name}`);
+
+    if (!remoteSection) {
+      throw new TsgitError(
+        `No such remote '${name}'`,
+        ErrorCode.REF_NOT_FOUND,
+        this.getSuggestions(name)
+      );
+    }
+
+    if (push) {
+      const pushUrl = remoteSection.get('pushurl');
+      if (pushUrl) return pushUrl;
+    }
+
+    return remoteSection.get('url') || '';
+  }
+
+  /**
+   * Check if a remote exists
+   */
+  exists(name: string): boolean {
+    return this.get(name) !== null;
   }
 
   /**
@@ -274,6 +393,7 @@ export class RemoteManager {
             url,
             fetch: values.get('fetch') || `+refs/heads/*:refs/remotes/${name}/*`,
             push: values.get('push'),
+            pushUrl: values.get('pushurl'),
           });
         }
       }
@@ -303,7 +423,11 @@ export class RemoteManager {
   setPushUrl(name: string, url: string): void {
     const existing = this.get(name);
     if (!existing) {
-      throw new Error(`Remote '${name}' does not exist`);
+      throw new TsgitError(
+        `No such remote '${name}'`,
+        ErrorCode.REF_NOT_FOUND,
+        this.getSuggestions(name)
+      );
     }
 
     const sections = this.loadConfig();
@@ -334,6 +458,7 @@ export class RemoteManager {
    */
   updateRemoteRef(remoteName: string, refName: string, hash: string): void {
     const refPath = path.join(this.remotesDir, remoteName, refName);
+    mkdirp(path.dirname(refPath));
     writeFile(refPath, hash + '\n');
   }
 
@@ -349,6 +474,37 @@ export class RemoteManager {
   }
 
   /**
+   * Delete a remote tracking ref
+   */
+  deleteRemoteRef(remoteName: string, refName: string): void {
+    const refPath = path.join(this.remotesDir, remoteName, refName);
+    if (exists(refPath)) {
+      deleteFile(refPath);
+    }
+  }
+
+  /**
+   * Update a remote tracking branch (alias for updateRemoteRef)
+   */
+  updateTrackingBranch(remote: string, branch: string, hash: string): void {
+    this.updateRemoteRef(remote, branch, hash);
+  }
+
+  /**
+   * Get tracking branch hash
+   */
+  getTrackingBranchHash(remote: string, branch: string): string | null {
+    return this.getRemoteRef(remote, branch);
+  }
+
+  /**
+   * Delete a remote tracking branch
+   */
+  deleteTrackingBranch(remote: string, branch: string): void {
+    this.deleteRemoteRef(remote, branch);
+  }
+
+  /**
    * List all refs for a remote
    */
   listRemoteRefs(remoteName: string): Map<string, string> {
@@ -360,14 +516,13 @@ export class RemoteManager {
     }
 
     const listRefsRecursive = (dir: string, prefix: string): void => {
-      const fs = require('fs');
-      const entries = fs.readdirSync(dir, { withFileTypes: true }) as Array<{ name: string; isDirectory(): boolean }>;
+      const entries = readDir(dir);
 
       for (const entry of entries) {
-        const fullPath = path.join(dir, entry.name);
-        const refName = prefix ? prefix + '/' + entry.name : entry.name;
+        const fullPath = path.join(dir, entry);
+        const refName = prefix ? prefix + '/' + entry : entry;
 
-        if (entry.isDirectory()) {
+        if (isDirectory(fullPath)) {
           listRefsRecursive(fullPath, refName);
         } else {
           const hash = readFileText(fullPath).trim();
@@ -381,12 +536,140 @@ export class RemoteManager {
   }
 
   /**
+   * Get remote tracking branches
+   */
+  getTrackingBranches(remoteName?: string): RemoteTrackingBranch[] {
+    const branches: RemoteTrackingBranch[] = [];
+
+    if (!exists(this.remotesDir)) {
+      return branches;
+    }
+
+    const remotes = remoteName ? [remoteName] : this.listRemoteDirs();
+
+    for (const remote of remotes) {
+      const refs = this.listRemoteRefs(remote);
+      for (const [name, hash] of refs) {
+        branches.push({
+          remote,
+          branch: name,
+          localRef: `refs/remotes/${remote}/${name}`,
+          hash,
+        });
+      }
+    }
+
+    return branches;
+  }
+
+  /**
+   * Set branch tracking configuration
+   */
+  setTrackingBranch(branch: string, remote: string, remoteBranch: string): void {
+    const sections = this.loadConfig();
+    
+    let branchSection = sections.get(`branch.${branch}`);
+    if (!branchSection) {
+      branchSection = new Map();
+      sections.set(`branch.${branch}`, branchSection);
+    }
+    
+    branchSection.set('remote', remote);
+    branchSection.set('merge', `refs/heads/${remoteBranch}`);
+    
+    this.saveConfig(sections);
+  }
+
+  /**
+   * Get branch tracking configuration
+   */
+  getTrackingConfig(branch: string): BranchTrackingConfig | null {
+    const sections = this.loadConfig();
+    const branchSection = sections.get(`branch.${branch}`);
+    
+    if (!branchSection) {
+      return null;
+    }
+
+    const remote = branchSection.get('remote');
+    const merge = branchSection.get('merge');
+    
+    if (!remote || !merge) {
+      return null;
+    }
+
+    return { remote, merge };
+  }
+
+  /**
+   * Get upstream branch name for a local branch
+   */
+  getUpstream(branch: string): { remote: string; branch: string } | null {
+    const tracking = this.getTrackingConfig(branch);
+    if (!tracking) {
+      return null;
+    }
+
+    const remoteBranch = tracking.merge.replace('refs/heads/', '');
+    return {
+      remote: tracking.remote,
+      branch: remoteBranch,
+    };
+  }
+
+  /**
    * Validate remote name
    */
   private isValidRemoteName(name: string): boolean {
     // Remote names should be alphanumeric with hyphens and underscores
     // They cannot start with a hyphen or contain slashes
     return /^[a-zA-Z0-9_][a-zA-Z0-9_-]*$/.test(name);
+  }
+
+  /**
+   * Get suggestions for similar remote names
+   */
+  private getSuggestions(name: string): string[] {
+    const remotes = this.list().map(r => r.name);
+    const suggestions: string[] = [];
+
+    for (const remote of remotes) {
+      if (remote.toLowerCase().includes(name.toLowerCase()) ||
+          name.toLowerCase().includes(remote.toLowerCase())) {
+        suggestions.push(`tsgit remote -v    # List all remotes`);
+        break;
+      }
+    }
+
+    if (remotes.length > 0) {
+      suggestions.push(`Available remotes: ${remotes.join(', ')}`);
+    } else {
+      suggestions.push(`tsgit remote add <name> <url>    # Add a remote`);
+    }
+
+    return suggestions;
+  }
+
+  /**
+   * List remote directories
+   */
+  private listRemoteDirs(): string[] {
+    if (!exists(this.remotesDir)) {
+      return [];
+    }
+    return readDir(this.remotesDir).filter(name => 
+      isDirectory(path.join(this.remotesDir, name))
+    );
+  }
+
+  /**
+   * Remove directory recursively
+   */
+  private removeDir(dir: string): void {
+    const fs = require('fs');
+    if (exists(dir)) {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   }
 
   /**

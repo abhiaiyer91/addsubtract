@@ -113,13 +113,13 @@ describe('RemoteManager', () => {
       
       expect(() => {
         remoteManager.add('origin', 'https://github.com/other/repo.git');
-      }).toThrow("Remote 'origin' already exists");
+      }).toThrow("remote origin already exists");
     });
 
     it('should throw when removing non-existent remote', () => {
       expect(() => {
         remoteManager.remove('nonexistent');
-      }).toThrow("Remote 'nonexistent' does not exist");
+      }).toThrow("No such remote: 'nonexistent'");
     });
   });
 

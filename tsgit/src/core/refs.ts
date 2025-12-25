@@ -78,8 +78,8 @@ export class Refs {
    * Resolve a ref to a commit hash
    */
   resolve(ref: string): string | null {
-    // Check if it's already a hash (40 hex chars)
-    if (/^[0-9a-f]{40}$/.test(ref)) {
+    // Check if it's already a hash (40 hex chars for SHA-1, 64 for SHA-256)
+    if (/^[0-9a-f]{40}$/.test(ref) || /^[0-9a-f]{64}$/.test(ref)) {
       return ref;
     }
 
@@ -140,7 +140,7 @@ export class Refs {
     if (!exists(branchPath)) {
       throw new Error(`Branch '${name}' not found`);
     }
-    
+
     const current = this.getCurrentBranch();
     if (current === name) {
       throw new Error(`Cannot delete the current branch '${name}'`);

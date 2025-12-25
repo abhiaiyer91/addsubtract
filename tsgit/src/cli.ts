@@ -36,7 +36,33 @@ import {
   handleStash,
   handleTag,
   handleReset,
+  handleBisect,
+  handleClean,
+  handleShow,
+  // History rewriting commands
+  handleCherryPick,
+  handleRebase,
+  handleRevert,
+  // Remote commands
+  handleRemote,
+  handleClone,
+  handleFetch,
+  handlePull,
+  handlePush,
+  // Plumbing commands
+  handleRevParse,
+  handleUpdateRef,
+  handleSymbolicRef,
+  handleForEachRef,
+  handleShowRef,
+  handleFsck,
+  // Advanced features
+  handleReflog,
+  handleGC,
 } from './commands';
+import { handleHooks } from './core/hooks';
+import { handleSubmodule } from './core/submodule';
+import { handleWorktree } from './core/worktree';
 import { TsgitError, findSimilar } from './core/errors';
 import { Repository } from './core/repository';
 import { launchTUI } from './ui/tui';
@@ -95,11 +121,47 @@ Undo & History:
   reset [--soft|--hard] Reset HEAD to a specific state
   stash                 Save working directory changes temporarily
 
+Debugging & Inspection:
+  show <commit>         Show commit details and diff
+  show <commit>:<file>  Show file at specific commit
+  bisect start          Start binary search for bug
+  bisect good/bad       Mark commits during bisect
+  clean -n              Preview untracked files to delete
+  clean -f              Delete untracked files
+
 Tags:
   tag                   List all tags
   tag <name>            Create a lightweight tag
   tag -a <name> -m ""   Create an annotated tag
   tag -d <name>         Delete a tag
+
+History Rewriting:
+  cherry-pick <commit>  Apply changes from specific commits
+  cherry-pick --continue Continue after conflict resolution
+  cherry-pick --abort   Abort the operation
+  rebase <branch>       Rebase current branch onto another
+  rebase --onto <new>   Rebase onto specific base
+  rebase --continue     Continue after conflict resolution
+  rebase --abort        Abort the rebase
+  revert <commit>       Create commit that undoes changes
+  revert -n <commit>    Revert without committing
+  revert --continue     Continue after conflict resolution
+
+Remote Operations:
+  remote                List configured remotes
+  remote add <n> <url>  Add a new remote
+  remote remove <name>  Remove a remote
+  clone <url> [<dir>]   Clone a repository
+  fetch [<remote>]      Download objects and refs from remote
+  pull [<remote>]       Fetch and integrate with local branch
+  push [<remote>]       Update remote refs and objects
+
+Advanced Features:
+  hooks                 Manage repository hooks
+  submodule             Manage submodules
+  worktree              Manage multiple working trees
+  reflog                Show reference log
+  gc                    Run garbage collection
 
 Quality of Life:
   amend                 Quickly fix the last commit
@@ -129,6 +191,12 @@ Plumbing Commands:
   hash-object <file>    Compute object ID and create a blob
   ls-files              Show information about files in the index
   ls-tree <tree>        List the contents of a tree object
+  rev-parse <ref>       Parse revision to hash
+  update-ref <ref> <h>  Update ref to new hash
+  symbolic-ref <name>   Read/write symbolic refs
+  for-each-ref          Iterate over refs
+  show-ref              List refs with hashes
+  fsck                  Verify object database
 
 Options:
   -h, --help            Show this help message
@@ -154,6 +222,11 @@ Examples:
   tsgit stats                 # View repo statistics
   tsgit snapshot create       # Create checkpoint
   tsgit blame file.ts         # See who changed what
+  tsgit remote add origin /path/to/repo  # Add remote
+  tsgit clone ./source ./dest  # Clone a repository
+  tsgit fetch origin           # Fetch from origin
+  tsgit pull                   # Pull current branch
+  tsgit push -u origin main    # Push and set upstream
 `;
 
 const COMMANDS = [
@@ -165,19 +238,29 @@ const COMMANDS = [
   'ui', 'web',
   'ai',
   'cat-file', 'hash-object', 'ls-files', 'ls-tree',
+  // Plumbing commands
+  'rev-parse', 'update-ref', 'symbolic-ref', 'for-each-ref', 'show-ref', 'fsck',
   // New Git-compatible commands
-  'stash', 'tag', 'reset',
+  'stash', 'tag', 'reset', 'bisect', 'clean', 'show',
+  // History rewriting commands
+  'cherry-pick', 'rebase', 'revert',
+  // Remote commands
+  'remote', 'clone', 'fetch', 'pull', 'push',
+  // Advanced features
+  'hooks', 'submodule', 'worktree', 'reflog', 'gc',
   'help',
 ];
 
 function parseArgs(args: string[]): { command: string; args: string[]; options: Record<string, boolean | string> } {
   const options: Record<string, boolean | string> = {};
   const positional: string[] = [];
-  
+
   let i = 0;
+  let foundCommand = false;
+
   while (i < args.length) {
     const arg = args[i];
-    
+
     if (arg.startsWith('--')) {
       const key = arg.slice(2);
       // Check if next arg is a value (not starting with -)
@@ -199,9 +282,10 @@ function parseArgs(args: string[]): { command: string; args: string[]; options: 
         i += 2;
       } else {
         // Map short flags to long names
+        // Only map -v to version if no command found yet
         const mapping: Record<string, string> = {
           'h': 'help',
-          'v': 'version',
+          'v': foundCommand ? 'verbose' : 'version',
           'b': 'branch',
           'd': 'delete',
           't': 'type',
@@ -211,12 +295,18 @@ function parseArgs(args: string[]): { command: string; args: string[]; options: 
           's': 'stage',
           'c': 'create',
           'a': 'all',
+          'f': 'force',
+          'u': 'set-upstream',
         };
         options[mapping[key] || key] = true;
         i++;
       }
     } else {
       positional.push(arg);
+      // Mark that we found a command
+      if (!foundCommand && COMMANDS.includes(arg)) {
+        foundCommand = true;
+      }
       i++;
     }
   }
@@ -230,13 +320,16 @@ function parseArgs(args: string[]): { command: string; args: string[]; options: 
 
 function main(): void {
   const args = process.argv.slice(2);
-  
+
   if (args.length === 0) {
     console.log(HELP);
     return;
   }
 
   const { command, args: cmdArgs, options } = parseArgs(args);
+
+  // For commands that do their own argument parsing, use raw args after command
+  const rawArgs = args.slice(1);
 
   if (options.help || command === 'help') {
     console.log(HELP);
@@ -369,9 +462,9 @@ function main(): void {
 
       case 'graph': {
         const repo = Repository.find();
-        printGraph(repo, { 
-          useColors: true, 
-          maxCommits: options.n ? parseInt(options.n as string, 10) : 20 
+        printGraph(repo, {
+          useColors: true,
+          maxCommits: options.n ? parseInt(options.n as string, 10) : 20
         });
         break;
       }
@@ -414,6 +507,31 @@ function main(): void {
           recursive: !!options.recursive || !!options.r,
           nameOnly: !!options['name-only'],
         });
+        break;
+
+      // Plumbing commands - pass raw args since they handle their own parsing
+      case 'rev-parse':
+        handleRevParse(args.slice(1));
+        break;
+
+      case 'update-ref':
+        handleUpdateRef(args.slice(1));
+        break;
+
+      case 'symbolic-ref':
+        handleSymbolicRef(args.slice(1));
+        break;
+
+      case 'for-each-ref':
+        handleForEachRef(args.slice(1));
+        break;
+
+      case 'show-ref':
+        handleShowRef(args.slice(1));
+        break;
+
+      case 'fsck':
+        handleFsck(args.slice(1));
         break;
 
       case 'ai':
@@ -475,17 +593,105 @@ function main(): void {
         handleSnapshot(cmdArgs);
         break;
 
-      // New Git-compatible commands
+      // New Git-compatible commands (these parse their own arguments)
       case 'stash':
-        handleStash(cmdArgs);
+        handleStash(rawArgs);
         break;
 
       case 'tag':
-        handleTag(cmdArgs);
+        handleTag(rawArgs);
         break;
 
       case 'reset':
-        handleReset(cmdArgs);
+        handleReset(rawArgs);
+        break;
+
+      case 'bisect':
+        handleBisect(rawArgs);
+        break;
+
+      case 'clean':
+        handleClean(rawArgs);
+        break;
+
+      case 'show':
+        handleShow(rawArgs);
+        break;
+
+      // History rewriting commands
+      case 'cherry-pick':
+        handleCherryPick(cmdArgs.concat(
+          options.continue ? ['--continue'] : [],
+          options.abort ? ['--abort'] : [],
+          options.skip ? ['--skip'] : [],
+          options['no-commit'] ? ['--no-commit'] : []
+        ));
+        break;
+
+      case 'rebase':
+        handleRebase(cmdArgs.concat(
+          options.continue ? ['--continue'] : [],
+          options.abort ? ['--abort'] : [],
+          options.skip ? ['--skip'] : [],
+          options.onto ? ['--onto', options.onto as string] : []
+        ));
+        break;
+
+      case 'revert':
+        handleRevert(cmdArgs.concat(
+          options.continue ? ['--continue'] : [],
+          options.abort ? ['--abort'] : [],
+          options['no-commit'] ? ['--no-commit'] : [],
+          options.mainline ? ['-m', options.mainline as string] : []
+        ));
+      // Remote commands
+      case 'remote':
+        // Pass through all remaining args including -v for verbose
+        handleRemote(args.slice(args.indexOf('remote') + 1));
+        break;
+
+      case 'clone':
+        // Pass through all remaining args
+        handleClone(args.slice(args.indexOf('clone') + 1));
+        break;
+
+      case 'fetch':
+        // Pass through all remaining args
+        handleFetch(args.slice(args.indexOf('fetch') + 1));
+        break;
+
+      case 'pull':
+        // Pass through all remaining args
+        handlePull(args.slice(args.indexOf('pull') + 1));
+        break;
+
+      case 'push':
+        // Pass through all remaining args
+        handlePush(args.slice(args.indexOf('push') + 1));
+        break;
+
+      // Advanced features
+      case 'hooks':
+        handleHooks(cmdArgs);
+        break;
+
+      case 'submodule':
+        handleSubmodule(cmdArgs).catch((error: Error) => {
+          console.error(`error: ${error.message}`);
+          process.exit(1);
+        });
+        return; // Exit main() to let async handle complete
+
+      case 'worktree':
+        handleWorktree(cmdArgs);
+        break;
+
+      case 'reflog':
+        handleReflog(cmdArgs);
+        break;
+
+      case 'gc':
+        handleGC(cmdArgs);
         break;
 
       default: {
