@@ -42,6 +42,7 @@ import { Repository } from './core/repository';
 import { launchTUI } from './ui/tui';
 import { launchWebUI } from './ui/web';
 import { launchEnhancedWebUI } from './ui/web-enhanced';
+import { launchPremiumWebUI } from './ui/web-premium';
 import { printGraph } from './ui/graph';
 
 const VERSION = '2.0.0';
@@ -65,7 +66,9 @@ Usage: tsgit <command> [<args>]
 
 Visual Interface:
   ui                    Launch interactive terminal UI (TUI)
-  web [--port <n>]      Launch enhanced web UI in browser
+  web [--port <n>]      Launch premium GitKraken-style web UI
+  web --enhanced        Launch enhanced web UI (previous version)
+  web --basic           Launch basic web UI
   graph                 Show commit graph in terminal
 
 Core Commands:
@@ -361,8 +364,11 @@ function main(): void {
         const port = options.port ? parseInt(options.port as string, 10) : 3847;
         if (options.basic) {
           launchWebUI(port);
-        } else {
+        } else if (options.enhanced) {
           launchEnhancedWebUI(port);
+        } else {
+          // Default to premium GitKraken-style UI
+          launchPremiumWebUI(port);
         }
         break;
       }

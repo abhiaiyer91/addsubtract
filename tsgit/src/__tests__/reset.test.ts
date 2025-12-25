@@ -323,7 +323,7 @@ describe('reset command', () => {
 
     it('should reset to branch name', () => {
       // Create a new branch at an earlier commit
-      repo.checkout(commits[2], { createBranch: true, branchName: 'feature' });
+      repo.refs.createBranch('feature', commits[2]);
       repo.checkout('main');
 
       const result = reset(repo, 'feature', { mode: 'soft' });

@@ -431,78 +431,259 @@ function formatDate(date: Date): string {
 }
 
 /**
- * Render graph as HTML for web UI
+ * Render graph as HTML for web UI - GitKraken-inspired smooth curves
  */
 export function renderGraphHTML(graph: CommitGraph): string {
   const rows: string[] = [];
   
-  // CSS colors for columns
+  // Beautiful gradient-inspired color palette
   const cssColors = [
-    '#f87171', '#4ade80', '#facc15', '#60a5fa', 
-    '#c084fc', '#22d3d3', '#fb923c', '#a78bfa'
+    '#6366f1', // Indigo
+    '#22c55e', // Green
+    '#f59e0b', // Amber
+    '#ec4899', // Pink
+    '#8b5cf6', // Purple
+    '#06b6d4', // Cyan
+    '#ef4444', // Red
+    '#84cc16', // Lime
   ];
 
-  for (const node of graph.nodes) {
-    // SVG for graph visualization
-    const graphWidth = graph.maxColumns * 24;
-    const cx = node.column * 24 + 12;
+  const ROW_HEIGHT = 40;
+  const COLUMN_WIDTH = 28;
+  const NODE_RADIUS = 5;
+  const HEAD_RADIUS = 7;
+
+  for (let nodeIndex = 0; nodeIndex < graph.nodes.length; nodeIndex++) {
+    const node = graph.nodes[nodeIndex];
+    const graphWidth = Math.max(120, (graph.maxColumns + 1) * COLUMN_WIDTH);
+    const cx = node.column * COLUMN_WIDTH + 14;
+    const cy = ROW_HEIGHT / 2;
     
-    // Build SVG paths for edges from this node
+    // Build SVG with smooth bezier curves
     let paths = '';
-    const edges = graph.edges.filter(e => e.from === node.hash);
-    for (const edge of edges) {
-      const x1 = edge.fromColumn * 24 + 12;
-      const x2 = edge.toColumn * 24 + 12;
+    
+    // Draw edges going DOWN from this node (to parents)
+    const outgoingEdges = graph.edges.filter(e => e.from === node.hash);
+    for (const edge of outgoingEdges) {
+      const x1 = edge.fromColumn * COLUMN_WIDTH + 14;
+      const x2 = edge.toColumn * COLUMN_WIDTH + 14;
       const color = cssColors[edge.fromColumn % cssColors.length];
       
       if (x1 === x2) {
         // Straight line down
-        paths += `<line x1="${x1}" y1="20" x2="${x2}" y2="40" stroke="${color}" stroke-width="2"/>`;
+        paths += `<line x1="${x1}" y1="${cy + NODE_RADIUS}" x2="${x2}" y2="${ROW_HEIGHT}" 
+                  stroke="${color}" stroke-width="2.5" stroke-linecap="round"/>`;
       } else {
-        // Curved line for merge/branch
-        paths += `<path d="M${x1},20 Q${x1},30 ${(x1+x2)/2},30 Q${x2},30 ${x2},40" 
-                  fill="none" stroke="${color}" stroke-width="2"/>`;
+        // Beautiful S-curve for merge/branch (GitKraken style)
+        const midY = cy + (ROW_HEIGHT - cy) / 2 + 4;
+        const ctrlOffset = Math.abs(x2 - x1) * 0.4;
+        paths += `<path d="M${x1} ${cy + NODE_RADIUS} 
+                          C${x1} ${midY}, ${x2} ${midY}, ${x2} ${ROW_HEIGHT}" 
+                  fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round"/>`;
       }
     }
-
+    
+    // Draw incoming edges from above (from children)
+    if (nodeIndex > 0) {
+      const incomingEdges = graph.edges.filter(e => e.to === node.hash);
+      for (const edge of incomingEdges) {
+        const x1 = edge.fromColumn * COLUMN_WIDTH + 14;
+        const x2 = edge.toColumn * COLUMN_WIDTH + 14;
+        const color = cssColors[edge.fromColumn % cssColors.length];
+        
+        if (x1 === x2) {
+          // Straight line from top
+          paths += `<line x1="${x1}" y1="0" x2="${x2}" y2="${cy - NODE_RADIUS}" 
+                    stroke="${color}" stroke-width="2.5" stroke-linecap="round"/>`;
+        } else {
+          // S-curve from a different column
+          const midY = cy / 2;
+          paths += `<path d="M${x1} 0 
+                            C${x1} ${midY}, ${x2} ${midY}, ${x2} ${cy - NODE_RADIUS}" 
+                    fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round"/>`;
+        }
+      }
+    }
+    
+    // Draw the commit node
     const nodeColor = cssColors[node.column % cssColors.length];
-    const nodeRadius = node.isHead ? 8 : 6;
+    const radius = node.isHead ? HEAD_RADIUS : NODE_RADIUS;
+    
+    let nodeElement = '';
+    if (node.isHead) {
+      // HEAD commit gets a special double-ring effect
+      nodeElement = `
+        <circle cx="${cx}" cy="${cy}" r="${radius + 3}" fill="${nodeColor}" opacity="0.25"/>
+        <circle cx="${cx}" cy="${cy}" r="${radius}" fill="${nodeColor}"/>
+        <circle cx="${cx}" cy="${cy}" r="${radius - 2}" fill="#0d1117"/>
+        <circle cx="${cx}" cy="${cy}" r="${radius - 3}" fill="${nodeColor}"/>
+      `;
+    } else {
+      // Regular commit node with subtle shadow effect
+      nodeElement = `
+        <circle cx="${cx}" cy="${cy}" r="${radius + 1}" fill="${nodeColor}" opacity="0.3"/>
+        <circle cx="${cx}" cy="${cy}" r="${radius}" fill="${nodeColor}"/>
+      `;
+    }
     
     const graphSvg = `
-      <svg width="${graphWidth}" height="40" style="vertical-align: middle;">
+      <svg width="${graphWidth}" height="${ROW_HEIGHT}" class="graph-svg">
+        <defs>
+          <filter id="glow-${nodeIndex}" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+            <feMerge>
+              <feMergeNode in="coloredBlur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+        </defs>
         ${paths}
-        <circle cx="${cx}" cy="20" r="${nodeRadius}" fill="${nodeColor}" 
-                stroke="${node.isHead ? '#fff' : 'none'}" stroke-width="2"/>
+        <g class="graph-node" filter="url(#glow-${nodeIndex})">${nodeElement}</g>
       </svg>
     `;
 
-    // Branches and tags
+    // Build decorations (branches and tags)
     let decorations = '';
     if (node.branches.length > 0) {
       decorations += node.branches.map(b => 
-        `<span class="branch-tag">${b}</span>`
+        `<span class="branch-label${node.isHead && b === graph.nodes[0]?.branches[0] ? ' current' : ''}">${escapeHtml(b)}</span>`
       ).join('');
     }
     if (node.tags.length > 0) {
       decorations += node.tags.map(t => 
-        `<span class="tag-label">${t}</span>`
+        `<span class="tag-label">🏷 ${escapeHtml(t)}</span>`
       ).join('');
     }
 
     rows.push(`
       <div class="graph-row" data-hash="${node.hash}">
-        <div class="graph-visual">${graphSvg}</div>
+        <div class="graph-visual" style="width: ${graphWidth}px;">${graphSvg}</div>
         <div class="graph-info">
           <span class="commit-hash">${node.shortHash}</span>
           ${decorations}
           <span class="commit-message">${escapeHtml(node.message)}</span>
-          <span class="commit-meta">${node.author} • ${formatDate(node.date)}</span>
+          <span class="commit-author">${escapeHtml(node.author)}</span>
+          <span class="commit-time">${formatDate(node.date)}</span>
         </div>
       </div>
     `);
   }
 
   return rows.join('\n');
+}
+
+/**
+ * Get CSS styles for the graph (for standalone use)
+ */
+export function getGraphStyles(): string {
+  return `
+    .graph-row {
+      display: flex;
+      align-items: center;
+      padding: 4px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    
+    .graph-row:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+    
+    .graph-row.selected {
+      background: rgba(99, 102, 241, 0.15);
+    }
+    
+    .graph-visual {
+      flex-shrink: 0;
+    }
+    
+    .graph-svg {
+      overflow: visible;
+      display: block;
+    }
+    
+    .graph-node {
+      transition: transform 0.15s ease;
+    }
+    
+    .graph-row:hover .graph-node {
+      transform: scale(1.15);
+    }
+    
+    .graph-info {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding-left: 12px;
+      overflow: hidden;
+    }
+    
+    .commit-hash {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: #58a6ff;
+      flex-shrink: 0;
+    }
+    
+    .branch-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 10px;
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.2) 0%, rgba(139, 92, 246, 0.15) 100%);
+      border: 1px solid rgba(139, 92, 246, 0.3);
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 500;
+      color: #a5b4fc;
+      flex-shrink: 0;
+    }
+    
+    .branch-label.current {
+      background: linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(74, 222, 128, 0.15) 100%);
+      border-color: rgba(74, 222, 128, 0.3);
+      color: #86efac;
+    }
+    
+    .tag-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 10px;
+      background: rgba(251, 191, 36, 0.15);
+      border: 1px solid rgba(251, 191, 36, 0.25);
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 500;
+      color: #fcd34d;
+      flex-shrink: 0;
+    }
+    
+    .commit-message {
+      flex: 1;
+      font-size: 13px;
+      color: #e6edf3;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    
+    .commit-author {
+      font-size: 12px;
+      color: #8b949e;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    
+    .commit-time {
+      font-size: 12px;
+      color: #6e7681;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+  `;
 }
 
 /**
