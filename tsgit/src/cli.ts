@@ -23,6 +23,8 @@ import {
   handleScope,
 } from './commands';
 import { TsgitError, findSimilar } from './core/errors';
+import { launchTUI } from './ui/tui';
+import { launchWebUI } from './ui/web';
 
 const VERSION = '2.0.0';
 
@@ -37,8 +39,13 @@ tsgit improves on Git with:
   • Branch state management (auto-stash on switch)
   • Monorepo scopes (work with subsets of large repos)
   • Better error messages (with suggestions)
+  • Built-in visual UI (terminal and web)
 
 Usage: tsgit <command> [<args>]
+
+Visual Interface:
+  ui                    Launch interactive terminal UI (TUI)
+  web [--port <n>]      Launch web-based UI in browser
 
 Core Commands:
   init                  Create an empty tsgit repository
@@ -81,6 +88,8 @@ Options:
   -v, --version         Show version number
 
 Examples:
+  tsgit ui                    # Launch terminal UI
+  tsgit web                   # Launch web UI
   tsgit init
   tsgit add .
   tsgit commit -m "Initial commit"
@@ -96,6 +105,7 @@ const COMMANDS = [
   'branch', 'switch', 'checkout', 'restore',
   'merge', 'undo', 'history',
   'scope',
+  'ui', 'web',
   'cat-file', 'hash-object', 'ls-files', 'ls-tree',
   'help',
 ];
@@ -282,6 +292,16 @@ function main(): void {
       case 'scope':
         handleScope(cmdArgs);
         break;
+
+      case 'ui':
+        launchTUI();
+        break;
+
+      case 'web': {
+        const port = options.port ? parseInt(options.port as string, 10) : 3847;
+        launchWebUI(port);
+        break;
+      }
 
       case 'cat-file':
         if (cmdArgs.length === 0) {

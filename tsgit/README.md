@@ -14,6 +14,7 @@ A complete Git implementation built from the ground up in TypeScript, with signi
 | Loses changes on switch | **Auto-stash per branch** - seamless context switching |
 | Poor monorepo support | **Repository scopes** - work with subsets efficiently |
 | Cryptic errors | **Helpful error messages** - with suggestions and similar commands |
+| No built-in UI | **Visual interfaces** - Terminal UI and Web UI built-in |
 
 ## 📦 Installation
 
@@ -37,7 +38,64 @@ tsgit commit -m "Initial commit"
 # Or commit directly without staging
 tsgit commit -a -m "Update all tracked files"
 tsgit commit file.ts -m "Fix specific file"
+
+# Launch visual interface
+tsgit ui    # Terminal UI
+tsgit web   # Web UI (opens browser)
 ```
+
+## 🖥️ Visual Interfaces
+
+### Terminal UI (TUI)
+
+Launch an interactive terminal interface with `tsgit ui`:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ tsgit │ my-project │ Branch: main                              │
+├─────────────────────────────────────────────────────────────────┤
+│ Status                    │ Files                               │
+│ ─────────────────────────────────────────────────────────────── │
+│ On branch: main           │ [M] src/index.ts                   │
+│                           │ [?] new-file.ts                     │
+│ Changes not staged:       │ [S] README.md                       │
+│   ~ src/index.ts          │                                     │
+│                           │                                     │
+├─────────────────────────────────────────────────────────────────┤
+│ Commit Log                │ Diff                                │
+│ ─────────────────────────────────────────────────────────────── │
+│ a1b2c3d4 Fix bug...       │ --- a/src/index.ts                 │
+│ e5f6g7h8 Add feature...   │ +++ b/src/index.ts                 │
+│ i9j0k1l2 Initial commit   │ @@ -1,5 +1,7 @@                    │
+└─────────────────────────────────────────────────────────────────┘
+ q:quit  r:refresh  a:add  c:commit  s:switch  ?:help
+```
+
+**Keyboard Shortcuts:**
+- `Tab` - Switch between panels
+- `a` - Stage selected file
+- `c` - Create commit
+- `s` - Switch branch
+- `r` - Refresh
+- `q` - Quit
+- `?` - Help
+
+### Web UI
+
+Launch a modern web dashboard with `tsgit web`:
+
+```bash
+tsgit web           # Opens on http://localhost:3847
+tsgit web --port 8080   # Custom port
+```
+
+Features:
+- 📊 Visual status overview
+- 📁 File staging with one click
+- 📜 Commit history browser
+- ⎇ Branch management
+- ↩ One-click undo
+- 🌙 Beautiful dark theme
 
 ## 🆕 New Commands
 
@@ -198,6 +256,10 @@ tsgit/
 │   │   ├── undo.ts           # New: undo/history commands
 │   │   ├── merge.ts          # New: merge with conflicts
 │   │   └── scope.ts          # New: monorepo scope
+│   ├── ui/
+│   │   ├── tui.ts            # Terminal User Interface
+│   │   ├── web.ts            # Web-based UI
+│   │   └── index.ts          # UI exports
 │   ├── utils/
 │   │   ├── hash.ts           # SHA-256/SHA-1 hashing
 │   │   ├── compression.ts    # Zlib compression
@@ -227,6 +289,8 @@ tsgit/
 | Branch auto-stash | ✅ | ❌ |
 | Monorepo scopes | ✅ | ⚠️ (sparse checkout) |
 | Helpful errors | ✅ | ❌ |
+| Built-in TUI | ✅ | ❌ |
+| Built-in Web UI | ✅ | ❌ |
 | Remote operations | ❌ (planned) | ✅ |
 | Packfiles | ❌ (planned) | ✅ |
 

@@ -51,5 +51,8 @@ export * from './core/scope';
 export * from './utils/hash';
 export * from './utils/compression';
 
+// User Interface
+export * from './ui';
+
 // Version
 export const VERSION = '2.0.0';
