@@ -15,6 +15,15 @@ import { Repository } from '../core/repository';
 import { RemoteManager } from '../core/remote';
 import { TsgitError, ErrorCode } from '../core/errors';
 import { exists, mkdirp, writeFile } from '../utils/fs';
+import {
+  SmartHttpClient,
+  normalizeRepoUrl,
+  parsePackfile,
+  resolveHead,
+  getBranches,
+  getTags,
+  RefAdvertisement,
+} from '../core/protocol';
 
 const colors = {
   green: (s: string) => `\x1b[32m${s}\x1b[0m`,
@@ -183,13 +192,22 @@ function copyObjectsRecursive(src: string, dest: string): void {
 }
 
 /**
- * Clone a remote repository
+ * Clone a remote repository using Smart HTTP protocol
  */
-function cloneRemote(url: string, destPath: string, options: CloneOptions): Repository {
+async function cloneRemoteAsync(url: string, destPath: string, options: CloneOptions): Promise<Repository> {
   console.log(colors.dim(`Cloning into '${destPath}'...`));
   
-  // Initialize repository
-  const repo = Repository.init(destPath);
+  // Normalize URL for HTTP client
+  const httpUrl = normalizeRepoUrl(url);
+  
+  // Create HTTP client first to discover remote's capabilities
+  const client = new SmartHttpClient(httpUrl);
+  
+  // Discover refs to determine object format (SHA-1 vs SHA-256)
+  // Most Git servers use SHA-1, so we initialize with SHA-1 for interop
+  // Initialize repository with SHA-1 for Git interoperability
+  // Git remotes currently use SHA-1 (SHA-256 support is experimental)
+  const repo = Repository.init(destPath, { hashAlgorithm: 'sha1' });
   const remoteManager = new RemoteManager(repo.gitDir);
   remoteManager.init();
 
@@ -198,42 +216,186 @@ function cloneRemote(url: string, destPath: string, options: CloneOptions): Repo
   // Add origin remote
   remoteManager.add(originName, url);
 
-  // For now, we show a message about network operations
-  // In a full implementation, this would use git protocol or HTTP
-  console.log(colors.yellow('!') + ' Remote cloning requires network protocol implementation');
-  console.log(colors.dim(`  Remote URL: ${url}`));
-  console.log(colors.dim(`  Origin name: ${originName}`));
-  
-  if (options.depth) {
-    console.log(colors.dim(`  Shallow clone depth: ${options.depth}`));
+  try {
+    // Step 1: Discover refs from remote
+    if (options.progress) {
+      console.log(colors.dim('Discovering refs...'));
+    }
     
-    // Configure shallow clone
-    repo.partialClone.enable(url, {
-      type: 'tree:depth',
-      depth: options.depth,
-    });
+    const advertisement = await client.discoverRefs('upload-pack');
+    
+    if (advertisement.refs.length === 0) {
+      console.log(colors.yellow('!') + ' Remote repository appears to be empty');
+      return repo;
+    }
+
+    // Determine what to fetch
+    const branches = getBranches(advertisement);
+    const tags = getTags(advertisement);
+    
+    if (options.progress) {
+      console.log(colors.dim(`Found ${branches.length} branches, ${tags.length} tags`));
+    }
+
+    // Get refs to fetch based on options
+    let wantRefs = branches.map(r => r.hash);
+    
+    // Add tags
+    for (const tag of tags) {
+      if (!wantRefs.includes(tag.hash)) {
+        wantRefs.push(tag.hash);
+      }
+      // Also get peeled refs for annotated tags
+      if (tag.peeled && !wantRefs.includes(tag.peeled)) {
+        wantRefs.push(tag.peeled);
+      }
+    }
+
+    // If specific branch requested, filter to just that
+    if (options.branch) {
+      const targetBranch = branches.find(
+        b => b.name === `refs/heads/${options.branch}` || b.name === options.branch
+      );
+      if (targetBranch) {
+        wantRefs = [targetBranch.hash];
+      } else {
+        throw new TsgitError(
+          `Remote branch '${options.branch}' not found`,
+          ErrorCode.REF_NOT_FOUND,
+          branches.map(b => `  ${b.name.replace('refs/heads/', '')}`)
+        );
+      }
+    }
+
+    // Remove duplicates
+    wantRefs = [...new Set(wantRefs)];
+
+    if (wantRefs.length === 0) {
+      console.log(colors.yellow('!') + ' No refs to fetch');
+      return repo;
+    }
+
+    // Step 2: Fetch pack file
+    if (options.progress) {
+      console.log(colors.dim(`Fetching ${wantRefs.length} refs...`));
+    }
+
+    const fetchOptions = options.depth ? { depth: options.depth } : undefined;
+    const packData = await client.fetchPack(wantRefs, [], fetchOptions);
+
+    if (options.progress) {
+      console.log(colors.dim(`Received ${packData.length} bytes`));
+    }
+
+    // Step 3: Parse pack file and store objects
+    if (options.progress) {
+      console.log(colors.dim('Unpacking objects...'));
+    }
+
+    const parsedPack = parsePackfile(packData, options.progress ? (info) => {
+      process.stdout.write(`\r${colors.dim(`${info.phase}: ${info.current}/${info.total}`)}`);
+    } : undefined);
+
+    if (options.progress) {
+      console.log(); // New line after progress
+    }
+
+    // Store all objects
+    let objectsStored = 0;
+    for (const obj of parsedPack.objects) {
+      repo.objects.writeRawObject(obj.type, obj.data, obj.hash);
+      objectsStored++;
+    }
+
+    if (options.progress) {
+      console.log(colors.dim(`Stored ${objectsStored} objects`));
+    }
+
+    // Step 4: Set up refs
+    // Update remote tracking branches
+    for (const branch of branches) {
+      const branchName = branch.name.replace('refs/heads/', '');
+      remoteManager.updateTrackingBranch(originName, branchName, branch.hash);
+    }
+
+    // Create tags
+    for (const tag of tags) {
+      const tagName = tag.name.replace('refs/tags/', '');
+      try {
+        repo.refs.createTag(tagName, tag.hash);
+      } catch {
+        // Tag may already exist
+      }
+    }
+
+    // Step 5: Determine default branch and checkout
+    let defaultBranch = options.branch;
+    
+    if (!defaultBranch) {
+      // Try to determine from HEAD symref
+      const headTarget = resolveHead(advertisement);
+      if (headTarget) {
+        defaultBranch = headTarget.replace('refs/heads/', '');
+      } else {
+        // Fall back to main or master
+        if (branches.find(b => b.name === 'refs/heads/main')) {
+          defaultBranch = 'main';
+        } else if (branches.find(b => b.name === 'refs/heads/master')) {
+          defaultBranch = 'master';
+        } else if (branches.length > 0) {
+          defaultBranch = branches[0].name.replace('refs/heads/', '');
+        }
+      }
+    }
+
+    // Create local branch and checkout
+    if (defaultBranch && !options.bare && !options.noCheckout) {
+      const branchRef = branches.find(
+        b => b.name === `refs/heads/${defaultBranch}` || b.name === defaultBranch
+      );
+      
+      if (branchRef) {
+        // Create local branch pointing to the same commit
+        repo.refs.createBranch(defaultBranch, branchRef.hash);
+        repo.refs.setHeadSymbolic(`refs/heads/${defaultBranch}`);
+        
+        // Set up tracking
+        remoteManager.setTrackingBranch(defaultBranch, originName, defaultBranch);
+        
+        // Checkout the tree
+        if (options.progress) {
+          console.log(colors.dim(`Checking out '${defaultBranch}'...`));
+        }
+        repo.checkout(defaultBranch);
+      }
+    }
+
+    // Configure shallow clone if requested
+    if (options.depth) {
+      repo.partialClone.enable(url, {
+        type: 'tree:depth',
+        depth: options.depth,
+      });
+    }
+
+    return repo;
+  } catch (error) {
+    // Clean up on failure
+    if (exists(destPath)) {
+      try {
+        fs.rmSync(destPath, { recursive: true, force: true });
+      } catch {
+        // Ignore cleanup errors
+      }
+    }
+    throw error;
   }
-
-  if (options.branch) {
-    console.log(colors.dim(`  Target branch: ${options.branch}`));
-  }
-
-  console.log();
-  console.log(colors.cyan('ℹ') + ' To complete the clone, you would need to:');
-  console.log('  1. Fetch refs from the remote server');
-  console.log('  2. Download object pack files');
-  console.log('  3. Checkout the default branch');
-  console.log();
-  console.log(colors.dim('  This requires implementing the Git wire protocol (git:// or smart HTTP).'));
-  console.log(colors.dim('  For now, use local file paths or interop with Git for remote operations.'));
-
-  return repo;
 }
 
 /**
- * Clone a repository
+ * Clone a repository (async version for remote repos)
  */
-export function clone(url: string, directory?: string, options: CloneOptions = {}): Repository {
+export async function cloneAsync(url: string, directory?: string, options: CloneOptions = {}): Promise<Repository> {
   const parsed = parseRepoUrl(url);
   const destPath = directory || parsed.name;
   const absoluteDest = path.resolve(destPath);
@@ -263,24 +425,67 @@ export function clone(url: string, directory?: string, options: CloneOptions = {
     const sourcePath = path.resolve(parsed.path);
     repo = cloneLocal(sourcePath, absoluteDest, options);
   } else {
-    // Remote clone
-    repo = cloneRemote(url, absoluteDest, options);
+    // Remote clone using Smart HTTP
+    repo = await cloneRemoteAsync(url, absoluteDest, options);
   }
 
   // Handle bare repository
   if (options.bare) {
     console.log(colors.dim('Note: Bare repository created'));
-    // For bare repos, we'd move contents differently
-    // This is simplified for now
   }
 
   return repo;
 }
 
 /**
- * CLI handler for clone command
+ * Clone a repository (sync version, only works for local repos)
  */
-export function handleClone(args: string[]): void {
+export function clone(url: string, directory?: string, options: CloneOptions = {}): Repository {
+  const parsed = parseRepoUrl(url);
+  
+  if (parsed.protocol !== 'file') {
+    throw new TsgitError(
+      'Synchronous clone only works for local repositories. Use cloneAsync() for remote repositories.',
+      ErrorCode.OPERATION_FAILED,
+      ['Use: await cloneAsync(url, directory, options)']
+    );
+  }
+  
+  const destPath = directory || parsed.name;
+  const absoluteDest = path.resolve(destPath);
+
+  // Check if destination exists
+  if (exists(absoluteDest)) {
+    const contents = fs.readdirSync(absoluteDest);
+    if (contents.length > 0) {
+      throw new TsgitError(
+        `destination path '${destPath}' already exists and is not an empty directory`,
+        ErrorCode.OPERATION_FAILED,
+        [
+          `rm -rf ${destPath}    # Remove existing directory`,
+          `wit clone ${url} ${destPath}-new    # Use a different name`,
+        ]
+      );
+    }
+  }
+
+  // Create destination directory
+  mkdirp(absoluteDest);
+
+  const sourcePath = path.resolve(parsed.path);
+  const repo = cloneLocal(sourcePath, absoluteDest, options);
+
+  if (options.bare) {
+    console.log(colors.dim('Note: Bare repository created'));
+  }
+
+  return repo;
+}
+
+/**
+ * CLI handler for clone command (async)
+ */
+export async function handleCloneAsync(args: string[]): Promise<void> {
   const options: CloneOptions = {};
   const positional: string[] = [];
 
@@ -337,7 +542,7 @@ export function handleClone(args: string[]): void {
   const directory = positional[1];
 
   try {
-    const repo = clone(url, directory, options);
+    const repo = await cloneAsync(url, directory, options);
     
     const parsed = parseRepoUrl(url);
     const destName = directory || parsed.name;
@@ -363,4 +568,18 @@ export function handleClone(args: string[]): void {
     }
     process.exit(1);
   }
+}
+
+/**
+ * CLI handler for clone command (sync wrapper)
+ */
+export function handleClone(args: string[]): void {
+  handleCloneAsync(args).catch(error => {
+    if (error instanceof TsgitError) {
+      console.error(error.format());
+    } else if (error instanceof Error) {
+      console.error(colors.red('error: ') + error.message);
+    }
+    process.exit(1);
+  });
 }
