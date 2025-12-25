@@ -21,6 +21,8 @@ import {
   handleMerge,
   handleCommit,
   handleScope,
+  // AI commands
+  handleAI,
 } from './commands';
 import { TsgitError, findSimilar } from './core/errors';
 import { Repository } from './core/repository';
@@ -43,6 +45,7 @@ tsgit improves on Git with:
   • Monorepo scopes (work with subsets of large repos)
   • Better error messages (with suggestions)
   • Built-in visual UI (terminal and web)
+  • AI-powered features (commit messages, code review, conflict resolution)
 
 Usage: tsgit <command> [<args>]
 
@@ -81,6 +84,14 @@ Monorepo Support:
   scope use <preset>    Use a preset scope (frontend, backend, docs)
   scope clear           Clear scope restrictions
 
+AI-Powered Features:
+  ai <query>            Natural language git commands
+  ai commit [-a] [-x]   Generate commit message from changes
+  ai review             AI code review of changes
+  ai explain [ref]      Explain a commit
+  ai resolve [file]     AI-assisted conflict resolution
+  ai status             Show AI configuration
+
 Plumbing Commands:
   cat-file <hash>       Provide content or type info for objects
   hash-object <file>    Compute object ID and create a blob
@@ -102,6 +113,8 @@ Examples:
   tsgit merge feature
   tsgit undo
   tsgit scope use frontend
+  tsgit ai "what files changed?"
+  tsgit ai commit -a -x
 `;
 
 const COMMANDS = [
@@ -110,6 +123,7 @@ const COMMANDS = [
   'merge', 'undo', 'history',
   'scope', 'graph',
   'ui', 'web',
+  'ai',
   'cat-file', 'hash-object', 'ls-files', 'ls-tree',
   'help',
 ];
@@ -359,6 +373,14 @@ function main(): void {
           nameOnly: !!options['name-only'],
         });
         break;
+
+      case 'ai':
+        // AI commands are async, so we need to handle them specially
+        handleAI(cmdArgs).catch((error: Error) => {
+          console.error(`error: ${error.message}`);
+          process.exit(1);
+        });
+        return; // Exit main() to let async handle complete
 
       default: {
         // Provide suggestions for unknown commands

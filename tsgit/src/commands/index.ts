@@ -15,6 +15,9 @@ export { undo, history, handleUndo, handleHistory } from './undo';
 export { merge, mergeAbort, mergeContinue, showConflicts, handleMerge } from './merge';
 export { handleScope } from './scope';
 
+// AI-powered commands
+export { handleAI, handleAICommit, handleReview, handleExplain, handleResolve } from './ai';
+
 // Plumbing commands (low-level)
 export { catFile } from './cat-file';
 export { hashObjectCommand } from './hash-object';

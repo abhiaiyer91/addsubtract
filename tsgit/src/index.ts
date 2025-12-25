@@ -54,5 +54,8 @@ export * from './utils/compression';
 // User Interface
 export * from './ui';
 
+// AI Integration
+export * from './ai';
+
 // Version
 export const VERSION = '2.0.0';
