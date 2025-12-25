@@ -4,94 +4,36 @@ This document outlines all missing features needed to achieve feature parity wit
 
 ## Overview
 
-| Workstream | Priority | Complexity | Dependencies |
-|------------|----------|------------|--------------|
-| 1. Local Commands | High | Medium | None |
-| 2. Remote Infrastructure | Critical | High | None |
-| 3. Remote Commands | Critical | High | Workstream 2 |
-| 4. History Rewriting | High | High | None |
-| 5. Plumbing Commands | Medium | Low | None |
-| 6. Advanced Features | Low | Medium | Various |
+| Workstream               | Priority | Complexity | Status              |
+| ------------------------ | -------- | ---------- | ------------------- |
+| 1. Local Commands        | High     | Medium     | **Mostly Complete** |
+| 2. Remote Infrastructure | Critical | High       | Not Started         |
+| 3. Remote Commands       | Critical | High       | Not Started         |
+| 4. History Rewriting     | High     | High       | Not Started         |
+| 5. Plumbing Commands     | Medium   | Low        | Not Started         |
+| 6. Advanced Features     | Low      | Medium     | Not Started         |
 
 ---
 
-## Workstream 1: Local Commands
+## Workstream 1: Local Commands ✅ Mostly Complete
 
-**Owner:** _Unassigned_  
-**Estimated Effort:** 2-3 days  
-**Dependencies:** None
+**Status:** Core local commands are implemented. Only a few remain.
 
-These are standalone local commands that don't require network code.
+### ✅ Completed Commands
 
-### 1.1 Stash Command ✅ (Started)
-**File:** `src/commands/stash.ts`
+| Command | Status  | Notes                                                          |
+| ------- | ------- | -------------------------------------------------------------- |
+| `stash` | ✅ Done | Full implementation: save, list, show, apply, pop, drop, clear |
+| `tag`   | ✅ Done | Lightweight + annotated tags, list, delete, verify             |
+| `reset` | ✅ Done | soft/mixed/hard modes, revision parsing (HEAD~N, HEAD^)        |
 
-```typescript
-// Already created - needs testing and refinement
-tsgit stash [save] [-m "msg"]  // Save working directory
-tsgit stash list               // List stashes
-tsgit stash show [n]           // Show stash contents
-tsgit stash apply [n]          // Apply without removing
-tsgit stash pop [n]            // Apply and remove
-tsgit stash drop [n]           // Remove stash
-tsgit stash clear              // Clear all
-```
+### 1.1 Bisect Command
 
-**TODO:**
-- [ ] Add tests in `src/__tests__/stash.test.ts`
-- [ ] Handle edge cases (conflicts on apply)
-- [ ] Add `--keep-index` option
-
-### 1.2 Tag Command ✅ (Started)
-**File:** `src/commands/tag.ts`
-
-```typescript
-// Already created - needs CLI integration
-tsgit tag                      // List tags
-tsgit tag <name>               // Create lightweight tag
-tsgit tag -a <name> -m "msg"   // Create annotated tag
-tsgit tag -d <name>            // Delete tag
-tsgit tag -v <name>            // Show tag info
-```
-
-**TODO:**
-- [ ] Add to CLI (`src/cli.ts`)
-- [ ] Add to exports (`src/commands/index.ts`)
-- [ ] Add tests
-
-### 1.3 Reset Command ✅ (Started)
-**File:** `src/commands/reset.ts`
-
-```typescript
-// Already created - needs CLI integration
-tsgit reset --soft <ref>       // Move HEAD only
-tsgit reset --mixed <ref>      // Move HEAD + reset index (default)
-tsgit reset --hard <ref>       // Move HEAD + reset index + working dir
-tsgit reset <file>             // Unstage file
-```
-
-**TODO:**
-- [ ] Add to CLI (`src/cli.ts`)
-- [ ] Add to exports (`src/commands/index.ts`)
-- [ ] Add revision parsing for `HEAD~3`, `HEAD^`, etc.
-- [ ] Add tests
-
-### 1.4 Bisect Command
 **File:** `src/commands/bisect.ts`
 
 Binary search to find the commit that introduced a bug.
 
 ```typescript
-interface BisectState {
-  active: boolean;
-  goodCommit: string;
-  badCommit: string;
-  currentCommit: string;
-  testedCommits: Map<string, 'good' | 'bad'>;
-  remaining: string[];
-}
-
-// Commands needed:
 tsgit bisect start              // Start bisect session
 tsgit bisect good [<rev>]       // Mark commit as good
 tsgit bisect bad [<rev>]        // Mark commit as bad
@@ -101,11 +43,13 @@ tsgit bisect log                // Show bisect log
 ```
 
 **Implementation Notes:**
+
 - Store state in `.tsgit/BISECT_STATE.json`
 - Use binary search on commit history
 - Auto-checkout commits during bisect
 
-### 1.5 Clean Command
+### 1.2 Clean Command
+
 **File:** `src/commands/clean.ts`
 
 Remove untracked files from working directory.
@@ -117,7 +61,8 @@ tsgit clean -fd                 // Delete untracked files and directories
 tsgit clean -fx                 // Also delete ignored files
 ```
 
-### 1.6 Show Command
+### 1.3 Show Command
+
 **File:** `src/commands/show.ts`
 
 Show various types of objects.
@@ -132,36 +77,32 @@ tsgit show <tag>                // Show tag info
 
 ## Workstream 2: Remote Infrastructure
 
-**Owner:** _Unassigned_  
 **Estimated Effort:** 3-4 days  
 **Dependencies:** None
 
 Core infrastructure needed for all remote operations.
 
 ### 2.1 Remote Configuration
+
 **File:** `src/core/remote.ts`
 
 ```typescript
 export interface Remote {
   name: string;
   url: string;
-  fetch: string;  // Refspec for fetching
-  push?: string;  // Refspec for pushing
-}
-
-export interface RemoteConfig {
-  remotes: Map<string, Remote>;
+  fetch: string; // Refspec for fetching
+  push?: string; // Refspec for pushing
 }
 
 export class RemoteManager {
   constructor(gitDir: string);
-  
+
   // CRUD operations
   add(name: string, url: string): void;
   remove(name: string): void;
   rename(oldName: string, newName: string): void;
   setUrl(name: string, url: string): void;
-  
+
   // Queries
   get(name: string): Remote | null;
   list(): Remote[];
@@ -178,6 +119,7 @@ export class RemoteManager {
 ```
 
 ### 2.2 Git Protocol Implementation
+
 **File:** `src/core/protocol/`
 
 ```
@@ -191,103 +133,41 @@ src/core/protocol/
 └── refs-discovery.ts  # Ref advertisement parsing
 ```
 
-#### 2.2.1 Types (`types.ts`)
-```typescript
-export interface RefAdvertisement {
-  refs: Map<string, string>;  // ref name -> hash
-  capabilities: string[];
-  head?: string;
-}
+#### Smart HTTP Protocol (`smart-http.ts`)
 
-export interface WantHave {
-  wants: string[];     // Commits we want
-  haves: string[];     // Commits we have
-  done: boolean;
-}
-
-export interface PackNegotiation {
-  commonBase: string[];
-  objectsNeeded: string[];
-}
-```
-
-#### 2.2.2 Smart HTTP Protocol (`smart-http.ts`)
 ```typescript
 export class SmartHttpClient {
   constructor(baseUrl: string);
-  
+
   // Discovery
-  async discoverRefs(service: 'upload-pack' | 'receive-pack'): Promise<RefAdvertisement>;
-  
+  async discoverRefs(
+    service: "upload-pack" | "receive-pack"
+  ): Promise<RefAdvertisement>;
+
   // Fetching (upload-pack)
   async fetchPack(wants: string[], haves: string[]): Promise<Buffer>;
-  
-  // Pushing (receive-pack)  
+
+  // Pushing (receive-pack)
   async pushPack(refs: RefUpdate[], pack: Buffer): Promise<PushResult>;
 }
 ```
 
 **HTTP Endpoints:**
+
 - `GET /info/refs?service=git-upload-pack` - Ref discovery for fetch
 - `POST /git-upload-pack` - Fetch pack negotiation
 - `GET /info/refs?service=git-receive-pack` - Ref discovery for push
 - `POST /git-receive-pack` - Push pack data
 
-#### 2.2.3 Pack File Format (`pack.ts`)
-```typescript
-export interface PackHeader {
-  signature: 'PACK';
-  version: 2 | 3;
-  objectCount: number;
-}
-
-export interface PackObject {
-  type: 'commit' | 'tree' | 'blob' | 'tag' | 'ofs_delta' | 'ref_delta';
-  size: number;
-  data: Buffer;
-  // For deltas:
-  baseOffset?: number;
-  baseHash?: string;
-}
-
-export class PackfileParser {
-  parse(data: Buffer): PackObject[];
-}
-
-export class PackfileWriter {
-  constructor(objects: ObjectStore);
-  
-  // Create pack from object list
-  createPack(objectHashes: string[]): Buffer;
-  
-  // Delta compression
-  createDelta(base: Buffer, target: Buffer): Buffer;
-}
-```
-
-**Pack Format:**
-```
-PACK (4 bytes signature)
-Version (4 bytes, network order)
-Object count (4 bytes, network order)
-[Objects...]
-SHA-1 checksum of entire pack (20 bytes)
-```
-
 ### 2.3 Authentication
+
 **File:** `src/core/auth.ts`
 
 ```typescript
-export interface Credentials {
-  username?: string;
-  password?: string;
-  token?: string;
-}
-
 export class CredentialManager {
   // Try to get credentials from various sources
   async getCredentials(url: string): Promise<Credentials | null>;
-  
+
   // Sources (in order):
   // 1. Environment: TSGIT_TOKEN, GIT_TOKEN, GITHUB_TOKEN
   // 2. Git credential helper (if available)
@@ -300,11 +180,11 @@ export class CredentialManager {
 
 ## Workstream 3: Remote Commands
 
-**Owner:** _Unassigned_  
 **Estimated Effort:** 4-5 days  
 **Dependencies:** Workstream 2 (Remote Infrastructure)
 
 ### 3.1 Remote Command
+
 **File:** `src/commands/remote.ts`
 
 ```typescript
@@ -318,6 +198,7 @@ tsgit remote set-url <name> <url> // Change URL
 ```
 
 ### 3.2 Clone Command
+
 **File:** `src/commands/clone.ts`
 
 ```typescript
@@ -328,6 +209,7 @@ tsgit clone --bare <url>        // Bare clone
 ```
 
 **Implementation Steps:**
+
 1. Parse URL and determine protocol
 2. Create target directory
 3. Initialize repository (`tsgit init`)
@@ -336,6 +218,7 @@ tsgit clone --bare <url>        // Bare clone
 6. Checkout default branch
 
 ### 3.3 Fetch Command
+
 **File:** `src/commands/fetch.ts`
 
 ```typescript
@@ -346,14 +229,8 @@ tsgit fetch --prune             // Delete stale remote refs
 tsgit fetch <remote> <refspec>  // Fetch specific ref
 ```
 
-**Implementation Steps:**
-1. Discover remote refs
-2. Determine which objects we need (want/have negotiation)
-3. Receive and parse pack file
-4. Store objects in object store
-5. Update remote-tracking refs (`refs/remotes/<remote>/*`)
-
 ### 3.4 Pull Command
+
 **File:** `src/commands/pull.ts`
 
 ```typescript
@@ -363,24 +240,8 @@ tsgit pull <remote> <branch>    // Pull specific branch
 tsgit pull --ff-only            // Only fast-forward
 ```
 
-**Implementation:**
-```typescript
-export async function pull(options: PullOptions): Promise<void> {
-  // 1. Fetch
-  await fetch({ remote: options.remote });
-  
-  // 2. Merge or rebase
-  if (options.rebase) {
-    await rebase({ onto: `${options.remote}/${options.branch}` });
-  } else {
-    await merge(`${options.remote}/${options.branch}`, {
-      ffOnly: options.ffOnly,
-    });
-  }
-}
-```
-
 ### 3.5 Push Command
+
 **File:** `src/commands/push.ts`
 
 ```typescript
@@ -394,23 +255,15 @@ tsgit push --tags               // Push all tags
 tsgit push --delete <branch>    // Delete remote branch
 ```
 
-**Implementation Steps:**
-1. Determine what to push (current branch or specified refs)
-2. Discover remote refs
-3. Check if push is allowed (fast-forward, force, etc.)
-4. Create pack file with objects remote doesn't have
-5. Send pack file to remote
-6. Update local remote-tracking refs
-
 ---
 
 ## Workstream 4: History Rewriting
 
-**Owner:** _Unassigned_  
 **Estimated Effort:** 3-4 days  
 **Dependencies:** None
 
 ### 4.1 Cherry-Pick Command
+
 **File:** `src/commands/cherry-pick.ts`
 
 ```typescript
@@ -422,29 +275,8 @@ tsgit cherry-pick --skip        // Skip current commit
 tsgit cherry-pick -n <commit>   // Apply without committing
 ```
 
-**Implementation:**
-```typescript
-export function cherryPick(commitHash: string): CherryPickResult {
-  // 1. Get the commit and its parent
-  const commit = repo.objects.readCommit(commitHash);
-  const parentHash = commit.parentHashes[0];
-  
-  // 2. Get the diff between parent and commit
-  const parentTree = getTree(parentHash);
-  const commitTree = getTree(commitHash);
-  const changes = diffTrees(parentTree, commitTree);
-  
-  // 3. Apply changes to current working directory
-  for (const change of changes) {
-    applyChange(change);
-  }
-  
-  // 4. Create new commit with same message
-  return repo.commit(commit.message);
-}
-```
-
 ### 4.2 Rebase Command
+
 **File:** `src/commands/rebase.ts`
 
 ```typescript
@@ -456,28 +288,9 @@ tsgit rebase --skip             // Skip current commit
 ```
 
 **State File:** `.tsgit/REBASE_STATE.json`
-```typescript
-interface RebaseState {
-  active: boolean;
-  onto: string;              // Target base commit
-  originalBranch: string;    // Branch being rebased
-  originalHead: string;      // Original HEAD before rebase
-  currentCommit: string;     // Current commit being applied
-  remainingCommits: string[]; // Commits left to apply
-  completedCommits: string[]; // Commits already applied
-}
-```
-
-**Implementation Steps:**
-1. Find merge base between current branch and target
-2. Collect commits to replay (from merge base to HEAD)
-3. Checkout target commit
-4. For each commit to replay:
-   - Cherry-pick the commit
-   - If conflict, save state and stop
-5. Update branch reference to new HEAD
 
 ### 4.3 Revert Command
+
 **File:** `src/commands/revert.ts`
 
 ```typescript
@@ -488,20 +301,17 @@ tsgit revert --continue         // Continue after conflict
 tsgit revert --abort            // Abort operation
 ```
 
-**Implementation:**
-Similar to cherry-pick but applies the inverse of the changes.
-
 ---
 
 ## Workstream 5: Plumbing Commands
 
-**Owner:** _Unassigned_  
 **Estimated Effort:** 2 days  
 **Dependencies:** None
 
 Low-level commands for scripting and advanced usage.
 
 ### 5.1 Rev-Parse
+
 **File:** `src/commands/rev-parse.ts`
 
 ```typescript
@@ -514,6 +324,7 @@ tsgit rev-parse --show-toplevel // Output: repo root
 ```
 
 ### 5.2 Update-Ref
+
 **File:** `src/commands/update-ref.ts`
 
 ```typescript
@@ -523,6 +334,7 @@ tsgit update-ref --stdin             // Batch update
 ```
 
 ### 5.3 Symbolic-Ref
+
 **File:** `src/commands/symbolic-ref.ts`
 
 ```typescript
@@ -532,6 +344,7 @@ tsgit symbolic-ref --short HEAD      // Output: main
 ```
 
 ### 5.4 For-Each-Ref
+
 **File:** `src/commands/for-each-ref.ts`
 
 ```typescript
@@ -542,6 +355,7 @@ tsgit for-each-ref --format='%(refname)'     // Custom format
 ```
 
 ### 5.5 Show-Ref
+
 **File:** `src/commands/show-ref.ts`
 
 ```typescript
@@ -552,6 +366,7 @@ tsgit show-ref <ref>              // Check if ref exists
 ```
 
 ### 5.6 Verify Objects
+
 **File:** `src/commands/fsck.ts`
 
 ```typescript
@@ -563,14 +378,15 @@ tsgit fsck --full                 // Full verification
 
 ## Workstream 6: Advanced Features
 
-**Owner:** _Unassigned_  
 **Estimated Effort:** 4-5 days  
 **Dependencies:** Workstreams 2, 3
 
 ### 6.1 Hooks System
+
 **File:** `src/core/hooks.ts`
 
 **Hook Types:**
+
 - `pre-commit` - Before commit is created
 - `post-commit` - After commit is created
 - `pre-push` - Before push
@@ -580,22 +396,8 @@ tsgit fsck --full                 // Full verification
 
 **Directory:** `.tsgit/hooks/`
 
-```typescript
-export class HookManager {
-  constructor(gitDir: string);
-  
-  // Run a hook
-  async run(hookName: string, args?: string[]): Promise<HookResult>;
-  
-  // Install a hook
-  install(hookName: string, script: string): void;
-  
-  // Check if hook exists
-  exists(hookName: string): boolean;
-}
-```
-
 ### 6.2 Submodules
+
 **File:** `src/core/submodule.ts`
 
 ```typescript
@@ -606,15 +408,8 @@ tsgit submodule status             // Show status
 tsgit submodule foreach <cmd>      // Run command in each
 ```
 
-**Config File:** `.tsgitmodules`
-```ini
-[submodule "lib/foo"]
-    path = lib/foo
-    url = https://github.com/user/foo.git
-    branch = main
-```
-
 ### 6.3 Worktrees
+
 **File:** `src/core/worktree.ts`
 
 ```typescript
@@ -625,6 +420,7 @@ tsgit worktree prune                // Prune stale entries
 ```
 
 ### 6.4 Reflog
+
 **File:** `src/commands/reflog.ts`
 
 Traditional reflog alongside the existing journal.
@@ -636,6 +432,7 @@ tsgit reflog expire             // Prune old entries
 ```
 
 ### 6.5 Garbage Collection
+
 **File:** `src/commands/gc.ts`
 
 ```typescript
@@ -645,100 +442,22 @@ tsgit gc --prune=now            // Prune immediately
 ```
 
 **Tasks:**
+
 - Remove unreachable objects
 - Pack loose objects into packfiles
 - Remove stale refs
 
 ---
 
-## Integration Checklist
+## Testing ✅ Complete
 
-After implementing each command, update these files:
+All commands now have comprehensive tests:
 
-### `src/commands/index.ts`
-```typescript
-// Add exports for new commands
-export { handleStash } from './stash';
-export { handleTag } from './tag';
-export { handleReset } from './reset';
-// ... etc
-```
-
-### `src/cli.ts`
-```typescript
-// Add command cases
-case 'stash':
-  handleStash(cmdArgs);
-  break;
-
-case 'tag':
-  handleTag(cmdArgs);
-  break;
-// ... etc
-```
-
-```typescript
-// Add to COMMANDS array for typo suggestions
-const COMMANDS = [
-  // existing...
-  'stash', 'tag', 'reset', 'cherry-pick', 'rebase',
-  'remote', 'clone', 'fetch', 'pull', 'push',
-  // ... etc
-];
-```
-
-### `src/cli.ts` HELP text
-Update the help text with new commands.
-
----
-
-## Testing Strategy
-
-Each command should have corresponding tests:
-
-```
-src/__tests__/
-├── stash.test.ts
-├── tag.test.ts
-├── reset.test.ts
-├── cherry-pick.test.ts
-├── rebase.test.ts
-├── remote.test.ts
-├── clone.test.ts
-├── fetch.test.ts
-├── pull.test.ts
-├── push.test.ts
-└── protocol/
-    ├── smart-http.test.ts
-    ├── pack.test.ts
-    └── packfile.test.ts
-```
-
-**Test Patterns:**
-```typescript
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { Repository } from '../core/repository';
-import { createTestRepo, cleanupTestRepo } from './test-utils';
-
-describe('command-name', () => {
-  let repo: Repository;
-  let testDir: string;
-
-  beforeEach(() => {
-    const setup = createTestRepo();
-    repo = setup.repo;
-    testDir = setup.dir;
-  });
-
-  afterEach(() => {
-    cleanupTestRepo(testDir);
-  });
-
-  it('should do something', () => {
-    // Test implementation
-  });
-});
-```
+| Command | Test File                     | Status  |
+| ------- | ----------------------------- | ------- |
+| stash   | `src/__tests__/stash.test.ts` | ✅ Done |
+| tag     | `src/__tests__/tag.test.ts`   | ✅ Done |
+| reset   | `src/__tests__/reset.test.ts` | ✅ Done |
 
 ---
 
@@ -746,31 +465,37 @@ describe('command-name', () => {
 
 Recommended implementation order for maximum impact:
 
-1. **Phase 1 - Local Essentials** (Week 1)
-   - [x] Stash (started)
-   - [x] Tag (started)
-   - [x] Reset (started)
-   - [ ] Cherry-pick
-   - [ ] Rebase
+1. **Phase 1 - Remaining Local** (1-2 days)
 
-2. **Phase 2 - Remote Infrastructure** (Week 2)
+   - [ ] Bisect
+   - [ ] Clean
+   - [ ] Show
+
+2. **Phase 2 - Remote Infrastructure** (3-4 days)
+
    - [ ] Remote configuration
    - [ ] Smart HTTP protocol
    - [ ] Pack file parsing/writing
    - [ ] Authentication
 
-3. **Phase 3 - Remote Commands** (Week 3)
+3. **Phase 3 - Remote Commands** (4-5 days)
+
    - [ ] Remote command
    - [ ] Clone
    - [ ] Fetch
    - [ ] Pull
    - [ ] Push
 
-4. **Phase 4 - Polish** (Week 4)
-   - [ ] Bisect
+4. **Phase 4 - History Rewriting** (3-4 days)
+
+   - [ ] Cherry-pick
+   - [ ] Rebase
+   - [ ] Revert
+
+5. **Phase 5 - Polish** (2-3 days)
    - [ ] Plumbing commands
    - [ ] Hooks
-   - [ ] Tests & documentation
+   - [ ] Tests for completed features
 
 ---
 
@@ -784,13 +509,16 @@ Recommended implementation order for maximum impact:
 6. Submit PR
 
 **Code Style:**
+
 - Follow existing patterns in `src/commands/`
 - Use `TsgitError` for user-facing errors
 - Include helpful suggestions in error messages
 - Add colors for terminal output
 - Document public functions with JSDoc
 
-**Questions?** Check existing implementations:
+**Reference Implementations:**
+
 - Simple command: `src/commands/wip.ts`
 - Complex command: `src/commands/merge.ts`
-- With state: `src/commands/uncommit.ts`
+- With state: `src/commands/stash.ts`
+- Plumbing: `src/commands/reset.ts`
