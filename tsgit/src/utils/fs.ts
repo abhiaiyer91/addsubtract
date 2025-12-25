@@ -17,20 +17,20 @@ export function parseIgnoreFile(content: string): string[] {
 }
 
 /**
- * Load ignore patterns from .tsgitignore (or .gitignore as fallback)
+ * Load ignore patterns from .gitignore and .tsgitignore
+ * Both files are loaded if they exist (patterns are combined)
  */
 export function loadIgnorePatterns(workDir: string): string[] {
   const patterns = [...DEFAULT_IGNORE_PATTERNS];
   
-  // Try .tsgitignore first, then .gitignore
-  const ignoreFiles = ['.tsgitignore', '.gitignore'];
+  // Load both .gitignore and .tsgitignore if they exist
+  const ignoreFiles = ['.gitignore', '.tsgitignore'];
   
   for (const ignoreFile of ignoreFiles) {
     const ignorePath = path.join(workDir, ignoreFile);
     if (fs.existsSync(ignorePath)) {
       const content = fs.readFileSync(ignorePath, 'utf8');
       patterns.push(...parseIgnoreFile(content));
-      break; // Only use the first found ignore file
     }
   }
   
