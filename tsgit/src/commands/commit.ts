@@ -40,16 +40,16 @@ export interface CommitResult {
  * 
  * @example
  * // Standard commit (requires staging first)
- * tsgit commit -m "message"
+ * wit commit -m "message"
  * 
  * // Commit all tracked changes (skip staging)
- * tsgit commit -a -m "message"
+ * wit commit -a -m "message"
  * 
  * // Commit specific files directly (skip staging)
- * tsgit commit file1.ts file2.ts -m "message"
+ * wit commit file1.ts file2.ts -m "message"
  * 
  * // Amend previous commit
- * tsgit commit --amend -m "new message"
+ * wit commit --amend -m "new message"
  */
 export function commitWithOptions(
   repo: Repository,
@@ -288,7 +288,7 @@ export function handleCommit(args: string[]): void {
 
   if (!options.message) {
     console.error('error: switch `m\' requires a value');
-    console.error('\nUsage: tsgit commit [options] [files...] -m <message>');
+    console.error('\nUsage: wit commit [options] [files...] -m <message>');
     console.error('\nOptions:');
     console.error('  -m, --message <msg>  Commit message');
     console.error('  -a, --all            Stage and commit all tracked changes');
@@ -297,9 +297,9 @@ export function handleCommit(args: string[]): void {
     console.error('  --author <author>    Override author (format: "Name <email>")');
     console.error('  --dry-run            Show what would be committed');
     console.error('\nExamples:');
-    console.error('  tsgit commit -m "Add feature"');
-    console.error('  tsgit commit -a -m "Update all"');
-    console.error('  tsgit commit file.ts -m "Fix bug"');
+    console.error('  wit commit -m "Add feature"');
+    console.error('  wit commit -a -m "Update all"');
+    console.error('  wit commit file.ts -m "Fix bug"');
     process.exit(1);
   }
 

@@ -3,11 +3,11 @@
  * Show various types of objects (commits, files at commits, tags)
  * 
  * Usage:
- * - tsgit show <commit>             # Show commit details + diff
- * - tsgit show <commit>:<file>      # Show file at commit
- * - tsgit show <tag>                # Show tag info
- * - tsgit show --stat <commit>      # Show commit with stat summary only
- * - tsgit show --name-only <commit> # Show commit with file names only
+ * - wit show <commit>             # Show commit details + diff
+ * - wit show <commit>:<file>      # Show file at commit
+ * - wit show <tag>                # Show tag info
+ * - wit show --stat <commit>      # Show commit with stat summary only
+ * - wit show --name-only <commit> # Show commit with file names only
  */
 
 import * as path from 'path';
@@ -118,8 +118,8 @@ export function showFileAtCommit(
       `Path '${filePath}' does not exist in '${commitRef}'`,
       ErrorCode.FILE_NOT_FOUND,
       [
-        `tsgit ls-tree ${commitRef}    # List files in commit`,
-        `tsgit show ${commitRef}       # Show commit details`
+        `wit ls-tree ${commitRef}    # List files in commit`,
+        `wit show ${commitRef}       # Show commit details`
       ]
     );
   }
@@ -213,9 +213,9 @@ export function show(
       `Unknown revision or path: ${ref}`,
       ErrorCode.REF_NOT_FOUND,
       [
-        'tsgit log         # View recent commits',
-        'tsgit branch      # List branches',
-        'tsgit tag         # List tags'
+        'wit log         # View recent commits',
+        'wit branch      # List branches',
+        'wit tag         # List tags'
       ]
     );
   }

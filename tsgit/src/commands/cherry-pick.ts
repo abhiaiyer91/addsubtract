@@ -3,12 +3,12 @@
  * Apply changes from specific commits to the current branch
  * 
  * Usage:
- *   tsgit cherry-pick <commit>           Apply a single commit
- *   tsgit cherry-pick <c1> <c2>          Apply multiple commits
- *   tsgit cherry-pick --continue         Continue after conflict resolution
- *   tsgit cherry-pick --abort            Abort the operation
- *   tsgit cherry-pick --skip             Skip current commit
- *   tsgit cherry-pick -n <commit>        Apply without committing
+ *   wit cherry-pick <commit>           Apply a single commit
+ *   wit cherry-pick <c1> <c2>          Apply multiple commits
+ *   wit cherry-pick --continue         Continue after conflict resolution
+ *   wit cherry-pick --abort            Abort the operation
+ *   wit cherry-pick --skip             Skip current commit
+ *   wit cherry-pick -n <commit>        Apply without committing
  */
 
 import * as path from 'path';
@@ -120,8 +120,8 @@ export class CherryPickManager {
         'A cherry-pick is already in progress',
         ErrorCode.OPERATION_FAILED,
         [
-          'tsgit cherry-pick --continue    # Continue after resolving conflicts',
-          'tsgit cherry-pick --abort       # Abort the cherry-pick',
+          'wit cherry-pick --continue    # Continue after resolving conflicts',
+          'wit cherry-pick --abort       # Abort the cherry-pick',
         ]
       );
     }
@@ -134,7 +134,7 @@ export class CherryPickManager {
         throw new TsgitError(
           `bad revision '${ref}'`,
           ErrorCode.REF_NOT_FOUND,
-          ['tsgit log    # View existing commits']
+          ['wit log    # View existing commits']
         );
       }
       commits.push(hash);
@@ -144,7 +144,7 @@ export class CherryPickManager {
       throw new TsgitError(
         'No commits specified',
         ErrorCode.INVALID_ARGUMENT,
-        ['tsgit cherry-pick <commit>    # Specify a commit to cherry-pick']
+        ['wit cherry-pick <commit>    # Specify a commit to cherry-pick']
       );
     }
 
@@ -155,8 +155,8 @@ export class CherryPickManager {
         'You have uncommitted changes',
         ErrorCode.UNCOMMITTED_CHANGES,
         [
-          'tsgit stash              # Stash your changes',
-          'tsgit commit -m "WIP"    # Commit your changes first',
+          'wit stash              # Stash your changes',
+          'wit commit -m "WIP"    # Commit your changes first',
         ]
       );
     }
@@ -652,8 +652,8 @@ ${changeContent}
    * Get default author info
    */
   private getDefaultAuthor(): Author {
-    const name = process.env.TSGIT_AUTHOR_NAME || process.env.GIT_AUTHOR_NAME || 'Anonymous';
-    const email = process.env.TSGIT_AUTHOR_EMAIL || process.env.GIT_AUTHOR_EMAIL || 'anonymous@example.com';
+    const name = process.env.WIT_AUTHOR_NAME || process.env.GIT_AUTHOR_NAME || 'Anonymous';
+    const email = process.env.WIT_AUTHOR_EMAIL || process.env.GIT_AUTHOR_EMAIL || 'anonymous@example.com';
 
     return {
       name,
@@ -725,7 +725,7 @@ export function handleCherryPick(args: string[]): void {
             }
           }
           console.error('\nResolve conflicts and run:');
-          console.error('  tsgit cherry-pick --continue');
+          console.error('  wit cherry-pick --continue');
           process.exit(1);
         }
         break;
@@ -755,7 +755,7 @@ export function handleCherryPick(args: string[]): void {
       default: {
         if (commits.length === 0) {
           console.error('error: No commit specified');
-          console.error('\nUsage: tsgit cherry-pick [options] <commit>...');
+          console.error('\nUsage: wit cherry-pick [options] <commit>...');
           console.error('\nOptions:');
           console.error('  --continue        Continue after conflict resolution');
           console.error('  --abort           Abort the operation');
@@ -780,9 +780,9 @@ export function handleCherryPick(args: string[]): void {
             }
           }
           console.error('\nResolve conflicts and run:');
-          console.error('  tsgit cherry-pick --continue');
+          console.error('  wit cherry-pick --continue');
           console.error('\nOr abort with:');
-          console.error('  tsgit cherry-pick --abort');
+          console.error('  wit cherry-pick --abort');
           process.exit(1);
         }
         break;

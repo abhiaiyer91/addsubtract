@@ -3,12 +3,12 @@
  * Parse revision (or other objects) and output SHA-256/SHA-1 hashes
  * 
  * Usage:
- * - tsgit rev-parse HEAD             # Output: commit hash
- * - tsgit rev-parse HEAD~3           # 3 commits back
- * - tsgit rev-parse --short HEAD     # Short hash
- * - tsgit rev-parse --verify <ref>   # Verify ref exists (silent if not)
- * - tsgit rev-parse --git-dir        # Output: .tsgit
- * - tsgit rev-parse --show-toplevel  # Output: repo root
+ * - wit rev-parse HEAD             # Output: commit hash
+ * - wit rev-parse HEAD~3           # 3 commits back
+ * - wit rev-parse --short HEAD     # Short hash
+ * - wit rev-parse --verify <ref>   # Verify ref exists (silent if not)
+ * - wit rev-parse --git-dir        # Output: .wit
+ * - wit rev-parse --show-toplevel  # Output: repo root
  * 
  * This is a plumbing command for scripting and advanced usage.
  */

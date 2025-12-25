@@ -72,9 +72,9 @@ import { printGraph } from './ui/graph';
 const VERSION = '2.0.0';
 
 const HELP = `
-tsgit - A Modern Git Implementation in TypeScript
+wit - A Modern Git Implementation in TypeScript
 
-tsgit improves on Git with:
+wit improves on Git with:
   • SHA-256 hashing (more secure than SHA-1)
   • Large file chunking (better binary file handling)
   • Operation undo/history (easily undo mistakes)
@@ -86,7 +86,7 @@ tsgit improves on Git with:
   • AI-powered features (commit messages, code review, conflict resolution)
   • Quality of life commands (amend, wip, uncommit, etc.)
 
-Usage: tsgit <command> [<args>]
+Usage: wit <command> [<args>]
 
 Visual Interface:
   ui                    Launch interactive terminal UI (TUI)
@@ -94,7 +94,7 @@ Visual Interface:
   graph                 Show commit graph in terminal
 
 Core Commands:
-  init                  Create an empty tsgit repository
+  init                  Create an empty wit repository
   add <file>...         Add file contents to the index
   commit -m <message>   Record changes to the repository
   status                Show the working tree status
@@ -202,30 +202,30 @@ Options:
   -v, --version         Show version number
 
 Examples:
-  tsgit ui                    # Launch terminal UI
-  tsgit web                   # Launch web UI
-  tsgit init
-  tsgit add .
-  tsgit commit -m "Initial commit"
-  tsgit commit -a -m "Update all tracked files"
-  tsgit switch -c feature
-  tsgit merge feature
-  tsgit undo
-  tsgit scope use frontend
-  tsgit ai "what files changed?"
-  tsgit ai commit -a -x
-  tsgit wip -a                # Quick save all changes
-  tsgit amend -m "New msg"    # Fix last commit message
-  tsgit uncommit              # Undo commit, keep changes
-  tsgit cleanup --dry-run     # Preview branch cleanup
-  tsgit stats                 # View repo statistics
-  tsgit snapshot create       # Create checkpoint
-  tsgit blame file.ts         # See who changed what
-  tsgit remote add origin /path/to/repo  # Add remote
-  tsgit clone ./source ./dest  # Clone a repository
-  tsgit fetch origin           # Fetch from origin
-  tsgit pull                   # Pull current branch
-  tsgit push -u origin main    # Push and set upstream
+  wit ui                    # Launch terminal UI
+  wit web                   # Launch web UI
+  wit init
+  wit add .
+  wit commit -m "Initial commit"
+  wit commit -a -m "Update all tracked files"
+  wit switch -c feature
+  wit merge feature
+  wit undo
+  wit scope use frontend
+  wit ai "what files changed?"
+  wit ai commit -a -x
+  wit wip -a                # Quick save all changes
+  wit amend -m "New msg"    # Fix last commit message
+  wit uncommit              # Undo commit, keep changes
+  wit cleanup --dry-run     # Preview branch cleanup
+  wit stats                 # View repo statistics
+  wit snapshot create       # Create checkpoint
+  wit blame file.ts         # See who changed what
+  wit remote add origin /path/to/repo  # Add remote
+  wit clone ./source ./dest  # Clone a repository
+  wit fetch origin           # Fetch from origin
+  wit pull                   # Pull current branch
+  wit push -u origin main    # Push and set upstream
 `;
 
 const COMMANDS = [
@@ -336,7 +336,7 @@ function main(): void {
   }
 
   if (options.version) {
-    console.log(`tsgit version ${VERSION}`);
+    console.log(`wit version ${VERSION}`);
     return;
   }
 
@@ -349,7 +349,7 @@ function main(): void {
       case 'add':
         if (cmdArgs.length === 0) {
           console.error('Nothing specified, nothing added.');
-          console.error('hint: Maybe you wanted to say "tsgit add ."?');
+          console.error('hint: Maybe you wanted to say "wit add ."?');
           process.exit(1);
         }
         add(cmdArgs);
@@ -692,7 +692,7 @@ function main(): void {
       default: {
         // Provide suggestions for unknown commands
         const similar = findSimilar(command, COMMANDS);
-        console.error(`tsgit: '${command}' is not a tsgit command. See 'tsgit --help'.`);
+        console.error(`wit: '${command}' is not a wit command. See 'wit --help'.`);
         if (similar.length > 0) {
           console.error('\nDid you mean one of these?');
           for (const cmd of similar) {

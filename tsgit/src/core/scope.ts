@@ -315,8 +315,8 @@ export class ScopeManager {
         `Scope '${name}' not found`,
         ErrorCode.INVALID_ARGUMENT,
         [
-          'tsgit scope list    # List available scopes',
-          ...SCOPE_PRESETS.map(p => `tsgit scope use ${p.name}    # ${p.description}`),
+          'wit scope list    # List available scopes',
+          ...SCOPE_PRESETS.map(p => `wit scope use ${p.name}    # ${p.description}`),
         ]
       );
     }
@@ -434,9 +434,9 @@ export class ScopedRepository {
         `Path '${filePath}' is outside the current scope`,
         ErrorCode.SCOPE_VIOLATION,
         [
-          'tsgit scope show    # View current scope',
-          `tsgit scope add ${filePath}    # Add path to scope`,
-          'tsgit scope clear    # Clear scope restrictions',
+          'wit scope show    # View current scope',
+          `wit scope add ${filePath}    # Add path to scope`,
+          'wit scope clear    # Clear scope restrictions',
         ]
       );
     }

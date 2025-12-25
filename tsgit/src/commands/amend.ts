@@ -38,7 +38,7 @@ export function amend(options: AmendOptions = {}): string {
     throw new TsgitError(
       'No commits to amend',
       ErrorCode.NO_COMMITS_YET,
-      ['tsgit commit -m "Initial commit"    # Create your first commit']
+      ['wit commit -m "Initial commit"    # Create your first commit']
     );
   }
   
@@ -62,9 +62,9 @@ export function amend(options: AmendOptions = {}): string {
       'Nothing to amend - no staged changes and no new message provided',
       ErrorCode.NOTHING_TO_COMMIT,
       [
-        'tsgit amend -m "New message"    # Change commit message',
-        'tsgit add <file>                # Stage changes first',
-        'tsgit amend -a                  # Stage and amend all tracked changes',
+        'wit amend -m "New message"    # Change commit message',
+        'wit add <file>                # Stage changes first',
+        'wit amend -a                  # Stage and amend all tracked changes',
       ]
     );
   }
@@ -94,8 +94,8 @@ export function amend(options: AmendOptions = {}): string {
     parentHashes,
     lastCommit.author,  // Keep original author
     {
-      name: process.env.TSGIT_AUTHOR_NAME || process.env.GIT_AUTHOR_NAME || lastCommit.committer.name,
-      email: process.env.TSGIT_AUTHOR_EMAIL || process.env.GIT_AUTHOR_EMAIL || lastCommit.committer.email,
+      name: process.env.WIT_AUTHOR_NAME || process.env.GIT_AUTHOR_NAME || lastCommit.committer.name,
+      email: process.env.WIT_AUTHOR_EMAIL || process.env.GIT_AUTHOR_EMAIL || lastCommit.committer.email,
       timestamp: Math.floor(Date.now() / 1000),
       timezone: getTimezone(),
     },
@@ -149,7 +149,7 @@ function buildTree(repo: Repository): string {
     throw new TsgitError(
       'Nothing staged',
       ErrorCode.NOTHING_TO_COMMIT,
-      ['tsgit add <file>    # Stage files first']
+      ['wit add <file>    # Stage files first']
     );
   }
   

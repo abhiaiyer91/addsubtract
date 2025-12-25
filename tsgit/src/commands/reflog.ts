@@ -6,14 +6,14 @@
  * a way to recover from mistakes.
  * 
  * Commands:
- * - tsgit reflog                    Show HEAD reflog
- * - tsgit reflog <ref>              Show reflog for specific ref
- * - tsgit reflog show <ref>         Same as above
- * - tsgit reflog expire             Prune old entries
- * - tsgit reflog delete <entry>     Delete specific entry
- * - tsgit reflog exists <ref>       Check if reflog exists
+ * - wit reflog                    Show HEAD reflog
+ * - wit reflog <ref>              Show reflog for specific ref
+ * - wit reflog show <ref>         Same as above
+ * - wit reflog expire             Prune old entries
+ * - wit reflog delete <entry>     Delete specific entry
+ * - wit reflog exists <ref>       Check if reflog exists
  * 
- * Reflog entries are stored in .tsgit/logs/
+ * Reflog entries are stored in .wit/logs/
  */
 
 import * as path from 'path';
@@ -145,8 +145,8 @@ export class ReflogManager {
     mkdirp(path.dirname(logPath));
 
     // Get author info
-    const authorName = author?.name || process.env.TSGIT_AUTHOR_NAME || process.env.GIT_AUTHOR_NAME || 'Anonymous';
-    const authorEmail = author?.email || process.env.TSGIT_AUTHOR_EMAIL || process.env.GIT_AUTHOR_EMAIL || 'anonymous@example.com';
+    const authorName = author?.name || process.env.WIT_AUTHOR_NAME || process.env.GIT_AUTHOR_NAME || 'Anonymous';
+    const authorEmail = author?.email || process.env.WIT_AUTHOR_EMAIL || process.env.GIT_AUTHOR_EMAIL || 'anonymous@example.com';
     const timestamp = Math.floor(Date.now() / 1000);
     const timezone = this.getTimezone();
 
@@ -604,12 +604,12 @@ export function handleReflog(args: string[]): void {
       default:
         console.error(colors.red('error: ') + `Unknown subcommand: ${subcommand}`);
         console.error('\nUsage:');
-        console.error('  tsgit reflog                  Show HEAD reflog');
-        console.error('  tsgit reflog <ref>            Show reflog for ref');
-        console.error('  tsgit reflog show <ref>       Show detailed reflog');
-        console.error('  tsgit reflog expire [--all]   Expire old entries');
-        console.error('  tsgit reflog delete <ref> [n] Delete reflog or entry');
-        console.error('  tsgit reflog exists <ref>     Check if reflog exists');
+        console.error('  wit reflog                  Show HEAD reflog');
+        console.error('  wit reflog <ref>            Show reflog for ref');
+        console.error('  wit reflog show <ref>       Show detailed reflog');
+        console.error('  wit reflog expire [--all]   Expire old entries');
+        console.error('  wit reflog delete <ref> [n] Delete reflog or entry');
+        console.error('  wit reflog exists <ref>     Check if reflog exists');
         process.exit(1);
     }
   } catch (error) {

@@ -46,7 +46,7 @@ interface NetrcEntry {
  * CredentialManager handles authentication for remote operations
  * 
  * Tries to get credentials from various sources in order:
- * 1. Environment variables: TSGIT_TOKEN, GIT_TOKEN, GITHUB_TOKEN
+ * 1. Environment variables: WIT_TOKEN, GIT_TOKEN, GITHUB_TOKEN
  * 2. Git credential helper (if available)
  * 3. .netrc file
  * 4. Interactive prompt (if TTY available)
@@ -185,12 +185,12 @@ export class CredentialManager {
    * Get credentials from environment variables
    */
   private getFromEnvironment(parsed: ParsedUrl): Credentials | null {
-    // Check for tsgit-specific token first
-    const tsgitToken = process.env.TSGIT_TOKEN;
-    if (tsgitToken) {
+    // Check for wit-specific token first
+    const witToken = process.env.WIT_TOKEN;
+    if (witToken) {
       return {
-        username: 'tsgit',
-        password: tsgitToken,
+        username: 'wit',
+        password: witToken,
         type: 'bearer',
       };
     }
@@ -230,8 +230,8 @@ export class CredentialManager {
     }
 
     // Check for username/password environment variables
-    const username = process.env.GIT_USERNAME || process.env.TSGIT_USERNAME;
-    const password = process.env.GIT_PASSWORD || process.env.TSGIT_PASSWORD;
+    const username = process.env.GIT_USERNAME || process.env.WIT_USERNAME;
+    const password = process.env.GIT_PASSWORD || process.env.WIT_PASSWORD;
     if (username && password) {
       return {
         username,

@@ -36,8 +36,8 @@ describe('RemoteManager', () => {
   let remoteManager: RemoteManager;
 
   beforeEach(() => {
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tsgit-remote-test-'));
-    gitDir = path.join(tempDir, '.tsgit');
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wit-remote-test-'));
+    gitDir = path.join(tempDir, '.wit');
     fs.mkdirSync(gitDir, { recursive: true });
     fs.mkdirSync(path.join(gitDir, 'refs', 'remotes'), { recursive: true });
     
@@ -162,13 +162,13 @@ describe('Protocol - Ref Advertisement', () => {
     const caps = {
       'multi_ack': true,
       'thin-pack': true,
-      'agent': 'tsgit/2.0',
+      'agent': 'wit/2.0',
     };
     
     const result = serializeCapabilities(caps);
     expect(result).toContain('multi_ack');
     expect(result).toContain('thin-pack');
-    expect(result).toContain('agent=tsgit/2.0');
+    expect(result).toContain('agent=wit/2.0');
   });
 
   it('should parse refspec', () => {
@@ -281,8 +281,8 @@ describe('CredentialManager', () => {
   });
 
   it('should get credentials from environment', async () => {
-    const originalToken = process.env.TSGIT_TOKEN;
-    process.env.TSGIT_TOKEN = 'test-token';
+    const originalToken = process.env.WIT_TOKEN;
+    process.env.WIT_TOKEN = 'test-token';
     
     try {
       const manager = new CredentialManager();
@@ -293,19 +293,19 @@ describe('CredentialManager', () => {
       expect(creds!.type).toBe('bearer');
     } finally {
       if (originalToken) {
-        process.env.TSGIT_TOKEN = originalToken;
+        process.env.WIT_TOKEN = originalToken;
       } else {
-        delete process.env.TSGIT_TOKEN;
+        delete process.env.WIT_TOKEN;
       }
     }
   });
 
   it('should return null when no credentials available', async () => {
-    const originalTsgitToken = process.env.TSGIT_TOKEN;
+    const originalTsgitToken = process.env.WIT_TOKEN;
     const originalGithubToken = process.env.GITHUB_TOKEN;
     const originalGitToken = process.env.GIT_TOKEN;
     
-    delete process.env.TSGIT_TOKEN;
+    delete process.env.WIT_TOKEN;
     delete process.env.GITHUB_TOKEN;
     delete process.env.GIT_TOKEN;
     
@@ -319,7 +319,7 @@ describe('CredentialManager', () => {
       // We can't reliably test this as it depends on system configuration
       // Just verify it doesn't throw
     } finally {
-      if (originalTsgitToken) process.env.TSGIT_TOKEN = originalTsgitToken;
+      if (originalTsgitToken) process.env.WIT_TOKEN = originalTsgitToken;
       if (originalGithubToken) process.env.GITHUB_TOKEN = originalGithubToken;
       if (originalGitToken) process.env.GIT_TOKEN = originalGitToken;
     }

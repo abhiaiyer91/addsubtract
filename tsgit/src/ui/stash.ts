@@ -1,5 +1,5 @@
 /**
- * Stash Management UI for tsgit
+ * Stash Management UI for wit
  * Visual stash list with quick actions
  */
 

@@ -1,5 +1,5 @@
 /**
- * Enhanced error handling for tsgit
+ * Enhanced error handling for wit
  * Provides structured, actionable error messages
  */
 
@@ -60,7 +60,7 @@ export interface ErrorContext {
 }
 
 /**
- * Main error class for tsgit
+ * Main error class for wit
  * Provides structured errors with suggestions and context
  */
 export class TsgitError extends Error {
@@ -177,10 +177,10 @@ function levenshteinDistance(a: string, b: string): number {
 export const Errors = {
   notARepository(path: string): TsgitError {
     return new TsgitError(
-      `Not a tsgit repository (or any parent up to root): ${path}`,
+      `Not a wit repository (or any parent up to root): ${path}`,
       ErrorCode.NOT_A_REPOSITORY,
       [
-        'tsgit init    # Initialize a new repository here',
+        'wit init    # Initialize a new repository here',
         'cd <repo>     # Navigate to an existing repository',
       ],
       { path }
@@ -192,7 +192,7 @@ export const Errors = {
       `Repository already exists at ${path}`,
       ErrorCode.REPOSITORY_EXISTS,
       [
-        'cd .tsgit && ls    # Explore existing repository',
+        'cd .wit && ls    # Explore existing repository',
       ],
       { path }
     );
@@ -203,8 +203,8 @@ export const Errors = {
       `Object not found: ${hash}`,
       ErrorCode.OBJECT_NOT_FOUND,
       [
-        'tsgit log    # View existing commits',
-        'tsgit branch # List available branches',
+        'wit log    # View existing commits',
+        'wit branch # List available branches',
       ],
       { hash }
     );
@@ -215,10 +215,10 @@ export const Errors = {
     const suggestions: string[] = [];
 
     if (similar.length > 0) {
-      suggestions.push(...similar.map(b => `tsgit checkout ${b}`));
+      suggestions.push(...similar.map(b => `wit checkout ${b}`));
     }
-    suggestions.push(`tsgit branch create ${name}    # Create new branch`);
-    suggestions.push('tsgit branch list              # List all branches');
+    suggestions.push(`wit branch create ${name}    # Create new branch`);
+    suggestions.push('wit branch list              # List all branches');
 
     return new TsgitError(
       `Branch '${name}' not found`,
@@ -233,8 +233,8 @@ export const Errors = {
       `Branch '${name}' already exists`,
       ErrorCode.BRANCH_EXISTS,
       [
-        `tsgit checkout ${name}    # Switch to existing branch`,
-        `tsgit branch delete ${name} && tsgit branch create ${name}    # Recreate branch`,
+        `wit checkout ${name}    # Switch to existing branch`,
+        `wit branch delete ${name} && wit branch create ${name}    # Recreate branch`,
       ],
       { branch: name }
     );
@@ -245,8 +245,8 @@ export const Errors = {
       `Cannot delete the current branch '${name}'`,
       ErrorCode.CANNOT_DELETE_CURRENT_BRANCH,
       [
-        'tsgit checkout <other-branch>    # Switch to another branch first',
-        'tsgit checkout main              # Switch to main branch',
+        'wit checkout <other-branch>    # Switch to another branch first',
+        'wit checkout main              # Switch to main branch',
       ],
       { branch: name }
     );
@@ -268,8 +268,8 @@ export const Errors = {
       'Nothing to commit, working tree clean',
       ErrorCode.NOTHING_TO_COMMIT,
       [
-        'tsgit status    # Check repository status',
-        'tsgit add <file>    # Stage files first',
+        'wit status    # Check repository status',
+        'wit add <file>    # Stage files first',
       ]
     );
   },
@@ -279,9 +279,9 @@ export const Errors = {
       'You have uncommitted changes that would be overwritten',
       ErrorCode.UNCOMMITTED_CHANGES,
       [
-        'tsgit stash              # Stash your changes',
-        'tsgit commit -m "WIP"    # Commit your changes',
-        'tsgit checkout --force   # Discard changes (dangerous)',
+        'wit stash              # Stash your changes',
+        'wit commit -m "WIP"    # Commit your changes',
+        'wit checkout --force   # Discard changes (dangerous)',
       ],
       { files }
     );
@@ -292,8 +292,8 @@ export const Errors = {
       'No commits yet in this repository',
       ErrorCode.NO_COMMITS_YET,
       [
-        'tsgit add .               # Stage all files',
-        'tsgit commit -m "Initial commit"    # Create first commit',
+        'wit add .               # Stage all files',
+        'wit commit -m "Initial commit"    # Create first commit',
       ]
     );
   },
@@ -303,9 +303,9 @@ export const Errors = {
       `Merge conflict in ${files.length} file(s)`,
       ErrorCode.MERGE_CONFLICT,
       [
-        'tsgit conflicts           # View conflicts in detail',
-        'tsgit resolve <file>      # Mark file as resolved',
-        'tsgit merge --abort       # Abort the merge',
+        'wit conflicts           # View conflicts in detail',
+        'wit resolve <file>      # Mark file as resolved',
+        'wit merge --abort       # Abort the merge',
       ],
       { files }
     );
@@ -325,8 +325,8 @@ export const Errors = {
       `Path '${path}' is outside the repository scope`,
       ErrorCode.SCOPE_VIOLATION,
       [
-        'tsgit scope show    # View current scope',
-        'tsgit scope add <path>    # Add path to scope',
+        'wit scope show    # View current scope',
+        'wit scope add <path>    # Add path to scope',
       ],
       { path, scope }
     );

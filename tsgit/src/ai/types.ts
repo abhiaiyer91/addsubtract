@@ -1,5 +1,5 @@
 /**
- * Type definitions for tsgit AI integration
+ * Type definitions for wit AI integration
  */
 
 /**

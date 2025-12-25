@@ -101,7 +101,7 @@ describe('rev-parse command', () => {
     it('should return git-dir path', () => {
       const gitDir = revParse(repo, '', { gitDir: true });
       expect(gitDir).toBe(repo.gitDir);
-      expect(gitDir).toContain('.tsgit');
+      expect(gitDir).toContain('.wit');
     });
 
     it('should return show-toplevel path', () => {

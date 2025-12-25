@@ -3,11 +3,11 @@
  * Reapply commits on top of another base branch
  * 
  * Usage:
- *   tsgit rebase <branch>           Rebase onto branch
- *   tsgit rebase --onto <new> <old> Rebase onto specific base
- *   tsgit rebase --continue         Continue after conflict resolution
- *   tsgit rebase --abort            Abort the rebase
- *   tsgit rebase --skip             Skip current commit
+ *   wit rebase <branch>           Rebase onto branch
+ *   wit rebase --onto <new> <old> Rebase onto specific base
+ *   wit rebase --continue         Continue after conflict resolution
+ *   wit rebase --abort            Abort the rebase
+ *   wit rebase --skip             Skip current commit
  */
 
 import * as path from 'path';
@@ -131,8 +131,8 @@ export class RebaseManager {
         'A rebase is already in progress',
         ErrorCode.OPERATION_FAILED,
         [
-          'tsgit rebase --continue    # Continue after resolving conflicts',
-          'tsgit rebase --abort        # Abort the rebase',
+          'wit rebase --continue    # Continue after resolving conflicts',
+          'wit rebase --abort        # Abort the rebase',
         ]
       );
     }
@@ -151,8 +151,8 @@ export class RebaseManager {
         'You have uncommitted changes',
         ErrorCode.UNCOMMITTED_CHANGES,
         [
-          'tsgit stash              # Stash your changes',
-          'tsgit commit -m "WIP"    # Commit your changes first',
+          'wit stash              # Stash your changes',
+          'wit commit -m "WIP"    # Commit your changes first',
         ]
       );
     }
@@ -767,7 +767,7 @@ export function handleRebase(args: string[]): void {
             }
           }
           console.error('\nResolve conflicts and run:');
-          console.error('  tsgit rebase --continue');
+          console.error('  wit rebase --continue');
           process.exit(1);
         }
         break;
@@ -797,7 +797,7 @@ export function handleRebase(args: string[]): void {
       default: {
         if (!targetBranch) {
           console.error('error: No branch specified');
-          console.error('\nUsage: tsgit rebase [options] <branch>');
+          console.error('\nUsage: wit rebase [options] <branch>');
           console.error('\nOptions:');
           console.error('  --continue        Continue after conflict resolution');
           console.error('  --abort           Abort the rebase');
@@ -805,8 +805,8 @@ export function handleRebase(args: string[]): void {
           console.error('  --onto <branch>   Rebase onto specific branch');
           console.error('  --autostash       Automatically stash and unstash');
           console.error('\nExamples:');
-          console.error('  tsgit rebase main                    # Rebase onto main');
-          console.error('  tsgit rebase --onto main feature     # Rebase onto main from feature');
+          console.error('  wit rebase main                    # Rebase onto main');
+          console.error('  wit rebase --onto main feature     # Rebase onto main from feature');
           process.exit(1);
         }
 
@@ -829,9 +829,9 @@ export function handleRebase(args: string[]): void {
             }
           }
           console.error('\nResolve conflicts and run:');
-          console.error('  tsgit rebase --continue');
+          console.error('  wit rebase --continue');
           console.error('\nOr abort with:');
-          console.error('  tsgit rebase --abort');
+          console.error('  wit rebase --abort');
           process.exit(1);
         }
         break;

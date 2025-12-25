@@ -1,5 +1,5 @@
 /**
- * Timeline & Activity Visualization for tsgit
+ * Timeline & Activity Visualization for wit
  * Beautiful activity timeline with contribution graphs
  */
 

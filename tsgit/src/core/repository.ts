@@ -62,7 +62,7 @@ export class Repository {
 
   constructor(workDir: string, config: Partial<RepositoryConfig> = {}) {
     this.workDir = path.resolve(workDir);
-    this.gitDir = path.join(this.workDir, '.tsgit');
+    this.gitDir = path.join(this.workDir, '.wit');
     this.config = { ...DEFAULT_CONFIG, ...config };
     
     // Set hash algorithm
@@ -125,13 +125,13 @@ export class Repository {
     // Create HEAD pointing to main branch
     writeFile(path.join(repo.gitDir, 'HEAD'), 'ref: refs/heads/main\n');
 
-    // Create config file with tsgit improvements
+    // Create config file with wit improvements
     const hashAlgo = options.hashAlgorithm || 'sha256';
     const config = `[core]
     repositoryformatversion = 1
     filemode = true
     bare = false
-[tsgit]
+[wit]
     hashAlgorithm = ${hashAlgo}
     largeFileThreshold = ${CHUNK_THRESHOLD}
     autoStashOnSwitch = true
@@ -152,7 +152,7 @@ export class Repository {
     repo.hooks.init();
     repo.remotes.init();
 
-    console.log(`Initialized tsgit repository with ${hashAlgo} hashing`);
+    console.log(`Initialized wit repository with ${hashAlgo} hashing`);
 
     return repo;
   }
@@ -164,14 +164,14 @@ export class Repository {
     let currentPath = path.resolve(startPath);
 
     while (true) {
-      const gitDir = path.join(currentPath, '.tsgit');
+      const gitDir = path.join(currentPath, '.wit');
       if (exists(gitDir)) {
         return new Repository(currentPath);
       }
 
       const parent = path.dirname(currentPath);
       if (parent === currentPath) {
-        throw new Error('Not a tsgit repository (or any parent up to root)');
+        throw new Error('Not a wit repository (or any parent up to root)');
       }
       currentPath = parent;
     }
@@ -517,8 +517,8 @@ export class Repository {
    * Get default author info from environment or config
    */
   private getDefaultAuthor(): Author {
-    const name = process.env.TSGIT_AUTHOR_NAME || process.env.GIT_AUTHOR_NAME || 'Anonymous';
-    const email = process.env.TSGIT_AUTHOR_EMAIL || process.env.GIT_AUTHOR_EMAIL || 'anonymous@example.com';
+    const name = process.env.WIT_AUTHOR_NAME || process.env.GIT_AUTHOR_NAME || 'Anonymous';
+    const email = process.env.WIT_AUTHOR_EMAIL || process.env.GIT_AUTHOR_EMAIL || 'anonymous@example.com';
 
     return {
       name,

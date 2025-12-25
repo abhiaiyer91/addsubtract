@@ -3,10 +3,10 @@
  * Read, modify, and delete symbolic refs
  * 
  * Usage:
- * - tsgit symbolic-ref HEAD              # Output: refs/heads/main
- * - tsgit symbolic-ref HEAD refs/heads/x # Set HEAD to branch x
- * - tsgit symbolic-ref --short HEAD      # Output: main
- * - tsgit symbolic-ref -d <name>         # Delete symbolic ref
+ * - wit symbolic-ref HEAD              # Output: refs/heads/main
+ * - wit symbolic-ref HEAD refs/heads/x # Set HEAD to branch x
+ * - wit symbolic-ref --short HEAD      # Output: main
+ * - wit symbolic-ref -d <name>         # Delete symbolic ref
  * 
  * This is a plumbing command for scripting and advanced usage.
  */
@@ -168,9 +168,9 @@ export function handleSymbolicRef(args: string[]): void {
   }
 
   if (positional.length === 0) {
-    console.error('usage: tsgit symbolic-ref <name> [<ref>]');
-    console.error('   or: tsgit symbolic-ref -d <name>');
-    console.error('   or: tsgit symbolic-ref --short <name>');
+    console.error('usage: wit symbolic-ref <name> [<ref>]');
+    console.error('   or: wit symbolic-ref -d <name>');
+    console.error('   or: wit symbolic-ref --short <name>');
     process.exit(1);
   }
 

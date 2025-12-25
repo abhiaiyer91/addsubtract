@@ -1,5 +1,5 @@
 /**
- * Visual Merge Conflict Resolution UI for tsgit
+ * Visual Merge Conflict Resolution UI for wit
  * Interactive 3-way merge with visual diff
  */
 

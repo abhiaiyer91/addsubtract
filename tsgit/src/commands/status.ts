@@ -26,7 +26,7 @@ export function status(): void {
     // Show staged changes
     if (stat.staged.length > 0) {
       console.log('Changes to be committed:');
-      console.log('  (use "tsgit restore --staged <file>..." to unstage)');
+      console.log('  (use "wit restore --staged <file>..." to unstage)');
       console.log();
       for (const file of stat.staged) {
         console.log(`        ${colors.green('new file:   ' + file)}`);
@@ -37,7 +37,7 @@ export function status(): void {
     // Show modified files
     if (stat.modified.length > 0) {
       console.log('Changes not staged for commit:');
-      console.log('  (use "tsgit add <file>..." to update what will be committed)');
+      console.log('  (use "wit add <file>..." to update what will be committed)');
       console.log();
       for (const file of stat.modified) {
         console.log(`        ${colors.red('modified:   ' + file)}`);
@@ -57,7 +57,7 @@ export function status(): void {
     // Show untracked files
     if (stat.untracked.length > 0) {
       console.log('Untracked files:');
-      console.log('  (use "tsgit add <file>..." to include in what will be committed)');
+      console.log('  (use "wit add <file>..." to include in what will be committed)');
       console.log();
       for (const file of stat.untracked) {
         console.log(`        ${colors.red(file)}`);
@@ -70,7 +70,7 @@ export function status(): void {
         stat.untracked.length === 0 && stat.deleted.length === 0) {
       console.log('nothing to commit, working tree clean');
     } else if (stat.staged.length === 0) {
-      console.log('no changes added to commit (use "tsgit add" to stage)');
+      console.log('no changes added to commit (use "wit add" to stage)');
     }
   } catch (error) {
     if (error instanceof Error) {

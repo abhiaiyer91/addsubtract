@@ -1,6 +1,6 @@
-# Git vs tsgit: An Architectural Deep Dive
+# Git vs wit: An Architectural Deep Dive
 
-This document explains how the original Git version control system works internally and how tsgit—a modern TypeScript implementation—solves the same problems, often with improvements.
+This document explains how the original Git version control system works internally and how wit—a modern TypeScript implementation—solves the same problems, often with improvements.
 
 ## Table of Contents
 
@@ -48,12 +48,12 @@ Git stores everything in the `.git/` directory:
 └── hooks/           # Git hooks
 ```
 
-### How tsgit Works (High Level)
+### How wit Works (High Level)
 
-tsgit mirrors Git's conceptual model while making practical improvements:
+wit mirrors Git's conceptual model while making practical improvements:
 
 ```
-.tsgit/
+.wit/
 ├── HEAD              # Current branch reference
 ├── config            # Repository configuration (INI + JSON)
 ├── index             # JSON staging area (human-readable)
@@ -91,9 +91,9 @@ This is then compressed with zlib before writing to disk.
 
 **Security Issue**: SHA-1 has been cryptographically broken since 2017 (the "SHAttered" attack). While Git has partial mitigations, repositories remain vulnerable to collision attacks.
 
-### tsgit's Approach
+### wit's Approach
 
-tsgit defaults to **SHA-256** (64-character hex), providing significantly stronger security:
+wit defaults to **SHA-256** (64-character hex), providing significantly stronger security:
 
 ```typescript
 // src/utils/hash.ts
@@ -111,7 +111,7 @@ export function hashObject(type: string, content: Buffer): string {
 }
 ```
 
-tsgit uses the same object format as Git (`{type} {size}\0{content}`) and the same zlib compression, ensuring conceptual compatibility while upgrading security:
+wit uses the same object format as Git (`{type} {size}\0{content}`) and the same zlib compression, ensuring conceptual compatibility while upgrading security:
 
 ```typescript
 // src/utils/compression.ts
@@ -157,9 +157,9 @@ committer {name} <{email}> {timestamp} {timezone}
 {commit message}
 ```
 
-### tsgit's Object Implementation
+### wit's Object Implementation
 
-tsgit implements all four object types with a clean TypeScript class hierarchy:
+wit implements all four object types with a clean TypeScript class hierarchy:
 
 ```typescript
 // src/core/object.ts
@@ -252,9 +252,9 @@ This binary format is efficient but:
 - Requires specialized tools to read
 - Easy to corrupt
 
-### tsgit's Approach
+### wit's Approach
 
-tsgit uses a **JSON format** that's human-readable and easier to debug:
+wit uses a **JSON format** that's human-readable and easier to debug:
 
 ```typescript
 // src/core/index.ts
@@ -298,7 +298,7 @@ export class Index {
 }
 ```
 
-Example `.tsgit/index`:
+Example `.wit/index`:
 ```json
 {
   "version": 2,
@@ -340,9 +340,9 @@ Git resolves refs by:
 2. If HEAD starts with `ref:` → follow the chain
 3. Otherwise check `refs/heads/`, `refs/tags/`, etc.
 
-### tsgit's Approach
+### wit's Approach
 
-tsgit uses the exact same approach:
+wit uses the exact same approach:
 
 ```typescript
 // src/core/refs.ts
@@ -379,7 +379,7 @@ export class Refs {
 }
 ```
 
-The key addition: tsgit validates hash length against the configured algorithm (40 chars for SHA-1, 64 for SHA-256).
+The key addition: wit validates hash length against the configured algorithm (40 chars for SHA-1, 64 for SHA-256).
 
 ---
 
@@ -397,7 +397,7 @@ Git traverses history by:
 2. Load commit object
 3. Follow parent hashes recursively
 
-### tsgit's Approach
+### wit's Approach
 
 Same conceptual model with a clean traversal API:
 
@@ -454,9 +454,9 @@ Key concepts:
 - **Context lines**: Unchanged lines around changes (default: 3)
 - The algorithm minimizes edits (insertions + deletions)
 
-### tsgit's Approach
+### wit's Approach
 
-tsgit implements a **Longest Common Subsequence (LCS)** based diff, which produces equivalent results:
+wit implements a **Longest Common Subsequence (LCS)** based diff, which produces equivalent results:
 
 ```typescript
 // src/core/diff.ts
@@ -499,7 +499,7 @@ export interface DiffHunk {
 }
 ```
 
-**Enhancement**: tsgit includes colored terminal output and binary file detection:
+**Enhancement**: wit includes colored terminal output and binary file detection:
 
 ```typescript
 export function isBinary(content: Buffer): boolean {
@@ -538,9 +538,9 @@ their changes
 - Conflict resolution requires manual text editing
 - Easy to accidentally leave markers in code
 
-### tsgit's Approach
+### wit's Approach
 
-tsgit uses the same three-way merge algorithm but provides **structured conflict data**:
+wit uses the same three-way merge algorithm but provides **structured conflict data**:
 
 ```typescript
 // src/core/merge.ts
@@ -565,10 +565,10 @@ export interface FileConflict {
 }
 ```
 
-Instead of inline markers, tsgit saves **conflict files**:
+Instead of inline markers, wit saves **conflict files**:
 
 ```
-.tsgit/conflicts/
+.wit/conflicts/
 ├── file.txt.ours        # Our version
 ├── file.txt.theirs      # Their version
 ├── file.txt.base        # Common ancestor
@@ -612,9 +612,9 @@ Git was designed for text files and small binaries. For large files:
 - Replaces files with pointer files in the repo
 - Requires additional setup and configuration
 
-### tsgit's Approach
+### wit's Approach
 
-tsgit has **built-in large file chunking**:
+wit has **built-in large file chunking**:
 
 ```typescript
 // src/core/large-file.ts
@@ -692,9 +692,9 @@ def5678 HEAD@{1}: checkout: moving from main to feature
 - Requires understanding Git internals to use effectively
 - `git reset --hard` can still lose work
 
-### tsgit's Approach
+### wit's Approach
 
-tsgit maintains an **operation journal** that records every action:
+wit maintains an **operation journal** that records every action:
 
 ```typescript
 // src/core/journal.ts
@@ -720,9 +720,9 @@ export interface StateSnapshot {
 Simple undo command:
 
 ```bash
-$ tsgit undo           # Undo last operation
-$ tsgit undo --steps 3 # Undo last 3 operations
-$ tsgit history        # Show operation history
+$ wit undo           # Undo last operation
+$ wit undo --steps 3 # Undo last 3 operations
+$ wit history        # Show operation history
 ```
 
 **Example journal entry**:
@@ -772,9 +772,9 @@ $ git stash pop
 - Stash is a global stack, not per-branch
 - `git stash list` can accumulate many entries
 
-### tsgit's Approach
+### wit's Approach
 
-tsgit has **automatic per-branch state management**:
+wit has **automatic per-branch state management**:
 
 ```typescript
 // src/core/branch-state.ts
@@ -815,13 +815,13 @@ export class BranchStateManager {
 
 **Workflow**:
 ```bash
-$ tsgit switch main       # Auto-saves work from current branch
+$ wit switch main       # Auto-saves work from current branch
 # ... fix bug on main ...
-$ tsgit commit -m "Fix bug"
-$ tsgit switch feature    # Auto-restores work from feature branch
+$ wit commit -m "Fix bug"
+$ wit switch feature    # Auto-restores work from feature branch
 ```
 
-States are stored per-branch in `.tsgit/branch-states/`:
+States are stored per-branch in `.wit/branch-states/`:
 - `feature.json` - compressed state for feature branch
 - `feature.history.json` - history of saved states
 
@@ -843,9 +843,9 @@ $ git sparse-checkout set packages/frontend/
 - Requires specific Git version
 - Not widely understood or used
 
-### tsgit's Approach
+### wit's Approach
 
-tsgit has first-class **scope support**:
+wit has first-class **scope support**:
 
 ```typescript
 // src/core/scope.ts
@@ -879,10 +879,10 @@ export const SCOPE_PRESETS: ScopePreset[] = [
 
 **Usage**:
 ```bash
-$ tsgit scope use frontend  # Limit to frontend/
-$ tsgit status              # Shows only frontend files
-$ tsgit add .               # Adds only frontend files
-$ tsgit scope clear         # Back to full repo
+$ wit scope use frontend  # Limit to frontend/
+$ wit status              # Shows only frontend files
+$ wit add .               # Adds only frontend files
+$ wit scope clear         # Back to full repo
 ```
 
 **Integration with other commands**:
@@ -918,9 +918,9 @@ hint: Updates were rejected because the remote contains work that you do
 hint: not have locally.
 ```
 
-### tsgit's Approach
+### wit's Approach
 
-tsgit provides **structured errors with actionable suggestions**:
+wit provides **structured errors with actionable suggestions**:
 
 ```typescript
 // src/core/errors.ts
@@ -949,9 +949,9 @@ export const Errors = {
     const suggestions: string[] = [];
 
     if (similar.length > 0) {
-      suggestions.push(...similar.map(b => `tsgit checkout ${b}`));
+      suggestions.push(...similar.map(b => `wit checkout ${b}`));
     }
-    suggestions.push(`tsgit branch create ${name}    # Create new branch`);
+    suggestions.push(`wit branch create ${name}    # Create new branch`);
 
     return new TsgitError(
       `Branch '${name}' not found`,
@@ -968,9 +968,9 @@ export const Errors = {
 error: Branch 'featur' not found
 
 hint: Did you mean one of these?
-  tsgit checkout feature
-  tsgit checkout features
-  tsgit branch create featur    # Create new branch
+  wit checkout feature
+  wit checkout features
+  wit branch create featur    # Create new branch
 ```
 
 The `findSimilar` function uses **Levenshtein distance** to find typo corrections:
@@ -987,7 +987,7 @@ function levenshteinDistance(a: string, b: string): number {
 
 ## Summary: Key Differences
 
-| Aspect | Git | tsgit |
+| Aspect | Git | wit |
 |--------|-----|-------|
 | **Hash Algorithm** | SHA-1 (broken) | SHA-256 (default) |
 | **Index Format** | Binary | JSON (human-readable) |
@@ -1002,7 +1002,7 @@ function levenshteinDistance(a: string, b: string): number {
 
 ### Conceptual Equivalence
 
-Despite the improvements, tsgit maintains conceptual compatibility with Git:
+Despite the improvements, wit maintains conceptual compatibility with Git:
 
 - Same object types (blob, tree, commit, tag)
 - Same object format (`{type} {size}\0{content}`)
@@ -1011,7 +1011,7 @@ Despite the improvements, tsgit maintains conceptual compatibility with Git:
 - Same tree sorting algorithm
 - Same commit format
 
-This means users familiar with Git internals can understand tsgit immediately, while benefiting from modern improvements.
+This means users familiar with Git internals can understand wit immediately, while benefiting from modern improvements.
 
 ### What's Intentionally Different
 

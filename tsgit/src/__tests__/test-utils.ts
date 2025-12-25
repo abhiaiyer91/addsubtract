@@ -1,5 +1,5 @@
 /**
- * Test utilities for tsgit tests
+ * Test utilities for wit tests
  */
 
 import * as fs from 'fs';
@@ -15,7 +15,7 @@ let originalCwd: string = process.cwd();
  * Create a temporary directory for testing
  */
 export function createTempDir(): string {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tsgit-test-'));
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wit-test-'));
   return tempDir;
 }
 
@@ -23,7 +23,7 @@ export function createTempDir(): string {
  * Clean up a temporary directory
  */
 export function cleanupTempDir(dir: string | undefined): void {
-  if (dir && dir.includes('tsgit-test-') && fs.existsSync(dir)) {
+  if (dir && dir.includes('wit-test-') && fs.existsSync(dir)) {
     try {
       fs.rmSync(dir, { recursive: true, force: true });
     } catch {

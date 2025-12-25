@@ -8,8 +8,8 @@ import { z } from 'zod';
 import { Repository } from '../../core/repository.js';
 
 export const switchBranchTool = createTool({
-  id: 'tsgit-switch-branch',
-  description: 'Switch to a different branch. Can also create a new branch and switch to it. Note: tsgit automatically saves uncommitted work when switching branches (auto-stash).',
+  id: 'wit-switch-branch',
+  description: 'Switch to a different branch. Can also create a new branch and switch to it. Note: wit automatically saves uncommitted work when switching branches (auto-stash).',
   inputSchema: z.object({
     branch: z.string().describe('Name of the branch to switch to'),
     create: z.boolean().optional().describe('If true, create the branch if it does not exist'),
@@ -53,7 +53,7 @@ export const switchBranchTool = createTool({
       const status = repo.status();
       const hasChanges = status.staged.length > 0 || status.modified.length > 0;
       
-      // Switch branch (auto-stash happens automatically in tsgit)
+      // Switch branch (auto-stash happens automatically in wit)
       repo.checkout(branch);
       
       return {

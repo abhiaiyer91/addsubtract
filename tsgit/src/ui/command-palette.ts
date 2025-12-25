@@ -1,5 +1,5 @@
 /**
- * Command Palette for tsgit
+ * Command Palette for wit
  * VS Code-style command palette with fuzzy search
  */
 
@@ -244,7 +244,7 @@ function escapeHtml(text: string): string {
 }
 
 /**
- * Get default tsgit commands
+ * Get default wit commands
  */
 export function getDefaultCommands(callbacks: {
   onCommit?: () => void;

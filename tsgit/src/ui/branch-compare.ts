@@ -1,5 +1,5 @@
 /**
- * Branch Comparison View for tsgit
+ * Branch Comparison View for wit
  * Compare branches visually with commit differences
  */
 

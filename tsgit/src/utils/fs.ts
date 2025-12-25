@@ -4,10 +4,10 @@ import * as path from 'path';
 /**
  * Default patterns that are always ignored
  */
-const DEFAULT_IGNORE_PATTERNS = ['.tsgit/', '.git/', 'node_modules/'];
+const DEFAULT_IGNORE_PATTERNS = ['.wit/', '.git/', 'node_modules/'];
 
 /**
- * Parse a .tsgitignore or .gitignore file into patterns
+ * Parse a .witignore or .gitignore file into patterns
  */
 export function parseIgnoreFile(content: string): string[] {
   return content
@@ -17,14 +17,14 @@ export function parseIgnoreFile(content: string): string[] {
 }
 
 /**
- * Load ignore patterns from .gitignore and .tsgitignore
+ * Load ignore patterns from .gitignore and .witignore
  * Both files are loaded if they exist (patterns are combined)
  */
 export function loadIgnorePatterns(workDir: string): string[] {
   const patterns = [...DEFAULT_IGNORE_PATTERNS];
   
-  // Load both .gitignore and .tsgitignore if they exist
-  const ignoreFiles = ['.gitignore', '.tsgitignore'];
+  // Load both .gitignore and .witignore if they exist
+  const ignoreFiles = ['.gitignore', '.witignore'];
   
   for (const ignoreFile of ignoreFiles) {
     const ignorePath = path.join(workDir, ignoreFile);

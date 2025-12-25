@@ -1,5 +1,5 @@
 /**
- * Advanced Theme System for tsgit
+ * Advanced Theme System for wit
  * Supports multiple themes with customization
  */
 

@@ -3,11 +3,11 @@
  * Verify the connectivity and validity of objects in the database
  * 
  * Usage:
- * - tsgit fsck                        # Verify object database
- * - tsgit fsck --full                 # Full verification (slower)
- * - tsgit fsck --unreachable          # Show unreachable objects
- * - tsgit fsck --dangling             # Show dangling objects (default)
- * - tsgit fsck --connectivity-only    # Only check reachability
+ * - wit fsck                        # Verify object database
+ * - wit fsck --full                 # Full verification (slower)
+ * - wit fsck --unreachable          # Show unreachable objects
+ * - wit fsck --dangling             # Show dangling objects (default)
+ * - wit fsck --connectivity-only    # Only check reachability
  * 
  * This is a plumbing command for verifying repository integrity.
  */

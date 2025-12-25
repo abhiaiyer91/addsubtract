@@ -1,11 +1,11 @@
 {
-  "name": "tsgit",
+  "name": "wit",
   "version": "2.0.0",
   "description": "A modern Git implementation in TypeScript with AI-powered features - SHA-256, built-in UI, undo support, AI commit messages, and more",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "tsgit": "./dist/cli.js"
+    "wit": "./dist/cli.js"
   },
   "scripts": {
     "build": "tsc",
@@ -29,7 +29,8 @@
     "llm",
     "mastra",
     "commit-message",
-    "code-review"
+    "code-review",
+    "wit"
   ],
   "author": "",
   "license": "MIT",
@@ -49,6 +50,6 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-username/tsgit"
+    "url": "https://github.com/your-username/wit"
   }
 }

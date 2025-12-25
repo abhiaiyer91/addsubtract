@@ -3,13 +3,13 @@
  * Manage remote repositories
  * 
  * Usage:
- *   tsgit remote                    # List remotes
- *   tsgit remote -v                 # List with URLs
- *   tsgit remote add <name> <url>   # Add remote
- *   tsgit remote remove <name>      # Remove remote
- *   tsgit remote rename <old> <new> # Rename remote
- *   tsgit remote get-url <name>     # Show URL
- *   tsgit remote set-url <name> <url> # Change URL
+ *   wit remote                    # List remotes
+ *   wit remote -v                 # List with URLs
+ *   wit remote add <name> <url>   # Add remote
+ *   wit remote remove <name>      # Remove remote
+ *   wit remote rename <old> <new> # Rename remote
+ *   wit remote get-url <name>     # Show URL
+ *   wit remote set-url <name> <url> # Change URL
  */
 
 import { Repository } from '../core/repository';
@@ -186,7 +186,7 @@ export function handleRemote(args: string[]): void {
         const url = positional[2];
         
         if (!name || !url) {
-          console.error(colors.red('error: ') + 'usage: tsgit remote add <name> <url>');
+          console.error(colors.red('error: ') + 'usage: wit remote add <name> <url>');
           process.exit(1);
         }
         
@@ -199,7 +199,7 @@ export function handleRemote(args: string[]): void {
         const name = positional[1];
         
         if (!name) {
-          console.error(colors.red('error: ') + 'usage: tsgit remote remove <name>');
+          console.error(colors.red('error: ') + 'usage: wit remote remove <name>');
           process.exit(1);
         }
         
@@ -212,7 +212,7 @@ export function handleRemote(args: string[]): void {
         const newName = positional[2];
         
         if (!oldName || !newName) {
-          console.error(colors.red('error: ') + 'usage: tsgit remote rename <old> <new>');
+          console.error(colors.red('error: ') + 'usage: wit remote rename <old> <new>');
           process.exit(1);
         }
         
@@ -224,7 +224,7 @@ export function handleRemote(args: string[]): void {
         const name = positional[1];
         
         if (!name) {
-          console.error(colors.red('error: ') + 'usage: tsgit remote get-url <name>');
+          console.error(colors.red('error: ') + 'usage: wit remote get-url <name>');
           process.exit(1);
         }
         
@@ -237,7 +237,7 @@ export function handleRemote(args: string[]): void {
         const url = positional[2];
         
         if (!name || !url) {
-          console.error(colors.red('error: ') + 'usage: tsgit remote set-url <name> <url>');
+          console.error(colors.red('error: ') + 'usage: wit remote set-url <name> <url>');
           process.exit(1);
         }
         
@@ -261,7 +261,7 @@ export function handleRemote(args: string[]): void {
         const name = positional[1];
         
         if (!name) {
-          console.error(colors.red('error: ') + 'usage: tsgit remote prune <name>');
+          console.error(colors.red('error: ') + 'usage: wit remote prune <name>');
           process.exit(1);
         }
         
@@ -279,14 +279,14 @@ export function handleRemote(args: string[]): void {
         } else {
           console.error(colors.red('error: ') + `Unknown subcommand: ${subcommand}`);
           console.error('\nUsage:');
-          console.error('  tsgit remote                      List remotes');
-          console.error('  tsgit remote -v                   List with URLs');
-          console.error('  tsgit remote add <name> <url>     Add remote');
-          console.error('  tsgit remote remove <name>        Remove remote');
-          console.error('  tsgit remote rename <old> <new>   Rename remote');
-          console.error('  tsgit remote get-url <name>       Show URL');
-          console.error('  tsgit remote set-url <name> <url> Change URL');
-          console.error('  tsgit remote show <name>          Show remote details');
+          console.error('  wit remote                      List remotes');
+          console.error('  wit remote -v                   List with URLs');
+          console.error('  wit remote add <name> <url>     Add remote');
+          console.error('  wit remote remove <name>        Remove remote');
+          console.error('  wit remote rename <old> <new>   Rename remote');
+          console.error('  wit remote get-url <name>       Show URL');
+          console.error('  wit remote set-url <name> <url> Change URL');
+          console.error('  wit remote show <name>          Show remote details');
           process.exit(1);
         }
       }

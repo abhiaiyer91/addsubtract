@@ -4,17 +4,17 @@
  * Provides Git-like submodule support for nested repositories.
  * 
  * Commands:
- * - tsgit submodule add <url> <path>   Add a submodule
- * - tsgit submodule init               Initialize submodules
- * - tsgit submodule update             Update submodules to recorded commits
- * - tsgit submodule status             Show submodule status
- * - tsgit submodule foreach <cmd>      Run command in each submodule
- * - tsgit submodule sync               Sync submodule URLs
- * - tsgit submodule deinit <path>      Deinitialize a submodule
+ * - wit submodule add <url> <path>   Add a submodule
+ * - wit submodule init               Initialize submodules
+ * - wit submodule update             Update submodules to recorded commits
+ * - wit submodule status             Show submodule status
+ * - wit submodule foreach <cmd>      Run command in each submodule
+ * - wit submodule sync               Sync submodule URLs
+ * - wit submodule deinit <path>      Deinitialize a submodule
  * 
  * Submodule configuration is stored in:
- * - .tsgitmodules (or .gitmodules)
- * - .tsgit/config
+ * - .witmodules (or .gitmodules)
+ * - .wit/config
  */
 
 import * as path from 'path';
@@ -25,7 +25,7 @@ import { TsgitError, ErrorCode } from './errors';
 import { FileMode } from './types';
 
 /**
- * Submodule entry in .tsgitmodules
+ * Submodule entry in .witmodules
  */
 export interface SubmoduleConfig {
   name: string;
@@ -53,7 +53,7 @@ export interface SubmoduleStatus {
 }
 
 /**
- * Parsed .tsgitmodules file
+ * Parsed .witmodules file
  */
 interface ModulesFile {
   submodules: Map<string, SubmoduleConfig>;
@@ -69,19 +69,19 @@ export class SubmoduleManager {
   private modulesDir: string;
 
   constructor(private gitDir: string, private workDir: string) {
-    this.modulesPath = path.join(workDir, '.tsgitmodules');
+    this.modulesPath = path.join(workDir, '.witmodules');
     this.gitmodulesPath = path.join(workDir, '.gitmodules');
     this.configPath = path.join(gitDir, 'config');
     this.modulesDir = path.join(gitDir, 'modules');
   }
 
   /**
-   * Parse .tsgitmodules or .gitmodules file
+   * Parse .witmodules or .gitmodules file
    */
   private parseModulesFile(): ModulesFile {
     const submodules = new Map<string, SubmoduleConfig>();
     
-    // Try .tsgitmodules first, then .gitmodules
+    // Try .witmodules first, then .gitmodules
     const filePath = exists(this.modulesPath) 
       ? this.modulesPath 
       : (exists(this.gitmodulesPath) ? this.gitmodulesPath : null);
@@ -148,7 +148,7 @@ export class SubmoduleManager {
   }
 
   /**
-   * Write .tsgitmodules file
+   * Write .witmodules file
    */
   private writeModulesFile(modules: ModulesFile): void {
     let content = '';
@@ -205,15 +205,15 @@ export class SubmoduleManager {
    */
   private getSubmoduleCommit(submodulePath: string): string | null {
     const fullPath = path.join(this.workDir, submodulePath);
-    const headPath = path.join(fullPath, '.tsgit', 'HEAD');
+    const headPath = path.join(fullPath, '.wit', 'HEAD');
     const gitHeadPath = path.join(fullPath, '.git', 'HEAD');
     
-    // Check for tsgit repo
+    // Check for wit repo
     if (exists(headPath)) {
       const head = readFileText(headPath).trim();
       if (head.startsWith('ref: ')) {
         // Symbolic ref
-        const refPath = path.join(fullPath, '.tsgit', head.slice(5));
+        const refPath = path.join(fullPath, '.wit', head.slice(5));
         if (exists(refPath)) {
           return readFileText(refPath).trim();
         }
@@ -241,7 +241,7 @@ export class SubmoduleManager {
    */
   private isInitialized(config: SubmoduleConfig): boolean {
     const moduleDir = path.join(this.modulesDir, config.name);
-    const submoduleGitDir = path.join(this.workDir, config.path, '.tsgit');
+    const submoduleGitDir = path.join(this.workDir, config.path, '.wit');
     const submoduleGitDir2 = path.join(this.workDir, config.path, '.git');
     
     return exists(moduleDir) || exists(submoduleGitDir) || exists(submoduleGitDir2);
@@ -276,7 +276,7 @@ export class SubmoduleManager {
         const fullPath = path.join(this.workDir, config.path);
         
         // Check if on a branch
-        const headPath = path.join(fullPath, '.tsgit', 'HEAD');
+        const headPath = path.join(fullPath, '.wit', 'HEAD');
         const gitHeadPath = path.join(fullPath, '.git', 'HEAD');
         
         const actualHeadPath = exists(headPath) ? headPath : (exists(gitHeadPath) ? gitHeadPath : null);
@@ -355,7 +355,7 @@ export class SubmoduleManager {
       branch: options.branch,
     };
 
-    // Add to .tsgitmodules
+    // Add to .witmodules
     modules.submodules.set(name, config);
     this.writeModulesFile(modules);
 
@@ -460,7 +460,7 @@ export class SubmoduleManager {
         // Recursive update
         if (options.recursive) {
           const subManager = new SubmoduleManager(
-            path.join(fullPath, '.tsgit'),
+            path.join(fullPath, '.wit'),
             fullPath
           );
           await subManager.update({ ...options, submodulePaths: undefined });
@@ -497,7 +497,7 @@ export class SubmoduleManager {
       throw new TsgitError(
         `No submodule at path '${targetPath}'`,
         ErrorCode.OPERATION_FAILED,
-        ['tsgit submodule status    # List submodules']
+        ['wit submodule status    # List submodules']
       );
     }
 
@@ -524,7 +524,7 @@ export class SubmoduleManager {
     if (exists(fullPath)) {
       const entries = readDir(fullPath);
       for (const entry of entries) {
-        if (entry !== '.git' && entry !== '.tsgit') {
+        if (entry !== '.git' && entry !== '.wit') {
           const entryPath = path.join(fullPath, entry);
           fs.rmSync(entryPath, { recursive: true, force: true });
         }
@@ -574,7 +574,7 @@ export class SubmoduleManager {
       fs.rmSync(moduleDir, { recursive: true, force: true });
     }
 
-    // Remove from .tsgitmodules
+    // Remove from .witmodules
     modules.submodules.delete(foundName);
     this.writeModulesFile(modules);
   }
@@ -596,8 +596,8 @@ export class SubmoduleManager {
 
       try {
         const output = await this.runCommand(command, fullPath, {
-          TSGIT_SUBMODULE_NAME: name,
-          TSGIT_SUBMODULE_PATH: config.path,
+          WIT_SUBMODULE_NAME: name,
+          WIT_SUBMODULE_PATH: config.path,
         });
         
         results.set(name, { success: true, output });
@@ -605,7 +605,7 @@ export class SubmoduleManager {
         // Recursive
         if (options.recursive) {
           const subManager = new SubmoduleManager(
-            path.join(fullPath, '.tsgit'),
+            path.join(fullPath, '.wit'),
             fullPath
           );
           const subResults = await subManager.foreach(command, options);
@@ -625,7 +625,7 @@ export class SubmoduleManager {
   }
 
   /**
-   * Sync submodule URLs from .tsgitmodules to .tsgit/config
+   * Sync submodule URLs from .witmodules to .wit/config
    */
   sync(submodulePaths?: string[]): SubmoduleConfig[] {
     const modules = this.parseModulesFile();
@@ -763,7 +763,7 @@ export async function handleSubmodule(args: string[]): Promise<void> {
         
         if (statuses.length === 0) {
           console.log(colors.dim('No submodules configured'));
-          console.log(colors.dim('Use "tsgit submodule add <url> <path>" to add a submodule'));
+          console.log(colors.dim('Use "wit submodule add <url> <path>" to add a submodule'));
           return;
         }
 
@@ -796,7 +796,7 @@ export async function handleSubmodule(args: string[]): Promise<void> {
         
         if (!url || !targetPath) {
           console.error(colors.red('error: ') + 'Missing required arguments');
-          console.error('\nUsage: tsgit submodule add <url> <path> [--branch <branch>]');
+          console.error('\nUsage: wit submodule add <url> <path> [--branch <branch>]');
           process.exit(1);
         }
 
@@ -883,7 +883,7 @@ export async function handleSubmodule(args: string[]): Promise<void> {
         
         if (!command || command === '--recursive') {
           console.error(colors.red('error: ') + 'Please specify a command');
-          console.error('\nUsage: tsgit submodule foreach [--recursive] <command>');
+          console.error('\nUsage: wit submodule foreach [--recursive] <command>');
           process.exit(1);
         }
 
@@ -916,13 +916,13 @@ export async function handleSubmodule(args: string[]): Promise<void> {
       default:
         console.error(colors.red('error: ') + `Unknown subcommand: ${subcommand}`);
         console.error('\nUsage:');
-        console.error('  tsgit submodule                     Show status');
-        console.error('  tsgit submodule add <url> <path>    Add a submodule');
-        console.error('  tsgit submodule init [<path>...]    Initialize submodules');
-        console.error('  tsgit submodule update [--init]     Update submodules');
-        console.error('  tsgit submodule deinit <path>       Deinitialize a submodule');
-        console.error('  tsgit submodule foreach <cmd>       Run command in each');
-        console.error('  tsgit submodule sync                Sync URLs');
+        console.error('  wit submodule                     Show status');
+        console.error('  wit submodule add <url> <path>    Add a submodule');
+        console.error('  wit submodule init [<path>...]    Initialize submodules');
+        console.error('  wit submodule update [--init]     Update submodules');
+        console.error('  wit submodule deinit <path>       Deinitialize a submodule');
+        console.error('  wit submodule foreach <cmd>       Run command in each');
+        console.error('  wit submodule sync                Sync URLs');
         process.exit(1);
     }
   } catch (error) {

@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { Repository } from '../../core/repository.js';
 
 export const getStatusTool = createTool({
-  id: 'tsgit-get-status',
+  id: 'wit-get-status',
   description: 'Get the current status of the git repository including staged files, modified files, untracked files, and deleted files. Use this to understand what changes exist in the working directory.',
   inputSchema: z.object({
     path: z.string().optional().describe('Optional path to the repository. Defaults to current directory.'),

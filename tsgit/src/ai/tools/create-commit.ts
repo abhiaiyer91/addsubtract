@@ -9,7 +9,7 @@ import { Repository } from '../../core/repository.js';
 import { Journal, StateSnapshot } from '../../core/journal.js';
 
 export const createCommitTool = createTool({
-  id: 'tsgit-create-commit',
+  id: 'wit-create-commit',
   description: 'Create a new commit with the currently staged changes. Requires a commit message. Optionally can stage all tracked modified files before committing with the "all" flag.',
   inputSchema: z.object({
     message: z.string().describe('The commit message. Should describe what changes were made and why.'),

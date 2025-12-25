@@ -170,7 +170,7 @@ export function buildFileTree(repo: Repository): TreeNode {
     expanded: true,
   };
 
-  const excludeDirs = ['.tsgit', 'node_modules', '.git', 'dist', 'build'];
+  const excludeDirs = ['.wit', 'node_modules', '.git', 'dist', 'build'];
   
   try {
     buildTreeRecursive(repo.workDir, root, '', statusMap, excludeDirs);

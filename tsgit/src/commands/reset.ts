@@ -3,10 +3,10 @@
  * Reset current HEAD to a specified state
  * 
  * Usage:
- * - tsgit reset --soft HEAD~1    # Undo commit, keep changes staged
- * - tsgit reset --mixed HEAD~1   # Undo commit, keep changes unstaged (default)
- * - tsgit reset --hard HEAD~1    # Undo commit, discard all changes
- * - tsgit reset <file>           # Unstage a file (same as restore --staged)
+ * - wit reset --soft HEAD~1    # Undo commit, keep changes staged
+ * - wit reset --mixed HEAD~1   # Undo commit, keep changes unstaged (default)
+ * - wit reset --hard HEAD~1    # Undo commit, discard all changes
+ * - wit reset <file>           # Unstage a file (same as restore --staged)
  * 
  * This provides the full power of git reset with clearer naming.
  */
@@ -81,7 +81,7 @@ export function parseRevision(repo: Repository, revSpec: string): string {
       throw new TsgitError(
         `Cannot go back ${offset} commits from '${ref}' - only ${i} parents exist`,
         ErrorCode.OPERATION_FAILED,
-        [`tsgit reset ${ref}~${i}    # Reset to the earliest commit`]
+        [`wit reset ${ref}~${i}    # Reset to the earliest commit`]
       );
     }
 
@@ -196,7 +196,7 @@ function resetWorkingDirectory(repo: Repository, commitHash: string): void {
   flattenTree(repo, commit.treeHash, '', treeFiles);
 
   // Get current working files
-  const excludeDirs = ['.tsgit/', 'node_modules/', '.git/'];
+  const excludeDirs = ['.wit/', 'node_modules/', '.git/'];
   const workFiles = walkDir(repo.workDir, excludeDirs);
 
   // Delete files not in tree
@@ -387,17 +387,17 @@ export function handleReset(args: string[]): void {
     if (mode === 'soft') {
       console.log();
       console.log(colors.cyan('Your changes are still staged.'));
-      console.log(colors.dim('  tsgit status        # See staged changes'));
-      console.log(colors.dim('  tsgit commit -m ""  # Commit with new message'));
+      console.log(colors.dim('  wit status        # See staged changes'));
+      console.log(colors.dim('  wit commit -m ""  # Commit with new message'));
     } else if (mode === 'mixed') {
       console.log();
       console.log(colors.cyan('Your changes are preserved but unstaged.'));
-      console.log(colors.dim('  tsgit status        # See changes'));
-      console.log(colors.dim('  tsgit add .         # Stage all'));
+      console.log(colors.dim('  wit status        # See changes'));
+      console.log(colors.dim('  wit add .         # Stage all'));
     } else if (mode === 'hard') {
       console.log();
       console.log(colors.yellow('Working directory has been reset.'));
-      console.log(colors.dim('  tsgit undo          # Undo this reset if needed'));
+      console.log(colors.dim('  wit undo          # Undo this reset if needed'));
     }
 
   } catch (error) {

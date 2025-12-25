@@ -1,5 +1,5 @@
 /**
- * Terminal User Interface (TUI) for tsgit
+ * Terminal User Interface (TUI) for wit
  * A beautiful, interactive terminal interface
  */
 
@@ -42,7 +42,7 @@ export class TsgitTUI {
     this.repo = repo;
     this.screen = blessed.screen({
       smartCSR: true,
-      title: 'tsgit - Visual Interface',
+      title: 'wit - Visual Interface',
       fullUnicode: true,
     });
 
@@ -287,7 +287,7 @@ export class TsgitTUI {
   private getHeaderContent(): string {
     const branch = this.repo.refs.getCurrentBranch() || 'detached HEAD';
     const repoName = path.basename(this.repo.workDir);
-    return ` {bold}tsgit{/bold} │ ${repoName} │ Branch: {green-fg}${branch}{/green-fg}`;
+    return ` {bold}wit{/bold} │ ${repoName} │ Branch: {green-fg}${branch}{/green-fg}`;
   }
 
   /**
@@ -553,7 +553,7 @@ export class TsgitTUI {
    */
   private showHelp(): void {
     const helpContent = `
-{bold}tsgit Terminal UI - Keyboard Shortcuts{/bold}
+{bold}wit Terminal UI - Keyboard Shortcuts{/bold}
 
 {bold}Navigation:{/bold}
   Tab        - Switch between panels
@@ -633,7 +633,7 @@ export function launchTUI(): void {
     tui.run();
   } catch (error) {
     console.error('Error:', error instanceof Error ? error.message : 'Unknown error');
-    console.error('Make sure you are in a tsgit repository');
+    console.error('Make sure you are in a wit repository');
     process.exit(1);
   }
 }

@@ -3,11 +3,11 @@
  * Remove untracked files from working directory
  * 
  * Usage:
- * - tsgit clean -n                  # Dry run (show what would be deleted)
- * - tsgit clean -f                  # Force delete untracked files
- * - tsgit clean -fd                 # Delete untracked files and directories
- * - tsgit clean -fx                 # Also delete ignored files
- * - tsgit clean -i                  # Interactive mode
+ * - wit clean -n                  # Dry run (show what would be deleted)
+ * - wit clean -f                  # Force delete untracked files
+ * - wit clean -fd                 # Delete untracked files and directories
+ * - wit clean -fx                 # Also delete ignored files
+ * - wit clean -i                  # Interactive mode
  */
 
 import * as path from 'path';
@@ -94,8 +94,8 @@ export function getUntrackedItems(
             : entry.name;
           const fullPath = path.join(dir, entry.name);
 
-          // Skip .tsgit, .git, node_modules
-          if (entry.name === '.tsgit' || entry.name === '.git' || entry.name === 'node_modules') {
+          // Skip .wit, .git, node_modules
+          if (entry.name === '.wit' || entry.name === '.git' || entry.name === 'node_modules') {
             continue;
           }
 
@@ -169,8 +169,8 @@ export function clean(repo: Repository, options: CleanOptions = {}): CleanResult
       'Clean requires -f (force) or -n (dry-run) to prevent accidental data loss',
       ErrorCode.OPERATION_FAILED,
       [
-        'tsgit clean -n    # Preview what would be deleted',
-        'tsgit clean -f    # Actually delete files'
+        'wit clean -n    # Preview what would be deleted',
+        'wit clean -f    # Actually delete files'
       ]
     );
   }

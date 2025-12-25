@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { Repository } from '../../core/repository.js';
 
 export const stageFilesTool = createTool({
-  id: 'tsgit-stage-files',
+  id: 'wit-stage-files',
   description: 'Stage files for the next commit. Use "." to stage all files, or specify individual file paths. Staging prepares changes to be included in the next commit.',
   inputSchema: z.object({
     files: z.array(z.string()).describe('Array of file paths to stage. Use ["."] to stage all files.'),

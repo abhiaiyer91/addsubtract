@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { Repository } from '../../core/repository.js';
 
 export const getLogTool = createTool({
-  id: 'tsgit-get-log',
+  id: 'wit-get-log',
   description: 'Get the commit history log. Returns recent commits with their hash, message, author, and date. Use this to understand the project history and find specific commits.',
   inputSchema: z.object({
     limit: z.number().optional().default(10).describe('Maximum number of commits to return'),

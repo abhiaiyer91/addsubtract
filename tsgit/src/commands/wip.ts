@@ -54,9 +54,9 @@ export function wip(options: WipOptions = {}): string {
       'Nothing to commit',
       ErrorCode.NOTHING_TO_COMMIT,
       [
-        'tsgit wip -a          # Stage all tracked files first',
-        'tsgit wip -u          # Include untracked files too',
-        'tsgit add <file>      # Stage specific files',
+        'wit wip -a          # Stage all tracked files first',
+        'wit wip -u          # Include untracked files too',
+        'wit add <file>      # Stage specific files',
       ]
     );
   }
@@ -194,8 +194,8 @@ export function handleWip(args: string[]): void {
   try {
     const hash = wip(options);
     console.log(colors.green('✓') + ` Created WIP commit: ${colors.yellow(hash.slice(0, 8))}`);
-    console.log(colors.dim('  Use "tsgit undo" to revert if needed'));
-    console.log(colors.dim('  Use "tsgit uncommit" to keep changes staged'));
+    console.log(colors.dim('  Use "wit undo" to revert if needed'));
+    console.log(colors.dim('  Use "wit uncommit" to keep changes staged'));
   } catch (error) {
     if (error instanceof TsgitError) {
       console.error(error.format());

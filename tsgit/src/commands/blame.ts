@@ -295,7 +295,7 @@ export function handleBlame(args: string[]): void {
   
   if (!filePath) {
     console.error(colors.red('error: ') + 'No file specified');
-    console.error(colors.dim('Usage: tsgit blame <file>'));
+    console.error(colors.dim('Usage: wit blame <file>'));
     process.exit(1);
   }
   

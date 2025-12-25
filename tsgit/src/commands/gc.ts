@@ -1,16 +1,16 @@
 /**
  * Garbage Collection Command
  * 
- * Cleans up and optimizes the tsgit repository.
+ * Cleans up and optimizes the wit repository.
  * 
  * Commands:
- * - tsgit gc                       Run garbage collection
- * - tsgit gc --aggressive          More aggressive optimization
- * - tsgit gc --prune=now           Prune immediately (no grace period)
- * - tsgit gc --prune=<date>        Prune objects older than date
- * - tsgit gc --no-prune            Don't prune loose objects
- * - tsgit gc --quiet               Suppress output
- * - tsgit gc --auto                Only run if thresholds exceeded
+ * - wit gc                       Run garbage collection
+ * - wit gc --aggressive          More aggressive optimization
+ * - wit gc --prune=now           Prune immediately (no grace period)
+ * - wit gc --prune=<date>        Prune objects older than date
+ * - wit gc --no-prune            Don't prune loose objects
+ * - wit gc --quiet               Suppress output
+ * - wit gc --auto                Only run if thresholds exceeded
  * 
  * Tasks performed:
  * 1. Remove unreachable objects

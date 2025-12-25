@@ -1,6 +1,6 @@
-# tsgit Feature Implementation Plan
+# wit Feature Implementation Plan
 
-This document outlines all features implemented in tsgit, organized into workstreams.
+This document outlines all features implemented in wit, organized into workstreams.
 
 ## Overview
 
@@ -41,7 +41,7 @@ This document outlines all features implemented in tsgit, organized into workstr
 **File:** `src/core/remote.ts`
 
 ```typescript
-import { RemoteManager } from "tsgit/core/remote";
+import { RemoteManager } from "wit/core/remote";
 
 const remotes = new RemoteManager(gitDir);
 
@@ -67,7 +67,7 @@ const { force, src, dst } = RemoteManager.parseRefspec(
 const localRef = RemoteManager.applyRefspec(refspec, "refs/heads/main");
 ```
 
-**Storage:** `.tsgit/config` (INI format, Git-compatible)
+**Storage:** `.wit/config` (INI format, Git-compatible)
 
 ### 2.2 Git Protocol Implementation ✅
 
@@ -90,7 +90,7 @@ src/core/protocol/
 
 **Environment Variables Supported:**
 
-- `TSGIT_TOKEN` - Universal token
+- `WIT_TOKEN` - Universal token
 - `GITHUB_TOKEN` / `GH_TOKEN` - GitHub
 - `GITLAB_TOKEN` / `GL_TOKEN` - GitLab
 - `GIT_TOKEN` - Generic
@@ -107,13 +107,13 @@ src/core/protocol/
 **File:** `src/commands/remote.ts`
 
 ```typescript
-tsgit remote                    // List remotes
-tsgit remote -v                 // List with URLs
-tsgit remote add <name> <url>   // Add remote
-tsgit remote remove <name>      // Remove remote
-tsgit remote rename <old> <new> // Rename remote
-tsgit remote get-url <name>     // Show URL
-tsgit remote set-url <name> <url> // Change URL
+wit remote                    // List remotes
+wit remote -v                 // List with URLs
+wit remote add <name> <url>   // Add remote
+wit remote remove <name>      // Remove remote
+wit remote rename <old> <new> // Rename remote
+wit remote get-url <name>     // Show URL
+wit remote set-url <name> <url> // Change URL
 ```
 
 ### 3.2 Clone Command ✅
@@ -121,10 +121,10 @@ tsgit remote set-url <name> <url> // Change URL
 **File:** `src/commands/clone.ts`
 
 ```typescript
-tsgit clone <url> [<dir>]       // Clone repository
-tsgit clone --depth <n> <url>   // Shallow clone
-tsgit clone --branch <b> <url>  // Clone specific branch
-tsgit clone --bare <url>        // Bare clone
+wit clone <url> [<dir>]       // Clone repository
+wit clone --depth <n> <url>   // Shallow clone
+wit clone --branch <b> <url>  // Clone specific branch
+wit clone --bare <url>        // Bare clone
 ```
 
 ### 3.3 Fetch Command ✅
@@ -132,11 +132,11 @@ tsgit clone --bare <url>        // Bare clone
 **File:** `src/commands/fetch.ts`
 
 ```typescript
-tsgit fetch                     // Fetch from origin
-tsgit fetch <remote>            // Fetch from specific remote
-tsgit fetch --all               // Fetch from all remotes
-tsgit fetch --prune             // Delete stale remote refs
-tsgit fetch <remote> <refspec>  // Fetch specific ref
+wit fetch                     // Fetch from origin
+wit fetch <remote>            // Fetch from specific remote
+wit fetch --all               // Fetch from all remotes
+wit fetch --prune             // Delete stale remote refs
+wit fetch <remote> <refspec>  // Fetch specific ref
 ```
 
 ### 3.4 Pull Command ✅
@@ -144,10 +144,10 @@ tsgit fetch <remote> <refspec>  // Fetch specific ref
 **File:** `src/commands/pull.ts`
 
 ```typescript
-tsgit pull                      // Fetch + merge
-tsgit pull --rebase             // Fetch + rebase
-tsgit pull <remote> <branch>    // Pull specific branch
-tsgit pull --ff-only            // Only fast-forward
+wit pull                      // Fetch + merge
+wit pull --rebase             // Fetch + rebase
+wit pull <remote> <branch>    // Pull specific branch
+wit pull --ff-only            // Only fast-forward
 ```
 
 ### 3.5 Push Command ✅
@@ -155,14 +155,14 @@ tsgit pull --ff-only            // Only fast-forward
 **File:** `src/commands/push.ts`
 
 ```typescript
-tsgit push                      // Push current branch to origin
-tsgit push <remote>             // Push to specific remote
-tsgit push <remote> <branch>    // Push specific branch
-tsgit push -u <remote> <branch> // Push and set upstream
-tsgit push --force              // Force push
-tsgit push --force-with-lease   // Safe force push
-tsgit push --tags               // Push all tags
-tsgit push --delete <branch>    // Delete remote branch
+wit push                      // Push current branch to origin
+wit push <remote>             // Push to specific remote
+wit push <remote> <branch>    // Push specific branch
+wit push -u <remote> <branch> // Push and set upstream
+wit push --force              // Force push
+wit push --force-with-lease   // Safe force push
+wit push --tags               // Push all tags
+wit push --delete <branch>    // Delete remote branch
 ```
 
 ---
@@ -176,12 +176,12 @@ tsgit push --delete <branch>    // Delete remote branch
 **File:** `src/commands/cherry-pick.ts`
 
 ```typescript
-tsgit cherry-pick <commit>      // Apply commit
-tsgit cherry-pick <c1> <c2>     // Apply multiple commits
-tsgit cherry-pick --continue    // Continue after conflict
-tsgit cherry-pick --abort       // Abort operation
-tsgit cherry-pick --skip        // Skip current commit
-tsgit cherry-pick -n <commit>   // Apply without committing
+wit cherry-pick <commit>      // Apply commit
+wit cherry-pick <c1> <c2>     // Apply multiple commits
+wit cherry-pick --continue    // Continue after conflict
+wit cherry-pick --abort       // Abort operation
+wit cherry-pick --skip        // Skip current commit
+wit cherry-pick -n <commit>   // Apply without committing
 ```
 
 ### 4.2 Rebase Command ✅
@@ -189,25 +189,25 @@ tsgit cherry-pick -n <commit>   // Apply without committing
 **File:** `src/commands/rebase.ts`
 
 ```typescript
-tsgit rebase <branch>           // Rebase onto branch
-tsgit rebase --onto <new> <old> // Rebase onto specific base
-tsgit rebase --continue         // Continue after conflict
-tsgit rebase --abort            // Abort rebase
-tsgit rebase --skip             // Skip current commit
+wit rebase <branch>           // Rebase onto branch
+wit rebase --onto <new> <old> // Rebase onto specific base
+wit rebase --continue         // Continue after conflict
+wit rebase --abort            // Abort rebase
+wit rebase --skip             // Skip current commit
 ```
 
-**State File:** `.tsgit/REBASE_STATE.json`
+**State File:** `.wit/REBASE_STATE.json`
 
 ### 4.3 Revert Command ✅
 
 **File:** `src/commands/revert.ts`
 
 ```typescript
-tsgit revert <commit>           // Create commit that undoes changes
-tsgit revert <c1> <c2>          // Revert multiple commits
-tsgit revert --no-commit <c>    // Revert without committing
-tsgit revert --continue         // Continue after conflict
-tsgit revert --abort            // Abort operation
+wit revert <commit>           // Create commit that undoes changes
+wit revert <c1> <c2>          // Revert multiple commits
+wit revert --no-commit <c>    // Revert without committing
+wit revert --continue         // Continue after conflict
+wit revert --abort            // Abort operation
 ```
 
 ---
@@ -221,12 +221,12 @@ tsgit revert --abort            // Abort operation
 **File:** `src/commands/rev-parse.ts`
 
 ```typescript
-tsgit rev-parse HEAD            // Output: commit hash
-tsgit rev-parse HEAD~3          // 3 commits back
-tsgit rev-parse --short HEAD    // Short hash
-tsgit rev-parse --verify <ref>  // Verify ref exists
-tsgit rev-parse --git-dir       // Output: .tsgit
-tsgit rev-parse --show-toplevel // Output: repo root
+wit rev-parse HEAD            // Output: commit hash
+wit rev-parse HEAD~3          // 3 commits back
+wit rev-parse --short HEAD    // Short hash
+wit rev-parse --verify <ref>  // Verify ref exists
+wit rev-parse --git-dir       // Output: .wit
+wit rev-parse --show-toplevel // Output: repo root
 ```
 
 ### 5.2 Update-Ref ✅
@@ -234,9 +234,9 @@ tsgit rev-parse --show-toplevel // Output: repo root
 **File:** `src/commands/update-ref.ts`
 
 ```typescript
-tsgit update-ref <ref> <hash>        // Update ref
-tsgit update-ref -d <ref>            // Delete ref
-tsgit update-ref --stdin             // Batch update
+wit update-ref <ref> <hash>        // Update ref
+wit update-ref -d <ref>            // Delete ref
+wit update-ref --stdin             // Batch update
 ```
 
 ### 5.3 Symbolic-Ref ✅
@@ -244,9 +244,9 @@ tsgit update-ref --stdin             // Batch update
 **File:** `src/commands/symbolic-ref.ts`
 
 ```typescript
-tsgit symbolic-ref HEAD              // Output: refs/heads/main
-tsgit symbolic-ref HEAD refs/heads/x // Set HEAD to branch
-tsgit symbolic-ref --short HEAD      // Output: main
+wit symbolic-ref HEAD              // Output: refs/heads/main
+wit symbolic-ref HEAD refs/heads/x // Set HEAD to branch
+wit symbolic-ref --short HEAD      // Output: main
 ```
 
 ### 5.4 For-Each-Ref ✅
@@ -254,10 +254,10 @@ tsgit symbolic-ref --short HEAD      // Output: main
 **File:** `src/commands/for-each-ref.ts`
 
 ```typescript
-tsgit for-each-ref                           // List all refs
-tsgit for-each-ref refs/heads                // List branches
-tsgit for-each-ref refs/tags                 // List tags
-tsgit for-each-ref --format='%(refname)'     // Custom format
+wit for-each-ref                           // List all refs
+wit for-each-ref refs/heads                // List branches
+wit for-each-ref refs/tags                 // List tags
+wit for-each-ref --format='%(refname)'     // Custom format
 ```
 
 ### 5.5 Show-Ref ✅
@@ -265,10 +265,10 @@ tsgit for-each-ref --format='%(refname)'     // Custom format
 **File:** `src/commands/show-ref.ts`
 
 ```typescript
-tsgit show-ref                    // List all refs with hashes
-tsgit show-ref --heads            // Only branches
-tsgit show-ref --tags             // Only tags
-tsgit show-ref <ref>              // Check if ref exists
+wit show-ref                    // List all refs with hashes
+wit show-ref --heads            // Only branches
+wit show-ref --tags             // Only tags
+wit show-ref <ref>              // Check if ref exists
 ```
 
 ### 5.6 Verify Objects ✅
@@ -276,8 +276,8 @@ tsgit show-ref <ref>              // Check if ref exists
 **File:** `src/commands/fsck.ts`
 
 ```typescript
-tsgit fsck                        // Verify object database
-tsgit fsck --full                 // Full verification
+wit fsck                        // Verify object database
+wit fsck --full                 // Full verification
 ```
 
 ---
@@ -299,18 +299,18 @@ tsgit fsck --full                 // Full verification
 - `pre-rebase` - Before rebase
 - `commit-msg` - Validate/modify commit message
 
-**Directory:** `.tsgit/hooks/`
+**Directory:** `.wit/hooks/`
 
 ### 6.2 Submodules ✅
 
 **File:** `src/core/submodule.ts`
 
 ```typescript
-tsgit submodule add <url> <path>   // Add submodule
-tsgit submodule init               // Initialize submodules
-tsgit submodule update             // Update submodules
-tsgit submodule status             // Show status
-tsgit submodule foreach <cmd>      // Run command in each
+wit submodule add <url> <path>   // Add submodule
+wit submodule init               // Initialize submodules
+wit submodule update             // Update submodules
+wit submodule status             // Show status
+wit submodule foreach <cmd>      // Run command in each
 ```
 
 ### 6.3 Worktrees ✅
@@ -318,10 +318,10 @@ tsgit submodule foreach <cmd>      // Run command in each
 **File:** `src/core/worktree.ts`
 
 ```typescript
-tsgit worktree add <path> <branch>  // Add worktree
-tsgit worktree list                 // List worktrees
-tsgit worktree remove <path>        // Remove worktree
-tsgit worktree prune                // Prune stale entries
+wit worktree add <path> <branch>  // Add worktree
+wit worktree list                 // List worktrees
+wit worktree remove <path>        // Remove worktree
+wit worktree prune                // Prune stale entries
 ```
 
 ### 6.4 Reflog ✅
@@ -329,9 +329,9 @@ tsgit worktree prune                // Prune stale entries
 **File:** `src/commands/reflog.ts`
 
 ```typescript
-tsgit reflog                    // Show HEAD reflog
-tsgit reflog <ref>              // Show reflog for ref
-tsgit reflog expire             // Prune old entries
+wit reflog                    // Show HEAD reflog
+wit reflog <ref>              // Show reflog for ref
+wit reflog expire             // Prune old entries
 ```
 
 ### 6.5 Garbage Collection ✅
@@ -339,9 +339,9 @@ tsgit reflog expire             // Prune old entries
 **File:** `src/commands/gc.ts`
 
 ```typescript
-tsgit gc                        // Run garbage collection
-tsgit gc --aggressive           // More aggressive optimization
-tsgit gc --prune=now            // Prune immediately
+wit gc                        // Run garbage collection
+wit gc --aggressive           // More aggressive optimization
+wit gc --prune=now            // Prune immediately
 ```
 
 ---

@@ -119,7 +119,7 @@ function serializeConfig(sections: Map<string, Map<string, string>>): string {
 /**
  * RemoteManager handles remote repository configuration
  * 
- * Stores configuration in .tsgit/config using Git-compatible INI format
+ * Stores configuration in .wit/config using Git-compatible INI format
  */
 export class RemoteManager {
   private configPath: string;
@@ -175,8 +175,8 @@ export class RemoteManager {
         `remote ${name} already exists`,
         ErrorCode.OPERATION_FAILED,
         [
-          `tsgit remote set-url ${name} ${url}    # Update existing remote URL`,
-          `tsgit remote remove ${name}            # Remove and re-add`,
+          `wit remote set-url ${name} ${url}    # Update existing remote URL`,
+          `wit remote remove ${name}            # Remove and re-add`,
         ]
       );
     }
@@ -636,7 +636,7 @@ export class RemoteManager {
     for (const remote of remotes) {
       if (remote.toLowerCase().includes(name.toLowerCase()) ||
           name.toLowerCase().includes(remote.toLowerCase())) {
-        suggestions.push(`tsgit remote -v    # List all remotes`);
+        suggestions.push(`wit remote -v    # List all remotes`);
         break;
       }
     }
@@ -644,7 +644,7 @@ export class RemoteManager {
     if (remotes.length > 0) {
       suggestions.push(`Available remotes: ${remotes.join(', ')}`);
     } else {
-      suggestions.push(`tsgit remote add <name> <url>    # Add a remote`);
+      suggestions.push(`wit remote add <name> <url>    # Add a remote`);
     }
 
     return suggestions;

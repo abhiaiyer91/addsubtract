@@ -1,5 +1,5 @@
 /**
- * tsgit - A Modern Git Implementation in TypeScript
+ * wit - A Modern Git Implementation in TypeScript
  * 
  * Improvements over Git:
  * - SHA-256 hashing by default (more secure than SHA-1)
@@ -12,7 +12,7 @@
  * 
  * @example
  * ```typescript
- * import { Repository } from 'tsgit';
+ * import { Repository } from 'wit';
  * 
  * // Initialize a new repository
  * const repo = Repository.init('/path/to/project');

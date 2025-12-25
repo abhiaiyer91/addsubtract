@@ -3,10 +3,10 @@
  * Fetch from remote and integrate changes
  * 
  * Usage:
- *   tsgit pull                      # Fetch + merge from upstream
- *   tsgit pull --rebase             # Fetch + rebase
- *   tsgit pull <remote> <branch>    # Pull specific branch
- *   tsgit pull --ff-only            # Only fast-forward
+ *   wit pull                      # Fetch + merge from upstream
+ *   wit pull --rebase             # Fetch + rebase
+ *   wit pull <remote> <branch>    # Pull specific branch
+ *   wit pull --ff-only            # Only fast-forward
  */
 
 import * as path from 'path';
@@ -117,8 +117,8 @@ export function pull(
       'You are not currently on a branch',
       ErrorCode.DETACHED_HEAD,
       [
-        'tsgit checkout <branch>    # Switch to a branch first',
-        'tsgit switch <branch>      # Or use switch command',
+        'wit checkout <branch>    # Switch to a branch first',
+        'wit switch <branch>      # Or use switch command',
       ]
     );
   }
@@ -147,8 +147,8 @@ export function pull(
       `No such remote: '${remote}'`,
       ErrorCode.REF_NOT_FOUND,
       [
-        'tsgit remote add origin <url>    # Add origin remote',
-        'tsgit remote -v                  # List configured remotes',
+        'wit remote add origin <url>    # Add origin remote',
+        'wit remote -v                  # List configured remotes',
       ]
     );
   }
@@ -164,9 +164,9 @@ export function pull(
       'Cannot pull with uncommitted changes',
       ErrorCode.UNCOMMITTED_CHANGES,
       [
-        'tsgit stash             # Stash your changes first',
-        'tsgit commit -m "WIP"   # Or commit them',
-        'tsgit pull --autostash  # Or auto-stash during pull',
+        'wit stash             # Stash your changes first',
+        'wit commit -m "WIP"   # Or commit them',
+        'wit pull --autostash  # Or auto-stash during pull',
       ]
     );
   }
@@ -187,8 +187,8 @@ export function pull(
       `Couldn't find remote ref ${remoteRef}`,
       ErrorCode.REF_NOT_FOUND,
       [
-        `tsgit fetch ${remote}    # Fetch from remote first`,
-        'tsgit branch -r          # List remote branches',
+        `wit fetch ${remote}    # Fetch from remote first`,
+        'wit branch -r          # List remote branches',
       ]
     );
   }
@@ -226,8 +226,8 @@ export function pull(
       'Not possible to fast-forward, aborting',
       ErrorCode.OPERATION_FAILED,
       [
-        'tsgit pull               # Allow merge commits',
-        'tsgit pull --rebase      # Or rebase instead',
+        'wit pull               # Allow merge commits',
+        'wit pull --rebase      # Or rebase instead',
       ]
     );
   }
@@ -250,7 +250,7 @@ export function pull(
     throw new TsgitError(
       'Not possible to fast-forward',
       ErrorCode.OPERATION_FAILED,
-      ['tsgit pull --no-ff is not valid when fast-forward is not possible']
+      ['wit pull --no-ff is not valid when fast-forward is not possible']
     );
   }
 
@@ -363,7 +363,7 @@ function performRebase(
   console.log(colors.dim('  3. Reset to remote branch'));
   console.log(colors.dim('  4. Replay each commit'));
   console.log();
-  console.log(colors.cyan('ℹ') + ' Use regular merge for now: tsgit pull');
+  console.log(colors.cyan('ℹ') + ' Use regular merge for now: wit pull');
 
   return {
     fetchResult: null,
@@ -434,8 +434,8 @@ export function handlePull(args: string[]): void {
       case 'conflict':
         console.log(colors.yellow('!') + ' Merge conflicts detected');
         console.log(colors.dim('  Fix conflicts and run:'));
-        console.log(colors.dim('    tsgit add <resolved files>'));
-        console.log(colors.dim('    tsgit commit'));
+        console.log(colors.dim('    wit add <resolved files>'));
+        console.log(colors.dim('    wit commit'));
         break;
 
       case 'rebase':

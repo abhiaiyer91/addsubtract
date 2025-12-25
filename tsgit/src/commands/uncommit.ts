@@ -50,7 +50,7 @@ export function uncommit(options: UncommitOptions = {}): { originalHash: string;
       throw new TsgitError(
         `Cannot uncommit ${count} commits - only ${i} commits exist`,
         ErrorCode.OPERATION_FAILED,
-        [`tsgit uncommit -n ${i}    # Uncommit ${i} commits instead`]
+        [`wit uncommit -n ${i}    # Uncommit ${i} commits instead`]
       );
     }
     
@@ -61,7 +61,7 @@ export function uncommit(options: UncommitOptions = {}): { originalHash: string;
         throw new TsgitError(
           `Cannot uncommit ${count} commits - only ${i + 1} commits exist`,
           ErrorCode.OPERATION_FAILED,
-          [`tsgit uncommit -n ${i + 1}    # Uncommit all ${i + 1} commits`]
+          [`wit uncommit -n ${i + 1}    # Uncommit all ${i + 1} commits`]
         );
       }
       targetHash = null;  // We're uncommitting the initial commit
@@ -92,7 +92,7 @@ export function uncommit(options: UncommitOptions = {}): { originalHash: string;
       throw new TsgitError(
         'Cannot uncommit the initial commit',
         ErrorCode.OPERATION_FAILED,
-        ['Use "tsgit undo" to undo the initial commit instead']
+        ['Use "wit undo" to undo the initial commit instead']
       );
     }
   } else {
@@ -151,7 +151,7 @@ function resetToTree(repo: Repository, treeHash: string): void {
   flattenTree(repo, treeHash, '', treeFiles);
   
   // Get all current working files
-  const workFiles = walkDir(repo.workDir, ['.tsgit/', 'node_modules/', '.git/']);
+  const workFiles = walkDir(repo.workDir, ['.wit/', 'node_modules/', '.git/']);
   
   // Delete files not in tree
   for (const file of workFiles) {
@@ -229,9 +229,9 @@ export function handleUncommit(args: string[]): void {
     if (!options.hard) {
       console.log();
       console.log(colors.cyan('Your changes are still staged.'));
-      console.log(colors.dim('  tsgit status        # See staged changes'));
-      console.log(colors.dim('  tsgit commit -m ""  # Commit with new message'));
-      console.log(colors.dim('  tsgit restore --staged .  # Unstage all'));
+      console.log(colors.dim('  wit status        # See staged changes'));
+      console.log(colors.dim('  wit commit -m ""  # Commit with new message'));
+      console.log(colors.dim('  wit restore --staged .  # Unstage all'));
     }
   } catch (error) {
     if (error instanceof TsgitError) {

@@ -36,13 +36,13 @@ export interface SwitchResult {
  * 
  * @example
  * // Switch to existing branch
- * tsgit switch feature
+ * wit switch feature
  * 
  * // Create and switch to new branch
- * tsgit switch -c new-feature
+ * wit switch -c new-feature
  * 
  * // Switch with auto-stash
- * tsgit switch --auto-stash main
+ * wit switch --auto-stash main
  */
 export function switchBranch(
   repo: Repository,
@@ -187,7 +187,7 @@ export function handleSwitch(args: string[]): void {
 
   if (!branchName) {
     console.error('Error: Branch name required');
-    console.error('\nUsage: tsgit switch [options] <branch>');
+    console.error('\nUsage: wit switch [options] <branch>');
     console.error('\nOptions:');
     console.error('  -c, --create     Create the branch if it doesn\'t exist');
     console.error('  -f, --force      Discard local changes');

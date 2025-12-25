@@ -1,17 +1,17 @@
 /**
- * tsgit AI Agent
+ * wit AI Agent
  * 
  * An intelligent agent that can help with git operations, commit message generation,
  * conflict resolution, and natural language git commands.
  */
 
 import { Agent } from '@mastra/core/agent';
-import { tsgitTools } from './tools/index.js';
+import { witTools } from './tools/index.js';
 
 /**
- * System instructions for the tsgit AI agent
+ * System instructions for the wit AI agent
  */
-const TSGIT_AGENT_INSTRUCTIONS = `You are tsgit AI, an intelligent assistant for version control operations. You help developers with git-related tasks using tsgit, a modern TypeScript implementation of Git.
+const WIT_AGENT_INSTRUCTIONS = `You are wit AI, an intelligent assistant for version control operations. You help developers with git-related tasks using wit, a modern TypeScript implementation of Git.
 
 ## Your Capabilities
 
@@ -32,7 +32,7 @@ You can help with:
    - Suggest the best resolution based on code context
 
 4. **Undo Operations**
-   - Help undo mistakes using tsgit's journal system
+   - Help undo mistakes using wit's journal system
    - Explain what operations can be undone
 
 ## Commit Message Guidelines
@@ -78,15 +78,15 @@ You have access to the following tools:
 Always use these tools to interact with the repository rather than making assumptions about its state.`;
 
 /**
- * Create the tsgit AI agent
+ * Create the wit AI agent
  */
-export const tsgitAgent = new Agent({
-  id: 'tsgit-agent',
-  name: 'tsgit AI Assistant',
+export const witAgent = new Agent({
+  id: 'wit-agent',
+  name: 'wit AI Assistant',
   description: 'An intelligent assistant for git operations, commit messages, and conflict resolution',
-  instructions: TSGIT_AGENT_INSTRUCTIONS,
+  instructions: WIT_AGENT_INSTRUCTIONS,
   model: 'openai/gpt-4o',
-  tools: tsgitTools,
+  tools: witTools,
 });
 
 /**
@@ -94,11 +94,11 @@ export const tsgitAgent = new Agent({
  */
 export function createTsgitAgent(model: string = 'openai/gpt-4o'): Agent {
   return new Agent({
-    id: 'tsgit-agent',
-    name: 'tsgit AI Assistant',
+    id: 'wit-agent',
+    name: 'wit AI Assistant',
     description: 'An intelligent assistant for git operations, commit messages, and conflict resolution',
-    instructions: TSGIT_AGENT_INSTRUCTIONS,
+    instructions: WIT_AGENT_INSTRUCTIONS,
     model,
-    tools: tsgitTools,
+    tools: witTools,
   });
 }

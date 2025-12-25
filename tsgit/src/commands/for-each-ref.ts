@@ -3,10 +3,10 @@
  * Iterate over refs and output information about each one
  * 
  * Usage:
- * - tsgit for-each-ref                           # List all refs
- * - tsgit for-each-ref refs/heads                # List branches
- * - tsgit for-each-ref refs/tags                 # List tags
- * - tsgit for-each-ref --format='%(refname)'     # Custom format
+ * - wit for-each-ref                           # List all refs
+ * - wit for-each-ref refs/heads                # List branches
+ * - wit for-each-ref refs/tags                 # List tags
+ * - wit for-each-ref --format='%(refname)'     # Custom format
  * 
  * Format placeholders:
  * - %(objectname)     - Full SHA hash

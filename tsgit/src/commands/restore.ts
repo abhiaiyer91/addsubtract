@@ -37,16 +37,16 @@ export interface RestoreResult {
  * 
  * @example
  * // Restore file from index (discard working tree changes)
- * tsgit restore file.txt
+ * wit restore file.txt
  * 
  * // Restore file from a specific commit
- * tsgit restore --source HEAD~1 file.txt
+ * wit restore --source HEAD~1 file.txt
  * 
  * // Unstage a file (restore staged to index)
- * tsgit restore --staged file.txt
+ * wit restore --staged file.txt
  * 
  * // Restore all files
- * tsgit restore .
+ * wit restore .
  */
 export function restore(
   repo: Repository,
@@ -180,7 +180,7 @@ function restoreSingleFile(
         throw new TsgitError(
           `Path '${filePath}' does not exist in '${source}'`,
           ErrorCode.FILE_NOT_FOUND,
-          [`tsgit log    # View available commits`]
+          [`wit log    # View available commits`]
         );
       }
     } else {
@@ -191,8 +191,8 @@ function restoreSingleFile(
           `Path '${filePath}' is not in the index`,
           ErrorCode.FILE_NOT_STAGED,
           [
-            `tsgit restore --source HEAD ${filePath}    # Restore from HEAD`,
-            `tsgit status    # Check file status`,
+            `wit restore --source HEAD ${filePath}    # Restore from HEAD`,
+            `wit status    # Check file status`,
           ]
         );
       }
@@ -274,7 +274,7 @@ export function handleRestore(args: string[]): void {
 
   if (paths.length === 0) {
     console.error('Error: File path(s) required');
-    console.error('\nUsage: tsgit restore [options] <pathspec>...');
+    console.error('\nUsage: wit restore [options] <pathspec>...');
     console.error('\nOptions:');
     console.error('  -s, --source <ref>  Restore from specific commit/ref');
     console.error('  -S, --staged        Restore staged content (unstage)');
@@ -282,9 +282,9 @@ export function handleRestore(args: string[]): void {
     console.error('  --theirs            Use theirs version during merge');
     console.error('  --ours              Use ours version during merge');
     console.error('\nExamples:');
-    console.error('  tsgit restore file.txt           # Restore from index');
-    console.error('  tsgit restore --staged file.txt  # Unstage file');
-    console.error('  tsgit restore --source HEAD~1 .  # Restore all from previous commit');
+    console.error('  wit restore file.txt           # Restore from index');
+    console.error('  wit restore --staged file.txt  # Unstage file');
+    console.error('  wit restore --source HEAD~1 .  # Restore all from previous commit');
     process.exit(1);
   }
 

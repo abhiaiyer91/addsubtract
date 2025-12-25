@@ -9,7 +9,7 @@ import { Repository } from '../../core/repository.js';
 import { SearchEngine } from '../../ui/search.js';
 
 export const searchTool = createTool({
-  id: 'tsgit-search',
+  id: 'wit-search',
   description: 'Search the repository for commits, files, and content matching a query. Use this to find specific code, commits by message, or files by name.',
   inputSchema: z.object({
     query: z.string().describe('Search query string'),

@@ -29,7 +29,7 @@ import { parseRefAdvertisement, serializeCapabilities } from './refs-discovery';
 export class SmartHttpClient {
   private baseUrl: string;
   private credentials?: Credentials;
-  private userAgent: string = 'tsgit/2.0';
+  private userAgent: string = 'wit/2.0';
 
   constructor(baseUrl: string, credentials?: Credentials) {
     // Normalize URL

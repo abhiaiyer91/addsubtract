@@ -1,7 +1,7 @@
 /**
  * Hooks System
  * 
- * Provides Git-like hooks for customizing tsgit behavior.
+ * Provides Git-like hooks for customizing wit behavior.
  * 
  * Hook Types:
  * - pre-commit: Before commit is created (can abort)
@@ -14,8 +14,8 @@
  * - pre-receive: Before receiving a push
  * 
  * Hooks can be:
- * 1. Shell scripts in .tsgit/hooks/
- * 2. TypeScript/JavaScript files in .tsgit/hooks/
+ * 1. Shell scripts in .wit/hooks/
+ * 2. TypeScript/JavaScript files in .wit/hooks/
  * 3. Programmatic hooks registered via the API
  */
 
@@ -282,7 +282,7 @@ export class HookManager {
     mkdirp(this.hooksDir);
     
     // Create a hooks README
-    const readme = `# tsgit Hooks
+    const readme = `# wit Hooks
 
 Place hook scripts in this directory. Hooks must be executable.
 
@@ -529,16 +529,16 @@ To enable a sample hook:
       const env: Record<string, string> = {
         ...process.env as Record<string, string>,
         ...context.env,
-        TSGIT_DIR: context.gitDir,
-        TSGIT_WORK_DIR: context.workDir,
-        TSGIT_HOOK_TYPE: context.hookType,
+        WIT_DIR: context.gitDir,
+        WIT_WORK_DIR: context.workDir,
+        WIT_HOOK_TYPE: context.hookType,
       };
 
       if (context.commitHash) {
-        env.TSGIT_COMMIT = context.commitHash;
+        env.WIT_COMMIT = context.commitHash;
       }
       if (context.branch) {
-        env.TSGIT_BRANCH = context.branch;
+        env.WIT_BRANCH = context.branch;
       }
 
       // Determine how to execute the hook
@@ -715,7 +715,7 @@ export function handleHooks(args: string[]): void {
       
       if (hooks.length === 0) {
         console.log(colors.dim('No hooks installed'));
-        console.log(colors.dim('Use "tsgit hooks install <hook-type>" to install a hook'));
+        console.log(colors.dim('Use "wit hooks install <hook-type>" to install a hook'));
         return;
       }
 
@@ -846,13 +846,13 @@ export function handleHooks(args: string[]): void {
     default:
       console.error(colors.red('error: ') + `Unknown subcommand: ${subcommand}`);
       console.error('\nUsage:');
-      console.error('  tsgit hooks                       List installed hooks');
-      console.error('  tsgit hooks init                  Initialize hooks directory');
-      console.error('  tsgit hooks install <type>        Install a hook from template');
-      console.error('  tsgit hooks remove <type>         Remove a hook');
-      console.error('  tsgit hooks show <type>           Show hook content');
-      console.error('  tsgit hooks template <type>       Show hook template');
-      console.error('  tsgit hooks run <type> [args...]  Run a hook manually');
+      console.error('  wit hooks                       List installed hooks');
+      console.error('  wit hooks init                  Initialize hooks directory');
+      console.error('  wit hooks install <type>        Install a hook from template');
+      console.error('  wit hooks remove <type>         Remove a hook');
+      console.error('  wit hooks show <type>           Show hook content');
+      console.error('  wit hooks template <type>       Show hook template');
+      console.error('  wit hooks run <type> [args...]  Run a hook manually');
       process.exit(1);
   }
 }

@@ -1,5 +1,5 @@
 /**
- * Interactive Blame View for tsgit
+ * Interactive Blame View for wit
  * Shows line-by-line commit information with rich visualizations
  */
 

@@ -1,5 +1,5 @@
 /**
- * AI Commands for tsgit
+ * AI Commands for wit
  * 
  * Provides AI-powered features including:
  * - Natural language commands
@@ -47,7 +47,7 @@ function formatDiffOutput(file: string, diffLines: DiffLine[], contextLines: num
 }
 
 /**
- * Handle the main `tsgit ai` command for natural language interaction
+ * Handle the main `wit ai` command for natural language interaction
  */
 export async function handleAI(args: string[]): Promise<void> {
   if (args.length === 0) {
@@ -67,8 +67,8 @@ export async function handleAI(args: string[]): Promise<void> {
   if (!isAIAvailable()) {
     console.error('AI features require an API key.');
     console.error('Set OPENAI_API_KEY or ANTHROPIC_API_KEY environment variable.');
-    console.error('\nAlternatively, set TSGIT_AI_MODEL to use a different provider.');
-    console.error('\nRun "tsgit ai status" to see current configuration.');
+    console.error('\nAlternatively, set WIT_AI_MODEL to use a different provider.');
+    console.error('\nRun "wit ai status" to see current configuration.');
     process.exit(1);
   }
 
@@ -103,13 +103,13 @@ async function handleChat(args: string[]): Promise<void> {
   
   if (!query) {
     console.error('Please provide a question or command.');
-    console.error('Example: tsgit ai "what files have I changed?"');
+    console.error('Example: wit ai "what files have I changed?"');
     process.exit(1);
   }
 
   const agent = getTsgitAgent();
   
-  console.log('\n🤖 tsgit AI\n');
+  console.log('\n🤖 wit AI\n');
   
   try {
     const result = await agent.stream(query);
@@ -152,7 +152,7 @@ async function handleAICommit(args: string[]): Promise<void> {
   
   if (stagedFiles.length === 0) {
     console.error('No changes staged for commit.');
-    console.error('Use "tsgit add <files>" to stage files first, or use "tsgit ai commit -a" to stage all.');
+    console.error('Use "wit add <files>" to stage files first, or use "wit ai commit -a" to stage all.');
     process.exit(1);
   }
   
@@ -226,9 +226,9 @@ ${diffContent}`;
       console.log(`\n✅ [${branch} ${shortHash}] ${message.split('\n')[0]}`);
     } else {
       console.log('\nTo use this message, run:');
-      console.log(`  tsgit commit -m "${message.split('\n')[0]}"`);
+      console.log(`  wit commit -m "${message.split('\n')[0]}"`);
       console.log('\nOr add --execute (-x) to commit directly:');
-      console.log('  tsgit ai commit -x');
+      console.log('  wit ai commit -x');
     }
   } catch (error) {
     console.error('Error generating commit message:', error instanceof Error ? error.message : 'Unknown error');
@@ -388,7 +388,7 @@ async function handleResolve(args: string[]): Promise<void> {
   
   if (unresolvedConflicts.length === 0) {
     console.log('All conflicts have been resolved.');
-    console.log('Run "tsgit merge --continue" to complete the merge.');
+    console.log('Run "wit merge --continue" to complete the merge.');
     return;
   }
   
@@ -456,7 +456,7 @@ If you can provide a merged resolution, output it in a code block labeled "RESOL
 function printAIStatus(): void {
   const info = getAIInfo();
   
-  console.log('\n🤖 tsgit AI Status\n');
+  console.log('\n🤖 wit AI Status\n');
   console.log(`Available: ${info.available ? '✅ Yes' : '❌ No'}`);
   console.log(`Model: ${info.model}`);
   console.log(`Provider: ${info.provider}`);
@@ -465,13 +465,13 @@ function printAIStatus(): void {
     console.log('\nTo enable AI features, set one of:');
     console.log('  export OPENAI_API_KEY=sk-...');
     console.log('  export ANTHROPIC_API_KEY=sk-ant-...');
-    console.log('  export TSGIT_AI_MODEL=provider/model');
+    console.log('  export WIT_AI_MODEL=provider/model');
   }
   
   console.log('\nEnvironment Variables:');
   console.log(`  OPENAI_API_KEY: ${process.env.OPENAI_API_KEY ? '✅ Set' : '❌ Not set'}`);
   console.log(`  ANTHROPIC_API_KEY: ${process.env.ANTHROPIC_API_KEY ? '✅ Set' : '❌ Not set'}`);
-  console.log(`  TSGIT_AI_MODEL: ${process.env.TSGIT_AI_MODEL || '(not set, using default)'}`);
+  console.log(`  WIT_AI_MODEL: ${process.env.WIT_AI_MODEL || '(not set, using default)'}`);
 }
 
 /**
@@ -479,17 +479,17 @@ function printAIStatus(): void {
  */
 function printAIHelp(): void {
   console.log(`
-tsgit ai - AI-powered git assistant
+wit ai - AI-powered git assistant
 
-Usage: tsgit ai <command> [options]
+Usage: wit ai <command> [options]
 
 Commands:
-  tsgit ai <query>              Ask a question or give a natural language command
-  tsgit ai commit [-a] [-x]     Generate a commit message from staged changes
-  tsgit ai review [--staged]    Review code changes
-  tsgit ai explain [ref]        Explain a commit
-  tsgit ai resolve [file]       Help resolve merge conflicts
-  tsgit ai status               Show AI configuration status
+  wit ai <query>              Ask a question or give a natural language command
+  wit ai commit [-a] [-x]     Generate a commit message from staged changes
+  wit ai review [--staged]    Review code changes
+  wit ai explain [ref]        Explain a commit
+  wit ai resolve [file]       Help resolve merge conflicts
+  wit ai status               Show AI configuration status
 
 Options:
   -a, --all        Stage all tracked files before commit message generation
@@ -497,17 +497,17 @@ Options:
   --staged         Review only staged changes
 
 Examples:
-  tsgit ai "what files have changed?"
-  tsgit ai "show me the last 5 commits"
-  tsgit ai "create a branch for the login feature"
-  tsgit ai commit -a -x
-  tsgit ai review --staged
-  tsgit ai resolve src/utils.ts
+  wit ai "what files have changed?"
+  wit ai "show me the last 5 commits"
+  wit ai "create a branch for the login feature"
+  wit ai commit -a -x
+  wit ai review --staged
+  wit ai resolve src/utils.ts
 
 Environment:
   OPENAI_API_KEY       OpenAI API key (for GPT models)
   ANTHROPIC_API_KEY    Anthropic API key (for Claude models)
-  TSGIT_AI_MODEL       Model to use (default: openai/gpt-4o)
+  WIT_AI_MODEL       Model to use (default: openai/gpt-4o)
 `);
 }
 

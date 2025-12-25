@@ -3,13 +3,13 @@
  * List references in a local repository
  * 
  * Usage:
- * - tsgit show-ref                    # List all refs with hashes
- * - tsgit show-ref --heads            # Only branches
- * - tsgit show-ref --tags             # Only tags
- * - tsgit show-ref <ref>              # Check if ref exists (exit 0/1)
- * - tsgit show-ref --verify <ref>     # Verify ref exists
- * - tsgit show-ref --hash             # Show only hashes
- * - tsgit show-ref -q                 # Quiet, useful for scripting
+ * - wit show-ref                    # List all refs with hashes
+ * - wit show-ref --heads            # Only branches
+ * - wit show-ref --tags             # Only tags
+ * - wit show-ref <ref>              # Check if ref exists (exit 0/1)
+ * - wit show-ref --verify <ref>     # Verify ref exists
+ * - wit show-ref --hash             # Show only hashes
+ * - wit show-ref -q                 # Quiet, useful for scripting
  * 
  * This is a plumbing command for scripting and advanced usage.
  */

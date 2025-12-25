@@ -9,15 +9,15 @@
  * - Running long processes without blocking other work
  * 
  * Commands:
- * - tsgit worktree add <path> <branch>  Create new worktree
- * - tsgit worktree list                 List all worktrees
- * - tsgit worktree remove <path>        Remove a worktree
- * - tsgit worktree prune                Prune stale worktree entries
- * - tsgit worktree lock <path>          Lock a worktree from being pruned
- * - tsgit worktree unlock <path>        Unlock a worktree
- * - tsgit worktree move <path> <new>    Move a worktree
+ * - wit worktree add <path> <branch>  Create new worktree
+ * - wit worktree list                 List all worktrees
+ * - wit worktree remove <path>        Remove a worktree
+ * - wit worktree prune                Prune stale worktree entries
+ * - wit worktree lock <path>          Lock a worktree from being pruned
+ * - wit worktree unlock <path>        Unlock a worktree
+ * - wit worktree move <path> <new>    Move a worktree
  * 
- * Worktree data is stored in .tsgit/worktrees/
+ * Worktree data is stored in .wit/worktrees/
  */
 
 import * as path from 'path';
@@ -39,7 +39,7 @@ export interface WorktreeInfo {
 }
 
 /**
- * Worktree entry stored in .tsgit/worktrees/<name>/
+ * Worktree entry stored in .wit/worktrees/<name>/
  */
 interface WorktreeEntry {
   gitdir: string;  // Path to the worktree's gitdir
@@ -267,7 +267,7 @@ export class WorktreeManager {
     mkdirp(entryDir);
 
     // Create .git file in worktree pointing to entry
-    const worktreeGitFile = path.join(fullPath, '.tsgit');
+    const worktreeGitFile = path.join(fullPath, '.wit');
     writeFile(worktreeGitFile, `gitdir: ${entryDir}\n`);
 
     // Create gitdir file pointing back
@@ -439,7 +439,7 @@ export class WorktreeManager {
       throw new TsgitError(
         `'${worktreePath}' is not a worktree`,
         ErrorCode.OPERATION_FAILED,
-        ['tsgit worktree list    # List worktrees']
+        ['wit worktree list    # List worktrees']
       );
     }
 
@@ -455,7 +455,7 @@ export class WorktreeManager {
         `Worktree '${worktreePath}' is locked: ${worktree.lockReason || 'no reason given'}`,
         ErrorCode.OPERATION_FAILED,
         [
-          'tsgit worktree unlock <path>    # Unlock the worktree',
+          'wit worktree unlock <path>    # Unlock the worktree',
           'Use --force to remove anyway'
         ]
       );
@@ -464,7 +464,7 @@ export class WorktreeManager {
     // Check for changes (unless force)
     if (!options.force && exists(fullPath)) {
       // Simple check: look for modified files
-      const gitFile = path.join(fullPath, '.tsgit');
+      const gitFile = path.join(fullPath, '.wit');
       if (exists(gitFile)) {
         const content = readFileText(gitFile).trim();
         if (content.startsWith('gitdir:')) {
@@ -474,7 +474,7 @@ export class WorktreeManager {
           // We could check for modifications here, but for simplicity
           // we'll just warn if there are any files
           const entries = readDir(fullPath);
-          const hasFiles = entries.some(e => e !== '.tsgit');
+          const hasFiles = entries.some(e => e !== '.wit');
           
           if (hasFiles) {
             // Just a warning for now
@@ -642,7 +642,7 @@ export class WorktreeManager {
       throw new TsgitError(
         `Worktree '${oldPath}' is locked`,
         ErrorCode.OPERATION_FAILED,
-        ['tsgit worktree unlock <path>    # Unlock first']
+        ['wit worktree unlock <path>    # Unlock first']
       );
     }
 
@@ -668,7 +668,7 @@ export class WorktreeManager {
     }
 
     // Update gitdir path
-    const worktreeGitFile = path.join(newFullPath, '.tsgit');
+    const worktreeGitFile = path.join(newFullPath, '.wit');
     writeFile(worktreeGitFile, `gitdir: ${newEntryDir}\n`);
 
     // Update gitdir reference
@@ -743,7 +743,7 @@ export function handleWorktree(args: string[]): void {
         
         if (!targetPath) {
           console.error(colors.red('error: ') + 'Please specify a path');
-          console.error('\nUsage: tsgit worktree add <path> <branch|commit>');
+          console.error('\nUsage: wit worktree add <path> <branch|commit>');
           process.exit(1);
         }
 
@@ -855,7 +855,7 @@ export function handleWorktree(args: string[]): void {
         
         if (!oldPath || !newPath) {
           console.error(colors.red('error: ') + 'Please specify both old and new paths');
-          console.error('\nUsage: tsgit worktree move <old-path> <new-path>');
+          console.error('\nUsage: wit worktree move <old-path> <new-path>');
           process.exit(1);
         }
 
@@ -867,14 +867,14 @@ export function handleWorktree(args: string[]): void {
       default:
         console.error(colors.red('error: ') + `Unknown subcommand: ${subcommand}`);
         console.error('\nUsage:');
-        console.error('  tsgit worktree                     List worktrees');
-        console.error('  tsgit worktree add <path> <branch> Create new worktree');
-        console.error('  tsgit worktree add <path> -b <new> Create with new branch');
-        console.error('  tsgit worktree remove <path>       Remove worktree');
-        console.error('  tsgit worktree prune               Prune stale entries');
-        console.error('  tsgit worktree lock <path>         Lock worktree');
-        console.error('  tsgit worktree unlock <path>       Unlock worktree');
-        console.error('  tsgit worktree move <old> <new>    Move worktree');
+        console.error('  wit worktree                     List worktrees');
+        console.error('  wit worktree add <path> <branch> Create new worktree');
+        console.error('  wit worktree add <path> -b <new> Create with new branch');
+        console.error('  wit worktree remove <path>       Remove worktree');
+        console.error('  wit worktree prune               Prune stale entries');
+        console.error('  wit worktree lock <path>         Lock worktree');
+        console.error('  wit worktree unlock <path>       Unlock worktree');
+        console.error('  wit worktree move <old> <new>    Move worktree');
         process.exit(1);
     }
   } catch (error) {

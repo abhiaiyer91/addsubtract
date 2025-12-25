@@ -9,8 +9,8 @@ import { Repository } from '../../core/repository.js';
 import { Journal } from '../../core/journal.js';
 
 export const undoTool = createTool({
-  id: 'tsgit-undo',
-  description: 'Undo the last operation(s) in the repository. tsgit maintains a journal of all operations that can be undone. Use this to revert mistakes.',
+  id: 'wit-undo',
+  description: 'Undo the last operation(s) in the repository. wit maintains a journal of all operations that can be undone. Use this to revert mistakes.',
   inputSchema: z.object({
     steps: z.number().optional().default(1).describe('Number of operations to undo'),
     dryRun: z.boolean().optional().describe('If true, only show what would be undone without actually undoing'),

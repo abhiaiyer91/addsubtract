@@ -91,7 +91,7 @@ export class SnapshotManager {
         const relativePath = path.relative(this.workDir, fullPath);
         
         if (entry.isDirectory()) {
-          if (['node_modules', '.tsgit', '.git'].includes(entry.name)) continue;
+          if (['node_modules', '.wit', '.git'].includes(entry.name)) continue;
           walkDir(fullPath);
         } else if (entry.isFile()) {
           try {
@@ -149,7 +149,7 @@ export class SnapshotManager {
       throw new TsgitError(
         `Snapshot not found: ${id}`,
         ErrorCode.OBJECT_NOT_FOUND,
-        ['tsgit snapshot list    # Show available snapshots']
+        ['wit snapshot list    # Show available snapshots']
       );
     }
     
@@ -204,7 +204,7 @@ export class SnapshotManager {
       throw new TsgitError(
         `Snapshot not found: ${id}`,
         ErrorCode.OBJECT_NOT_FOUND,
-        ['tsgit snapshot list    # Show available snapshots']
+        ['wit snapshot list    # Show available snapshots']
       );
     }
     
@@ -252,7 +252,7 @@ export function handleSnapshot(args: string[]): void {
         console.log(colors.green('✓') + ` Created snapshot: ${colors.cyan(snapshot.name || snapshot.id)}`);
         console.log(colors.dim(`  ID: ${snapshot.id}`));
         console.log(colors.dim(`  Files: ${snapshot.files.size}`));
-        console.log(colors.dim(`  Restore with: tsgit snapshot restore ${snapshot.id}`));
+        console.log(colors.dim(`  Restore with: wit snapshot restore ${snapshot.id}`));
         break;
       }
       
@@ -261,7 +261,7 @@ export function handleSnapshot(args: string[]): void {
         const id = args[1];
         if (!id) {
           console.error(colors.red('error: ') + 'Snapshot ID required');
-          console.error(colors.dim('Usage: tsgit snapshot restore <id>'));
+          console.error(colors.dim('Usage: wit snapshot restore <id>'));
           process.exit(1);
         }
         
@@ -283,7 +283,7 @@ export function handleSnapshot(args: string[]): void {
         
         if (snapshots.length === 0) {
           console.log(colors.dim('No snapshots yet'));
-          console.log(colors.dim('  tsgit snapshot create [name]    # Create one'));
+          console.log(colors.dim('  wit snapshot create [name]    # Create one'));
           return;
         }
         
@@ -333,10 +333,10 @@ export function handleSnapshot(args: string[]): void {
         console.error(colors.red('error: ') + `Unknown subcommand: ${subcommand}`);
         console.log();
         console.log('Usage:');
-        console.log('  tsgit snapshot create [name]   Create a snapshot');
-        console.log('  tsgit snapshot list            List all snapshots');
-        console.log('  tsgit snapshot restore <id>    Restore a snapshot');
-        console.log('  tsgit snapshot delete <id>     Delete a snapshot');
+        console.log('  wit snapshot create [name]   Create a snapshot');
+        console.log('  wit snapshot list            List all snapshots');
+        console.log('  wit snapshot restore <id>    Restore a snapshot');
+        console.log('  wit snapshot delete <id>     Delete a snapshot');
         process.exit(1);
     }
   } catch (error) {

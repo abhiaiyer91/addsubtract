@@ -3,14 +3,14 @@
  * Update remote refs along with associated objects
  * 
  * Usage:
- *   tsgit push                      # Push current branch to origin
- *   tsgit push <remote>             # Push to specific remote
- *   tsgit push <remote> <branch>    # Push specific branch
- *   tsgit push -u <remote> <branch> # Push and set upstream
- *   tsgit push --force              # Force push
- *   tsgit push --force-with-lease   # Safe force push
- *   tsgit push --tags               # Push all tags
- *   tsgit push --delete <branch>    # Delete remote branch
+ *   wit push                      # Push current branch to origin
+ *   wit push <remote>             # Push to specific remote
+ *   wit push <remote> <branch>    # Push specific branch
+ *   wit push -u <remote> <branch> # Push and set upstream
+ *   wit push --force              # Force push
+ *   wit push --force-with-lease   # Safe force push
+ *   wit push --tags               # Push all tags
+ *   wit push --delete <branch>    # Delete remote branch
  */
 
 import * as path from 'path';
@@ -108,7 +108,7 @@ function pushToLocal(
   };
 
   // Get destination repository
-  const destGitDir = path.join(remoteUrl, '.tsgit');
+  const destGitDir = path.join(remoteUrl, '.wit');
 
   if (!exists(destGitDir)) {
     throw new TsgitError(
@@ -338,7 +338,7 @@ function pushTags(
     return results;
   }
 
-  const destGitDir = path.join(remoteUrl, '.tsgit');
+  const destGitDir = path.join(remoteUrl, '.wit');
   const destRepo = new Repository(remoteUrl);
 
   const localTags = repo.refs.listTags();
@@ -391,8 +391,8 @@ export function push(
       'You are not currently on a branch',
       ErrorCode.DETACHED_HEAD,
       [
-        'tsgit checkout <branch>    # Switch to a branch first',
-        'tsgit push origin <branch> # Or specify a branch to push',
+        'wit checkout <branch>    # Switch to a branch first',
+        'wit push origin <branch> # Or specify a branch to push',
       ]
     );
   }
@@ -406,8 +406,8 @@ export function push(
       `No such remote: '${remote}'`,
       ErrorCode.REF_NOT_FOUND,
       [
-        'tsgit remote add origin <url>    # Add origin remote',
-        'tsgit remote -v                  # List configured remotes',
+        'wit remote add origin <url>    # Add origin remote',
+        'wit remote -v                  # List configured remotes',
       ]
     );
   }
@@ -427,7 +427,7 @@ export function push(
       throw new TsgitError(
         'You must specify a branch to delete',
         ErrorCode.INVALID_ARGUMENT,
-        ['tsgit push --delete origin <branch>']
+        ['wit push --delete origin <branch>']
       );
     }
     refs.push({ local: branchName, remote: branchName });
@@ -508,7 +508,7 @@ function formatPushResults(result: PushResult, verbose: boolean): void {
     console.log(colors.red('error: ') + 'failed to push some refs');
     console.log(colors.dim('hint: Updates were rejected because the tip of your current branch is behind'));
     console.log(colors.dim('hint: its remote counterpart. Integrate the remote changes (e.g.'));
-    console.log(colors.dim('hint: \'tsgit pull ...\') before pushing again.'));
+    console.log(colors.dim('hint: \'wit pull ...\') before pushing again.'));
   }
 }
 

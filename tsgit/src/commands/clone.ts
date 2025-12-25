@@ -3,10 +3,10 @@
  * Clone a repository
  * 
  * Usage:
- *   tsgit clone <url> [<dir>]       # Clone repository
- *   tsgit clone --depth <n> <url>   # Shallow clone
- *   tsgit clone --branch <b> <url>  # Clone specific branch
- *   tsgit clone --bare <url>        # Bare clone
+ *   wit clone <url> [<dir>]       # Clone repository
+ *   wit clone --depth <n> <url>   # Shallow clone
+ *   wit clone --branch <b> <url>  # Clone specific branch
+ *   wit clone --bare <url>        # Bare clone
  */
 
 import * as path from 'path';
@@ -84,7 +84,7 @@ export function parseRepoUrl(url: string): { protocol: string; host: string; pat
  */
 function cloneLocal(sourcePath: string, destPath: string, options: CloneOptions): Repository {
   // Verify source exists
-  const sourceGitDir = path.join(sourcePath, '.tsgit');
+  const sourceGitDir = path.join(sourcePath, '.wit');
   if (!exists(sourceGitDir)) {
     throw new TsgitError(
       `repository '${sourcePath}' does not exist`,
@@ -247,7 +247,7 @@ export function clone(url: string, directory?: string, options: CloneOptions = {
         ErrorCode.OPERATION_FAILED,
         [
           `rm -rf ${destPath}    # Remove existing directory`,
-          `tsgit clone ${url} ${destPath}-new    # Use a different name`,
+          `wit clone ${url} ${destPath}-new    # Use a different name`,
         ]
       );
     }
@@ -322,7 +322,7 @@ export function handleClone(args: string[]): void {
   if (positional.length === 0) {
     console.error(colors.red('error: ') + 'You must specify a repository to clone.');
     console.error('\nUsage:');
-    console.error('  tsgit clone <repository> [<directory>]');
+    console.error('  wit clone <repository> [<directory>]');
     console.error('\nOptions:');
     console.error('  --bare           Create a bare repository');
     console.error('  --depth <n>      Create a shallow clone with n commits');

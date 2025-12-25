@@ -3,11 +3,11 @@
  * Download objects and refs from remote repositories
  * 
  * Usage:
- *   tsgit fetch                     # Fetch from origin
- *   tsgit fetch <remote>            # Fetch from specific remote
- *   tsgit fetch --all               # Fetch from all remotes
- *   tsgit fetch --prune             # Delete stale remote refs
- *   tsgit fetch <remote> <refspec>  # Fetch specific ref
+ *   wit fetch                     # Fetch from origin
+ *   wit fetch <remote>            # Fetch from specific remote
+ *   wit fetch --all               # Fetch from all remotes
+ *   wit fetch --prune             # Delete stale remote refs
+ *   wit fetch <remote> <refspec>  # Fetch specific ref
  */
 
 import * as path from 'path';
@@ -85,7 +85,7 @@ function fetchFromLocal(
 
   // Get source repository
   const sourcePath = remote.url;
-  const sourceGitDir = path.join(sourcePath, '.tsgit');
+  const sourceGitDir = path.join(sourcePath, '.wit');
   
   if (!exists(sourceGitDir)) {
     throw new TsgitError(
@@ -295,7 +295,7 @@ export function fetch(
       throw new TsgitError(
         'No remotes configured',
         ErrorCode.REF_NOT_FOUND,
-        ['tsgit remote add <name> <url>    # Add a remote first']
+        ['wit remote add <name> <url>    # Add a remote first']
       );
     }
   } else {
@@ -309,7 +309,7 @@ export function fetch(
         ErrorCode.REF_NOT_FOUND,
         available.length > 0 
           ? [`Available remotes: ${available.join(', ')}`]
-          : ['tsgit remote add origin <url>    # Add origin remote']
+          : ['wit remote add origin <url>    # Add origin remote']
       );
     }
     

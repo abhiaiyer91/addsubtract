@@ -3,11 +3,11 @@
  * Create commits that undo the changes from previous commits
  * 
  * Usage:
- *   tsgit revert <commit>           Revert a single commit
- *   tsgit revert <c1> <c2>          Revert multiple commits
- *   tsgit revert --no-commit <c>    Revert without committing
- *   tsgit revert --continue         Continue after conflict resolution
- *   tsgit revert --abort            Abort the operation
+ *   wit revert <commit>           Revert a single commit
+ *   wit revert <c1> <c2>          Revert multiple commits
+ *   wit revert --no-commit <c>    Revert without committing
+ *   wit revert --continue         Continue after conflict resolution
+ *   wit revert --abort            Abort the operation
  */
 
 import * as path from 'path';
@@ -121,8 +121,8 @@ export class RevertManager {
         'A revert is already in progress',
         ErrorCode.OPERATION_FAILED,
         [
-          'tsgit revert --continue    # Continue after resolving conflicts',
-          'tsgit revert --abort        # Abort the revert',
+          'wit revert --continue    # Continue after resolving conflicts',
+          'wit revert --abort        # Abort the revert',
         ]
       );
     }
@@ -135,7 +135,7 @@ export class RevertManager {
         throw new TsgitError(
           `bad revision '${ref}'`,
           ErrorCode.REF_NOT_FOUND,
-          ['tsgit log    # View existing commits']
+          ['wit log    # View existing commits']
         );
       }
       commits.push(hash);
@@ -145,7 +145,7 @@ export class RevertManager {
       throw new TsgitError(
         'No commits specified',
         ErrorCode.INVALID_ARGUMENT,
-        ['tsgit revert <commit>    # Specify a commit to revert']
+        ['wit revert <commit>    # Specify a commit to revert']
       );
     }
 
@@ -157,9 +157,9 @@ export class RevertManager {
           'You have uncommitted changes',
           ErrorCode.UNCOMMITTED_CHANGES,
           [
-            'tsgit stash              # Stash your changes',
-            'tsgit commit -m "WIP"    # Commit your changes first',
-            'tsgit revert -n <commit> # Revert without committing',
+            'wit stash              # Stash your changes',
+            'wit commit -m "WIP"    # Commit your changes first',
+            'wit revert -n <commit> # Revert without committing',
           ]
         );
       }
@@ -229,8 +229,8 @@ export class RevertManager {
           `Commit ${commitHash.slice(0, 8)} is a merge commit. Use -m to specify the parent.`,
           ErrorCode.INVALID_ARGUMENT,
           [
-            'tsgit revert -m 1 <commit>    # Use first parent',
-            'tsgit revert -m 2 <commit>    # Use second parent',
+            'wit revert -m 1 <commit>    # Use first parent',
+            'wit revert -m 2 <commit>    # Use second parent',
           ]
         );
       }
@@ -678,8 +678,8 @@ This reverts commit ${state.currentCommit}.`;
    * Get default author info
    */
   private getDefaultAuthor(): Author {
-    const name = process.env.TSGIT_AUTHOR_NAME || process.env.GIT_AUTHOR_NAME || 'Anonymous';
-    const email = process.env.TSGIT_AUTHOR_EMAIL || process.env.GIT_AUTHOR_EMAIL || 'anonymous@example.com';
+    const name = process.env.WIT_AUTHOR_NAME || process.env.GIT_AUTHOR_NAME || 'Anonymous';
+    const email = process.env.WIT_AUTHOR_EMAIL || process.env.GIT_AUTHOR_EMAIL || 'anonymous@example.com';
 
     return {
       name,
@@ -753,7 +753,7 @@ export function handleRevert(args: string[]): void {
             }
           }
           console.error('\nResolve conflicts and run:');
-          console.error('  tsgit revert --continue');
+          console.error('  wit revert --continue');
           process.exit(1);
         }
         break;
@@ -783,7 +783,7 @@ export function handleRevert(args: string[]): void {
       default: {
         if (commits.length === 0) {
           console.error('error: No commit specified');
-          console.error('\nUsage: tsgit revert [options] <commit>...');
+          console.error('\nUsage: wit revert [options] <commit>...');
           console.error('\nOptions:');
           console.error('  --continue           Continue after conflict resolution');
           console.error('  --abort              Abort the operation');
@@ -792,9 +792,9 @@ export function handleRevert(args: string[]): void {
           console.error('  -m, --mainline <n>   Parent number for merge commits');
           console.error('  -s, --signoff        Add signed-off-by line');
           console.error('\nExamples:');
-          console.error('  tsgit revert abc123              # Revert commit abc123');
-          console.error('  tsgit revert -n abc123           # Revert without committing');
-          console.error('  tsgit revert -m 1 <merge>        # Revert merge using first parent');
+          console.error('  wit revert abc123              # Revert commit abc123');
+          console.error('  wit revert -n abc123           # Revert without committing');
+          console.error('  wit revert -m 1 <merge>        # Revert merge using first parent');
           process.exit(1);
         }
 
@@ -802,7 +802,7 @@ export function handleRevert(args: string[]): void {
         if (result.success) {
           if (options.noCommit) {
             console.log(colors.green('✓') + ' Changes applied to working directory');
-            console.log(colors.dim('  Use `tsgit commit` to commit the reverted changes'));
+            console.log(colors.dim('  Use `wit commit` to commit the reverted changes'));
           } else {
             console.log(colors.green('✓') + ` Revert completed: ${result.commits.length} commit(s) created`);
             for (const hash of result.commits) {
@@ -818,9 +818,9 @@ export function handleRevert(args: string[]): void {
             }
           }
           console.error('\nResolve conflicts and run:');
-          console.error('  tsgit revert --continue');
+          console.error('  wit revert --continue');
           console.error('\nOr abort with:');
-          console.error('  tsgit revert --abort');
+          console.error('  wit revert --abort');
           process.exit(1);
         }
         break;

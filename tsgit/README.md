@@ -1,51 +1,51 @@
-# tsgit
+# wit
 
 A modern Git implementation in TypeScript that fixes Git's most frustrating problems.
 
-## Why tsgit?
+## Why wit?
 
-Git is powerful but has well-known issues. tsgit addresses them:
+Git is powerful but has well-known issues. wit addresses them:
 
-| Problem | Git | tsgit |
+| Problem | Git | wit |
 |---------|-----|-------|
 | Security | SHA-1 (broken) | SHA-256 default |
 | Large files | Needs LFS | Built-in chunking |
-| Undo mistakes | Reflog is cryptic | Simple `tsgit undo` |
+| Undo mistakes | Reflog is cryptic | Simple `wit undo` |
 | Branch switching | Loses uncommitted work | Auto-stash per branch |
 | Merge conflicts | Inline markers | Structured JSON |
 | Confusing commands | `checkout` does 5 things | Dedicated `switch`/`restore` |
 | Error messages | Cryptic | Helpful with suggestions |
 | Visual interface | External tools needed | Built-in TUI & Web UI |
-| Quick saves | No built-in solution | `tsgit wip` auto-message |
-| Fixing commits | `git commit --amend` verbose | Simple `tsgit amend` |
-| Branch cleanup | Manual process | `tsgit cleanup` |
-| Repository stats | External tools | Built-in `tsgit stats` |
+| Quick saves | No built-in solution | `wit wip` auto-message |
+| Fixing commits | `git commit --amend` verbose | Simple `wit amend` |
+| Branch cleanup | Manual process | `wit cleanup` |
+| Repository stats | External tools | Built-in `wit stats` |
 
 ## Installation
 
 ```bash
-cd tsgit
+cd wit
 npm install
 npm run build
-npm link   # Makes 'tsgit' available globally
+npm link   # Makes 'wit' available globally
 ```
 
 ## Quick Start
 
 ```bash
 # Initialize a new repository
-tsgit init
+wit init
 
 # Add files and commit
-tsgit add .
-tsgit commit -m "Initial commit"
+wit add .
+wit commit -m "Initial commit"
 
 # Or commit directly (skip staging)
-tsgit commit -a -m "Update everything"
+wit commit -a -m "Update everything"
 
 # Launch visual interface
-tsgit web   # Opens web UI at http://localhost:3847
-tsgit ui    # Terminal UI
+wit web   # Opens web UI at http://localhost:3847
+wit ui    # Terminal UI
 ```
 
 ## Commands
@@ -53,138 +53,138 @@ tsgit ui    # Terminal UI
 ### Basic Workflow
 
 ```bash
-tsgit init [path]           # Create new repository
-tsgit add <files...>        # Stage files
-tsgit add .                 # Stage all
-tsgit commit -m "message"   # Commit staged changes
-tsgit commit -a -m "msg"    # Stage tracked + commit
-tsgit status                # Show status
-tsgit log                   # Show history
-tsgit log --oneline         # Compact history
-tsgit diff                  # Show unstaged changes
-tsgit diff --staged         # Show staged changes
+wit init [path]           # Create new repository
+wit add <files...>        # Stage files
+wit add .                 # Stage all
+wit commit -m "message"   # Commit staged changes
+wit commit -a -m "msg"    # Stage tracked + commit
+wit status                # Show status
+wit log                   # Show history
+wit log --oneline         # Compact history
+wit diff                  # Show unstaged changes
+wit diff --staged         # Show staged changes
 ```
 
 ### Branches
 
 ```bash
-tsgit branch                # List branches
-tsgit branch feature        # Create branch
-tsgit branch -d feature     # Delete branch
-tsgit switch main           # Switch to branch
-tsgit switch -c feature     # Create and switch
-tsgit checkout feature      # Switch (git-compatible)
+wit branch                # List branches
+wit branch feature        # Create branch
+wit branch -d feature     # Delete branch
+wit switch main           # Switch to branch
+wit switch -c feature     # Create and switch
+wit checkout feature      # Switch (git-compatible)
 ```
 
 ### Undo & History
 
 ```bash
-tsgit undo                  # Undo last operation
-tsgit undo --steps 3        # Undo last 3 operations
-tsgit history               # Show operation history
-tsgit restore file.ts       # Restore file from index
-tsgit restore --staged file # Unstage file
-tsgit uncommit              # Undo commit, keep changes staged
-tsgit uncommit 2            # Undo last 2 commits
+wit undo                  # Undo last operation
+wit undo --steps 3        # Undo last 3 operations
+wit history               # Show operation history
+wit restore file.ts       # Restore file from index
+wit restore --staged file # Unstage file
+wit uncommit              # Undo commit, keep changes staged
+wit uncommit 2            # Undo last 2 commits
 ```
 
 ### Quality of Life Commands
 
 ```bash
 # Quick saves
-tsgit wip                   # WIP commit with auto-generated message
-tsgit wip -a                # Stage all tracked files + WIP commit
-tsgit wip -a "fixing bug"   # WIP with custom suffix
+wit wip                   # WIP commit with auto-generated message
+wit wip -a                # Stage all tracked files + WIP commit
+wit wip -a "fixing bug"   # WIP with custom suffix
 
 # Fix last commit
-tsgit amend -m "New message"  # Change commit message
-tsgit amend                   # Add staged changes to last commit
-tsgit amend -a                # Stage all + amend
+wit amend -m "New message"  # Change commit message
+wit amend                   # Add staged changes to last commit
+wit amend -a                # Stage all + amend
 
 # Fixup commits (for later squashing)
-tsgit fixup HEAD~2          # Create fixup for 2 commits ago
-tsgit fixup -l              # List recent commits
+wit fixup HEAD~2          # Create fixup for 2 commits ago
+wit fixup -l              # List recent commits
 
 # Quick checkpoints
-tsgit snapshot create       # Save current state
-tsgit snapshot list         # List all snapshots
-tsgit snapshot restore <id> # Restore a snapshot
+wit snapshot create       # Save current state
+wit snapshot list         # List all snapshots
+wit snapshot restore <id> # Restore a snapshot
 
 # Branch cleanup
-tsgit cleanup               # Find merged/stale branches
-tsgit cleanup --dry-run     # Preview what would be deleted
-tsgit cleanup --force       # Delete without confirmation
+wit cleanup               # Find merged/stale branches
+wit cleanup --dry-run     # Preview what would be deleted
+wit cleanup --force       # Delete without confirmation
 
 # Repository insights
-tsgit stats                 # Show repository statistics
-tsgit stats --all           # Detailed statistics
-tsgit blame file.ts         # Show who changed each line
+wit stats                 # Show repository statistics
+wit stats --all           # Detailed statistics
+wit blame file.ts         # Show who changed each line
 ```
 
 ### Merge
 
 ```bash
-tsgit merge feature         # Merge branch
-tsgit merge --conflicts     # Show conflicts
-tsgit merge --resolve file  # Mark as resolved
-tsgit merge --continue      # Complete merge
-tsgit merge --abort         # Abort merge
+wit merge feature         # Merge branch
+wit merge --conflicts     # Show conflicts
+wit merge --resolve file  # Mark as resolved
+wit merge --continue      # Complete merge
+wit merge --abort         # Abort merge
 ```
 
 ### Visual Interface
 
 ```bash
-tsgit ui                    # Terminal UI
-tsgit web                   # Web UI (http://localhost:3847)
-tsgit web --port 8080       # Custom port
-tsgit graph                 # ASCII commit graph
+wit ui                    # Terminal UI
+wit web                   # Web UI (http://localhost:3847)
+wit web --port 8080       # Custom port
+wit graph                 # ASCII commit graph
 ```
 
 ### Advanced Features
 
 ```bash
 # Hooks - customize behavior at key points
-tsgit hooks                       # List installed hooks
-tsgit hooks install pre-commit    # Install a hook from template
-tsgit hooks remove pre-commit     # Remove a hook
-tsgit hooks run pre-commit        # Test a hook manually
+wit hooks                       # List installed hooks
+wit hooks install pre-commit    # Install a hook from template
+wit hooks remove pre-commit     # Remove a hook
+wit hooks run pre-commit        # Test a hook manually
 
 # Submodules - nested repositories
-tsgit submodule add <url> <path>  # Add a submodule
-tsgit submodule init              # Initialize submodules
-tsgit submodule update            # Update submodules
-tsgit submodule status            # Show submodule status
-tsgit submodule foreach <cmd>     # Run command in each
+wit submodule add <url> <path>  # Add a submodule
+wit submodule init              # Initialize submodules
+wit submodule update            # Update submodules
+wit submodule status            # Show submodule status
+wit submodule foreach <cmd>     # Run command in each
 
 # Worktrees - multiple working directories
-tsgit worktree add <path> <branch>  # Create new worktree
-tsgit worktree list                 # List all worktrees
-tsgit worktree remove <path>        # Remove a worktree
-tsgit worktree prune                # Prune stale entries
+wit worktree add <path> <branch>  # Create new worktree
+wit worktree list                 # List all worktrees
+wit worktree remove <path>        # Remove a worktree
+wit worktree prune                # Prune stale entries
 
 # Reflog - reference history
-tsgit reflog                    # Show HEAD reflog
-tsgit reflog <ref>              # Show reflog for specific ref
-tsgit reflog expire             # Prune old entries
+wit reflog                    # Show HEAD reflog
+wit reflog <ref>              # Show reflog for specific ref
+wit reflog expire             # Prune old entries
 
 # Garbage Collection
-tsgit gc                        # Run garbage collection
-tsgit gc --aggressive           # More aggressive optimization
-tsgit gc --prune=now            # Prune immediately
+wit gc                        # Run garbage collection
+wit gc --aggressive           # More aggressive optimization
+wit gc --prune=now            # Prune immediately
 ```
 
 ### Monorepo Scopes
 
 ```bash
-tsgit scope                 # Show current scope
-tsgit scope set src/        # Limit to src/
-tsgit scope use frontend    # Use preset (frontend/backend/docs)
-tsgit scope clear           # Full repository
+wit scope                 # Show current scope
+wit scope set src/        # Limit to src/
+wit scope use frontend    # Use preset (frontend/backend/docs)
+wit scope clear           # Full repository
 ```
 
 ## Visual Interfaces
 
-### Web UI (`tsgit web`)
+### Web UI (`wit web`)
 
 Modern dashboard with:
 - **Commit graph** - Visual branch history
@@ -194,7 +194,7 @@ Modern dashboard with:
 - **One-click staging** - Stage files instantly
 - **Keyboard shortcuts** - Ctrl+P search, R refresh
 
-### Terminal UI (`tsgit ui`)
+### Terminal UI (`wit ui`)
 
 Interactive terminal interface:
 - Navigate with arrow keys
@@ -203,7 +203,7 @@ Interactive terminal interface:
 - `s` to switch branches
 - `Tab` between panels
 
-### Terminal Graph (`tsgit graph`)
+### Terminal Graph (`wit graph`)
 
 ```
 ● a1b2c3d4 (main) Latest commit - Alice, today
@@ -213,13 +213,13 @@ Interactive terminal interface:
 
 ## Configuration
 
-Repository config is stored in `.tsgit/config`:
+Repository config is stored in `.wit/config`:
 
 ```ini
 [core]
     repositoryformatversion = 1
     filemode = true
-[tsgit]
+[wit]
     hashAlgorithm = sha256
     largeFileThreshold = 2097152
     autoStashOnSwitch = true
@@ -228,7 +228,7 @@ Repository config is stored in `.tsgit/config`:
 ## Programmatic Usage
 
 ```typescript
-import { Repository } from 'tsgit';
+import { Repository } from 'wit';
 
 // Initialize
 const repo = Repository.init('/path/to/project');
@@ -241,7 +241,7 @@ const hash = repo.commit('Add file');
 repo.journal.popEntry();
 
 // Search
-import { SearchEngine } from 'tsgit';
+import { SearchEngine } from 'wit';
 const search = new SearchEngine(repo);
 const results = search.search('TODO');
 ```
@@ -249,7 +249,7 @@ const results = search.search('TODO');
 ## Directory Structure
 
 ```
-.tsgit/
+.wit/
 ├── HEAD              # Current branch reference
 ├── config            # Repository configuration
 ├── index             # Staging area (JSON)
@@ -277,16 +277,16 @@ const results = search.search('TODO');
 ### What's Better
 
 - **SHA-256** - Secure by default (Git still uses SHA-1)
-- **Undo anything** - `tsgit undo` reverts any operation
+- **Undo anything** - `wit undo` reverts any operation
 - **Auto-stash** - Never lose work when switching branches
 - **Built-in UI** - No external tools needed
 - **Clear commands** - `switch` for branches, `restore` for files
 - **Better errors** - Suggestions for typos and mistakes
 - **Large files** - Chunked storage without LFS
-- **Quick saves** - `tsgit wip` for instant WIP commits
-- **Easy amend** - `tsgit amend` is simpler than `git commit --amend`
-- **Branch cleanup** - `tsgit cleanup` finds and removes stale branches
-- **Statistics** - `tsgit stats` shows repo insights
+- **Quick saves** - `wit wip` for instant WIP commits
+- **Easy amend** - `wit amend` is simpler than `git commit --amend`
+- **Branch cleanup** - `wit cleanup` finds and removes stale branches
+- **Statistics** - `wit stats` shows repo insights
 - **Snapshots** - Quick checkpoints without full commits
 - **Smart blame** - Color-coded, with relative dates
 - **Hooks** - Full hook system (pre-commit, post-commit, etc.)
@@ -307,25 +307,25 @@ const results = search.search('TODO');
 
 ```bash
 # Committed to wrong branch?
-tsgit undo                  # Undo the commit
-tsgit switch correct-branch
-tsgit commit -m "Same message"
+wit undo                  # Undo the commit
+wit switch correct-branch
+wit commit -m "Same message"
 ```
 
 ### Quick Context Switch
 
 ```bash
 # Working on feature, need to fix bug
-tsgit switch main           # Auto-saves your work
+wit switch main           # Auto-saves your work
 # ... fix bug ...
-tsgit commit -a -m "Fix bug"
-tsgit switch feature        # Auto-restores your work
+wit commit -a -m "Fix bug"
+wit switch feature        # Auto-restores your work
 ```
 
 ### Search Repository
 
 ```bash
-tsgit web                   # Open web UI
+wit web                   # Open web UI
 # Press Ctrl+P, type "TODO"
 # See all commits, files, and code containing "TODO"
 ```
@@ -333,63 +333,63 @@ tsgit web                   # Open web UI
 ### Work on Monorepo Subset
 
 ```bash
-tsgit scope use frontend    # Only frontend/
-tsgit status                # Shows only frontend files
-tsgit add .                 # Adds only frontend files
-tsgit scope clear           # Back to full repo
+wit scope use frontend    # Only frontend/
+wit status                # Shows only frontend files
+wit add .                 # Adds only frontend files
+wit scope clear           # Back to full repo
 ```
 
 ### Quick WIP Workflow
 
 ```bash
 # You're working and need to switch branches quickly
-tsgit wip -a                # Quick save everything
-tsgit switch other-branch   # Work on something else
+wit wip -a                # Quick save everything
+wit switch other-branch   # Work on something else
 # ... do other work ...
-tsgit switch -              # Go back
-tsgit uncommit              # Restore your WIP state
+wit switch -              # Go back
+wit uncommit              # Restore your WIP state
 ```
 
 ### Fix a Typo in Last Commit
 
 ```bash
 # Made a typo in commit message?
-tsgit amend -m "Fixed: correct message"
+wit amend -m "Fixed: correct message"
 
 # Forgot to add a file?
-tsgit add forgotten-file.ts
-tsgit amend
+wit add forgotten-file.ts
+wit amend
 ```
 
 ### Clean Up Old Branches
 
 ```bash
 # See what branches can be cleaned
-tsgit cleanup --dry-run
+wit cleanup --dry-run
 
 # Clean up with confirmation
-tsgit cleanup
+wit cleanup
 
 # Clean up branches older than 60 days
-tsgit cleanup --days 60 --stale
+wit cleanup --days 60 --stale
 ```
 
 ### Create Checkpoints
 
 ```bash
 # Before doing something risky
-tsgit snapshot create "before refactor"
+wit snapshot create "before refactor"
 
 # Do risky work...
 
 # Something went wrong? Restore!
-tsgit snapshot restore "before refactor"
+wit snapshot restore "before refactor"
 ```
 
 ### View Repository Stats
 
 ```bash
-tsgit stats
+wit stats
 # Shows:
 #   - Total commits, files, lines
 #   - Top contributors
@@ -401,33 +401,33 @@ tsgit stats
 
 ```bash
 # Create a worktree for feature development
-tsgit worktree add ../feature-worktree feature-branch
+wit worktree add ../feature-worktree feature-branch
 
 # Now you can work on both branches at once
 # Main worktree stays on main, feature worktree on feature-branch
 
 # Clean up when done
-tsgit worktree remove ../feature-worktree
+wit worktree remove ../feature-worktree
 ```
 
 ### Set Up Pre-commit Hooks
 
 ```bash
 # Install a pre-commit hook
-tsgit hooks install pre-commit
+wit hooks install pre-commit
 
 # Edit the hook to run your linter
-# The hook is at .tsgit/hooks/pre-commit
+# The hook is at .wit/hooks/pre-commit
 
 # Test it manually
-tsgit hooks run pre-commit
+wit hooks run pre-commit
 ```
 
 ### Recover from Mistakes with Reflog
 
 ```bash
 # See your reference history
-tsgit reflog
+wit reflog
 
 # Reference any previous state
 # The reflog shows HEAD@{0}, HEAD@{1}, etc.

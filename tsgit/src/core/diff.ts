@@ -183,17 +183,17 @@ export function formatUnifiedDiff(fileDiff: FileDiff): string {
   const lines: string[] = [];
 
   if (fileDiff.isNew) {
-    lines.push(`diff --tsgit a/${fileDiff.newPath} b/${fileDiff.newPath}`);
+    lines.push(`diff --wit a/${fileDiff.newPath} b/${fileDiff.newPath}`);
     lines.push('new file mode 100644');
     lines.push(`--- /dev/null`);
     lines.push(`+++ b/${fileDiff.newPath}`);
   } else if (fileDiff.isDeleted) {
-    lines.push(`diff --tsgit a/${fileDiff.oldPath} b/${fileDiff.oldPath}`);
+    lines.push(`diff --wit a/${fileDiff.oldPath} b/${fileDiff.oldPath}`);
     lines.push('deleted file mode 100644');
     lines.push(`--- a/${fileDiff.oldPath}`);
     lines.push(`+++ /dev/null`);
   } else {
-    lines.push(`diff --tsgit a/${fileDiff.oldPath} b/${fileDiff.newPath}`);
+    lines.push(`diff --wit a/${fileDiff.oldPath} b/${fileDiff.newPath}`);
     lines.push(`--- a/${fileDiff.oldPath}`);
     lines.push(`+++ b/${fileDiff.newPath}`);
   }
@@ -256,7 +256,7 @@ export const colors = {
 export function formatColoredDiff(fileDiff: FileDiff): string {
   const lines: string[] = [];
 
-  lines.push(colors.bold(`diff --tsgit a/${fileDiff.oldPath} b/${fileDiff.newPath}`));
+  lines.push(colors.bold(`diff --wit a/${fileDiff.oldPath} b/${fileDiff.newPath}`));
   
   if (fileDiff.isNew) {
     lines.push(colors.yellow('new file mode 100644'));

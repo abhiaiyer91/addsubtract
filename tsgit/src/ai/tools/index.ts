@@ -1,5 +1,5 @@
 /**
- * tsgit AI Tools
+ * wit AI Tools
  * 
  * These tools provide the AI agent with capabilities to interact with the git repository.
  */
@@ -29,9 +29,9 @@ import { undoTool } from './undo.js';
 import { searchTool } from './search.js';
 
 /**
- * All tsgit tools bundled together for easy registration with an agent
+ * All wit tools bundled together for easy registration with an agent
  */
-export const tsgitTools = {
+export const witTools = {
   getStatus: getStatusTool,
   getDiff: getDiffTool,
   stageFiles: stageFilesTool,

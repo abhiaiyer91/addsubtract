@@ -87,7 +87,7 @@ export function showConflicts(): void {
   const unresolved = mergeManager.getUnresolvedConflicts();
   
   if (unresolved.length === 0) {
-    console.log('All conflicts resolved. Run `tsgit merge --continue` to complete.');
+    console.log('All conflicts resolved. Run `wit merge --continue` to complete.');
     return;
   }
 
@@ -117,7 +117,7 @@ export function resolveFile(filePath: string): void {
 
     const remaining = mergeManager.getUnresolvedConflicts();
     if (remaining.length === 0) {
-      console.log('\nAll conflicts resolved. Run `tsgit merge --continue` to complete.');
+      console.log('\nAll conflicts resolved. Run `wit merge --continue` to complete.');
     } else {
       console.log(`\n${remaining.length} conflict(s) remaining`);
     }
@@ -187,7 +187,7 @@ export function handleMerge(args: string[]): void {
     default:
       if (!branchName) {
         console.error('error: Branch name required');
-        console.error('\nUsage: tsgit merge [options] <branch>');
+        console.error('\nUsage: wit merge [options] <branch>');
         console.error('\nOptions:');
         console.error('  --abort           Abort the current merge');
         console.error('  --continue        Continue after resolving conflicts');

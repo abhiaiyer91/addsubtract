@@ -1,5 +1,5 @@
 /**
- * tsgit User Interface
+ * wit User Interface
  * Best-in-class UI components for git visualization
  */
 

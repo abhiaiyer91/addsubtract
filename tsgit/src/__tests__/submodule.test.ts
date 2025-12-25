@@ -46,13 +46,13 @@ describe('submodule', () => {
         expect(submodules).toEqual([]);
       });
 
-      it('should read submodules from .tsgitmodules', () => {
-        // Create a .tsgitmodules file
+      it('should read submodules from .witmodules', () => {
+        // Create a .witmodules file
         const modulesContent = `[submodule "lib"]
 \tpath = lib
 \turl = https://github.com/example/lib.git
 `;
-        fs.writeFileSync(path.join(testDir!, '.tsgitmodules'), modulesContent);
+        fs.writeFileSync(path.join(testDir!, '.witmodules'), modulesContent);
         
         const submodules = manager.list();
         expect(submodules.length).toBe(1);
@@ -82,7 +82,7 @@ describe('submodule', () => {
 \tpath = lib/two
 \turl = https://github.com/example/two.git
 `;
-        fs.writeFileSync(path.join(testDir!, '.tsgitmodules'), modulesContent);
+        fs.writeFileSync(path.join(testDir!, '.witmodules'), modulesContent);
         
         const submodules = manager.list();
         expect(submodules.length).toBe(2);
@@ -100,7 +100,7 @@ describe('submodule', () => {
 \tpath = lib
 \turl = https://github.com/example/lib.git
 `;
-        fs.writeFileSync(path.join(testDir!, '.tsgitmodules'), modulesContent);
+        fs.writeFileSync(path.join(testDir!, '.witmodules'), modulesContent);
         
         const status = manager.status();
         expect(status.length).toBe(1);
@@ -112,7 +112,7 @@ describe('submodule', () => {
 \tpath = vendor/mylib
 \turl = https://github.com/example/mylib.git
 `;
-        fs.writeFileSync(path.join(testDir!, '.tsgitmodules'), modulesContent);
+        fs.writeFileSync(path.join(testDir!, '.witmodules'), modulesContent);
         
         const status = manager.status();
         expect(status[0].name).toBe('mylib');
@@ -126,7 +126,7 @@ describe('submodule', () => {
 \tpath = lib
 \turl = https://github.com/example/lib.git
 `;
-        fs.writeFileSync(path.join(testDir!, '.tsgitmodules'), modulesContent);
+        fs.writeFileSync(path.join(testDir!, '.witmodules'), modulesContent);
         
         // Create the submodule directory
         fs.mkdirSync(path.join(testDir!, 'lib'), { recursive: true });
@@ -144,7 +144,7 @@ describe('submodule', () => {
 \tpath = lib2
 \turl = https://github.com/example/lib2.git
 `;
-        fs.writeFileSync(path.join(testDir!, '.tsgitmodules'), modulesContent);
+        fs.writeFileSync(path.join(testDir!, '.witmodules'), modulesContent);
         fs.mkdirSync(path.join(testDir!, 'lib1'), { recursive: true });
         fs.mkdirSync(path.join(testDir!, 'lib2'), { recursive: true });
         
@@ -159,7 +159,7 @@ describe('submodule', () => {
 \tpath = lib
 \turl = https://github.com/example/lib.git
 `;
-        fs.writeFileSync(path.join(testDir!, '.tsgitmodules'), modulesContent);
+        fs.writeFileSync(path.join(testDir!, '.witmodules'), modulesContent);
         fs.mkdirSync(path.join(testDir!, 'lib'), { recursive: true });
         
         manager.init();
@@ -183,14 +183,14 @@ describe('submodule', () => {
 \tpath = lib
 \turl = https://github.com/example/lib.git
 `;
-        fs.writeFileSync(path.join(testDir!, '.tsgitmodules'), modulesContent);
+        fs.writeFileSync(path.join(testDir!, '.witmodules'), modulesContent);
         fs.mkdirSync(path.join(testDir!, 'lib'), { recursive: true });
         
         manager.init();
         manager.remove('lib');
         
         // After removal, the submodule should no longer be in the list
-        // (or the .tsgitmodules should be updated)
+        // (or the .witmodules should be updated)
         expect(true).toBe(true);
       });
     });
@@ -201,7 +201,7 @@ describe('submodule', () => {
 \tpath = lib
 \turl = https://github.com/new/lib.git
 `;
-        fs.writeFileSync(path.join(testDir!, '.tsgitmodules'), modulesContent);
+        fs.writeFileSync(path.join(testDir!, '.witmodules'), modulesContent);
         
         // sync should not throw
         const synced = manager.sync();
@@ -213,7 +213,7 @@ describe('submodule', () => {
 \tpath = lib
 \turl = https://github.com/example/lib.git
 `;
-        fs.writeFileSync(path.join(testDir!, '.tsgitmodules'), modulesContent);
+        fs.writeFileSync(path.join(testDir!, '.witmodules'), modulesContent);
         
         const synced = manager.sync(['lib']);
         expect(Array.isArray(synced)).toBe(true);

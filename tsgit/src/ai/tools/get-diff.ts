@@ -42,7 +42,7 @@ function formatDiffOutput(file: string, diffLines: DiffLine[], contextLines: num
 }
 
 export const getDiffTool = createTool({
-  id: 'tsgit-get-diff',
+  id: 'wit-get-diff',
   description: 'Get the diff showing what has changed. Can show staged changes, unstaged changes, or changes for specific files. Use this to understand exactly what code has been modified.',
   inputSchema: z.object({
     staged: z.boolean().optional().describe('If true, show only staged changes. If false or not specified, show unstaged changes.'),

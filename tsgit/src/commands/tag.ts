@@ -3,12 +3,12 @@
  * Create, list, and delete tags
  * 
  * Usage:
- * - tsgit tag                    # List all tags
- * - tsgit tag v1.0.0             # Create lightweight tag
- * - tsgit tag -a v1.0.0 -m "msg" # Create annotated tag
- * - tsgit tag -d v1.0.0          # Delete tag
- * - tsgit tag -l "v1.*"          # List tags matching pattern
- * - tsgit tag -v v1.0.0          # Show tag details
+ * - wit tag                    # List all tags
+ * - wit tag v1.0.0             # Create lightweight tag
+ * - wit tag -a v1.0.0 -m "msg" # Create annotated tag
+ * - wit tag -d v1.0.0          # Delete tag
+ * - wit tag -l "v1.*"          # List tags matching pattern
+ * - wit tag -v v1.0.0          # Show tag details
  */
 
 import * as path from 'path';
@@ -60,8 +60,8 @@ export function createLightweightTag(repo: Repository, name: string, ref?: strin
         `Tag '${name}' already exists`,
         ErrorCode.OPERATION_FAILED,
         [
-          `tsgit tag -d ${name}    # Delete existing tag first`,
-          `tsgit tag -f ${name}    # Force overwrite`
+          `wit tag -d ${name}    # Delete existing tag first`,
+          `wit tag -f ${name}    # Force overwrite`
         ]
       );
     }
@@ -103,8 +103,8 @@ export function createAnnotatedTag(
       `Tag '${name}' already exists`,
       ErrorCode.OPERATION_FAILED,
       [
-        `tsgit tag -d ${name}    # Delete existing tag first`,
-        `tsgit tag -f ${name}    # Force overwrite`
+        `wit tag -d ${name}    # Delete existing tag first`,
+        `wit tag -f ${name}    # Force overwrite`
       ]
     );
   }
@@ -120,8 +120,8 @@ export function createAnnotatedTag(
 
   // Create tagger info
   const tagger: Author = {
-    name: process.env.TSGIT_AUTHOR_NAME || process.env.GIT_AUTHOR_NAME || 'Anonymous',
-    email: process.env.TSGIT_AUTHOR_EMAIL || process.env.GIT_AUTHOR_EMAIL || 'anonymous@example.com',
+    name: process.env.WIT_AUTHOR_NAME || process.env.GIT_AUTHOR_NAME || 'Anonymous',
+    email: process.env.WIT_AUTHOR_EMAIL || process.env.GIT_AUTHOR_EMAIL || 'anonymous@example.com',
     timestamp: Math.floor(Date.now() / 1000),
     timezone: getTimezone(),
   };
@@ -147,7 +147,7 @@ export function deleteTag(repo: Repository, name: string): void {
     throw new TsgitError(
       `Tag '${name}' not found`,
       ErrorCode.REF_NOT_FOUND,
-      ['tsgit tag    # List available tags']
+      ['wit tag    # List available tags']
     );
   }
 
@@ -188,7 +188,7 @@ export function getTagInfo(repo: Repository, name: string): {
     throw new TsgitError(
       `Tag '${name}' not found`,
       ErrorCode.REF_NOT_FOUND,
-      ['tsgit tag    # List available tags']
+      ['wit tag    # List available tags']
     );
   }
 
@@ -275,7 +275,7 @@ export function handleTag(args: string[]): void {
         throw new TsgitError(
           'No tag name specified',
           ErrorCode.OPERATION_FAILED,
-          ['tsgit tag -d <tagname>']
+          ['wit tag -d <tagname>']
         );
       }
 
@@ -292,7 +292,7 @@ export function handleTag(args: string[]): void {
         throw new TsgitError(
           'No tag name specified',
           ErrorCode.OPERATION_FAILED,
-          ['tsgit tag -v <tagname>']
+          ['wit tag -v <tagname>']
         );
       }
 
@@ -339,7 +339,7 @@ export function handleTag(args: string[]): void {
         throw new TsgitError(
           'Annotated tag requires a message',
           ErrorCode.OPERATION_FAILED,
-          ['tsgit tag -a <tagname> -m "message"']
+          ['wit tag -a <tagname> -m "message"']
         );
       }
 

@@ -2,15 +2,15 @@
  * Stash Command
  * Save and restore working directory changes
  * 
- * Unlike Git's cryptic stash, tsgit provides clear stash management:
- * - tsgit stash              # Save changes with auto-message
- * - tsgit stash save "msg"   # Save with custom message
- * - tsgit stash list         # List all stashes
- * - tsgit stash pop          # Apply and remove latest stash
- * - tsgit stash apply [n]    # Apply stash without removing
- * - tsgit stash drop [n]     # Remove a stash
- * - tsgit stash clear        # Remove all stashes
- * - tsgit stash show [n]     # Show stash contents
+ * Unlike Git's cryptic stash, wit provides clear stash management:
+ * - wit stash              # Save changes with auto-message
+ * - wit stash save "msg"   # Save with custom message
+ * - wit stash list         # List all stashes
+ * - wit stash pop          # Apply and remove latest stash
+ * - wit stash apply [n]    # Apply stash without removing
+ * - wit stash drop [n]     # Remove a stash
+ * - wit stash clear        # Remove all stashes
+ * - wit stash show [n]     # Show stash contents
  */
 
 import * as path from 'path';
@@ -130,7 +130,7 @@ export class StashManager {
 
     // Collect files
     const files: StashFile[] = [];
-    const excludeDirs = ['.tsgit/', 'node_modules/', '.git/'];
+    const excludeDirs = ['.wit/', 'node_modules/', '.git/'];
     const allFiles = walkDir(this.repo.workDir, excludeDirs);
 
     for (const filePath of allFiles) {
@@ -225,7 +225,7 @@ export class StashManager {
     this.flattenTree(commit.treeHash, '', treeFiles);
 
     // Get current working files
-    const excludeDirs = ['.tsgit/', 'node_modules/', '.git/'];
+    const excludeDirs = ['.wit/', 'node_modules/', '.git/'];
     const workFiles = walkDir(this.repo.workDir, excludeDirs);
 
     // Delete files not in tree
@@ -299,7 +299,7 @@ export class StashManager {
       throw new TsgitError(
         `stash@{${index}} does not exist`,
         ErrorCode.OPERATION_FAILED,
-        ['tsgit stash list    # List available stashes']
+        ['wit stash list    # List available stashes']
       );
     }
 
@@ -355,7 +355,7 @@ export class StashManager {
       throw new TsgitError(
         `stash@{${index}} does not exist`,
         ErrorCode.OPERATION_FAILED,
-        ['tsgit stash list    # List available stashes']
+        ['wit stash list    # List available stashes']
       );
     }
 
@@ -390,7 +390,7 @@ export class StashManager {
       throw new TsgitError(
         `stash@{${index}} does not exist`,
         ErrorCode.OPERATION_FAILED,
-        ['tsgit stash list    # List available stashes']
+        ['wit stash list    # List available stashes']
       );
     }
 
@@ -438,7 +438,7 @@ export function handleStash(args: string[]): void {
     switch (subcommand) {
       case 'save':
       case 'push': {
-        // tsgit stash [save] [-m "message"] or tsgit stash "message"
+        // wit stash [save] [-m "message"] or wit stash "message"
         let message: string | undefined;
         
         for (let i = 1; i < args.length; i++) {
@@ -494,7 +494,7 @@ export function handleStash(args: string[]): void {
         
         console.log(colors.green('✓') + ` Applied stash@{${index}}`);
         console.log(colors.dim(`  ${entry.message}`));
-        console.log(colors.cyan('\nStash kept. Use "tsgit stash drop" to remove it.'));
+        console.log(colors.cyan('\nStash kept. Use "wit stash drop" to remove it.'));
         break;
       }
 
@@ -531,13 +531,13 @@ export function handleStash(args: string[]): void {
         } else {
           console.error(colors.red('error: ') + `Unknown stash subcommand: ${subcommand}`);
           console.error('\nUsage:');
-          console.error('  tsgit stash [save] [-m "msg"]  Save changes to stash');
-          console.error('  tsgit stash list               List all stashes');
-          console.error('  tsgit stash show [n]           Show stash contents');
-          console.error('  tsgit stash apply [n]          Apply stash');
-          console.error('  tsgit stash pop [n]            Apply and remove stash');
-          console.error('  tsgit stash drop [n]           Remove stash');
-          console.error('  tsgit stash clear              Remove all stashes');
+          console.error('  wit stash [save] [-m "msg"]  Save changes to stash');
+          console.error('  wit stash list               List all stashes');
+          console.error('  wit stash show [n]           Show stash contents');
+          console.error('  wit stash apply [n]          Apply stash');
+          console.error('  wit stash pop [n]            Apply and remove stash');
+          console.error('  wit stash drop [n]           Remove stash');
+          console.error('  wit stash clear              Remove all stashes');
           process.exit(1);
         }
       }

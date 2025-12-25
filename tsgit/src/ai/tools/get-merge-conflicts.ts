@@ -9,7 +9,7 @@ import { Repository } from '../../core/repository.js';
 import { MergeManager } from '../../core/merge.js';
 
 export const getMergeConflictsTool = createTool({
-  id: 'tsgit-get-merge-conflicts',
+  id: 'wit-get-merge-conflicts',
   description: 'Get information about current merge conflicts, including the conflicting files and the specific conflict regions. Use this to understand what needs to be resolved.',
   inputSchema: z.object({}),
   outputSchema: z.object({

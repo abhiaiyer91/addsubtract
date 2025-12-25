@@ -1,5 +1,5 @@
 /**
- * Comprehensive Keyboard Navigation System for tsgit
+ * Comprehensive Keyboard Navigation System for wit
  * Full keyboard support with customizable shortcuts
  */
 
@@ -315,7 +315,7 @@ export class KeyboardManager {
 }
 
 /**
- * Default tsgit shortcuts
+ * Default wit shortcuts
  */
 export function getDefaultShortcuts(callbacks: {
   onCommandPalette?: () => void;

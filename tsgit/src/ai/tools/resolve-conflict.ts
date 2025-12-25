@@ -11,7 +11,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 export const resolveConflictTool = createTool({
-  id: 'tsgit-resolve-conflict',
+  id: 'wit-resolve-conflict',
   description: 'Resolve a merge conflict by providing the resolved content for a file. After resolving all conflicts, the merge can be completed.',
   inputSchema: z.object({
     file: z.string().describe('Path to the file with the conflict'),

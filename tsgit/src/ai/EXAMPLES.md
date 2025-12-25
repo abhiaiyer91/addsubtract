@@ -1,6 +1,6 @@
-# tsgit AI Examples
+# wit AI Examples
 
-This guide shows how to use tsgit's AI-powered features using `@mastra/core`.
+This guide shows how to use wit's AI-powered features using `@mastra/core`.
 
 ## Setup
 
@@ -14,13 +14,13 @@ export OPENAI_API_KEY=sk-your-key-here
 export ANTHROPIC_API_KEY=sk-ant-your-key-here
 
 # Optional: Use a different model
-export TSGIT_AI_MODEL=anthropic/claude-sonnet-4-20250514
+export WIT_AI_MODEL=anthropic/claude-sonnet-4-20250514
 ```
 
 Check your configuration:
 
 ```bash
-tsgit ai status
+wit ai status
 ```
 
 ---
@@ -31,21 +31,21 @@ Ask questions or give commands in plain English:
 
 ```bash
 # Check status
-tsgit ai "what files have I changed?"
-tsgit ai "show me unstaged changes"
+wit ai "what files have I changed?"
+wit ai "show me unstaged changes"
 
 # View history
-tsgit ai "show me the last 5 commits"
-tsgit ai "what did I commit yesterday?"
+wit ai "show me the last 5 commits"
+wit ai "what did I commit yesterday?"
 
 # Branch operations
-tsgit ai "what branch am I on?"
-tsgit ai "list all branches"
-tsgit ai "switch to the main branch"
+wit ai "what branch am I on?"
+wit ai "list all branches"
+wit ai "switch to the main branch"
 
 # Search
-tsgit ai "find commits mentioning 'login'"
-tsgit ai "search for files containing 'TODO'"
+wit ai "find commits mentioning 'login'"
+wit ai "search for files containing 'TODO'"
 ```
 
 ---
@@ -56,10 +56,10 @@ Generate meaningful commit messages based on your changes:
 
 ```bash
 # First, stage your changes
-tsgit add .
+wit add .
 
 # Generate a commit message
-tsgit ai commit
+wit ai commit
 
 # Output:
 # 📝 Suggested commit message:
@@ -76,13 +76,13 @@ tsgit ai commit
 
 ```bash
 # Stage all tracked files AND generate message
-tsgit ai commit -a
+wit ai commit -a
 
 # Generate AND execute the commit
-tsgit ai commit -x
+wit ai commit -x
 
 # Stage all, generate, and commit in one command
-tsgit ai commit -a -x
+wit ai commit -a -x
 ```
 
 ---
@@ -93,10 +93,10 @@ Get AI feedback on your changes:
 
 ```bash
 # Review all changes (staged + unstaged)
-tsgit ai review
+wit ai review
 
 # Review only staged changes
-tsgit ai review --staged
+wit ai review --staged
 ```
 
 Example output:
@@ -131,11 +131,11 @@ Understand what a commit does:
 
 ```bash
 # Explain the latest commit
-tsgit ai explain
+wit ai explain
 
 # Explain a specific commit
-tsgit ai explain HEAD~3
-tsgit ai explain abc1234
+wit ai explain HEAD~3
+wit ai explain abc1234
 ```
 
 Example output:
@@ -167,13 +167,13 @@ Get help resolving merge conflicts:
 
 ```bash
 # Start a merge
-tsgit merge feature-branch
+wit merge feature-branch
 
 # If there are conflicts, ask for help
-tsgit ai resolve
+wit ai resolve
 
 # Or resolve a specific file
-tsgit ai resolve src/config.ts
+wit ai resolve src/config.ts
 ```
 
 Example output:
@@ -220,17 +220,17 @@ Would you like me to apply this resolution?
 
 ## 6. Undo with AI Help
 
-Use tsgit's undo feature with AI guidance:
+Use wit's undo feature with AI guidance:
 
 ```bash
 # See what can be undone
-tsgit ai "what operations can I undo?"
+wit ai "what operations can I undo?"
 
 # Preview undo
-tsgit ai "show me what undo would do"
+wit ai "show me what undo would do"
 
 # Actually undo
-tsgit undo
+wit undo
 ```
 
 ---
@@ -240,7 +240,7 @@ tsgit undo
 You can also use the AI features programmatically:
 
 ```typescript
-import { getTsgitAgent, createTsgitMastra } from 'tsgit/ai';
+import { getTsgitAgent, createTsgitMastra } from 'wit/ai';
 
 // Create a Mastra instance
 const mastra = createTsgitMastra({
@@ -265,21 +265,21 @@ for await (const chunk of stream.textStream) {
 ### Using Individual Tools
 
 ```typescript
-import { tsgitTools } from 'tsgit/ai';
+import { witTools } from 'wit/ai';
 
 // Get repository status
-const status = await tsgitTools.getStatus.execute({ path: '.' });
+const status = await witTools.getStatus.execute({ path: '.' });
 console.log('Modified files:', status.modified);
 
 // Get diff
-const diff = await tsgitTools.getDiff.execute({ 
+const diff = await witTools.getDiff.execute({ 
   staged: true,
   contextLines: 5 
 });
 console.log(diff.summary);
 
 // Create a commit
-const commit = await tsgitTools.createCommit.execute({
+const commit = await witTools.createCommit.execute({
   message: 'feat: add new feature',
   all: true,
 });
@@ -302,7 +302,7 @@ console.log('Committed:', commit.shortHash);
    - Stage related changes together
    - Don't mix unrelated changes in one commit
 
-5. **Code review**: Run `tsgit ai review` before pushing to catch issues early
+5. **Code review**: Run `wit ai review` before pushing to catch issues early
 
 ---
 
@@ -312,7 +312,7 @@ console.log('Committed:', commit.shortHash);
 |----------|-------------|---------|
 | `OPENAI_API_KEY` | OpenAI API key for GPT models | - |
 | `ANTHROPIC_API_KEY` | Anthropic API key for Claude models | - |
-| `TSGIT_AI_MODEL` | Model to use | `openai/gpt-4o` |
+| `WIT_AI_MODEL` | Model to use | `openai/gpt-4o` |
 
 ---
 
@@ -328,10 +328,10 @@ Example:
 
 ```bash
 # Use Claude
-export TSGIT_AI_MODEL=anthropic/claude-sonnet-4-20250514
+export WIT_AI_MODEL=anthropic/claude-sonnet-4-20250514
 export ANTHROPIC_API_KEY=sk-ant-...
 
 # Use GPT-4o-mini (faster, cheaper)
-export TSGIT_AI_MODEL=openai/gpt-4o-mini
+export WIT_AI_MODEL=openai/gpt-4o-mini
 export OPENAI_API_KEY=sk-...
 ```
