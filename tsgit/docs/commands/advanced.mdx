@@ -1,0 +1,391 @@
+---
+title: Advanced Commands
+description: "Power user commands for advanced workflows"
+---
+
+# Advanced Commands
+
+These commands provide powerful capabilities for advanced workflows.
+
+## Hooks
+
+Customize behavior at key points in the version control workflow.
+
+```bash
+tsgit hooks <command> [hook-name]
+```
+
+### Commands
+
+| Command | Description |
+|---------|-------------|
+| `list` | Show installed hooks |
+| `install <name>` | Install a hook from template |
+| `remove <name>` | Remove a hook |
+| `run <name>` | Test a hook manually |
+
+### Available Hooks
+
+| Hook | Triggered |
+|------|-----------|
+| `pre-commit` | Before commit is created |
+| `post-commit` | After commit is created |
+| `pre-merge` | Before merge starts |
+| `post-merge` | After merge completes |
+| `pre-push` | Before push (future) |
+
+### Examples
+
+```bash
+# List installed hooks
+tsgit hooks
+
+# Install pre-commit hook
+tsgit hooks install pre-commit
+
+# Test the hook
+tsgit hooks run pre-commit
+
+# Remove a hook
+tsgit hooks remove pre-commit
+```
+
+### Hook Location
+
+Hooks are stored in `.tsgit/hooks/`. Edit them to customize behavior:
+
+```bash
+# Example pre-commit hook
+#!/bin/bash
+npm run lint
+npm run test
+```
+
+---
+
+## Submodules
+
+Manage nested repositories within your project.
+
+```bash
+tsgit submodule <command> [options]
+```
+
+### Commands
+
+| Command | Description |
+|---------|-------------|
+| `add <url> <path>` | Add a submodule |
+| `init` | Initialize submodules |
+| `update` | Update submodules to recorded commits |
+| `status` | Show submodule status |
+| `foreach <cmd>` | Run command in each submodule |
+
+### Examples
+
+```bash
+# Add a submodule
+tsgit submodule add https://github.com/lib/utils.git vendor/utils
+
+# Initialize after cloning
+tsgit submodule init
+
+# Update to latest recorded commits
+tsgit submodule update
+
+# Check status
+tsgit submodule status
+
+# Run a command in all submodules
+tsgit submodule foreach "npm install"
+```
+
+---
+
+## Worktrees
+
+Work on multiple branches simultaneously with multiple working directories.
+
+```bash
+tsgit worktree <command> [options]
+```
+
+### Commands
+
+| Command | Description |
+|---------|-------------|
+| `add <path> <branch>` | Create new worktree |
+| `list` | List all worktrees |
+| `remove <path>` | Remove a worktree |
+| `prune` | Remove stale worktree entries |
+
+### Examples
+
+```bash
+# Create worktree for feature development
+tsgit worktree add ../feature-worktree feature-branch
+
+# List all worktrees
+tsgit worktree list
+
+# Remove when done
+tsgit worktree remove ../feature-worktree
+
+# Clean up stale entries
+tsgit worktree prune
+```
+
+### Example Output
+
+```
+Worktrees:
+  /home/user/project (main) *
+  /home/user/feature-worktree (feature-branch)
+  /home/user/hotfix (hotfix-123)
+```
+
+### Use Case
+
+```bash
+# You're working on a feature but need to hotfix main
+# Instead of stashing or switching, create a worktree
+
+tsgit worktree add ../hotfix main
+
+# Now you have two directories:
+# - /project (your feature work, untouched)
+# - /hotfix (clean main branch)
+
+cd ../hotfix
+# Fix the bug...
+tsgit commit -a -m "Hotfix: critical bug"
+
+# Go back to feature work
+cd ../project
+# Your feature branch is exactly as you left it!
+
+# Clean up
+tsgit worktree remove ../hotfix
+```
+
+---
+
+## Reflog
+
+View reference history for recovery.
+
+```bash
+tsgit reflog [ref] [options]
+```
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `expire` | Prune old reflog entries |
+
+### Examples
+
+```bash
+# Show HEAD reflog
+tsgit reflog
+
+# Show reflog for specific branch
+tsgit reflog main
+
+# Prune old entries
+tsgit reflog expire
+```
+
+### Example Output
+
+```
+HEAD@{0}: commit: Add authentication
+HEAD@{1}: switch: moving from feature to main
+HEAD@{2}: commit: Fix login bug
+HEAD@{3}: merge: feature-auth
+HEAD@{4}: commit: Initial setup
+```
+
+<Note>
+The reflog is what powers `tsgit undo`. Every operation is recorded and can be reversed.
+</Note>
+
+---
+
+## Garbage Collection
+
+Clean up and optimize the repository.
+
+```bash
+tsgit gc [options]
+```
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `--aggressive` | More thorough optimization (slower) |
+| `--prune=<date>` | Prune objects older than date |
+| `--prune=now` | Prune all unreachable objects immediately |
+
+### Examples
+
+```bash
+# Standard garbage collection
+tsgit gc
+
+# Aggressive optimization
+tsgit gc --aggressive
+
+# Prune immediately
+tsgit gc --prune=now
+```
+
+### When to Run
+
+- After deleting many branches
+- After undoing many operations
+- When repository feels slow
+- Before backing up (reduces size)
+
+---
+
+## Monorepo Scopes
+
+Limit operations to specific paths in a monorepo.
+
+```bash
+tsgit scope <command> [path]
+```
+
+### Commands
+
+| Command | Description |
+|---------|-------------|
+| `set <path>` | Set the current scope |
+| `use <preset>` | Use a predefined scope |
+| `clear` | Clear scope (full repository) |
+| (none) | Show current scope |
+
+### Presets
+
+Presets are defined in `.tsgit/config`:
+- `frontend` - Frontend code
+- `backend` - Backend code
+- `docs` - Documentation
+
+### Examples
+
+```bash
+# Check current scope
+tsgit scope
+
+# Limit to src directory
+tsgit scope set src/
+
+# Use preset
+tsgit scope use frontend
+
+# Clear scope
+tsgit scope clear
+```
+
+### Effect on Commands
+
+When a scope is set:
+
+```bash
+tsgit scope set packages/frontend/
+
+tsgit status    # Shows only frontend files
+tsgit add .     # Stages only frontend files
+tsgit log       # Shows commits affecting frontend
+tsgit diff      # Shows changes in frontend only
+```
+
+---
+
+## Plumbing Commands
+
+Low-level commands for scripting and advanced use.
+
+### hash-object
+
+```bash
+tsgit hash-object <file>
+```
+
+Calculate the hash of a file.
+
+### cat-file
+
+```bash
+tsgit cat-file <hash>
+```
+
+Display contents of an object.
+
+### ls-tree
+
+```bash
+tsgit ls-tree <tree-hash>
+```
+
+List contents of a tree object.
+
+### ls-files
+
+```bash
+tsgit ls-files
+```
+
+List files in the index.
+
+### rev-parse
+
+```bash
+tsgit rev-parse <rev>
+```
+
+Parse a revision to its hash.
+
+### for-each-ref
+
+```bash
+tsgit for-each-ref
+```
+
+Iterate over references.
+
+### update-ref
+
+```bash
+tsgit update-ref <ref> <hash>
+```
+
+Update a reference.
+
+### symbolic-ref
+
+```bash
+tsgit symbolic-ref <name>
+```
+
+Read or set a symbolic reference.
+
+### show-ref
+
+```bash
+tsgit show-ref
+```
+
+List references.
+
+### fsck
+
+```bash
+tsgit fsck
+```
+
+Verify repository integrity.

@@ -1,0 +1,293 @@
+---
+title: API Reference Overview
+description: "Use tsgit programmatically in your Node.js projects"
+---
+
+# API Reference
+
+tsgit can be used as a library in your Node.js applications, giving you programmatic access to all version control operations.
+
+## Installation
+
+```bash
+npm install tsgit
+```
+
+## Quick Start
+
+```typescript
+import { Repository } from 'tsgit';
+
+// Initialize a new repository
+const repo = Repository.init('/path/to/project');
+
+// Or open an existing one
+const repo = Repository.open('/path/to/existing');
+
+// Add files
+repo.add('src/index.ts');
+repo.add('.');  // Add all
+
+// Commit
+const hash = repo.commit('Initial commit');
+
+// Check status
+const status = repo.status();
+console.log(status.staged);
+console.log(status.modified);
+console.log(status.untracked);
+
+// View log
+const commits = repo.log({ limit: 10 });
+```
+
+## Core Classes
+
+<CardGroup cols={2}>
+  <Card title="Repository" icon="database" href="/api-reference/repository">
+    Main class for repository operations
+  </Card>
+  <Card title="SearchEngine" icon="magnifying-glass" href="/api-reference/search">
+    Search commits, files, and content
+  </Card>
+</CardGroup>
+
+## Module Structure
+
+```typescript
+import {
+  // Core
+  Repository,
+  ObjectStore,
+  Refs,
+  
+  // Search
+  SearchEngine,
+  
+  // Types
+  Commit,
+  Tree,
+  Blob,
+  Status,
+  DiffResult,
+} from 'tsgit';
+```
+
+## Common Patterns
+
+### Error Handling
+
+```typescript
+import { Repository, TsgitError, NotFoundError } from 'tsgit';
+
+try {
+  const repo = Repository.open('/path/to/repo');
+  const commit = repo.getCommit('abc123');
+} catch (error) {
+  if (error instanceof NotFoundError) {
+    console.error('Commit not found');
+  } else if (error instanceof TsgitError) {
+    console.error('tsgit error:', error.message);
+  } else {
+    throw error;
+  }
+}
+```
+
+### Async Operations
+
+Most operations are synchronous, but some (like large file operations) are async:
+
+```typescript
+// Sync
+const hash = repo.commit('Message');
+
+// Async
+const results = await repo.search('query');
+```
+
+### Working with Commits
+
+```typescript
+// Get a commit
+const commit = repo.getCommit('a1b2c3d4');
+console.log(commit.message);
+console.log(commit.author);
+console.log(commit.timestamp);
+
+// Get parent
+const parent = repo.getCommit(commit.parentHash);
+
+// Get tree
+const tree = repo.getTree(commit.treeHash);
+for (const entry of tree.entries) {
+  console.log(entry.name, entry.mode, entry.hash);
+}
+```
+
+### Working with Diffs
+
+```typescript
+// Diff working tree vs index
+const unstaged = repo.diff();
+
+// Diff index vs HEAD
+const staged = repo.diff({ staged: true });
+
+// Diff between commits
+const changes = repo.diff({ 
+  from: 'abc123', 
+  to: 'def456' 
+});
+
+// Process diff
+for (const file of changes.files) {
+  console.log(file.path, file.status);
+  for (const hunk of file.hunks) {
+    console.log(hunk.header);
+  }
+}
+```
+
+### Branching
+
+```typescript
+// List branches
+const branches = repo.branches();
+
+// Create branch
+repo.createBranch('feature');
+
+// Switch branch
+repo.switch('feature');
+
+// Get current branch
+const current = repo.currentBranch();
+```
+
+## Type Definitions
+
+### Status
+
+```typescript
+interface Status {
+  branch: string;
+  staged: FileStatus[];
+  modified: FileStatus[];
+  untracked: string[];
+  ahead: number;
+  behind: number;
+}
+
+interface FileStatus {
+  path: string;
+  status: 'added' | 'modified' | 'deleted' | 'renamed';
+  oldPath?: string;  // For renames
+}
+```
+
+### Commit
+
+```typescript
+interface Commit {
+  hash: string;
+  message: string;
+  author: string;
+  email: string;
+  timestamp: Date;
+  parentHash: string | null;
+  treeHash: string;
+}
+```
+
+### DiffResult
+
+```typescript
+interface DiffResult {
+  files: FileDiff[];
+}
+
+interface FileDiff {
+  path: string;
+  status: 'added' | 'modified' | 'deleted';
+  hunks: DiffHunk[];
+}
+
+interface DiffHunk {
+  header: string;
+  lines: DiffLine[];
+}
+
+interface DiffLine {
+  type: 'context' | 'add' | 'remove';
+  content: string;
+  oldLine?: number;
+  newLine?: number;
+}
+```
+
+## Example: Build Tool Integration
+
+```typescript
+import { Repository } from 'tsgit';
+
+async function buildIfChanged(paths: string[]) {
+  const repo = Repository.open('.');
+  const status = repo.status();
+  
+  // Check if any of our paths changed
+  const changedFiles = [
+    ...status.staged.map(f => f.path),
+    ...status.modified.map(f => f.path),
+  ];
+  
+  const needsBuild = paths.some(p => 
+    changedFiles.some(f => f.startsWith(p))
+  );
+  
+  if (needsBuild) {
+    console.log('Changes detected, building...');
+    await runBuild();
+  } else {
+    console.log('No changes in watched paths');
+  }
+}
+
+buildIfChanged(['src/', 'lib/']);
+```
+
+## Example: Commit Hook
+
+```typescript
+import { Repository } from 'tsgit';
+
+function preCommitHook() {
+  const repo = Repository.open('.');
+  const status = repo.status();
+  
+  // Check for forbidden patterns
+  for (const file of status.staged) {
+    const content = repo.getFileContent(file.path);
+    if (content.includes('console.log')) {
+      console.error(`Found console.log in ${file.path}`);
+      process.exit(1);
+    }
+  }
+  
+  console.log('Pre-commit checks passed');
+  process.exit(0);
+}
+
+preCommitHook();
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Repository API" icon="database" href="/api-reference/repository">
+    Full Repository class reference
+  </Card>
+  <Card title="Search API" icon="magnifying-glass" href="/api-reference/search">
+    SearchEngine class reference
+  </Card>
+</CardGroup>

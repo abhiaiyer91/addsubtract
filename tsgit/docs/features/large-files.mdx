@@ -1,0 +1,204 @@
+---
+title: Large File Support
+description: "Handle large files efficiently without external tools"
+---
+
+# Large File Support
+
+tsgit handles large files natively with automatic chunking - no Git LFS required.
+
+## Overview
+
+Unlike Git, which struggles with large files and requires Git LFS for efficient handling, tsgit includes built-in large file support:
+
+- **Automatic chunking:** Large files are split into manageable chunks
+- **Deduplication:** Identical chunks are stored only once
+- **Streaming:** Large files don't need to fit in memory
+- **No setup required:** Works out of the box
+
+## How It Works
+
+### Automatic Detection
+
+Files above the threshold (default: 2MB) are automatically chunked:
+
+```
+Large file (10MB)
+    ↓
+┌─────────┬─────────┬─────────┬─────────┬─────────┐
+│ Chunk 1 │ Chunk 2 │ Chunk 3 │ Chunk 4 │ Chunk 5 │
+│  2MB    │  2MB    │  2MB    │  2MB    │  2MB    │
+└─────────┴─────────┴─────────┴─────────┴─────────┘
+    ↓           ↓           ↓           ↓           ↓
+ hash1       hash2       hash3       hash4       hash5
+```
+
+Each chunk is:
+- Hashed independently
+- Stored if new
+- Deduplicated if it already exists
+
+### Manifest
+
+A manifest file tracks the chunks:
+
+```json
+{
+  "type": "large-file",
+  "size": 10485760,
+  "chunks": [
+    { "hash": "abc123...", "size": 2097152 },
+    { "hash": "def456...", "size": 2097152 },
+    { "hash": "ghi789...", "size": 2097152 },
+    { "hash": "jkl012...", "size": 2097152 },
+    { "hash": "mno345...", "size": 2097152 }
+  ]
+}
+```
+
+## Configuration
+
+### Threshold
+
+Set the large file threshold in `.tsgit/config`:
+
+```ini
+[tsgit]
+    largeFileThreshold = 2097152  # 2MB in bytes
+```
+
+**Common values:**
+
+| Size | Bytes |
+|------|-------|
+| 1 MB | 1048576 |
+| 2 MB | 2097152 |
+| 5 MB | 5242880 |
+| 10 MB | 10485760 |
+
+### Chunk Size
+
+```ini
+[tsgit]
+    chunkSize = 2097152  # 2MB chunks
+```
+
+## Usage
+
+### Adding Large Files
+
+Just use `add` as normal:
+
+```bash
+# Add a large file - chunking is automatic
+tsgit add large-video.mp4
+```
+
+tsgit will:
+1. Detect the file is above threshold
+2. Split into chunks
+3. Store chunks efficiently
+4. Create manifest
+
+### Status with Large Files
+
+```bash
+tsgit status
+
+Staged:
+  large-file: assets/video.mp4 (15.2 MB, 8 chunks)
+```
+
+### Diff with Large Files
+
+```bash
+tsgit diff assets/video.mp4
+
+Binary file changed
+  Before: 15.2 MB (8 chunks)
+  After:  16.1 MB (9 chunks)
+  Changed chunks: 2 (reusing 7)
+```
+
+## Benefits
+
+### Space Efficiency
+
+| Scenario | Git | tsgit |
+|----------|-----|-------|
+| 100MB file, 1 byte change | +100MB | +2MB (1 chunk) |
+| Same chunk in 10 files | 10x stored | 1x stored |
+| Binary file versions | Full copy each | Only changed chunks |
+
+### Performance
+
+- **Adding:** Faster for files with partial changes
+- **Cloning:** Only fetch needed chunks
+- **Checkout:** Stream large files from chunks
+
+### No External Dependencies
+
+Git LFS requires:
+- Server support
+- Additional setup
+- Separate tracking file
+
+tsgit just works:
+- Built-in to the format
+- No server changes needed
+- Automatic handling
+
+## Comparison with Git LFS
+
+| Feature | Git LFS | tsgit |
+|---------|---------|-------|
+| Setup required | Yes | No |
+| Server support | Required | Not needed |
+| Deduplication | File-level | Chunk-level |
+| Partial changes | Full re-upload | Only changed chunks |
+| Tracking file | `.gitattributes` | Automatic |
+
+## Best Practices
+
+<Tip>
+**Use meaningful chunk sizes**
+
+- Smaller chunks = better deduplication, more overhead
+- Larger chunks = less overhead, worse deduplication
+- 2MB is a good default for most use cases
+</Tip>
+
+<Tip>
+**Consider file types**
+
+- Video/audio: Often benefits from chunking
+- Compressed files (zip, jpg): Less benefit from chunking
+- Text files: Usually below threshold anyway
+</Tip>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="File not being chunked">
+    Check the threshold:
+    ```bash
+    tsgit config tsgit.largeFileThreshold
+    ```
+    Ensure the file is larger than this value.
+  </Accordion>
+  
+  <Accordion title="Slow performance with many chunks">
+    Try increasing chunk size:
+    ```ini
+    [tsgit]
+        chunkSize = 5242880  # 5MB
+    ```
+  </Accordion>
+  
+  <Accordion title="Repository size growing">
+    Run garbage collection:
+    ```bash
+    tsgit gc --aggressive
+    ```
+  </Accordion>
+</AccordionGroup>

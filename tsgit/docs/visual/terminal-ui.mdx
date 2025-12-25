@@ -1,0 +1,170 @@
+---
+title: Terminal UI
+description: "Interactive terminal interface for version control"
+---
+
+# Terminal UI
+
+The tsgit terminal UI provides a full-featured interface without leaving your terminal.
+
+## Launch
+
+```bash
+tsgit ui
+```
+
+## Interface Layout
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ tsgit - my-project (main)                                   │
+├─────────────────────────────────────────────────────────────┤
+│ Status              │ Diff                                  │
+│ ─────────────────── │ ─────────────────────────────────────│
+│ Staged:             │ @@ -10,6 +10,7 @@                    │
+│   src/index.ts      │  export function main() {            │
+│                     │    console.log("Starting");          │
+│ Unstaged:           │ +  initDatabase();                   │
+│   README.md         │    startServer();                    │
+│   src/utils.ts      │  }                                   │
+│                     │                                       │
+│ Untracked:          │                                       │
+│   notes.txt         │                                       │
+├─────────────────────────────────────────────────────────────┤
+│ [a]dd [c]ommit [s]witch [Tab] switch panel [q]uit          │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## Keyboard Controls
+
+### Navigation
+
+| Key | Action |
+|-----|--------|
+| `↑` / `k` | Move up |
+| `↓` / `j` | Move down |
+| `Tab` | Switch between panels |
+| `Enter` | Select / Expand |
+
+### Actions
+
+| Key | Action |
+|-----|--------|
+| `a` | Stage selected file |
+| `u` | Unstage selected file |
+| `c` | Open commit dialog |
+| `s` | Switch branch |
+| `d` | Show diff for selected file |
+| `r` | Refresh |
+| `q` | Quit |
+| `?` | Show help |
+
+### Commit Dialog
+
+When you press `c`:
+
+1. Type your commit message
+2. Press `Ctrl+Enter` to commit
+3. Press `Escape` to cancel
+
+## Panels
+
+### Status Panel (Left)
+
+Shows:
+- Staged files (ready to commit)
+- Unstaged modifications
+- Untracked files
+
+### Diff Panel (Right)
+
+Shows:
+- Diff for the selected file
+- Syntax highlighted
+- Scroll with arrow keys
+
+### Branch Panel
+
+Press `s` to open:
+- List of local branches
+- Current branch highlighted
+- Select and press Enter to switch
+
+## Workflow Example
+
+1. **Launch TUI:**
+   ```bash
+   tsgit ui
+   ```
+
+2. **Navigate:** Use arrow keys to select files
+
+3. **Stage:** Press `a` to stage selected file
+
+4. **View diff:** Press `Tab` to see changes
+
+5. **Commit:** Press `c`, type message, `Ctrl+Enter`
+
+6. **Switch branch:** Press `s`, select branch, Enter
+
+7. **Quit:** Press `q`
+
+## Features
+
+### File Status Colors
+
+- 🟢 Green: Staged
+- 🟡 Yellow: Modified
+- 🔴 Red: Deleted
+- ⚪ Gray: Untracked
+
+### Diff View
+
+- `+` lines: Added (green)
+- `-` lines: Removed (red)
+- Context lines: Normal
+
+### Branch Switching
+
+The TUI shows:
+- Branch list
+- Current branch marker
+- Uncommitted changes warning
+
+## Advantages
+
+- **Works over SSH:** Perfect for remote development
+- **Keyboard-driven:** Fast for touch typists
+- **Low overhead:** Lightweight compared to web UI
+- **Always available:** No browser needed
+
+## Customization
+
+The TUI respects your terminal theme. For best results:
+- Use a terminal with 256 colors
+- Use a monospace font
+- Ensure UTF-8 support
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Display issues">
+    Ensure your terminal supports:
+    - UTF-8 encoding
+    - 256 colors
+    - Minimum 80x24 size
+  </Accordion>
+  
+  <Accordion title="Keys not working">
+    Some terminals intercept keys. Try:
+    - Different terminal emulator
+    - Check terminal settings
+  </Accordion>
+  
+  <Accordion title="Colors look wrong">
+    Set your TERM variable:
+    ```bash
+    export TERM=xterm-256color
+    ```
+  </Accordion>
+</AccordionGroup>

@@ -1,0 +1,173 @@
+---
+title: Web UI
+description: "Modern web dashboard for visual version control"
+---
+
+# Web UI
+
+The tsgit web UI provides a modern, feature-rich interface for version control.
+
+## Launch
+
+```bash
+tsgit web
+```
+
+Opens your browser to `http://localhost:3847`.
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `--port <port>` | Use a custom port (default: 3847) |
+
+```bash
+# Use custom port
+tsgit web --port 8080
+```
+
+## Features
+
+### Commit Graph
+
+Visual representation of your commit history:
+- Branch visualization
+- Merge points
+- Click to view commit details
+- Navigate through history
+
+### Side-by-Side Diffs
+
+View changes with:
+- Syntax highlighting
+- Line-by-line comparison
+- Added/removed highlighting
+- File navigation
+
+### File Browser
+
+Browse your repository:
+- Tree view of files
+- Status icons (modified, staged, untracked)
+- Click to view file contents
+- Quick actions (stage, restore)
+
+### Search
+
+Find anything with `Ctrl+P`:
+- Commits by message
+- Files by name
+- Content search
+- Authors
+
+### One-Click Staging
+
+- Click to stage individual files
+- Click to unstage
+- Batch operations
+
+## Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl+P` | Focus search / command palette |
+| `Ctrl+Enter` | Open commit dialog |
+| `R` | Refresh view |
+| `Escape` | Close modal |
+| `?` | Show keyboard shortcuts |
+
+## Dashboard Panels
+
+### Status Panel
+
+Shows current repository state:
+- Current branch
+- Staged changes
+- Unstaged changes
+- Untracked files
+
+### History Panel
+
+Visual commit log:
+- Commit messages
+- Authors and dates
+- Branch/tag labels
+- Click to expand details
+
+### Diff Panel
+
+View changes:
+- Select file to see diff
+- Toggle between staged/unstaged
+- Syntax highlighted
+
+## Workflow Example
+
+1. **Open Web UI:**
+   ```bash
+   tsgit web
+   ```
+
+2. **Review changes:** See modified files in the status panel
+
+3. **Stage files:** Click the "+" button next to files
+
+4. **Review diff:** Click a file to see its changes
+
+5. **Commit:** Press `Ctrl+Enter`, enter message, submit
+
+6. **View history:** See your new commit in the graph
+
+## Configuration
+
+The web UI uses default settings, but you can customize:
+
+```ini
+# .tsgit/config
+[web]
+    port = 3847
+    openBrowser = true
+```
+
+## Screenshots
+
+### Main Dashboard
+
+The main view shows:
+- Commit graph on the left
+- File status in the center
+- Diff viewer on the right
+
+### Commit View
+
+Click a commit to see:
+- Full commit message
+- Changed files
+- Diff for each file
+- Parent commits
+
+### Search Results
+
+Search results show:
+- Matching commits
+- Matching files
+- Content matches with context
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Port already in use">
+    Use a different port:
+    ```bash
+    tsgit web --port 8080
+    ```
+  </Accordion>
+  
+  <Accordion title="Browser doesn't open">
+    Manually navigate to `http://localhost:3847`
+  </Accordion>
+  
+  <Accordion title="UI not updating">
+    Press `R` to refresh, or check for errors in the terminal
+  </Accordion>
+</AccordionGroup>

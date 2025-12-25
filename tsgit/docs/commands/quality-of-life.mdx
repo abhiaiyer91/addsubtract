@@ -1,0 +1,327 @@
+---
+title: Quality of Life
+description: "Productivity commands that make version control enjoyable"
+---
+
+# Quality of Life Commands
+
+These commands are designed to make common tasks faster and more enjoyable.
+
+## wip
+
+Create a quick work-in-progress commit with an auto-generated message.
+
+```bash
+tsgit wip [options] [suffix]
+```
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `-a`, `--all` | Stage all tracked files before committing |
+
+### Arguments
+
+| Argument | Description |
+|----------|-------------|
+| `suffix` | Optional text to append to the WIP message |
+
+### Examples
+
+```bash
+# WIP commit with staged files
+tsgit wip
+
+# Stage all tracked files and WIP commit
+tsgit wip -a
+
+# WIP with custom suffix
+tsgit wip -a "fixing login bug"
+```
+
+### Generated Messages
+
+```
+WIP: 2024-01-15 10:30 - 3 files changed
+WIP: 2024-01-15 10:30 - fixing login bug
+```
+
+<Tip>
+Use `tsgit uncommit` later to restore your WIP state and create a proper commit.
+</Tip>
+
+---
+
+## amend
+
+Modify the last commit easily.
+
+```bash
+tsgit amend [options]
+```
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `-m <message>` | New commit message |
+| `-a`, `--all` | Stage all tracked files before amending |
+
+### Examples
+
+```bash
+# Change the commit message
+tsgit amend -m "Better commit message"
+
+# Add staged changes to last commit (keep message)
+tsgit add forgotten-file.ts
+tsgit amend
+
+# Stage all and amend
+tsgit amend -a
+```
+
+### Comparison with Git
+
+| Git | tsgit |
+|-----|-------|
+| `git commit --amend -m "msg"` | `tsgit amend -m "msg"` |
+| `git add file && git commit --amend --no-edit` | `tsgit add file && tsgit amend` |
+
+---
+
+## fixup
+
+Create fixup commits for later squashing.
+
+```bash
+tsgit fixup <commit> [options]
+```
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `-l`, `--list` | List recent commits to choose from |
+
+### Examples
+
+```bash
+# Create fixup for specific commit
+tsgit fixup HEAD~2
+
+# List recent commits first
+tsgit fixup -l
+# Then choose one to fix up
+```
+
+---
+
+## snapshot
+
+Create quick checkpoints without full commits.
+
+```bash
+tsgit snapshot <command> [options]
+```
+
+### Commands
+
+| Command | Description |
+|---------|-------------|
+| `create [name]` | Save current state as a snapshot |
+| `list` | List all snapshots |
+| `restore <id>` | Restore a snapshot |
+| `delete <id>` | Delete a snapshot |
+
+### Examples
+
+```bash
+# Create a snapshot before risky changes
+tsgit snapshot create "before refactor"
+
+# List all snapshots
+tsgit snapshot list
+
+# Restore if something goes wrong
+tsgit snapshot restore "before refactor"
+
+# Clean up old snapshot
+tsgit snapshot delete "before refactor"
+```
+
+### Example Output
+
+```
+Snapshots:
+  1. "before refactor" (10 minutes ago)
+  2. "working login" (2 hours ago)
+  3. "initial setup" (1 day ago)
+```
+
+<Note>
+Snapshots are lighter than commits and don't appear in your commit history. They're perfect for "save points" during risky operations.
+</Note>
+
+---
+
+## cleanup
+
+Find and remove merged or stale branches.
+
+```bash
+tsgit cleanup [options]
+```
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `--dry-run` | Preview what would be deleted |
+| `--force` | Delete without confirmation |
+| `--merged` | Only show merged branches |
+| `--stale` | Only show stale branches |
+| `--days <n>` | Consider branches stale after N days (default: 30) |
+
+### Examples
+
+```bash
+# See what branches can be cleaned
+tsgit cleanup --dry-run
+
+# Interactive cleanup with confirmation
+tsgit cleanup
+
+# Force cleanup without prompts
+tsgit cleanup --force
+
+# Find branches older than 60 days
+tsgit cleanup --days 60 --stale
+```
+
+### Example Output
+
+```
+Found 3 branches to clean up:
+
+Merged branches:
+  feature-login (merged 5 days ago)
+  hotfix-typo (merged 2 weeks ago)
+
+Stale branches:
+  experiment-old (no commits for 45 days)
+
+Delete these branches? [y/N]
+```
+
+---
+
+## stats
+
+Show repository statistics and insights.
+
+```bash
+tsgit stats [options]
+```
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `--all` | Show detailed statistics |
+
+### Examples
+
+```bash
+# Basic stats
+tsgit stats
+
+# Detailed stats
+tsgit stats --all
+```
+
+### Example Output
+
+```
+Repository Statistics
+=====================
+
+Overview:
+  Commits: 1,234
+  Branches: 12
+  Contributors: 8
+  Files: 456
+  Lines of code: 45,678
+
+Top Contributors:
+  1. Alice (456 commits)
+  2. Bob (321 commits)
+  3. Charlie (234 commits)
+
+Languages:
+  TypeScript: 78%
+  JavaScript: 15%
+  JSON: 5%
+  Markdown: 2%
+
+Activity:
+  Most active day: Tuesday
+  Most active hour: 2-3 PM
+  Commits this week: 23
+```
+
+---
+
+## blame
+
+Show who changed each line of a file.
+
+```bash
+tsgit blame <file>
+```
+
+### Examples
+
+```bash
+tsgit blame src/index.ts
+```
+
+### Example Output
+
+```
+a1b2c3d4 (Alice  2024-01-15) import { Repository } from './core';
+e5f6g7h8 (Bob    2024-01-10) import { Logger } from './utils';
+a1b2c3d4 (Alice  2024-01-15) 
+i9j0k1l2 (Alice  2024-01-12) export function main() {
+e5f6g7h8 (Bob    2024-01-10)   const logger = new Logger();
+i9j0k1l2 (Alice  2024-01-12)   const repo = Repository.open('.');
+```
+
+---
+
+## Quick Productivity Workflow
+
+```bash
+# Working on something, need to switch contexts fast
+tsgit wip -a  # Quick save
+
+# Switch to handle something else
+tsgit switch other-branch
+
+# Come back later
+tsgit switch -
+tsgit uncommit  # Restore WIP state
+
+# Before doing something risky
+tsgit snapshot create "known good state"
+
+# Try something risky...
+
+# Didn't work? Restore!
+tsgit snapshot restore "known good state"
+
+# Done with feature, clean up
+tsgit cleanup --dry-run
+tsgit cleanup
+```

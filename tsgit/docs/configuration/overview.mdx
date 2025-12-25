@@ -1,0 +1,209 @@
+---
+title: Configuration Overview
+description: "Configure tsgit to match your workflow"
+---
+
+# Configuration
+
+tsgit stores configuration in `.tsgit/config` using an INI-like format, similar to Git.
+
+## Configuration Levels
+
+| Level | Location | Scope |
+|-------|----------|-------|
+| Repository | `.tsgit/config` | This repository only |
+| Global | `~/.tsgitconfig` | All your repositories |
+| System | `/etc/tsgitconfig` | All users (rare) |
+
+Lower levels override higher levels: Repository > Global > System.
+
+## Viewing Configuration
+
+```bash
+# View all settings
+tsgit config --list
+
+# View specific setting
+tsgit config core.hashAlgorithm
+
+# View with source location
+tsgit config --list --show-origin
+```
+
+## Setting Configuration
+
+```bash
+# Set repository config
+tsgit config <key> <value>
+
+# Set global config
+tsgit config --global <key> <value>
+```
+
+**Examples:**
+
+```bash
+# Set user info (global)
+tsgit config --global user.name "Your Name"
+tsgit config --global user.email "you@example.com"
+
+# Set repository-specific setting
+tsgit config tsgit.autoStashOnSwitch false
+```
+
+## Configuration Sections
+
+### Core Settings
+
+```ini
+[core]
+    repositoryformatversion = 1
+    filemode = true
+    bare = false
+```
+
+| Key | Description | Default |
+|-----|-------------|---------|
+| `repositoryformatversion` | Repository format version | `1` |
+| `filemode` | Track file permissions | `true` |
+| `bare` | Is this a bare repository | `false` |
+
+### tsgit Settings
+
+```ini
+[tsgit]
+    hashAlgorithm = sha256
+    largeFileThreshold = 2097152
+    autoStashOnSwitch = true
+    chunkSize = 2097152
+```
+
+| Key | Description | Default |
+|-----|-------------|---------|
+| `hashAlgorithm` | Hash algorithm (sha256/sha1) | `sha256` |
+| `largeFileThreshold` | Size for large file handling | `2097152` (2MB) |
+| `autoStashOnSwitch` | Auto-save on branch switch | `true` |
+| `chunkSize` | Chunk size for large files | `2097152` (2MB) |
+
+### User Settings
+
+```ini
+[user]
+    name = Your Name
+    email = you@example.com
+```
+
+### Remote Settings
+
+```ini
+[remote "origin"]
+    url = https://github.com/user/repo.git
+    fetch = +refs/heads/*:refs/remotes/origin/*
+```
+
+### Branch Settings
+
+```ini
+[branch "main"]
+    remote = origin
+    merge = refs/heads/main
+```
+
+## Quick Reference
+
+### Essential Settings
+
+```bash
+# Your identity
+tsgit config --global user.name "Your Name"
+tsgit config --global user.email "you@example.com"
+
+# Editor
+tsgit config --global core.editor "code --wait"
+
+# Default branch
+tsgit config --global init.defaultBranch main
+```
+
+### tsgit-Specific Settings
+
+```bash
+# Disable auto-stash
+tsgit config tsgit.autoStashOnSwitch false
+
+# Change large file threshold to 5MB
+tsgit config tsgit.largeFileThreshold 5242880
+
+# Use SHA-1 for Git compatibility (not recommended)
+tsgit config tsgit.hashAlgorithm sha1
+```
+
+## Configuration File Format
+
+```ini
+# Comments start with # or ;
+[section]
+    key = value
+    anotherKey = another value
+
+[section "subsection"]
+    key = value
+
+# Boolean values
+[feature]
+    enabled = true
+    disabled = false
+
+# Numbers
+[limits]
+    maxSize = 1048576
+```
+
+## Example Configuration
+
+Complete `.tsgit/config`:
+
+```ini
+[core]
+    repositoryformatversion = 1
+    filemode = true
+    bare = false
+
+[tsgit]
+    hashAlgorithm = sha256
+    largeFileThreshold = 2097152
+    autoStashOnSwitch = true
+
+[user]
+    name = Alice Developer
+    email = alice@example.com
+
+[remote "origin"]
+    url = git@github.com:alice/my-project.git
+    fetch = +refs/heads/*:refs/remotes/origin/*
+
+[branch "main"]
+    remote = origin
+    merge = refs/heads/main
+
+[scope "frontend"]
+    paths = packages/frontend/
+
+[scope "backend"]
+    paths = packages/backend/,packages/api/
+
+[ai]
+    enabled = true
+    model = gpt-4
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Repository Settings" icon="database" href="/configuration/repository">
+    Deep dive into repository configuration
+  </Card>
+  <Card title="Directory Structure" icon="folder-tree" href="/configuration/directory-structure">
+    Understanding .tsgit directory
+  </Card>
+</CardGroup>

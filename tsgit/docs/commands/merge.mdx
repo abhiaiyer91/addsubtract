@@ -1,0 +1,212 @@
+---
+title: Merge
+description: "Merge branches and resolve conflicts"
+---
+
+# Merge Commands
+
+tsgit provides an improved merge experience with structured conflict resolution.
+
+## merge
+
+Merge a branch into the current branch.
+
+```bash
+tsgit merge <branch> [options]
+```
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `--no-commit` | Perform merge but don't create a commit |
+| `--abort` | Abort the current merge |
+| `--continue` | Continue merge after resolving conflicts |
+| `--conflicts` | Show current conflicts |
+| `--resolve <file>` | Mark a file as resolved |
+
+### Examples
+
+```bash
+# Merge a branch
+tsgit merge feature-branch
+
+# Merge without auto-commit
+tsgit merge feature-branch --no-commit
+```
+
+---
+
+## Merge Workflow
+
+### Simple Merge (No Conflicts)
+
+```bash
+# Ensure you're on the target branch
+tsgit switch main
+
+# Merge the feature branch
+tsgit merge feature-login
+```
+
+Output:
+```
+Merging feature-login into main...
+Merge successful!
+```
+
+### Merge with Conflicts
+
+When conflicts occur:
+
+```bash
+tsgit merge feature-branch
+```
+
+Output:
+```
+Merging feature-branch into main...
+CONFLICT: src/index.ts
+CONFLICT: src/config.ts
+
+Automatic merge failed. Fix conflicts and run:
+  tsgit merge --continue
+```
+
+---
+
+## Conflict Resolution
+
+### View Conflicts
+
+```bash
+tsgit merge --conflicts
+```
+
+Output:
+```
+Conflicting files:
+  1. src/index.ts (3 conflicts)
+  2. src/config.ts (1 conflict)
+```
+
+### Structured Conflict Format
+
+Unlike Git's inline markers, tsgit uses structured JSON for conflicts:
+
+```json
+{
+  "file": "src/index.ts",
+  "conflicts": [
+    {
+      "line": 15,
+      "ours": "const timeout = 5000;",
+      "theirs": "const timeout = 10000;",
+      "base": "const timeout = 3000;"
+    }
+  ]
+}
+```
+
+### Resolving Conflicts
+
+1. **Edit the file** to fix conflicts
+2. **Mark as resolved:**
+   ```bash
+   tsgit merge --resolve src/index.ts
+   ```
+3. **Complete the merge:**
+   ```bash
+   tsgit merge --continue
+   ```
+
+### Abort a Merge
+
+If you want to cancel the merge:
+
+```bash
+tsgit merge --abort
+```
+
+---
+
+## Visual Conflict Resolution
+
+For complex conflicts, use the visual interface:
+
+```bash
+tsgit web
+```
+
+The web UI provides:
+- Side-by-side diff view
+- Click to choose "ours" or "theirs"
+- Manual editing for custom resolution
+- Preview of merged result
+
+---
+
+## Merge Example
+
+Here's a complete merge workflow:
+
+```bash
+# 1. Start on main branch
+tsgit switch main
+
+# 2. Attempt merge
+tsgit merge feature-auth
+
+# 3. If conflicts occur, view them
+tsgit merge --conflicts
+
+# 4. Open and edit conflicting files
+# (or use tsgit web for visual resolution)
+
+# 5. Mark files as resolved
+tsgit merge --resolve src/auth.ts
+tsgit merge --resolve src/config.ts
+
+# 6. Complete the merge
+tsgit merge --continue
+
+# 7. Verify the merge
+tsgit log --oneline -n 5
+```
+
+---
+
+## Undo a Merge
+
+Made a mistake? Just undo it:
+
+```bash
+tsgit undo
+```
+
+This works whether the merge:
+- Completed successfully
+- Is still in progress
+- Has conflicts
+
+---
+
+## Merge Strategies
+
+tsgit currently supports recursive merge strategy (similar to Git's default). Additional strategies are planned for future releases.
+
+## Tips
+
+<Tip>
+Before merging, ensure your branch is up to date:
+```bash
+tsgit switch feature-branch
+tsgit status  # Check for uncommitted changes
+tsgit switch main
+tsgit merge feature-branch
+```
+</Tip>
+
+<Warning>
+Don't use `--force` unless you really mean it. The undo command is your friend if something goes wrong.
+</Warning>

@@ -1,0 +1,143 @@
+---
+title: ASCII Graph
+description: "Quick commit visualization in the terminal"
+---
+
+# ASCII Graph
+
+View your commit history as a visual graph directly in the terminal.
+
+## Usage
+
+```bash
+tsgit graph
+```
+
+## Output
+
+```
+● a1b2c3d4 (HEAD -> main) Latest commit - Alice, today
+● e5f6g7h8 Add user authentication - Bob, yesterday
+│
+│ ● f9g0h1i2 (feature-branch) Feature work - Charlie, 2 days ago
+│ ● j3k4l5m6 More feature work - Charlie, 3 days ago
+├─┘
+● n7o8p9q0 Merge pull request #42 - Alice, 1 week ago
+├─╮
+│ ● r1s2t3u4 Fix critical bug - Bob, 1 week ago
+├─╯
+● v5w6x7y8 Initial commit - Alice, 2 weeks ago
+```
+
+## Understanding the Graph
+
+### Symbols
+
+| Symbol | Meaning |
+|--------|---------|
+| `●` | Commit |
+| `│` | Branch line |
+| `├─╮` | Merge (two parents) |
+| `├─╯` | Branch rejoins |
+| `├─┘` | Branch divergence |
+
+### Labels
+
+| Label | Meaning |
+|-------|---------|
+| `HEAD -> main` | Current branch |
+| `(main)` | Branch name |
+| `(tag: v1.0)` | Tag |
+| `(origin/main)` | Remote branch |
+
+## Options
+
+```bash
+# Show all branches
+tsgit graph --all
+
+# Limit number of commits
+tsgit graph -n 10
+```
+
+## Example Scenarios
+
+### Linear History
+
+```
+● Latest commit
+● Previous commit
+● Earlier commit
+● Initial commit
+```
+
+### Feature Branch
+
+```
+● (main) Latest on main
+│
+│ ● (feature) Feature commit 2
+│ ● Feature commit 1
+├─┘
+● Base commit
+```
+
+### Merge Commit
+
+```
+● Merge feature into main
+├─╮
+│ ● Feature work
+│ ● More feature work
+├─╯
+● Earlier main work
+```
+
+### Multiple Branches
+
+```
+● (main) Latest
+│
+│ ● (feature-a) Work on A
+├─┤
+│ │ ● (feature-b) Work on B
+├─┼─╯
+│ ●
+├─╯
+● Base
+```
+
+## When to Use
+
+The graph command is perfect for:
+
+- **Quick overview:** See branch structure at a glance
+- **Before merging:** Understand what will be merged
+- **After merging:** Verify merge was successful
+- **Debugging:** Find where branches diverged
+- **Scripting:** Output is parseable
+
+## Comparison
+
+| Need | Use |
+|------|-----|
+| Quick glance at history | `tsgit graph` |
+| Detailed commit info | `tsgit log` |
+| Interactive exploration | `tsgit web` |
+| Full-featured terminal | `tsgit ui` |
+
+## Tips
+
+<Tip>
+Combine with grep for quick searches:
+```bash
+tsgit graph | grep "feature"
+```
+</Tip>
+
+<Tip>
+Use `-n` to limit output for large repositories:
+```bash
+tsgit graph -n 20
+```
+</Tip>

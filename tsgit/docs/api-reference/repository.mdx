@@ -1,0 +1,560 @@
+---
+title: Repository
+description: "Repository class API reference"
+---
+
+# Repository
+
+The `Repository` class is the main entry point for all repository operations.
+
+## Import
+
+```typescript
+import { Repository } from 'tsgit';
+```
+
+## Static Methods
+
+### Repository.init()
+
+Create a new repository.
+
+```typescript
+static init(path?: string): Repository
+```
+
+**Parameters:**
+
+| Name | Type | Description |
+|------|------|-------------|
+| `path` | `string` | Directory to initialize (default: current directory) |
+
+**Returns:** `Repository` instance
+
+**Example:**
+
+```typescript
+// Initialize in current directory
+const repo = Repository.init();
+
+// Initialize in specific path
+const repo = Repository.init('/path/to/project');
+```
+
+---
+
+### Repository.open()
+
+Open an existing repository.
+
+```typescript
+static open(path?: string): Repository
+```
+
+**Parameters:**
+
+| Name | Type | Description |
+|------|------|-------------|
+| `path` | `string` | Repository path (default: current directory) |
+
+**Returns:** `Repository` instance
+
+**Throws:** `NotFoundError` if no repository found
+
+**Example:**
+
+```typescript
+const repo = Repository.open('/path/to/repo');
+```
+
+---
+
+### Repository.isRepository()
+
+Check if a directory is a tsgit repository.
+
+```typescript
+static isRepository(path: string): boolean
+```
+
+**Example:**
+
+```typescript
+if (Repository.isRepository('/some/path')) {
+  const repo = Repository.open('/some/path');
+}
+```
+
+## Instance Methods
+
+### Staging
+
+#### add()
+
+Stage files for commit.
+
+```typescript
+add(path: string | string[]): void
+```
+
+**Parameters:**
+
+| Name | Type | Description |
+|------|------|-------------|
+| `path` | `string \| string[]` | File(s) to stage |
+
+**Example:**
+
+```typescript
+repo.add('file.ts');
+repo.add(['file1.ts', 'file2.ts']);
+repo.add('.');  // Stage all
+```
+
+---
+
+#### unstage()
+
+Remove files from staging area.
+
+```typescript
+unstage(path: string | string[]): void
+```
+
+**Example:**
+
+```typescript
+repo.unstage('file.ts');
+```
+
+---
+
+### Committing
+
+#### commit()
+
+Create a new commit.
+
+```typescript
+commit(message: string, options?: CommitOptions): string
+```
+
+**Parameters:**
+
+| Name | Type | Description |
+|------|------|-------------|
+| `message` | `string` | Commit message |
+| `options` | `CommitOptions` | Optional settings |
+
+**Options:**
+
+```typescript
+interface CommitOptions {
+  all?: boolean;      // Stage all tracked files
+  amend?: boolean;    // Amend last commit
+  author?: string;    // Override author
+  email?: string;     // Override email
+}
+```
+
+**Returns:** Commit hash
+
+**Example:**
+
+```typescript
+const hash = repo.commit('Add feature');
+
+// Stage all and commit
+const hash = repo.commit('Update', { all: true });
+
+// Amend last commit
+repo.commit('Fixed message', { amend: true });
+```
+
+---
+
+### Status
+
+#### status()
+
+Get repository status.
+
+```typescript
+status(): Status
+```
+
+**Returns:**
+
+```typescript
+interface Status {
+  branch: string;
+  staged: FileStatus[];
+  modified: FileStatus[];
+  untracked: string[];
+  ahead: number;
+  behind: number;
+}
+```
+
+**Example:**
+
+```typescript
+const status = repo.status();
+
+console.log('On branch:', status.branch);
+console.log('Staged files:', status.staged.length);
+console.log('Modified files:', status.modified.length);
+console.log('Untracked:', status.untracked);
+```
+
+---
+
+### History
+
+#### log()
+
+Get commit history.
+
+```typescript
+log(options?: LogOptions): Commit[]
+```
+
+**Options:**
+
+```typescript
+interface LogOptions {
+  limit?: number;     // Max commits to return
+  since?: Date;       // Commits after this date
+  until?: Date;       // Commits before this date
+  author?: string;    // Filter by author
+  path?: string;      // Filter by path
+}
+```
+
+**Example:**
+
+```typescript
+// All commits
+const commits = repo.log();
+
+// Last 10 commits
+const recent = repo.log({ limit: 10 });
+
+// Commits affecting a file
+const fileHistory = repo.log({ path: 'src/index.ts' });
+```
+
+---
+
+#### getCommit()
+
+Get a specific commit.
+
+```typescript
+getCommit(ref: string): Commit
+```
+
+**Parameters:**
+
+| Name | Type | Description |
+|------|------|-------------|
+| `ref` | `string` | Commit hash or reference |
+
+**Example:**
+
+```typescript
+const commit = repo.getCommit('abc123');
+const head = repo.getCommit('HEAD');
+const parent = repo.getCommit('HEAD~1');
+```
+
+---
+
+### Diffing
+
+#### diff()
+
+Get differences.
+
+```typescript
+diff(options?: DiffOptions): DiffResult
+```
+
+**Options:**
+
+```typescript
+interface DiffOptions {
+  staged?: boolean;   // Diff staged vs HEAD
+  from?: string;      // Start commit/ref
+  to?: string;        // End commit/ref
+  path?: string;      // Limit to path
+}
+```
+
+**Example:**
+
+```typescript
+// Unstaged changes
+const unstaged = repo.diff();
+
+// Staged changes
+const staged = repo.diff({ staged: true });
+
+// Between commits
+const changes = repo.diff({ from: 'abc', to: 'def' });
+```
+
+---
+
+### Branches
+
+#### branches()
+
+List all branches.
+
+```typescript
+branches(): Branch[]
+```
+
+**Returns:**
+
+```typescript
+interface Branch {
+  name: string;
+  hash: string;
+  current: boolean;
+  upstream?: string;
+}
+```
+
+**Example:**
+
+```typescript
+const branches = repo.branches();
+for (const branch of branches) {
+  console.log(branch.current ? '* ' : '  ', branch.name);
+}
+```
+
+---
+
+#### currentBranch()
+
+Get current branch name.
+
+```typescript
+currentBranch(): string | null
+```
+
+Returns `null` if in detached HEAD state.
+
+---
+
+#### createBranch()
+
+Create a new branch.
+
+```typescript
+createBranch(name: string, startPoint?: string): void
+```
+
+**Example:**
+
+```typescript
+repo.createBranch('feature');
+repo.createBranch('from-tag', 'v1.0.0');
+```
+
+---
+
+#### deleteBranch()
+
+Delete a branch.
+
+```typescript
+deleteBranch(name: string, force?: boolean): void
+```
+
+---
+
+#### switch()
+
+Switch to a branch.
+
+```typescript
+switch(branch: string, options?: SwitchOptions): void
+```
+
+**Options:**
+
+```typescript
+interface SwitchOptions {
+  create?: boolean;   // Create branch if doesn't exist
+}
+```
+
+**Example:**
+
+```typescript
+repo.switch('main');
+repo.switch('new-feature', { create: true });
+```
+
+---
+
+### Merging
+
+#### merge()
+
+Merge a branch.
+
+```typescript
+merge(branch: string, options?: MergeOptions): MergeResult
+```
+
+**Returns:**
+
+```typescript
+interface MergeResult {
+  success: boolean;
+  hash?: string;           // Merge commit hash
+  conflicts?: string[];    // Conflicting files
+}
+```
+
+**Example:**
+
+```typescript
+const result = repo.merge('feature');
+if (!result.success) {
+  console.log('Conflicts in:', result.conflicts);
+}
+```
+
+---
+
+### Undo
+
+#### undo()
+
+Undo operations.
+
+```typescript
+undo(options?: UndoOptions): void
+```
+
+**Options:**
+
+```typescript
+interface UndoOptions {
+  steps?: number;    // Number of operations to undo
+}
+```
+
+**Example:**
+
+```typescript
+repo.undo();
+repo.undo({ steps: 3 });
+```
+
+---
+
+#### restore()
+
+Restore file from index or commit.
+
+```typescript
+restore(path: string, options?: RestoreOptions): void
+```
+
+**Options:**
+
+```typescript
+interface RestoreOptions {
+  staged?: boolean;    // Unstage file
+  source?: string;     // Restore from commit
+}
+```
+
+---
+
+### Low-Level Access
+
+#### getTree()
+
+Get a tree object.
+
+```typescript
+getTree(hash: string): Tree
+```
+
+---
+
+#### getBlob()
+
+Get a blob (file content).
+
+```typescript
+getBlob(hash: string): Blob
+```
+
+---
+
+#### getFileContent()
+
+Get file content from the working tree or index.
+
+```typescript
+getFileContent(path: string, options?: { staged?: boolean }): string
+```
+
+---
+
+## Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `path` | `string` | Repository root path |
+| `tsgitDir` | `string` | `.tsgit` directory path |
+| `workingDir` | `string` | Working directory path |
+| `config` | `Config` | Repository configuration |
+| `journal` | `Journal` | Operation journal (for undo) |
+
+## Example: Full Workflow
+
+```typescript
+import { Repository } from 'tsgit';
+
+// Open or create repo
+const repo = Repository.isRepository('.')
+  ? Repository.open('.')
+  : Repository.init('.');
+
+// Make changes and stage
+repo.add('src/feature.ts');
+repo.add('tests/feature.test.ts');
+
+// Check what's staged
+const status = repo.status();
+console.log('Staged:', status.staged.map(f => f.path));
+
+// Review diff
+const diff = repo.diff({ staged: true });
+for (const file of diff.files) {
+  console.log(`\n${file.path}:`);
+  for (const hunk of file.hunks) {
+    console.log(hunk.header);
+  }
+}
+
+// Commit
+const hash = repo.commit('Add new feature');
+console.log('Created commit:', hash);
+
+// View history
+const commits = repo.log({ limit: 5 });
+for (const commit of commits) {
+  console.log(`${commit.hash.slice(0, 7)} ${commit.message}`);
+}
+```

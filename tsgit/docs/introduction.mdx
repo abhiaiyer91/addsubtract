@@ -1,0 +1,84 @@
+---
+title: Introduction
+description: "A modern Git implementation in TypeScript that fixes Git's most frustrating problems"
+---
+
+# Welcome to tsgit
+
+tsgit is a modern Git implementation in TypeScript that addresses many of Git's well-known usability issues while maintaining compatibility with Git concepts.
+
+## Why tsgit?
+
+Git is powerful but has well-known issues. tsgit addresses them:
+
+| Problem | Git | tsgit |
+|---------|-----|-------|
+| Security | SHA-1 (broken) | SHA-256 default |
+| Large files | Needs LFS | Built-in chunking |
+| Undo mistakes | Reflog is cryptic | Simple `tsgit undo` |
+| Branch switching | Loses uncommitted work | Auto-stash per branch |
+| Merge conflicts | Inline markers | Structured JSON |
+| Confusing commands | `checkout` does 5 things | Dedicated `switch`/`restore` |
+| Error messages | Cryptic | Helpful with suggestions |
+| Visual interface | External tools needed | Built-in TUI & Web UI |
+| Quick saves | No built-in solution | `tsgit wip` auto-message |
+| Fixing commits | `git commit --amend` verbose | Simple `tsgit amend` |
+| Branch cleanup | Manual process | `tsgit cleanup` |
+| Repository stats | External tools | Built-in `tsgit stats` |
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="SHA-256 Security" icon="shield-halved">
+    Secure by default with SHA-256 hashing instead of Git's deprecated SHA-1
+  </Card>
+  <Card title="Built-in UI" icon="window">
+    Web UI and Terminal UI included - no external tools needed
+  </Card>
+  <Card title="Undo Anything" icon="rotate-left">
+    Simple `tsgit undo` command reverts any operation
+  </Card>
+  <Card title="AI-Powered" icon="robot">
+    AI-generated commit messages and code review support
+  </Card>
+  <Card title="Auto-stash" icon="layer-group">
+    Never lose work when switching branches
+  </Card>
+  <Card title="Large File Support" icon="file-zipper">
+    Built-in chunked storage without LFS
+  </Card>
+</CardGroup>
+
+## Quick Example
+
+```bash
+# Initialize a new repository
+tsgit init
+
+# Add files and commit
+tsgit add .
+tsgit commit -m "Initial commit"
+
+# Made a mistake? Just undo it
+tsgit undo
+
+# Launch visual interface
+tsgit web
+```
+
+## What's Next?
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Get up and running with tsgit in minutes
+  </Card>
+  <Card title="Installation" icon="download" href="/installation">
+    Detailed installation instructions
+  </Card>
+  <Card title="Commands" icon="terminal" href="/commands/overview">
+    Explore all available commands
+  </Card>
+  <Card title="API Reference" icon="code" href="/api-reference/overview">
+    Use tsgit programmatically in your projects
+  </Card>
+</CardGroup>
