@@ -7,6 +7,7 @@ import { Repository } from '../core/repository';
 import { Journal, StateSnapshot } from '../core/journal';
 import { TsgitError, Errors, ErrorCode } from '../core/errors';
 import { Author } from '../core/types';
+import { updateReflog } from './reflog';
 
 /**
  * Options for commit command
@@ -149,6 +150,29 @@ export function commitWithOptions(
     afterState,
     { commitHash: hash }
   );
+
+  // Update reflog
+  const messageFirstLineForReflog = options.message.split('\n')[0].slice(0, 50);
+  updateReflog(
+    repo.gitDir,
+    repo.workDir,
+    'HEAD',
+    beforeState.head || '0'.repeat(40),
+    hash,
+    `commit: ${messageFirstLineForReflog}`
+  );
+
+  // Also update branch reflog if on a branch
+  if (branch) {
+    updateReflog(
+      repo.gitDir,
+      repo.workDir,
+      `refs/heads/${branch}`,
+      beforeState.head || '0'.repeat(40),
+      hash,
+      `commit: ${messageFirstLineForReflog}`
+    );
+  }
 
   const shortHash = hash.slice(0, 8);
   const messageFirstLine = options.message.split('\n')[0];

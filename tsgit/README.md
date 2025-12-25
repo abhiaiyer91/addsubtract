@@ -140,6 +140,39 @@ tsgit web --port 8080       # Custom port
 tsgit graph                 # ASCII commit graph
 ```
 
+### Advanced Features
+
+```bash
+# Hooks - customize behavior at key points
+tsgit hooks                       # List installed hooks
+tsgit hooks install pre-commit    # Install a hook from template
+tsgit hooks remove pre-commit     # Remove a hook
+tsgit hooks run pre-commit        # Test a hook manually
+
+# Submodules - nested repositories
+tsgit submodule add <url> <path>  # Add a submodule
+tsgit submodule init              # Initialize submodules
+tsgit submodule update            # Update submodules
+tsgit submodule status            # Show submodule status
+tsgit submodule foreach <cmd>     # Run command in each
+
+# Worktrees - multiple working directories
+tsgit worktree add <path> <branch>  # Create new worktree
+tsgit worktree list                 # List all worktrees
+tsgit worktree remove <path>        # Remove a worktree
+tsgit worktree prune                # Prune stale entries
+
+# Reflog - reference history
+tsgit reflog                    # Show HEAD reflog
+tsgit reflog <ref>              # Show reflog for specific ref
+tsgit reflog expire             # Prune old entries
+
+# Garbage Collection
+tsgit gc                        # Run garbage collection
+tsgit gc --aggressive           # More aggressive optimization
+tsgit gc --prune=now            # Prune immediately
+```
+
 ### Monorepo Scopes
 
 ```bash
@@ -256,15 +289,17 @@ const results = search.search('TODO');
 - **Statistics** - `tsgit stats` shows repo insights
 - **Snapshots** - Quick checkpoints without full commits
 - **Smart blame** - Color-coded, with relative dates
+- **Hooks** - Full hook system (pre-commit, post-commit, etc.)
+- **Submodules** - Nested repository support
+- **Worktrees** - Multiple working directories
+- **Reflog** - Reference log with time-based recovery
+- **GC** - Garbage collection with aggressive optimization
 
 ### What's Missing (Planned)
 
 - Remote operations (push, pull, fetch, clone)
 - Rebase
 - Cherry-pick
-- Stash command (auto-stash exists)
-- Hooks
-- Submodules
 
 ## Examples
 
@@ -360,6 +395,43 @@ tsgit stats
 #   - Top contributors
 #   - Language breakdown
 #   - Activity patterns
+```
+
+### Work on Multiple Branches Simultaneously
+
+```bash
+# Create a worktree for feature development
+tsgit worktree add ../feature-worktree feature-branch
+
+# Now you can work on both branches at once
+# Main worktree stays on main, feature worktree on feature-branch
+
+# Clean up when done
+tsgit worktree remove ../feature-worktree
+```
+
+### Set Up Pre-commit Hooks
+
+```bash
+# Install a pre-commit hook
+tsgit hooks install pre-commit
+
+# Edit the hook to run your linter
+# The hook is at .tsgit/hooks/pre-commit
+
+# Test it manually
+tsgit hooks run pre-commit
+```
+
+### Recover from Mistakes with Reflog
+
+```bash
+# See your reference history
+tsgit reflog
+
+# Reference any previous state
+# The reflog shows HEAD@{0}, HEAD@{1}, etc.
+# You can use these with reset to recover
 ```
 
 ## License

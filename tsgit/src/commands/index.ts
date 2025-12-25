@@ -60,3 +60,7 @@ export { handleClone, clone, parseRepoUrl } from './clone';
 export { handleFetch, fetch } from './fetch';
 export { handlePull, pull } from './pull';
 export { handlePush, push } from './push';
+
+// Advanced features
+export { handleReflog, ReflogManager, updateReflog } from './reflog';
+export { handleGC, GarbageCollector } from './gc';

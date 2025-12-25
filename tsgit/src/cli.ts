@@ -56,7 +56,13 @@ import {
   handleForEachRef,
   handleShowRef,
   handleFsck,
+  // Advanced features
+  handleReflog,
+  handleGC,
 } from './commands';
+import { handleHooks } from './core/hooks';
+import { handleSubmodule } from './core/submodule';
+import { handleWorktree } from './core/worktree';
 import { TsgitError, findSimilar } from './core/errors';
 import { Repository } from './core/repository';
 import { launchTUI } from './ui/tui';
@@ -140,6 +146,7 @@ History Rewriting:
   revert <commit>       Create commit that undoes changes
   revert -n <commit>    Revert without committing
   revert --continue     Continue after conflict resolution
+
 Remote Operations:
   remote                List configured remotes
   remote add <n> <url>  Add a new remote
@@ -148,6 +155,13 @@ Remote Operations:
   fetch [<remote>]      Download objects and refs from remote
   pull [<remote>]       Fetch and integrate with local branch
   push [<remote>]       Update remote refs and objects
+
+Advanced Features:
+  hooks                 Manage repository hooks
+  submodule             Manage submodules
+  worktree              Manage multiple working trees
+  reflog                Show reference log
+  gc                    Run garbage collection
 
 Quality of Life:
   amend                 Quickly fix the last commit
@@ -232,6 +246,8 @@ const COMMANDS = [
   'cherry-pick', 'rebase', 'revert',
   // Remote commands
   'remote', 'clone', 'fetch', 'pull', 'push',
+  // Advanced features
+  'hooks', 'submodule', 'worktree', 'reflog', 'gc',
   'help',
 ];
 
@@ -652,6 +668,30 @@ function main(): void {
       case 'push':
         // Pass through all remaining args
         handlePush(args.slice(args.indexOf('push') + 1));
+        break;
+
+      // Advanced features
+      case 'hooks':
+        handleHooks(cmdArgs);
+        break;
+
+      case 'submodule':
+        handleSubmodule(cmdArgs).catch((error: Error) => {
+          console.error(`error: ${error.message}`);
+          process.exit(1);
+        });
+        return; // Exit main() to let async handle complete
+
+      case 'worktree':
+        handleWorktree(cmdArgs);
+        break;
+
+      case 'reflog':
+        handleReflog(cmdArgs);
+        break;
+
+      case 'gc':
+        handleGC(cmdArgs);
         break;
 
       default: {
