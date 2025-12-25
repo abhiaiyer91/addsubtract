@@ -59,6 +59,9 @@ import {
   // Advanced features
   handleReflog,
   handleGC,
+  // Command help
+  printCommandHelp,
+  hasHelpFlag,
 } from './commands';
 import { handleHooks } from './core/hooks';
 import { handleSubmodule } from './core/submodule';
@@ -330,7 +333,22 @@ function main(): void {
   // For commands that do their own argument parsing, use raw args after command
   const rawArgs = args.slice(1);
 
+  // Check for --help or -h flag on a specific command first
+  // This handles: wit add --help, wit commit -h, etc.
+  if (command && COMMANDS.includes(command) && command !== 'help' && (options.help || hasHelpFlag(rawArgs))) {
+    if (printCommandHelp(command)) {
+      return;
+    }
+  }
+
+  // Check for general help: wit --help, wit help, wit help <command>
   if (options.help || command === 'help') {
+    // Check if help is requested for a specific command
+    if (command === 'help' && cmdArgs.length > 0) {
+      if (printCommandHelp(cmdArgs[0])) {
+        return;
+      }
+    }
     console.log(HELP);
     return;
   }

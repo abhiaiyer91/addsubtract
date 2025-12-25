@@ -64,3 +64,6 @@ export { handlePush, push } from './push';
 // Advanced features
 export { handleReflog, ReflogManager, updateReflog } from './reflog';
 export { handleGC, GarbageCollector } from './gc';
+
+// Command help system
+export { COMMAND_HELP, formatCommandHelp, printCommandHelp, hasHelpFlag } from './command-help';
