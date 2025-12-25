@@ -190,3 +190,34 @@ export function buildTreeFromIndex(entries: IndexEntry[]): Map<string, Map<strin
 
   return trees;
 }
+
+// Re-export core modules
+export * from './types';
+export * from './errors';
+export { Repository, RepositoryConfig } from './repository';
+export { ObjectStore } from './object-store';
+export { GitObject, Blob, Tree, Commit, Tag } from './object';
+export { Refs } from './refs';
+export { Journal } from './journal';
+export { LargeFileHandler, CHUNK_THRESHOLD } from './large-file';
+export { BranchStateManager } from './branch-state';
+export { MergeManager } from './merge';
+export { ScopeManager } from './scope';
+export { PartialCloneManager, SparseCheckoutManager } from './partial-clone';
+export { FileDiff, DiffLine, DiffHunk, diff, createHunks, formatUnifiedDiff, formatColoredDiff, isBinary } from './diff';
+
+// Remote infrastructure
+export { Remote, RemoteManager } from './remote';
+export {
+  CredentialManager,
+  CredentialSource,
+  CredentialResult,
+  createBasicCredentials,
+  createBearerCredentials,
+  createGitHubCredentials,
+  createGitLabCredentials,
+  getCredentialManager,
+} from './auth';
+
+// Protocol exports
+export * as protocol from './protocol';
