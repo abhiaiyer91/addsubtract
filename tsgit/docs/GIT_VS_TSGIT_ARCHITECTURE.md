@@ -1026,9 +1026,23 @@ This means users familiar with Git internals can understand tsgit immediately, w
 - Remote operations (push, pull, fetch, clone)
 - Rebase
 - Cherry-pick
+- Revert
 - Hooks system
 - Submodules
+- Worktrees
 - Packfiles for storage optimization
+
+### What's Fully Implemented
+
+In addition to the core Git features (init, add, commit, status, log, diff, branch, checkout, merge):
+
+- **Stash** - Full stash management with save, list, show, apply, pop, drop, clear
+- **Tag** - Both lightweight and annotated tags with full CRUD operations
+- **Reset** - All three modes (soft, mixed, hard) with full revision parsing (HEAD~N, HEAD^)
+- **AI Features** - Commit message generation, code review, conflict resolution
+- **Quality of Life** - amend, wip, uncommit, fixup, cleanup, blame, stats, snapshot
+- **Monorepo Scopes** - First-class scope support for large repositories
+- **Visual UIs** - Terminal TUI and Web UI for visual git operations
 
 ---
 

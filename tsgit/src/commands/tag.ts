@@ -54,18 +54,22 @@ export function createLightweightTag(repo: Repository, name: string, ref?: strin
   }
 
   // Check if tag already exists
-  if (repo.refs.tagExists(name) && !force) {
-    throw new TsgitError(
-      `Tag '${name}' already exists`,
-      ErrorCode.OPERATION_FAILED,
-      [
-        `tsgit tag -d ${name}    # Delete existing tag first`,
-        `tsgit tag -f ${name}    # Force overwrite`
-      ]
-    );
+  if (repo.refs.tagExists(name)) {
+    if (!force) {
+      throw new TsgitError(
+        `Tag '${name}' already exists`,
+        ErrorCode.OPERATION_FAILED,
+        [
+          `tsgit tag -d ${name}    # Delete existing tag first`,
+          `tsgit tag -f ${name}    # Force overwrite`
+        ]
+      );
+    }
+    // Delete existing tag when force is true
+    repo.refs.deleteTag(name);
   }
 
-  // Create or update tag
+  // Create tag
   repo.refs.createTag(name, hash);
   
   return hash;
