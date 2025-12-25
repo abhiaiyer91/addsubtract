@@ -12,6 +12,7 @@ import { MergeManager } from './merge';
 import { ScopeManager } from './scope';
 import { PartialCloneManager, SparseCheckoutManager } from './partial-clone';
 import { setHashAlgorithm, getHashAlgorithm, HashAlgorithm } from '../utils/hash';
+import { HookManager } from './hooks';
 
 /**
  * Repository configuration
@@ -53,6 +54,7 @@ export class Repository {
   readonly scopeManager: ScopeManager;
   readonly partialClone: PartialCloneManager;
   readonly sparseCheckout: SparseCheckoutManager;
+  readonly hooks: HookManager;
 
   private config: RepositoryConfig;
 
@@ -77,6 +79,7 @@ export class Repository {
     this.scopeManager = new ScopeManager(this.gitDir, this.workDir);
     this.partialClone = new PartialCloneManager(this.gitDir, this.objects);
     this.sparseCheckout = new SparseCheckoutManager(this.gitDir);
+    this.hooks = new HookManager(this.gitDir, this.workDir);
   }
 
   /**
@@ -143,6 +146,7 @@ export class Repository {
     repo.largeFiles.init();
     repo.branchState.init();
     repo.scopeManager.init();
+    repo.hooks.init();
 
     console.log(`Initialized tsgit repository with ${hashAlgo} hashing`);
 

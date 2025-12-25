@@ -37,3 +37,7 @@ export { lsTree } from './ls-tree';
 export { handleStash, StashManager } from './stash';
 export { handleTag, createLightweightTag, createAnnotatedTag, listTags, deleteTag } from './tag';
 export { handleReset, reset, resetFile, parseRevision } from './reset';
+
+// Advanced features
+export { handleReflog, ReflogManager, updateReflog } from './reflog';
+export { handleGC, GarbageCollector } from './gc';

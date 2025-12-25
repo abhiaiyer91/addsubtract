@@ -36,7 +36,13 @@ import {
   handleStash,
   handleTag,
   handleReset,
+  // Advanced features
+  handleReflog,
+  handleGC,
 } from './commands';
+import { handleHooks } from './core/hooks';
+import { handleSubmodule } from './core/submodule';
+import { handleWorktree } from './core/worktree';
 import { TsgitError, findSimilar } from './core/errors';
 import { Repository } from './core/repository';
 import { launchTUI } from './ui/tui';
@@ -100,6 +106,13 @@ Tags:
   tag <name>            Create a lightweight tag
   tag -a <name> -m ""   Create an annotated tag
   tag -d <name>         Delete a tag
+
+Advanced Features:
+  hooks                 Manage repository hooks
+  submodule             Manage submodules
+  worktree              Manage multiple working trees
+  reflog                Show reference log
+  gc                    Run garbage collection
 
 Quality of Life:
   amend                 Quickly fix the last commit
@@ -167,6 +180,8 @@ const COMMANDS = [
   'cat-file', 'hash-object', 'ls-files', 'ls-tree',
   // New Git-compatible commands
   'stash', 'tag', 'reset',
+  // Advanced features
+  'hooks', 'submodule', 'worktree', 'reflog', 'gc',
   'help',
 ];
 
@@ -486,6 +501,30 @@ function main(): void {
 
       case 'reset':
         handleReset(cmdArgs);
+        break;
+
+      // Advanced features
+      case 'hooks':
+        handleHooks(cmdArgs);
+        break;
+
+      case 'submodule':
+        handleSubmodule(cmdArgs).catch((error: Error) => {
+          console.error(`error: ${error.message}`);
+          process.exit(1);
+        });
+        return; // Exit main() to let async handle complete
+
+      case 'worktree':
+        handleWorktree(cmdArgs);
+        break;
+
+      case 'reflog':
+        handleReflog(cmdArgs);
+        break;
+
+      case 'gc':
+        handleGC(cmdArgs);
         break;
 
       default: {
