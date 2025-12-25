@@ -42,6 +42,13 @@ import {
   handleFetch,
   handlePull,
   handlePush,
+  // Plumbing commands
+  handleRevParse,
+  handleUpdateRef,
+  handleSymbolicRef,
+  handleForEachRef,
+  handleShowRef,
+  handleFsck,
 } from './commands';
 import { TsgitError, findSimilar } from './core/errors';
 import { Repository } from './core/repository';
@@ -144,6 +151,12 @@ Plumbing Commands:
   hash-object <file>    Compute object ID and create a blob
   ls-files              Show information about files in the index
   ls-tree <tree>        List the contents of a tree object
+  rev-parse <ref>       Parse revision to hash
+  update-ref <ref> <h>  Update ref to new hash
+  symbolic-ref <name>   Read/write symbolic refs
+  for-each-ref          Iterate over refs
+  show-ref              List refs with hashes
+  fsck                  Verify object database
 
 Options:
   -h, --help            Show this help message
@@ -185,6 +198,8 @@ const COMMANDS = [
   'ui', 'web',
   'ai',
   'cat-file', 'hash-object', 'ls-files', 'ls-tree',
+  // Plumbing commands
+  'rev-parse', 'update-ref', 'symbolic-ref', 'for-each-ref', 'show-ref', 'fsck',
   // New Git-compatible commands
   'stash', 'tag', 'reset',
   // Remote commands
@@ -445,6 +460,31 @@ function main(): void {
           recursive: !!options.recursive || !!options.r,
           nameOnly: !!options['name-only'],
         });
+        break;
+
+      // Plumbing commands - pass raw args since they handle their own parsing
+      case 'rev-parse':
+        handleRevParse(args.slice(1));
+        break;
+
+      case 'update-ref':
+        handleUpdateRef(args.slice(1));
+        break;
+
+      case 'symbolic-ref':
+        handleSymbolicRef(args.slice(1));
+        break;
+
+      case 'for-each-ref':
+        handleForEachRef(args.slice(1));
+        break;
+
+      case 'show-ref':
+        handleShowRef(args.slice(1));
+        break;
+
+      case 'fsck':
+        handleFsck(args.slice(1));
         break;
 
       case 'ai':
