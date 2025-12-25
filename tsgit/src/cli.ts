@@ -30,6 +30,10 @@ import {
   handleStats,
   handleFixup,
   handleSnapshot,
+  // History Rewriting commands
+  handleReset,
+  handleCherryPick,
+  handleRebase,
 } from './commands';
 import { TsgitError, findSimilar } from './core/errors';
 import { Repository } from './core/repository';
@@ -86,6 +90,13 @@ Undo & History:
   history               Show operation history
   uncommit              Undo last commit, keep changes staged
 
+History Rewriting:
+  reset [--hard|--soft|--mixed] <commit>
+                        Reset HEAD to specified state
+  cherry-pick <commit>  Apply changes from a specific commit
+  rebase <branch>       Reapply commits on top of another branch
+  rebase -i <branch>    Interactive rebase (pick, squash, fixup, drop)
+
 Quality of Life:
   amend                 Quickly fix the last commit
   wip                   Quick WIP commit with auto-generated message
@@ -125,6 +136,7 @@ const COMMANDS = [
   'init', 'add', 'commit', 'status', 'log', 'diff',
   'branch', 'switch', 'checkout', 'restore',
   'merge', 'undo', 'history', 'uncommit',
+  'reset', 'cherry-pick', 'rebase',  // History rewriting
   'amend', 'wip', 'fixup', 'cleanup', 'blame', 'stats', 'snapshot',
   'scope', 'graph',
   'ui', 'web',
@@ -173,6 +185,7 @@ function parseArgs(args: string[]): { command: string; args: string[]; options: 
           's': 'stage',
           'c': 'create',
           'a': 'all',
+          'i': 'interactive',
         };
         options[mapping[key] || key] = true;
         i++;
@@ -428,6 +441,33 @@ function main(): void {
 
       case 'snapshot':
         handleSnapshot(cmdArgs);
+        break;
+
+      // History Rewriting commands
+      case 'reset':
+        handleReset(cmdArgs.concat(
+          options.hard ? ['--hard'] : [],
+          options.soft ? ['--soft'] : [],
+          options.mixed ? ['--mixed'] : []
+        ));
+        break;
+
+      case 'cherry-pick':
+        handleCherryPick(cmdArgs.concat(
+          options.continue ? ['--continue'] : [],
+          options.abort ? ['--abort'] : [],
+          options['no-commit'] ? ['--no-commit'] : []
+        ));
+        break;
+
+      case 'rebase':
+        handleRebase(cmdArgs.concat(
+          options.continue ? ['--continue'] : [],
+          options.abort ? ['--abort'] : [],
+          options.skip ? ['--skip'] : [],
+          options.interactive ? ['-i'] : [],
+          options.onto ? ['--onto', options.onto as string] : []
+        ));
         break;
 
       default: {
