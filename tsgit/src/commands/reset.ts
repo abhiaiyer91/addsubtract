@@ -68,7 +68,7 @@ export function parseRevision(repo: Repository, revSpec: string): string {
   if (!hash) {
     throw new TsgitError(
       `Cannot resolve '${ref}'`,
-      ErrorCode.REFERENCE_NOT_FOUND,
+      ErrorCode.REF_NOT_FOUND,
       ['Check that the commit or reference exists']
     );
   }

@@ -16,7 +16,7 @@ import { Repository } from '../core/repository';
 import { Tag as TagObject } from '../core/object';
 import { TsgitError, ErrorCode } from '../core/errors';
 import { exists, readFileText, writeFile, readDir } from '../utils/fs';
-import { Author } from '../core/types';
+import { Author, ObjectType } from '../core/types';
 
 const colors = {
   green: (s: string) => `\x1b[32m${s}\x1b[0m`,
@@ -48,7 +48,7 @@ export function createLightweightTag(repo: Repository, name: string, ref?: strin
   if (!hash) {
     throw new TsgitError(
       `Cannot resolve '${target}'`,
-      ErrorCode.REFERENCE_NOT_FOUND,
+      ErrorCode.REF_NOT_FOUND,
       ['Check that the commit or reference exists']
     );
   }
@@ -88,7 +88,7 @@ export function createAnnotatedTag(
   if (!targetHash) {
     throw new TsgitError(
       `Cannot resolve '${target}'`,
-      ErrorCode.REFERENCE_NOT_FOUND,
+      ErrorCode.REF_NOT_FOUND,
       ['Check that the commit or reference exists']
     );
   }
@@ -106,9 +106,9 @@ export function createAnnotatedTag(
   }
 
   // Determine object type
-  let objectType = 'commit';
+  let objectType: ObjectType = 'commit';
   try {
-    const obj = repo.objects.read(targetHash);
+    const obj = repo.objects.readObject(targetHash);
     objectType = obj.type;
   } catch {
     objectType = 'commit';
@@ -142,7 +142,7 @@ export function deleteTag(repo: Repository, name: string): void {
   if (!repo.refs.tagExists(name)) {
     throw new TsgitError(
       `Tag '${name}' not found`,
-      ErrorCode.REFERENCE_NOT_FOUND,
+      ErrorCode.REF_NOT_FOUND,
       ['tsgit tag    # List available tags']
     );
   }
@@ -183,7 +183,7 @@ export function getTagInfo(repo: Repository, name: string): {
   if (!repo.refs.tagExists(name)) {
     throw new TsgitError(
       `Tag '${name}' not found`,
-      ErrorCode.REFERENCE_NOT_FOUND,
+      ErrorCode.REF_NOT_FOUND,
       ['tsgit tag    # List available tags']
     );
   }
@@ -191,7 +191,7 @@ export function getTagInfo(repo: Repository, name: string): {
   const hash = repo.refs.resolve(name)!;
   
   try {
-    const obj = repo.objects.read(hash);
+    const obj = repo.objects.readObject(hash);
     
     if (obj.type === 'tag') {
       const tagObj = obj as TagObject;
