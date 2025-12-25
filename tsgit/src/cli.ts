@@ -36,6 +36,9 @@ import {
   handleStash,
   handleTag,
   handleReset,
+  handleBisect,
+  handleClean,
+  handleShow,
   // History rewriting commands
   handleCherryPick,
   handleRebase,
@@ -111,6 +114,14 @@ Undo & History:
   uncommit              Undo last commit, keep changes staged
   reset [--soft|--hard] Reset HEAD to a specific state
   stash                 Save working directory changes temporarily
+
+Debugging & Inspection:
+  show <commit>         Show commit details and diff
+  show <commit>:<file>  Show file at specific commit
+  bisect start          Start binary search for bug
+  bisect good/bad       Mark commits during bisect
+  clean -n              Preview untracked files to delete
+  clean -f              Delete untracked files
 
 Tags:
   tag                   List all tags
@@ -216,7 +227,7 @@ const COMMANDS = [
   // Plumbing commands
   'rev-parse', 'update-ref', 'symbolic-ref', 'for-each-ref', 'show-ref', 'fsck',
   // New Git-compatible commands
-  'stash', 'tag', 'reset',
+  'stash', 'tag', 'reset', 'bisect', 'clean', 'show',
   // History rewriting commands
   'cherry-pick', 'rebase', 'revert',
   // Remote commands
@@ -227,13 +238,13 @@ const COMMANDS = [
 function parseArgs(args: string[]): { command: string; args: string[]; options: Record<string, boolean | string> } {
   const options: Record<string, boolean | string> = {};
   const positional: string[] = [];
-  
+
   let i = 0;
   let foundCommand = false;
-  
+
   while (i < args.length) {
     const arg = args[i];
-    
+
     if (arg.startsWith('--')) {
       const key = arg.slice(2);
       // Check if next arg is a value (not starting with -)
@@ -293,13 +304,16 @@ function parseArgs(args: string[]): { command: string; args: string[]; options: 
 
 function main(): void {
   const args = process.argv.slice(2);
-  
+
   if (args.length === 0) {
     console.log(HELP);
     return;
   }
 
   const { command, args: cmdArgs, options } = parseArgs(args);
+
+  // For commands that do their own argument parsing, use raw args after command
+  const rawArgs = args.slice(1);
 
   if (options.help || command === 'help') {
     console.log(HELP);
@@ -432,9 +446,9 @@ function main(): void {
 
       case 'graph': {
         const repo = Repository.find();
-        printGraph(repo, { 
-          useColors: true, 
-          maxCommits: options.n ? parseInt(options.n as string, 10) : 20 
+        printGraph(repo, {
+          useColors: true,
+          maxCommits: options.n ? parseInt(options.n as string, 10) : 20
         });
         break;
       }
@@ -563,17 +577,29 @@ function main(): void {
         handleSnapshot(cmdArgs);
         break;
 
-      // New Git-compatible commands
+      // New Git-compatible commands (these parse their own arguments)
       case 'stash':
-        handleStash(cmdArgs);
+        handleStash(rawArgs);
         break;
 
       case 'tag':
-        handleTag(cmdArgs);
+        handleTag(rawArgs);
         break;
 
       case 'reset':
-        handleReset(cmdArgs);
+        handleReset(rawArgs);
+        break;
+
+      case 'bisect':
+        handleBisect(rawArgs);
+        break;
+
+      case 'clean':
+        handleClean(rawArgs);
+        break;
+
+      case 'show':
+        handleShow(rawArgs);
         break;
 
       // History rewriting commands

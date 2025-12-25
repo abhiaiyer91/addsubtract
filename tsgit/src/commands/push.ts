@@ -77,9 +77,9 @@ function canPushFastForward(repo: Repository, localHash: string, remoteHash: str
     if (current === remoteHash) {
       return true;
     }
-    
+
     visited.add(current);
-    
+
     try {
       const commit = repo.objects.readCommit(current);
       current = commit.parentHashes.length > 0 ? commit.parentHashes[0] : null;
@@ -109,7 +109,7 @@ function pushToLocal(
 
   // Get destination repository
   const destGitDir = path.join(remoteUrl, '.tsgit');
-  
+
   if (!exists(destGitDir)) {
     throw new TsgitError(
       `Repository '${remoteUrl}' not found`,
@@ -254,21 +254,21 @@ function copyAllObjects(src: string, dest: string): void {
   if (!exists(src)) return;
 
   const entries = readDir(src);
-  
+
   for (const entry of entries) {
     const srcPath = path.join(src, entry);
     const destPath = path.join(dest, entry);
-    
+
     if (isDirectory(srcPath)) {
       if (!exists(destPath)) {
         mkdirp(destPath);
       }
-      
+
       const objects = readDir(srcPath);
       for (const obj of objects) {
         const srcObjPath = path.join(srcPath, obj);
         const destObjPath = path.join(destPath, obj);
-        
+
         if (!exists(destObjPath) && !isDirectory(srcObjPath)) {
           fs.copyFileSync(srcObjPath, destObjPath);
         }
@@ -307,7 +307,7 @@ function pushToRemote(
   for (const { local, remote } of refs) {
     const localHash = repo.refs.resolve(local);
     console.log(colors.dim(`  Would push ${local} -> ${remote} (${localHash?.slice(0, 7) || 'none'})`));
-    
+
     result.refs.push({
       ref: remote,
       status: 'rejected',
@@ -342,22 +342,22 @@ function pushTags(
   const destRepo = new Repository(remoteUrl);
 
   const localTags = repo.refs.listTags();
-  
+
   for (const tag of localTags) {
     const localHash = repo.refs.resolve(`refs/tags/${tag}`);
     if (!localHash) continue;
 
     const remoteHasTag = destRepo.refs.tagExists(tag);
-    
+
     if (remoteHasTag) {
       const remoteHash = destRepo.refs.resolve(`refs/tags/${tag}`);
       if (remoteHash === localHash) {
         results.push({ ref: `refs/tags/${tag}`, status: 'up-to-date' });
       } else {
-        results.push({ 
-          ref: `refs/tags/${tag}`, 
+        results.push({
+          ref: `refs/tags/${tag}`,
           status: 'rejected',
-          message: 'tag already exists with different hash' 
+          message: 'tag already exists with different hash'
         });
       }
     } else {
@@ -400,7 +400,7 @@ export function push(
   // Determine remote
   const remote = remoteName || 'origin';
   const remoteConfig = remoteManager.get(remote);
-  
+
   if (!remoteConfig) {
     throw new TsgitError(
       `No such remote: '${remote}'`,
@@ -440,7 +440,7 @@ export function push(
 
   // Perform push
   let result: PushResult;
-  
+
   if (exists(remoteConfig.url) || remoteConfig.url.startsWith('/') || remoteConfig.url.startsWith('./')) {
     // Local push
     result = pushToLocal(repo, remoteManager, remote, remoteConfig.url, refs, options);
@@ -521,7 +521,7 @@ export function handlePush(args: string[]): void {
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
-    
+
     if (arg === '-u' || arg === '--set-upstream') {
       options.setUpstream = true;
     } else if (arg === '-f' || arg === '--force') {
@@ -548,7 +548,7 @@ export function handlePush(args: string[]): void {
 
   try {
     const result = push(remoteName, branchName, options);
-    
+
     // Format output
     console.log(colors.dim(`To ${result.remote}`));
     formatPushResults(result, options.verbose || false);
@@ -564,7 +564,7 @@ export function handlePush(args: string[]): void {
       if (pushed > 0) parts.push(`${pushed} updated`);
       if (newRefs > 0) parts.push(`${newRefs} new`);
       if (deleted > 0) parts.push(`${deleted} deleted`);
-      
+
       console.log(colors.green('✓') + ` Push complete: ${parts.join(', ')}`);
     } else if (rejected === 0) {
       console.log(colors.dim('Everything up-to-date'));

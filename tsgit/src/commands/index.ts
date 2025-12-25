@@ -50,6 +50,9 @@ export { fsck, handleFsck } from './fsck';
 export { handleStash, StashManager } from './stash';
 export { handleTag, createLightweightTag, createAnnotatedTag, listTags, deleteTag } from './tag';
 export { handleReset, reset, resetFile, parseRevision } from './reset';
+export { handleBisect, BisectManager } from './bisect';
+export { handleClean, clean, getUntrackedItems } from './clean';
+export { handleShow, show, showCommit, showFileAtCommit, showTag } from './show';
 
 // Remote commands
 export { handleRemote, listRemotes, addRemote, removeRemote, renameRemote, getRemoteUrl, setRemoteUrl } from './remote';

@@ -140,7 +140,7 @@ export class Refs {
     if (!exists(branchPath)) {
       throw new Error(`Branch '${name}' not found`);
     }
-    
+
     const current = this.getCurrentBranch();
     if (current === name) {
       throw new Error(`Cannot delete the current branch '${name}'`);
