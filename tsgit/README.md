@@ -16,6 +16,10 @@ Git is powerful but has well-known issues. tsgit addresses them:
 | Confusing commands | `checkout` does 5 things | Dedicated `switch`/`restore` |
 | Error messages | Cryptic | Helpful with suggestions |
 | Visual interface | External tools needed | Built-in TUI & Web UI |
+| Quick saves | No built-in solution | `tsgit wip` auto-message |
+| Fixing commits | `git commit --amend` verbose | Simple `tsgit amend` |
+| Branch cleanup | Manual process | `tsgit cleanup` |
+| Repository stats | External tools | Built-in `tsgit stats` |
 
 ## Installation
 
@@ -80,6 +84,41 @@ tsgit undo --steps 3        # Undo last 3 operations
 tsgit history               # Show operation history
 tsgit restore file.ts       # Restore file from index
 tsgit restore --staged file # Unstage file
+tsgit uncommit              # Undo commit, keep changes staged
+tsgit uncommit 2            # Undo last 2 commits
+```
+
+### Quality of Life Commands
+
+```bash
+# Quick saves
+tsgit wip                   # WIP commit with auto-generated message
+tsgit wip -a                # Stage all tracked files + WIP commit
+tsgit wip -a "fixing bug"   # WIP with custom suffix
+
+# Fix last commit
+tsgit amend -m "New message"  # Change commit message
+tsgit amend                   # Add staged changes to last commit
+tsgit amend -a                # Stage all + amend
+
+# Fixup commits (for later squashing)
+tsgit fixup HEAD~2          # Create fixup for 2 commits ago
+tsgit fixup -l              # List recent commits
+
+# Quick checkpoints
+tsgit snapshot create       # Save current state
+tsgit snapshot list         # List all snapshots
+tsgit snapshot restore <id> # Restore a snapshot
+
+# Branch cleanup
+tsgit cleanup               # Find merged/stale branches
+tsgit cleanup --dry-run     # Preview what would be deleted
+tsgit cleanup --force       # Delete without confirmation
+
+# Repository insights
+tsgit stats                 # Show repository statistics
+tsgit stats --all           # Detailed statistics
+tsgit blame file.ts         # Show who changed each line
 ```
 
 ### Merge
@@ -211,6 +250,12 @@ const results = search.search('TODO');
 - **Clear commands** - `switch` for branches, `restore` for files
 - **Better errors** - Suggestions for typos and mistakes
 - **Large files** - Chunked storage without LFS
+- **Quick saves** - `tsgit wip` for instant WIP commits
+- **Easy amend** - `tsgit amend` is simpler than `git commit --amend`
+- **Branch cleanup** - `tsgit cleanup` finds and removes stale branches
+- **Statistics** - `tsgit stats` shows repo insights
+- **Snapshots** - Quick checkpoints without full commits
+- **Smart blame** - Color-coded, with relative dates
 
 ### What's Missing (Planned)
 
@@ -257,6 +302,64 @@ tsgit scope use frontend    # Only frontend/
 tsgit status                # Shows only frontend files
 tsgit add .                 # Adds only frontend files
 tsgit scope clear           # Back to full repo
+```
+
+### Quick WIP Workflow
+
+```bash
+# You're working and need to switch branches quickly
+tsgit wip -a                # Quick save everything
+tsgit switch other-branch   # Work on something else
+# ... do other work ...
+tsgit switch -              # Go back
+tsgit uncommit              # Restore your WIP state
+```
+
+### Fix a Typo in Last Commit
+
+```bash
+# Made a typo in commit message?
+tsgit amend -m "Fixed: correct message"
+
+# Forgot to add a file?
+tsgit add forgotten-file.ts
+tsgit amend
+```
+
+### Clean Up Old Branches
+
+```bash
+# See what branches can be cleaned
+tsgit cleanup --dry-run
+
+# Clean up with confirmation
+tsgit cleanup
+
+# Clean up branches older than 60 days
+tsgit cleanup --days 60 --stale
+```
+
+### Create Checkpoints
+
+```bash
+# Before doing something risky
+tsgit snapshot create "before refactor"
+
+# Do risky work...
+
+# Something went wrong? Restore!
+tsgit snapshot restore "before refactor"
+```
+
+### View Repository Stats
+
+```bash
+tsgit stats
+# Shows:
+#   - Total commits, files, lines
+#   - Top contributors
+#   - Language breakdown
+#   - Activity patterns
 ```
 
 ## License

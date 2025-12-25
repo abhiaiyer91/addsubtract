@@ -23,6 +23,15 @@ import {
   handleScope,
   // AI commands
   handleAI,
+  // Quality of Life commands
+  handleAmend,
+  handleWip,
+  handleUncommit,
+  handleCleanup,
+  handleBlame,
+  handleStats,
+  handleFixup,
+  handleSnapshot,
 } from './commands';
 import { TsgitError, findSimilar } from './core/errors';
 import { Repository } from './core/repository';
@@ -46,6 +55,7 @@ tsgit improves on Git with:
   • Better error messages (with suggestions)
   • Built-in visual UI (terminal and web)
   • AI-powered features (commit messages, code review, conflict resolution)
+  • Quality of life commands (amend, wip, uncommit, etc.)
 
 Usage: tsgit <command> [<args>]
 
@@ -77,6 +87,16 @@ Merge & Conflict Resolution:
 Undo & History:
   undo                  Undo the last operation
   history               Show operation history
+  uncommit              Undo last commit, keep changes staged
+
+Quality of Life:
+  amend                 Quickly fix the last commit
+  wip                   Quick WIP commit with auto-generated message
+  fixup <commit>        Create fixup commit to squash later
+  cleanup               Find and delete merged/stale branches
+  blame <file>          Show who changed each line
+  stats                 Repository statistics dashboard
+  snapshot              Create/restore quick checkpoints
 
 Monorepo Support:
   scope                 Show current repository scope
@@ -115,12 +135,20 @@ Examples:
   tsgit scope use frontend
   tsgit ai "what files changed?"
   tsgit ai commit -a -x
+  tsgit wip -a                # Quick save all changes
+  tsgit amend -m "New msg"    # Fix last commit message
+  tsgit uncommit              # Undo commit, keep changes
+  tsgit cleanup --dry-run     # Preview branch cleanup
+  tsgit stats                 # View repo statistics
+  tsgit snapshot create       # Create checkpoint
+  tsgit blame file.ts         # See who changed what
 `;
 
 const COMMANDS = [
   'init', 'add', 'commit', 'status', 'log', 'diff',
   'branch', 'switch', 'checkout', 'restore',
-  'merge', 'undo', 'history',
+  'merge', 'undo', 'history', 'uncommit',
+  'amend', 'wip', 'fixup', 'cleanup', 'blame', 'stats', 'snapshot',
   'scope', 'graph',
   'ui', 'web',
   'ai',
@@ -381,6 +409,57 @@ function main(): void {
           process.exit(1);
         });
         return; // Exit main() to let async handle complete
+      // Quality of Life commands
+      case 'amend':
+        handleAmend(cmdArgs.concat(
+          options.message ? ['-m', options.message as string] : [],
+          options.all ? ['-a'] : []
+        ));
+        break;
+
+      case 'wip':
+        handleWip(cmdArgs.concat(
+          options.all ? ['-a'] : [],
+          options.message ? ['-m', options.message as string] : []
+        ));
+        break;
+
+      case 'uncommit':
+        handleUncommit(cmdArgs.concat(
+          options.hard ? ['--hard'] : []
+        ));
+        break;
+
+      case 'cleanup':
+        handleCleanup(cmdArgs.concat(
+          options['dry-run'] ? ['--dry-run'] : [],
+          options.force ? ['--force'] : [],
+          options.merged ? ['--merged'] : [],
+          options.stale ? ['--stale'] : [],
+          options.all ? ['--all'] : []
+        ));
+        break;
+
+      case 'blame':
+        handleBlame(cmdArgs);
+        break;
+
+      case 'stats':
+        handleStats(cmdArgs.concat(
+          options.all ? ['--all'] : []
+        ));
+        break;
+
+      case 'fixup':
+        handleFixup(cmdArgs.concat(
+          options.all ? ['-a'] : [],
+          options.amend ? ['--amend'] : []
+        ));
+        break;
+
+      case 'snapshot':
+        handleSnapshot(cmdArgs);
+        break;
 
       default: {
         // Provide suggestions for unknown commands
