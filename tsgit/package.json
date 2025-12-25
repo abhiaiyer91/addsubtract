@@ -1,8 +1,9 @@
 {
   "name": "tsgit",
-  "version": "1.0.0",
-  "description": "A Git implementation in TypeScript - built from the ground up",
+  "version": "2.0.0",
+  "description": "A modern Git implementation in TypeScript - SHA-256, built-in UI, undo support, and more",
   "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "bin": {
     "tsgit": "./dist/cli.js"
   },
@@ -10,13 +11,17 @@
     "build": "tsc",
     "start": "node dist/cli.js",
     "dev": "ts-node src/cli.ts",
-    "test": "jest",
-    "lint": "eslint src/**/*.ts"
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run build"
   },
   "keywords": [
     "git",
     "version-control",
-    "typescript"
+    "typescript",
+    "vcs",
+    "sha256",
+    "tui",
+    "cli"
   ],
   "author": "",
   "license": "MIT",
@@ -24,12 +29,15 @@
     "@types/node": "^20.10.0",
     "typescript": "^5.3.0"
   },
+  "dependencies": {
+    "@types/blessed": "^0.1.27",
+    "blessed": "^0.1.81"
+  },
   "engines": {
     "node": ">=18.0.0"
   },
-  "dependencies": {
-    "@types/blessed": "^0.1.27",
-    "blessed": "^0.1.81",
-    "blessed-contrib": "^4.11.0"
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/tsgit"
   }
 }

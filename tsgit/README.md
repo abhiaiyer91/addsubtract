@@ -1,140 +1,75 @@
-# tsgit - A Modern Git Implementation in TypeScript
+# tsgit
 
-A complete Git implementation built from the ground up in TypeScript, with significant improvements over traditional Git.
+A modern Git implementation in TypeScript that fixes Git's most frustrating problems.
 
-## 🚀 Improvements Over Git
+## Why tsgit?
 
-| Git Flaw | tsgit Improvement |
-|----------|-------------------|
-| SHA-1 vulnerability | **SHA-256 by default** - configurable, modern hash algorithm |
-| Poor large file handling | **Built-in chunking** - efficient storage for large binaries |
-| Confusing commands | **Dedicated commands** - `switch` for branches, `restore` for files |
-| No undo | **Operation journal** - undo any operation, view history |
-| Painful merge conflicts | **Structured conflicts** - JSON-based, tooling-friendly |
-| Loses changes on switch | **Auto-stash per branch** - seamless context switching |
-| Poor monorepo support | **Repository scopes** - work with subsets efficiently |
-| Cryptic errors | **Helpful error messages** - with suggestions and similar commands |
-| No built-in UI | **Visual interfaces** - Terminal UI and Web UI built-in |
+Git is powerful but has well-known issues. tsgit addresses them:
 
-## 📦 Installation
+| Problem | Git | tsgit |
+|---------|-----|-------|
+| Security | SHA-1 (broken) | SHA-256 default |
+| Large files | Needs LFS | Built-in chunking |
+| Undo mistakes | Reflog is cryptic | Simple `tsgit undo` |
+| Branch switching | Loses uncommitted work | Auto-stash per branch |
+| Merge conflicts | Inline markers | Structured JSON |
+| Confusing commands | `checkout` does 5 things | Dedicated `switch`/`restore` |
+| Error messages | Cryptic | Helpful with suggestions |
+| Visual interface | External tools needed | Built-in TUI & Web UI |
+
+## Installation
 
 ```bash
 cd tsgit
 npm install
 npm run build
-npm link  # Optional: make tsgit globally available
+npm link   # Makes 'tsgit' available globally
 ```
 
-## 🎯 Quick Start
+## Quick Start
 
 ```bash
-# Initialize a new repository (uses SHA-256 by default)
+# Initialize a new repository
 tsgit init
 
-# Add and commit files
+# Add files and commit
 tsgit add .
 tsgit commit -m "Initial commit"
 
-# Or commit directly without staging
-tsgit commit -a -m "Update all tracked files"
-tsgit commit file.ts -m "Fix specific file"
+# Or commit directly (skip staging)
+tsgit commit -a -m "Update everything"
 
 # Launch visual interface
+tsgit web   # Opens web UI at http://localhost:3847
 tsgit ui    # Terminal UI
-tsgit web   # Web UI (opens browser)
 ```
 
-## 🖥️ Visual Interfaces
+## Commands
 
-### Terminal UI (TUI)
-
-Launch an interactive terminal interface with `tsgit ui`:
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│ tsgit │ my-project │ Branch: main                              │
-├─────────────────────────────────────────────────────────────────┤
-│ Status                    │ Files                               │
-│ ─────────────────────────────────────────────────────────────── │
-│ On branch: main           │ [M] src/index.ts                   │
-│                           │ [?] new-file.ts                     │
-│ Changes not staged:       │ [S] README.md                       │
-│   ~ src/index.ts          │                                     │
-│                           │                                     │
-├─────────────────────────────────────────────────────────────────┤
-│ Commit Log                │ Diff                                │
-│ ─────────────────────────────────────────────────────────────── │
-│ a1b2c3d4 Fix bug...       │ --- a/src/index.ts                 │
-│ e5f6g7h8 Add feature...   │ +++ b/src/index.ts                 │
-│ i9j0k1l2 Initial commit   │ @@ -1,5 +1,7 @@                    │
-└─────────────────────────────────────────────────────────────────┘
- q:quit  r:refresh  a:add  c:commit  s:switch  ?:help
-```
-
-**Keyboard Shortcuts:**
-- `Tab` - Switch between panels
-- `a` - Stage selected file
-- `c` - Create commit
-- `s` - Switch branch
-- `r` - Refresh
-- `q` - Quit
-- `?` - Help
-
-### Web UI
-
-Launch a modern web dashboard with `tsgit web`:
+### Basic Workflow
 
 ```bash
-tsgit web           # Opens on http://localhost:3847
-tsgit web --port 8080   # Custom port
+tsgit init [path]           # Create new repository
+tsgit add <files...>        # Stage files
+tsgit add .                 # Stage all
+tsgit commit -m "message"   # Commit staged changes
+tsgit commit -a -m "msg"    # Stage tracked + commit
+tsgit status                # Show status
+tsgit log                   # Show history
+tsgit log --oneline         # Compact history
+tsgit diff                  # Show unstaged changes
+tsgit diff --staged         # Show staged changes
 ```
 
-Features:
-- 📊 **Commit graph visualization** - Visual branch history with SVG rendering
-- 📝 **Side-by-side diff viewer** - Syntax highlighted, split view diffs
-- 📁 **File tree browser** - Navigate repository with icons and status badges
-- 🔍 **Powerful search** - Search commits, files, and content
-- ⎇ **Branch management** - Switch branches with one click
-- ↩ **Operation history** - Undo any operation
-- 🌙 **Beautiful dark theme** - Easy on the eyes
-- ⌨️ **Keyboard shortcuts** - Ctrl+P search, Ctrl+Enter commit, R refresh
-
-### Terminal Graph
-
-View commit history as a colorful ASCII graph:
+### Branches
 
 ```bash
-tsgit graph              # Show graph in terminal
-tsgit graph -n 30        # Show last 30 commits
-```
-
-Output:
-```
-● a1b2c3d4 (main) Latest commit - Alice, 2 hours ago
-● e5f6g7h8 Add feature - Bob, yesterday
-● i9j0k1l2 Initial commit - Alice, 3 days ago
-```
-
-## 🆕 New Commands
-
-### Switch (dedicated branch switching)
-
-Unlike `git checkout`, `switch` only handles branches:
-
-```bash
-tsgit switch main              # Switch to branch
-tsgit switch -c feature        # Create and switch
-tsgit switch --auto-stash dev  # Auto-stash changes before switching
-```
-
-### Restore (dedicated file restoration)
-
-Unlike `git checkout`, `restore` only handles files:
-
-```bash
-tsgit restore file.txt              # Restore from index
-tsgit restore --staged file.txt     # Unstage file
-tsgit restore --source HEAD~1 .     # Restore all from previous commit
+tsgit branch                # List branches
+tsgit branch feature        # Create branch
+tsgit branch -d feature     # Delete branch
+tsgit switch main           # Switch to branch
+tsgit switch -c feature     # Create and switch
+tsgit checkout feature      # Switch (git-compatible)
 ```
 
 ### Undo & History
@@ -142,221 +77,188 @@ tsgit restore --source HEAD~1 .     # Restore all from previous commit
 ```bash
 tsgit undo                  # Undo last operation
 tsgit undo --steps 3        # Undo last 3 operations
-tsgit undo --dry-run        # Preview what would be undone
-tsgit history               # View operation history
+tsgit history               # Show operation history
+tsgit restore file.ts       # Restore file from index
+tsgit restore --staged file # Unstage file
 ```
 
-### Merge with Structured Conflicts
+### Merge
 
 ```bash
-tsgit merge feature         # Merge feature into current branch
-tsgit merge --conflicts     # View conflicts in structured format
-tsgit merge --resolve file  # Mark file as resolved
-tsgit merge --continue      # Complete merge after resolution
+tsgit merge feature         # Merge branch
+tsgit merge --conflicts     # Show conflicts
+tsgit merge --resolve file  # Mark as resolved
+tsgit merge --continue      # Complete merge
 tsgit merge --abort         # Abort merge
 ```
 
-### Scope (Monorepo Support)
+### Visual Interface
 
 ```bash
-tsgit scope                      # Show current scope
-tsgit scope set packages/web/    # Limit to specific path
-tsgit scope use frontend         # Use preset scope
-tsgit scope clear                # Work with full repo
-tsgit scope list                 # List available scopes
-
-# Presets: frontend, backend, docs, config
+tsgit ui                    # Terminal UI
+tsgit web                   # Web UI (http://localhost:3847)
+tsgit web --port 8080       # Custom port
+tsgit graph                 # ASCII commit graph
 ```
 
-## 📋 All Commands
+### Monorepo Scopes
 
-### Core Commands
-| Command | Description |
-|---------|-------------|
-| `init` | Create a new tsgit repository |
-| `add <file>...` | Stage files for commit |
-| `commit -m <msg>` | Create a commit |
-| `status` | Show working tree status |
-| `log` | Show commit history |
-| `diff` | Show changes |
-
-### Branch & Navigation
-| Command | Description |
-|---------|-------------|
-| `branch [name]` | List/create/delete branches |
-| `switch <branch>` | Switch branches (dedicated) |
-| `checkout <ref>` | Switch branches or restore files |
-| `restore <file>` | Restore files (dedicated) |
-
-### Merge & Conflicts
-| Command | Description |
-|---------|-------------|
-| `merge <branch>` | Merge branch into current |
-| `merge --abort` | Abort current merge |
-| `merge --continue` | Continue after resolving |
-| `merge --conflicts` | Show structured conflicts |
-
-### Undo & History
-| Command | Description |
-|---------|-------------|
-| `undo` | Undo last operation |
-| `history` | Show operation history |
-
-### Monorepo
-| Command | Description |
-|---------|-------------|
-| `scope` | Show/manage repository scope |
-| `scope set <paths>` | Limit to specific paths |
-| `scope use <preset>` | Use a preset scope |
-| `scope clear` | Clear scope restrictions |
-
-### Plumbing
-| Command | Description |
-|---------|-------------|
-| `cat-file` | Display object contents |
-| `hash-object` | Compute object hash |
-| `ls-files` | Show staged files |
-| `ls-tree` | List tree contents |
-
-## 🔧 Programmatic Usage
-
-```typescript
-import { Repository, TsgitError } from 'tsgit';
-
-// Initialize
-const repo = Repository.init('/path/to/project');
-
-// Add and commit
-repo.add('file.txt');
-const hash = repo.commit('Initial commit');
-
-// Undo last operation
-const undone = repo.journal.popEntry();
-
-// Work with scope
-repo.scopeManager.setScope({ paths: ['src/'] });
-const status = repo.status(); // Only shows src/ files
-
-// Handle errors
-try {
-  repo.checkout('nonexistent');
-} catch (error) {
-  if (error instanceof TsgitError) {
-    console.log(error.format()); // Shows suggestions
-  }
-}
+```bash
+tsgit scope                 # Show current scope
+tsgit scope set src/        # Limit to src/
+tsgit scope use frontend    # Use preset (frontend/backend/docs)
+tsgit scope clear           # Full repository
 ```
 
-## 🏗️ Architecture
+## Visual Interfaces
+
+### Web UI (`tsgit web`)
+
+Modern dashboard with:
+- **Commit graph** - Visual branch history
+- **Side-by-side diffs** - Syntax highlighted
+- **File browser** - With status icons
+- **Search** - Find commits, files, content
+- **One-click staging** - Stage files instantly
+- **Keyboard shortcuts** - Ctrl+P search, R refresh
+
+### Terminal UI (`tsgit ui`)
+
+Interactive terminal interface:
+- Navigate with arrow keys
+- `a` to stage files
+- `c` to commit
+- `s` to switch branches
+- `Tab` between panels
+
+### Terminal Graph (`tsgit graph`)
 
 ```
-tsgit/
-├── src/
-│   ├── core/
-│   │   ├── types.ts          # Type definitions
-│   │   ├── object.ts         # Git objects (Blob, Tree, Commit, Tag)
-│   │   ├── object-store.ts   # Object storage and retrieval
-│   │   ├── index.ts          # Staging area
-│   │   ├── refs.ts           # Reference management
-│   │   ├── repository.ts     # Main repository class
-│   │   ├── diff.ts           # Diff algorithm
-│   │   ├── errors.ts         # Structured error handling
-│   │   ├── journal.ts        # Operation journal (undo)
-│   │   ├── large-file.ts     # Large file chunking
-│   │   ├── merge.ts          # Merge and conflict resolution
-│   │   ├── branch-state.ts   # Per-branch state management
-│   │   ├── partial-clone.ts  # Partial clone support
-│   │   └── scope.ts          # Monorepo scope support
-│   ├── commands/
-│   │   ├── init.ts, add.ts, commit.ts, ...
-│   │   ├── switch.ts         # Dedicated branch switching
-│   │   ├── restore.ts        # Dedicated file restoration
-│   │   ├── undo.ts           # Undo/history commands
-│   │   ├── merge.ts          # Merge with conflicts
-│   │   └── scope.ts          # Monorepo scope
-│   ├── ui/
-│   │   ├── tui.ts            # Terminal User Interface
-│   │   ├── web.ts            # Basic Web UI
-│   │   ├── web-enhanced.ts   # Enhanced Web Dashboard
-│   │   ├── graph.ts          # Commit graph visualization
-│   │   ├── diff-viewer.ts    # Side-by-side diff viewer
-│   │   ├── file-tree.ts      # File tree browser
-│   │   ├── search.ts         # Search functionality
-│   │   └── index.ts          # UI exports
-│   ├── utils/
-│   │   ├── hash.ts           # SHA-256/SHA-1 hashing
-│   │   ├── compression.ts    # Zlib compression
-│   │   └── fs.ts             # File system utilities
-│   ├── cli.ts                # CLI entry point
-│   └── index.ts              # Library exports
-├── package.json
-├── tsconfig.json
-└── README.md
+● a1b2c3d4 (main) Latest commit - Alice, today
+● e5f6g7h8 Add feature - Bob, yesterday
+● i9j0k1l2 Initial commit - Alice, last week
 ```
 
-## 📊 Feature Comparison
+## Configuration
 
-| Feature | tsgit | Git |
-|---------|-------|-----|
-| Object storage | ✅ | ✅ |
-| SHA-256 hashing | ✅ (default) | ⚠️ (experimental) |
-| SHA-1 hashing | ✅ (optional) | ✅ (default) |
-| Zlib compression | ✅ | ✅ |
-| Blob/Tree/Commit | ✅ | ✅ |
-| Index/Staging | ✅ (JSON) | ✅ (binary) |
-| Branches/Tags | ✅ | ✅ |
-| Diff | ✅ (LCS) | ✅ (Myers) |
-| Merge | ✅ (structured) | ✅ (inline markers) |
-| Large file chunking | ✅ (built-in) | ❌ (needs LFS) |
-| Operation undo | ✅ | ❌ (reflog only) |
-| Branch auto-stash | ✅ | ❌ |
-| Monorepo scopes | ✅ | ⚠️ (sparse checkout) |
-| Helpful errors | ✅ | ❌ |
-| Built-in TUI | ✅ | ❌ |
-| Built-in Web UI | ✅ | ❌ |
-| Remote operations | ❌ (planned) | ✅ |
-| Packfiles | ❌ (planned) | ✅ |
-
-## 🛠️ Configuration
-
-tsgit stores configuration in `.tsgit/config`:
+Repository config is stored in `.tsgit/config`:
 
 ```ini
 [core]
     repositoryformatversion = 1
     filemode = true
-    bare = false
 [tsgit]
     hashAlgorithm = sha256
     largeFileThreshold = 2097152
     autoStashOnSwitch = true
 ```
 
-## 🤝 Commit Options
+## Programmatic Usage
 
-```bash
-# Standard commit
-tsgit commit -m "message"
+```typescript
+import { Repository } from 'tsgit';
 
-# Commit all tracked changes (skip staging)
-tsgit commit -a -m "message"
+// Initialize
+const repo = Repository.init('/path/to/project');
 
-# Commit specific files directly
-tsgit commit file1.ts file2.ts -m "message"
+// Add and commit
+repo.add('file.ts');
+const hash = repo.commit('Add file');
 
-# Dry run (show what would be committed)
-tsgit commit --dry-run -m "message"
+// Undo
+repo.journal.popEntry();
 
-# Custom author
-tsgit commit --author "Name <email@example.com>" -m "message"
+// Search
+import { SearchEngine } from 'tsgit';
+const search = new SearchEngine(repo);
+const results = search.search('TODO');
 ```
 
-## 📝 License
+## Directory Structure
+
+```
+.tsgit/
+├── HEAD              # Current branch reference
+├── config            # Repository configuration
+├── index             # Staging area (JSON)
+├── objects/          # Content-addressable storage
+│   ├── 2f/           # Object files by hash prefix
+│   └── ...
+├── refs/
+│   ├── heads/        # Branch references
+│   └── tags/         # Tag references
+├── journal.json      # Operation history (for undo)
+└── branch-states/    # Auto-stashed changes per branch
+```
+
+## Keyboard Shortcuts (Web UI)
+
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl+P` | Focus search |
+| `Ctrl+Enter` | Open commit dialog |
+| `R` | Refresh |
+| `Escape` | Close modal |
+
+## Differences from Git
+
+### What's Better
+
+- **SHA-256** - Secure by default (Git still uses SHA-1)
+- **Undo anything** - `tsgit undo` reverts any operation
+- **Auto-stash** - Never lose work when switching branches
+- **Built-in UI** - No external tools needed
+- **Clear commands** - `switch` for branches, `restore` for files
+- **Better errors** - Suggestions for typos and mistakes
+- **Large files** - Chunked storage without LFS
+
+### What's Missing (Planned)
+
+- Remote operations (push, pull, fetch, clone)
+- Rebase
+- Cherry-pick
+- Stash command (auto-stash exists)
+- Hooks
+- Submodules
+
+## Examples
+
+### Fix a Mistake
+
+```bash
+# Committed to wrong branch?
+tsgit undo                  # Undo the commit
+tsgit switch correct-branch
+tsgit commit -m "Same message"
+```
+
+### Quick Context Switch
+
+```bash
+# Working on feature, need to fix bug
+tsgit switch main           # Auto-saves your work
+# ... fix bug ...
+tsgit commit -a -m "Fix bug"
+tsgit switch feature        # Auto-restores your work
+```
+
+### Search Repository
+
+```bash
+tsgit web                   # Open web UI
+# Press Ctrl+P, type "TODO"
+# See all commits, files, and code containing "TODO"
+```
+
+### Work on Monorepo Subset
+
+```bash
+tsgit scope use frontend    # Only frontend/
+tsgit status                # Shows only frontend files
+tsgit add .                 # Adds only frontend files
+tsgit scope clear           # Back to full repo
+```
+
+## License
 
 MIT
-
-## 🙏 Acknowledgments
-
-- Inspired by [Git](https://git-scm.com/)
-- Built to understand and improve upon Git internals
-- References: [Git Internals](https://git-scm.com/book/en/v2/Git-Internals-Plumbing-and-Porcelain)
