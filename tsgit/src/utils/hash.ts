@@ -36,10 +36,18 @@ export function getHashAlgorithm(): HashAlgorithm {
 }
 
 /**
- * Get the expected digest length for current algorithm
+ * Get the expected digest length for current algorithm (hex string length)
  */
 export function getDigestLength(): number {
   return HASH_CONFIGS[currentAlgorithm].digestLength;
+}
+
+/**
+ * Get the raw byte length for current algorithm
+ * SHA-1 = 20 bytes, SHA-256 = 32 bytes
+ */
+export function getHashByteLength(): number {
+  return HASH_CONFIGS[currentAlgorithm].digestLength / 2;
 }
 
 /**

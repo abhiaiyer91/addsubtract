@@ -1,5 +1,5 @@
 import { ObjectType, TreeEntry, Author } from './types';
-import { hashObject } from '../utils/hash';
+import { hashObject, getHashByteLength } from '../utils/hash';
 
 /**
  * Base class for all Git objects
@@ -72,6 +72,7 @@ export class Tree extends GitObject {
   static deserialize(data: Buffer): Tree {
     const entries: TreeEntry[] = [];
     let offset = 0;
+    const hashByteLength = getHashByteLength();
 
     while (offset < data.length) {
       // Find the space after mode
@@ -86,12 +87,12 @@ export class Tree extends GitObject {
 
       const name = data.slice(spaceIndex + 1, nullIndex).toString('utf8');
 
-      // Read the 20-byte hash
-      const hashBytes = data.slice(nullIndex + 1, nullIndex + 21);
+      // Read the hash bytes (20 for SHA-1, 32 for SHA-256)
+      const hashBytes = data.slice(nullIndex + 1, nullIndex + 1 + hashByteLength);
       const hash = hashBytes.toString('hex');
 
       entries.push({ mode, name, hash });
-      offset = nullIndex + 21;
+      offset = nullIndex + 1 + hashByteLength;
     }
 
     return new Tree(entries);
