@@ -16,3 +16,8 @@ export {
 
 // Re-export types for convenience
 export * from './types';
+ *
+ * Building blocks for agent-centric applications backed by Git.
+ */
+
+export { Knowledge, type KnowledgeOptions, type HistoryEntry } from './knowledge';

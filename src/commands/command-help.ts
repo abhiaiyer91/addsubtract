@@ -1037,6 +1037,64 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
     seeAlso: ['gc', 'cat-file'],
   },
 
+  // ============ Platform Commands ============
+  pr: {
+    name: 'pr',
+    summary: 'Manage pull requests',
+    usage: 'wit pr <subcommand> [options]',
+    description: 'Create, list, view, merge, and close pull requests from the command line.',
+    options: [
+      { flag: 'create', description: 'Create a pull request from current branch' },
+      { flag: 'list', description: 'List pull requests' },
+      { flag: 'view <number>', description: 'View pull request details' },
+      { flag: 'checkout <number>', description: 'Checkout a pull request locally' },
+      { flag: 'merge <number>', description: 'Merge a pull request' },
+      { flag: 'close <number>', description: 'Close a pull request' },
+      { flag: 'reopen <number>', description: 'Reopen a closed pull request' },
+      { flag: '-b, --base <branch>', description: 'Target branch for PR (default: main)' },
+      { flag: '-t, --title <title>', description: 'Pull request title' },
+      { flag: '--state <state>', description: 'Filter by state (open, closed, merged, all)' },
+    ],
+    examples: [
+      { command: 'wit pr create', description: 'Create PR from current branch' },
+      { command: 'wit pr create -b develop', description: 'Create PR targeting develop' },
+      { command: 'wit pr list', description: 'List open PRs' },
+      { command: 'wit pr list --state all', description: 'List all PRs' },
+      { command: 'wit pr view 123', description: 'View PR #123' },
+      { command: 'wit pr merge 123', description: 'Merge PR #123' },
+    ],
+    seeAlso: ['issue', 'push', 'branch'],
+  },
+
+  issue: {
+    name: 'issue',
+    summary: 'Manage issues',
+    usage: 'wit issue <subcommand> [options]',
+    description: 'Create, list, view, close, and comment on issues from the command line.',
+    options: [
+      { flag: 'create <title>', description: 'Create a new issue' },
+      { flag: 'list', description: 'List issues' },
+      { flag: 'view <number>', description: 'View issue details' },
+      { flag: 'close <number>', description: 'Close an issue' },
+      { flag: 'reopen <number>', description: 'Reopen an issue' },
+      { flag: 'comment <number> <text>', description: 'Add a comment to an issue' },
+      { flag: '-t, --title <title>', description: 'Issue title' },
+      { flag: '-m, --body <body>', description: 'Issue body/description' },
+      { flag: '-l, --labels <labels>', description: 'Comma-separated labels' },
+      { flag: '--state <state>', description: 'Filter by state (open, closed, all)' },
+    ],
+    examples: [
+      { command: 'wit issue create "Bug: Login fails"', description: 'Create an issue' },
+      { command: 'wit issue create -t "Bug" -m "Steps..."', description: 'Create with body' },
+      { command: 'wit issue list', description: 'List open issues' },
+      { command: 'wit issue list --state closed', description: 'List closed issues' },
+      { command: 'wit issue view 42', description: 'View issue #42' },
+      { command: 'wit issue close 42', description: 'Close issue #42' },
+      { command: 'wit issue comment 42 "Fixed!"', description: 'Add comment' },
+    ],
+    seeAlso: ['pr', 'github'],
+  },
+
   // ============ Server ============
   serve: {
     name: 'serve',
