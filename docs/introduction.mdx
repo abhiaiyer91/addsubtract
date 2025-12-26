@@ -1,19 +1,19 @@
 ---
 title: Introduction
-description: "A modern Git implementation in TypeScript that fixes Git's most frustrating problems"
+description: "A modern Git implementation in TypeScript with AI-powered features"
 ---
 
 # Welcome to wit
 
-wit is a modern Git implementation in TypeScript that addresses many of Git's well-known usability issues while maintaining compatibility with Git concepts.
+**wit** is a modern Git implementation in TypeScript that addresses many of Git's well-known usability issues while adding powerful new features like AI assistance, built-in visual interfaces, and a robust undo system.
 
 ## Why wit?
 
 Git is powerful but has well-known issues. wit addresses them:
 
 | Problem | Git | wit |
-|---------|-----|-------|
-| Security | SHA-1 (broken) | SHA-256 default |
+|---------|-----|-----|
+| Security | SHA-1 (broken) | SHA-256 by default |
 | Large files | Needs LFS | Built-in chunking |
 | Undo mistakes | Reflog is cryptic | Simple `wit undo` |
 | Branch switching | Loses uncommitted work | Auto-stash per branch |
@@ -21,10 +21,7 @@ Git is powerful but has well-known issues. wit addresses them:
 | Confusing commands | `checkout` does 5 things | Dedicated `switch`/`restore` |
 | Error messages | Cryptic | Helpful with suggestions |
 | Visual interface | External tools needed | Built-in TUI & Web UI |
-| Quick saves | No built-in solution | `wit wip` auto-message |
-| Fixing commits | `git commit --amend` verbose | Simple `wit amend` |
-| Branch cleanup | Manual process | `wit cleanup` |
-| Repository stats | External tools | Built-in `wit stats` |
+| AI assistance | None | Commit messages, review, & more |
 
 ## Key Features
 
@@ -32,20 +29,26 @@ Git is powerful but has well-known issues. wit addresses them:
   <Card title="SHA-256 Security" icon="shield-halved">
     Secure by default with SHA-256 hashing instead of Git's deprecated SHA-1
   </Card>
+  <Card title="AI-Powered" icon="robot">
+    AI-generated commit messages, code review, and conflict resolution via OpenAI or Anthropic
+  </Card>
   <Card title="Built-in UI" icon="window">
     Web UI and Terminal UI included - no external tools needed
   </Card>
   <Card title="Undo Anything" icon="rotate-left">
-    Simple `wit undo` command reverts any operation
-  </Card>
-  <Card title="AI-Powered" icon="robot">
-    AI-generated commit messages and code review support
+    Simple `wit undo` command reverts any operation with full journal history
   </Card>
   <Card title="Auto-stash" icon="layer-group">
-    Never lose work when switching branches
+    Never lose work when switching branches - changes are automatically saved and restored
   </Card>
   <Card title="Large File Support" icon="file-zipper">
-    Built-in chunked storage without LFS
+    Built-in chunked storage without needing Git LFS
+  </Card>
+  <Card title="Quality of Life" icon="heart">
+    Commands like `wip`, `amend`, `uncommit`, `cleanup`, `stats`, and `snapshot`
+  </Card>
+  <Card title="Full Git Compatibility" icon="code-branch">
+    Cherry-pick, rebase, revert, stash, tags, bisect, hooks, worktrees, and more
   </Card>
 </CardGroup>
 
@@ -64,7 +67,34 @@ wit undo
 
 # Launch visual interface
 wit web
+
+# Use AI to generate commit messages
+wit ai commit -a -x
 ```
+
+## What's Included
+
+### Core Version Control
+- All standard Git operations: add, commit, branch, merge, diff, log
+- History rewriting: cherry-pick, rebase, revert
+- Advanced features: stash, tags, bisect, hooks, submodules, worktrees
+
+### AI Features
+- Natural language commands: `wit ai "what files changed?"`
+- Commit message generation: `wit ai commit`
+- Code review: `wit ai review`
+- Conflict resolution: `wit ai resolve`
+
+### Visual Interfaces
+- **Web UI** - Modern dashboard with commit graph, diffs, file browser
+- **Terminal UI** - Interactive interface with keyboard navigation
+- **ASCII Graph** - Commit history visualization in terminal
+
+### Developer Experience
+- Quality of life commands (`wip`, `amend`, `uncommit`, `cleanup`, `stats`)
+- Monorepo scopes for working with repository subsets
+- Better error messages with suggestions for typos
+- Operation journal for complete undo/redo support
 
 ## What's Next?
 
@@ -78,7 +108,7 @@ wit web
   <Card title="Commands" icon="terminal" href="/commands/overview">
     Explore all available commands
   </Card>
-  <Card title="API Reference" icon="code" href="/api-reference/overview">
-    Use wit programmatically in your projects
+  <Card title="AI Features" icon="robot" href="/features/ai-powered">
+    Learn about AI-powered capabilities
   </Card>
 </CardGroup>

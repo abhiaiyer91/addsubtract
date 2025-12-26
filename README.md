@@ -1,14 +1,18 @@
 # wit
 
-A modern Git implementation in TypeScript that fixes Git's most frustrating problems.
+A modern Git implementation in TypeScript with AI-powered features.
+
+[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://github.com/nicholasgriffintn/wit)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Node](https://img.shields.io/badge/node-%3E%3D22.13.0-brightgreen.svg)](https://nodejs.org)
 
 ## Why wit?
 
-Git is powerful but has well-known issues. wit addresses them:
+Git is powerful but has well-known usability issues. **wit** addresses them while adding modern features:
 
 | Problem | Git | wit |
-|---------|-----|-------|
-| Security | SHA-1 (broken) | SHA-256 default |
+|---------|-----|-----|
+| Security | SHA-1 (broken) | SHA-256 by default |
 | Large files | Needs LFS | Built-in chunking |
 | Undo mistakes | Reflog is cryptic | Simple `wit undo` |
 | Branch switching | Loses uncommitted work | Auto-stash per branch |
@@ -19,16 +23,32 @@ Git is powerful but has well-known issues. wit addresses them:
 | Quick saves | No built-in solution | `wit wip` auto-message |
 | Fixing commits | `git commit --amend` verbose | Simple `wit amend` |
 | Branch cleanup | Manual process | `wit cleanup` |
-| Repository stats | External tools | Built-in `wit stats` |
+| AI assistance | None | Built-in AI commit messages, review, & more |
+
+## Features
+
+- **🔐 SHA-256 Security** - Secure hashing by default (Git still uses SHA-1)
+- **🤖 AI-Powered** - Commit messages, code review, conflict resolution via OpenAI/Anthropic
+- **⏪ Undo Anything** - `wit undo` reverts any operation with full journal history
+- **🎨 Built-in UI** - Web UI (`wit web`) and Terminal UI (`wit ui`) included
+- **📁 Large File Support** - Chunked storage without LFS
+- **🔀 Auto-stash** - Never lose work when switching branches
+- **📦 Monorepo Scopes** - Work with repository subsets
+- **🛠️ Quality of Life** - `wip`, `amend`, `uncommit`, `cleanup`, `stats`, `blame`, `snapshot`
+- **🔧 Advanced Git** - Cherry-pick, rebase, revert, stash, tags, bisect, hooks, worktrees
+- **🌐 Remote Support** - Clone, fetch, pull, push operations
 
 ## Installation
 
 ```bash
+git clone https://github.com/nicholasgriffintn/wit.git
 cd wit
 npm install
 npm run build
 npm link   # Makes 'wit' available globally
 ```
+
+**Requirements:** Node.js >= 22.13.0
 
 ## Quick Start
 
@@ -50,22 +70,19 @@ wit ui    # Terminal UI
 
 ## Commands
 
-### Basic Workflow
+### Core Workflow
 
 ```bash
 wit init [path]           # Create new repository
 wit add <files...>        # Stage files
-wit add .                 # Stage all
 wit commit -m "message"   # Commit staged changes
 wit commit -a -m "msg"    # Stage tracked + commit
 wit status                # Show status
-wit log                   # Show history
-wit log --oneline         # Compact history
-wit diff                  # Show unstaged changes
-wit diff --staged         # Show staged changes
+wit log [--oneline]       # Show history
+wit diff [--staged]       # Show changes
 ```
 
-### Branches
+### Branches & Navigation
 
 ```bash
 wit branch                # List branches
@@ -74,6 +91,7 @@ wit branch -d feature     # Delete branch
 wit switch main           # Switch to branch
 wit switch -c feature     # Create and switch
 wit checkout feature      # Switch (git-compatible)
+wit restore file.ts       # Restore file from index
 ```
 
 ### Undo & History
@@ -82,13 +100,13 @@ wit checkout feature      # Switch (git-compatible)
 wit undo                  # Undo last operation
 wit undo --steps 3        # Undo last 3 operations
 wit history               # Show operation history
-wit restore file.ts       # Restore file from index
-wit restore --staged file # Unstage file
 wit uncommit              # Undo commit, keep changes staged
 wit uncommit 2            # Undo last 2 commits
+wit reset [--soft|--hard] # Reset HEAD to specific state
+wit stash                 # Stash working directory changes
 ```
 
-### Quality of Life Commands
+### Quality of Life
 
 ```bash
 # Quick saves
@@ -121,7 +139,7 @@ wit stats --all           # Detailed statistics
 wit blame file.ts         # Show who changed each line
 ```
 
-### Merge
+### Merge & Conflicts
 
 ```bash
 wit merge feature         # Merge branch
@@ -131,46 +149,66 @@ wit merge --continue      # Complete merge
 wit merge --abort         # Abort merge
 ```
 
-### Visual Interface
+### History Rewriting
 
 ```bash
-wit ui                    # Terminal UI
-wit web                   # Web UI (http://localhost:3847)
-wit web --port 8080       # Custom port
-wit graph                 # ASCII commit graph
+wit cherry-pick <commit>  # Apply changes from specific commits
+wit rebase <branch>       # Rebase current branch onto another
+wit rebase --onto <new>   # Rebase onto specific base
+wit revert <commit>       # Create commit that undoes changes
+```
+
+### Remote Operations
+
+```bash
+wit remote                # List configured remotes
+wit remote add <n> <url>  # Add a new remote
+wit clone <url> [<dir>]   # Clone a repository
+wit fetch [<remote>]      # Download objects from remote
+wit pull [<remote>]       # Fetch and merge
+wit push [<remote>]       # Push to remote
+wit push -u origin main   # Push and set upstream
+```
+
+### Tags
+
+```bash
+wit tag                   # List all tags
+wit tag v1.0.0            # Create lightweight tag
+wit tag -a v1.0.0 -m ""   # Create annotated tag
+wit tag -d v1.0.0         # Delete a tag
 ```
 
 ### Advanced Features
 
 ```bash
-# Hooks - customize behavior at key points
+# Hooks
 wit hooks                       # List installed hooks
 wit hooks install pre-commit    # Install a hook from template
 wit hooks remove pre-commit     # Remove a hook
 wit hooks run pre-commit        # Test a hook manually
 
-# Submodules - nested repositories
+# Submodules
 wit submodule add <url> <path>  # Add a submodule
 wit submodule init              # Initialize submodules
 wit submodule update            # Update submodules
 wit submodule status            # Show submodule status
-wit submodule foreach <cmd>     # Run command in each
 
-# Worktrees - multiple working directories
+# Worktrees
 wit worktree add <path> <branch>  # Create new worktree
 wit worktree list                 # List all worktrees
 wit worktree remove <path>        # Remove a worktree
-wit worktree prune                # Prune stale entries
 
-# Reflog - reference history
+# Reflog & Maintenance
 wit reflog                    # Show HEAD reflog
-wit reflog <ref>              # Show reflog for specific ref
-wit reflog expire             # Prune old entries
-
-# Garbage Collection
 wit gc                        # Run garbage collection
 wit gc --aggressive           # More aggressive optimization
-wit gc --prune=now            # Prune immediately
+
+# Debugging
+wit show <commit>             # Show commit details
+wit bisect start              # Binary search for bug
+wit clean -n                  # Preview untracked files to delete
+wit fsck                      # Verify object database
 ```
 
 ### Monorepo Scopes
@@ -182,17 +220,68 @@ wit scope use frontend    # Use preset (frontend/backend/docs)
 wit scope clear           # Full repository
 ```
 
+## AI-Powered Features
+
+wit includes AI assistance powered by [Mastra](https://mastra.ai/) with support for OpenAI and Anthropic models.
+
+### Setup
+
+```bash
+# For OpenAI (GPT-4o, etc.)
+export OPENAI_API_KEY=sk-your-key-here
+
+# OR for Anthropic (Claude)
+export ANTHROPIC_API_KEY=sk-ant-your-key-here
+
+# Optional: Use a different model
+export WIT_AI_MODEL=anthropic/claude-sonnet-4-20250514
+
+# Check configuration
+wit ai status
+```
+
+### AI Commands
+
+```bash
+# Natural language commands
+wit ai "what files have I changed?"
+wit ai "show me the last 5 commits"
+wit ai "switch to main branch"
+
+# Generate commit messages
+wit ai commit              # Generate message for staged changes
+wit ai commit -a           # Stage all + generate message
+wit ai commit -a -x        # Stage all, generate, and commit
+
+# Code review
+wit ai review              # Review all changes
+wit ai review --staged     # Review only staged changes
+
+# Explain commits
+wit ai explain             # Explain the latest commit
+wit ai explain HEAD~3      # Explain specific commit
+
+# Conflict resolution
+wit ai resolve             # Help resolve merge conflicts
+wit ai resolve src/file.ts # Resolve specific file
+```
+
 ## Visual Interfaces
 
 ### Web UI (`wit web`)
 
-Modern dashboard with:
+Modern dashboard at http://localhost:3847 with:
 - **Commit graph** - Visual branch history
 - **Side-by-side diffs** - Syntax highlighted
 - **File browser** - With status icons
 - **Search** - Find commits, files, content
 - **One-click staging** - Stage files instantly
 - **Keyboard shortcuts** - Ctrl+P search, R refresh
+
+```bash
+wit web                   # Default port 3847
+wit web --port 8080       # Custom port
+```
 
 ### Terminal UI (`wit ui`)
 
@@ -238,12 +327,15 @@ repo.add('file.ts');
 const hash = repo.commit('Add file');
 
 // Undo
-repo.journal.popEntry();
+repo.journal.undo();
 
 // Search
 import { SearchEngine } from 'wit';
 const search = new SearchEngine(repo);
 const results = search.search('TODO');
+
+// Work with scopes (monorepo)
+repo.scopeManager.setScope({ paths: ['packages/frontend/'] });
 ```
 
 ## Directory Structure
@@ -263,54 +355,7 @@ const results = search.search('TODO');
 └── branch-states/    # Auto-stashed changes per branch
 ```
 
-## Keyboard Shortcuts (Web UI)
-
-| Shortcut | Action |
-|----------|--------|
-| `Ctrl+P` | Focus search |
-| `Ctrl+Enter` | Open commit dialog |
-| `R` | Refresh |
-| `Escape` | Close modal |
-
-## Differences from Git
-
-### What's Better
-
-- **SHA-256** - Secure by default (Git still uses SHA-1)
-- **Undo anything** - `wit undo` reverts any operation
-- **Auto-stash** - Never lose work when switching branches
-- **Built-in UI** - No external tools needed
-- **Clear commands** - `switch` for branches, `restore` for files
-- **Better errors** - Suggestions for typos and mistakes
-- **Large files** - Chunked storage without LFS
-- **Quick saves** - `wit wip` for instant WIP commits
-- **Easy amend** - `wit amend` is simpler than `git commit --amend`
-- **Branch cleanup** - `wit cleanup` finds and removes stale branches
-- **Statistics** - `wit stats` shows repo insights
-- **Snapshots** - Quick checkpoints without full commits
-- **Smart blame** - Color-coded, with relative dates
-- **Hooks** - Full hook system (pre-commit, post-commit, etc.)
-- **Submodules** - Nested repository support
-- **Worktrees** - Multiple working directories
-- **Reflog** - Reference log with time-based recovery
-- **GC** - Garbage collection with aggressive optimization
-
-### What's Missing (Planned)
-
-- Remote operations (push, pull, fetch, clone)
-- Rebase
-- Cherry-pick
-
 ## Examples
-
-### Fix a Mistake
-
-```bash
-# Committed to wrong branch?
-wit undo                  # Undo the commit
-wit switch correct-branch
-wit commit -m "Same message"
-```
 
 ### Quick Context Switch
 
@@ -322,27 +367,17 @@ wit commit -a -m "Fix bug"
 wit switch feature        # Auto-restores your work
 ```
 
-### Search Repository
+### AI-Powered Commit Workflow
 
 ```bash
-wit web                   # Open web UI
-# Press Ctrl+P, type "TODO"
-# See all commits, files, and code containing "TODO"
-```
-
-### Work on Monorepo Subset
-
-```bash
-wit scope use frontend    # Only frontend/
-wit status                # Shows only frontend files
-wit add .                 # Adds only frontend files
-wit scope clear           # Back to full repo
+# Make changes, stage, and let AI generate the message
+wit add .
+wit ai commit -x          # Generate and execute commit
 ```
 
 ### Quick WIP Workflow
 
 ```bash
-# You're working and need to switch branches quickly
 wit wip -a                # Quick save everything
 wit switch other-branch   # Work on something else
 # ... do other work ...
@@ -364,75 +399,51 @@ wit amend
 ### Clean Up Old Branches
 
 ```bash
-# See what branches can be cleaned
-wit cleanup --dry-run
-
-# Clean up with confirmation
-wit cleanup
-
-# Clean up branches older than 60 days
-wit cleanup --days 60 --stale
+wit cleanup --dry-run     # Preview
+wit cleanup               # Clean up with confirmation
+wit cleanup --days 60     # Branches older than 60 days
 ```
 
 ### Create Checkpoints
 
 ```bash
-# Before doing something risky
 wit snapshot create "before refactor"
-
 # Do risky work...
-
-# Something went wrong? Restore!
-wit snapshot restore "before refactor"
-```
-
-### View Repository Stats
-
-```bash
-wit stats
-# Shows:
-#   - Total commits, files, lines
-#   - Top contributors
-#   - Language breakdown
-#   - Activity patterns
+wit snapshot restore "before refactor"  # Something went wrong? Restore!
 ```
 
 ### Work on Multiple Branches Simultaneously
 
 ```bash
-# Create a worktree for feature development
 wit worktree add ../feature-worktree feature-branch
-
-# Now you can work on both branches at once
-# Main worktree stays on main, feature worktree on feature-branch
-
-# Clean up when done
-wit worktree remove ../feature-worktree
+# Now work on both branches in different directories
+wit worktree remove ../feature-worktree  # Clean up when done
 ```
 
-### Set Up Pre-commit Hooks
+## Keyboard Shortcuts (Web UI)
 
-```bash
-# Install a pre-commit hook
-wit hooks install pre-commit
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl+P` | Focus search |
+| `Ctrl+Enter` | Open commit dialog |
+| `R` | Refresh |
+| `Escape` | Close modal |
 
-# Edit the hook to run your linter
-# The hook is at .wit/hooks/pre-commit
+## What's Different from Git
 
-# Test it manually
-wit hooks run pre-commit
-```
+### Improvements
+- **SHA-256** - Secure by default
+- **Undo anything** - `wit undo` reverts any operation
+- **Auto-stash** - Never lose work when switching branches
+- **Built-in UI** - No external tools needed
+- **AI assistance** - Commit messages, code review, conflict resolution
+- **Clear commands** - `switch` for branches, `restore` for files
+- **Better errors** - Suggestions for typos and mistakes
+- **Large files** - Chunked storage without LFS
+- **Quality of life** - `wip`, `amend`, `uncommit`, `cleanup`, `stats`, `snapshot`, `blame`
 
-### Recover from Mistakes with Reflog
-
-```bash
-# See your reference history
-wit reflog
-
-# Reference any previous state
-# The reflog shows HEAD@{0}, HEAD@{1}, etc.
-# You can use these with reset to recover
-```
+### Full Compatibility
+wit implements all standard Git functionality including cherry-pick, rebase, revert, stash, tags, bisect, hooks, submodules, worktrees, reflog, and garbage collection.
 
 ## License
 

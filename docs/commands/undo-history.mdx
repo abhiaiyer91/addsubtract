@@ -188,20 +188,69 @@ wit add forgotten-file.ts && wit amend
 
 ---
 
-## Comparison: undo vs uncommit vs restore
+## reset
+
+Reset the current HEAD to a specific state.
+
+```bash
+wit reset [options] [commit]
+```
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `--soft` | Keep changes staged |
+| `--mixed` | Keep changes but unstage (default) |
+| `--hard` | Discard all changes (use with caution!) |
+
+### Examples
+
+```bash
+# Soft reset - undo commit, keep changes staged
+wit reset --soft HEAD~1
+
+# Mixed reset - undo commit, unstage changes
+wit reset HEAD~1
+
+# Hard reset - discard all changes (DANGEROUS)
+wit reset --hard HEAD~1
+
+# Reset to specific commit
+wit reset --hard abc1234
+```
+
+<Warning>
+`wit reset --hard` will permanently discard uncommitted changes. Use with caution!
+</Warning>
+
+### Difference from uncommit
+
+| Command | Keeps Changes? | Keeps Staged? |
+|---------|----------------|---------------|
+| `wit uncommit` | ✅ Yes | ✅ Yes |
+| `wit reset --soft` | ✅ Yes | ✅ Yes |
+| `wit reset` (mixed) | ✅ Yes | ❌ No |
+| `wit reset --hard` | ❌ No | ❌ No |
+
+---
+
+## Comparison: undo vs uncommit vs restore vs reset
 
 | Command | Purpose | Scope |
 |---------|---------|-------|
 | `undo` | Reverse any operation | Operations (commits, branches, etc.) |
 | `uncommit` | Remove commits, keep changes | Commits only |
 | `restore` | Discard/unstage file changes | Files only |
+| `reset` | Move HEAD, optionally discard changes | Commits and working tree |
 
 ### Decision Guide
 
 - **"I want to undo the last thing I did"** → `wit undo`
-- **"I want to redo my last commit differently"** → `wit uncommit`
+- **"I want to redo my last commit differently"** → `wit uncommit` or `wit amend`
 - **"I want to discard changes to a file"** → `wit restore <file>`
 - **"I want to unstage a file"** → `wit restore --staged <file>`
+- **"I want to go back to a specific commit"** → `wit reset [--hard] <commit>`
 
 ---
 
