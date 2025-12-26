@@ -77,6 +77,13 @@ export class ObjectStore {
   }
 
   /**
+   * Alias for writeRawObject for backwards compatibility
+   */
+  writeRaw(type: ObjectType, content: Buffer): string {
+    return this.writeRawObject(type, content);
+  }
+
+  /**
    * Read a Git object from the store
    */
   readObject(hash: string): GitObject {

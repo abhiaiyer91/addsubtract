@@ -1,3 +1,10 @@
+/**
+ * Server Entrypoint
+ * 
+ * Main entry point for running wit as a Git server supporting
+ * HTTP (via Hono) and SSH protocols.
+ */
+
 import { Hono } from 'hono';
 import { serve, ServerType } from '@hono/node-server';
 import { logger } from 'hono/logger';
@@ -8,13 +15,17 @@ import { RepoManager } from './storage/repos';
 import { syncReposToDatabase } from './storage/sync';
 import { appRouter, createContext } from '../api/trpc';
 import * as path from 'path';
+import * as fs from 'fs';
 import { initDatabase, healthCheck as dbHealthCheck, isConnected as isDbConnected } from '../db';
+import { SSHServer, generateHostKey, SSHServerOptions } from './ssh';
+import { SSHKeyManager, FileBasedAccessControl } from './ssh/keys';
+import { Repository } from '../core/repository';
 
 /**
  * Server configuration options
  */
 export interface ServerOptions {
-  /** Port to listen on */
+  /** Port to listen on for HTTP */
   port: number;
   /** Base directory for repositories */
   reposDir: string;
@@ -22,6 +33,23 @@ export interface ServerOptions {
   verbose?: boolean;
   /** Hostname to bind to (default: 0.0.0.0) */
   host?: string;
+  /** SSH server options */
+  ssh?: {
+    /** Enable SSH server */
+    enabled: boolean;
+    /** SSH port (default: 22) */
+    port?: number;
+    /** SSH host (default: 0.0.0.0) */
+    host?: string;
+    /** Path to host key files */
+    hostKeyPaths?: string[];
+    /** Allow anonymous read access */
+    allowAnonymousRead?: boolean;
+    /** Banner message */
+    banner?: string;
+  };
+  /** Data directory for SSH keys and config */
+  dataDir?: string;
 }
 
 /**
@@ -34,6 +62,10 @@ export interface WitServer {
   server: ServerType;
   /** Repository manager */
   repoManager: RepoManager;
+  /** SSH server (if enabled) */
+  sshServer?: SSHServer;
+  /** SSH key manager (if SSH enabled) */
+  keyManager?: SSHKeyManager;
   /** Stop the server */
   stop: () => Promise<void>;
 }
@@ -151,12 +183,29 @@ export function startServer(options: ServerOptions): WitServer {
   // Create app
   const app = createApp(repoManager, { verbose });
 
-  // Start server
+  // Start HTTP server
   const server = serve({
     fetch: app.fetch,
     port,
     hostname: host,
   });
+
+  // Initialize SSH server if enabled
+  let sshServer: SSHServer | undefined;
+  let keyManager: SSHKeyManager | undefined;
+
+  if (options.ssh?.enabled) {
+    startSSHServer(options, absoluteReposDir).then(result => {
+      sshServer = result.sshServer;
+      keyManager = result.keyManager;
+    }).catch(err => {
+      console.error('✗ SSH server failed to start:', err.message);
+    });
+  }
+
+  const sshInfo = options.ssh?.enabled 
+    ? `\n║   SSH URL:  ssh://git@${host === '0.0.0.0' ? 'localhost' : host}:${options.ssh?.port || 22}                          ${(options.ssh?.port || 22).toString().length === 2 ? ' ' : ''}║`
+    : '';
 
   console.log(`
 ╔══════════════════════════════════════════════════════════════╗
@@ -164,7 +213,7 @@ export function startServer(options: ServerOptions): WitServer {
 ║   🚀 wit server is running!                                  ║
 ║                                                              ║
 ║   HTTP URL: http://${host === '0.0.0.0' ? 'localhost' : host}:${port}                              ${port.toString().length === 4 ? ' ' : ''}║
-║   tRPC API: http://${host === '0.0.0.0' ? 'localhost' : host}:${port}/trpc                         ${port.toString().length === 4 ? ' ' : ''}║
+║   tRPC API: http://${host === '0.0.0.0' ? 'localhost' : host}:${port}/trpc                         ${port.toString().length === 4 ? ' ' : ''}║${sshInfo}
 ║   Repositories: ${absoluteReposDir.slice(0, 40).padEnd(41)}║
 ║                                                              ║
 ║   Clone: wit clone http://localhost:${port}/owner/repo.git     ${port.toString().length === 4 ? ' ' : ''}║
@@ -189,15 +238,147 @@ export function startServer(options: ServerOptions): WitServer {
     app,
     server,
     repoManager,
+    sshServer,
+    keyManager,
     stop: async () => {
-      return new Promise<void>((resolve) => {
+      const promises: Promise<void>[] = [];
+      
+      promises.push(new Promise<void>((resolve) => {
         server.close(() => {
-          console.log('[server] Server stopped');
+          console.log('[server] HTTP server stopped');
           resolve();
         });
-      });
+      }));
+
+      if (sshServer) {
+        promises.push(sshServer.stop().then(() => {
+          console.log('[server] SSH server stopped');
+        }));
+      }
+
+      await Promise.all(promises);
     },
   };
+}
+
+/**
+ * Start the SSH server
+ */
+async function startSSHServer(
+  options: ServerOptions,
+  reposDir: string
+): Promise<{ sshServer: SSHServer; keyManager: SSHKeyManager }> {
+  const sshConfig = options.ssh!;
+  
+  // Load or generate host keys
+  const hostKeys = await loadHostKeys(options);
+
+  // Initialize key manager with file-based storage
+  const dataDir = options.dataDir || path.join(reposDir, '.wit-server');
+  const keysDir = path.join(dataDir, 'keys');
+  const accessConfigDir = path.join(dataDir, 'access');
+
+  fs.mkdirSync(keysDir, { recursive: true });
+  fs.mkdirSync(accessConfigDir, { recursive: true });
+
+  const accessControl = new FileBasedAccessControl(accessConfigDir);
+  const keyManager = new SSHKeyManager({
+    storagePath: keysDir,
+    accessControl,
+  });
+
+  const sshOptions: SSHServerOptions = {
+    hostKeys,
+    port: sshConfig.port || 22,
+    host: sshConfig.host || options.host || '0.0.0.0',
+    repoRoot: reposDir,
+    allowAnonymousRead: sshConfig.allowAnonymousRead || false,
+    banner: sshConfig.banner,
+  };
+
+  const sshServer = new SSHServer(sshOptions, keyManager);
+
+  // Set up event handlers
+  sshServer.on('connection', (session) => {
+    console.log(`[ssh] Connection from ${session.remoteAddress}`);
+  });
+
+  sshServer.on('authenticated', (session) => {
+    console.log(`[ssh] Authenticated: ${session.username}`);
+  });
+
+  sshServer.on('git-command', (session, command) => {
+    console.log(`[ssh] Git ${command.service}: ${command.repoPath} (${session.username})`);
+  });
+
+  sshServer.on('error', (error, session) => {
+    console.error(`[ssh] Error${session ? ` (${session.username})` : ''}: ${error.message}`);
+  });
+
+  await sshServer.start();
+  console.log(`✓ SSH server listening on port ${sshConfig.port || 22}`);
+
+  return { sshServer, keyManager };
+}
+
+/**
+ * Load or generate SSH host keys
+ */
+async function loadHostKeys(options: ServerOptions): Promise<Buffer[]> {
+  const sshConfig = options.ssh!;
+  const hostKeys: Buffer[] = [];
+
+  // Try to load from configured paths
+  if (sshConfig.hostKeyPaths) {
+    for (const keyPath of sshConfig.hostKeyPaths) {
+      if (fs.existsSync(keyPath)) {
+        hostKeys.push(fs.readFileSync(keyPath));
+      }
+    }
+  }
+
+  // If no keys loaded, check default locations or generate
+  if (hostKeys.length === 0) {
+    const dataDir = options.dataDir || path.join(options.reposDir, '.wit-server');
+    const keyDir = path.join(dataDir, 'ssh');
+    
+    fs.mkdirSync(keyDir, { recursive: true });
+
+    const rsaKeyPath = path.join(keyDir, 'ssh_host_rsa_key');
+    const ed25519KeyPath = path.join(keyDir, 'ssh_host_ed25519_key');
+
+    // Load or generate RSA key
+    if (fs.existsSync(rsaKeyPath)) {
+      hostKeys.push(fs.readFileSync(rsaKeyPath));
+    } else {
+      console.log('Generating RSA host key...');
+      const rsaKey = await generateHostKey('rsa');
+      fs.writeFileSync(rsaKeyPath, rsaKey, { mode: 0o600 });
+      hostKeys.push(rsaKey);
+    }
+
+    // Load or generate Ed25519 key
+    if (fs.existsSync(ed25519KeyPath)) {
+      hostKeys.push(fs.readFileSync(ed25519KeyPath));
+    } else {
+      console.log('Generating Ed25519 host key...');
+      const ed25519Key = await generateHostKey('ed25519');
+      fs.writeFileSync(ed25519KeyPath, ed25519Key, { mode: 0o600 });
+      hostKeys.push(ed25519Key);
+    }
+  }
+
+  return hostKeys;
+}
+
+/**
+ * Create a new repository
+ */
+export function createRepository(reposDir: string, owner: string, name: string): Repository {
+  const repoPath = path.join(reposDir, owner, name.endsWith('.git') ? name : `${name}.git`);
+  fs.mkdirSync(path.dirname(repoPath), { recursive: true });
+  fs.mkdirSync(repoPath, { recursive: true });
+  return Repository.init(repoPath);
 }
 
 /**
@@ -207,3 +388,7 @@ export { RepoManager } from './storage/repos';
 export { createGitRoutes } from './routes/git';
 export { syncReposToDatabase, syncRepoToDatabase } from './storage/sync';
 export { authMiddleware, gitAuthMiddleware, requireAuth } from './middleware/auth';
+
+// SSH exports
+export { SSHServer, SSHKeyManager, generateHostKey } from './ssh';
+export * from './ssh/types';
