@@ -3,6 +3,7 @@ import * as os from 'os';
 import { spawn } from 'child_process';
 import { exists, readFileText } from '../utils/fs';
 import { Credentials } from './protocol/types';
+import { loadGitHubCredentials } from './github';
 
 /**
  * Credential source types
@@ -197,11 +198,22 @@ export class CredentialManager {
 
     // Check for GitHub token (for github.com)
     if (parsed.host === 'github.com' || parsed.host.includes('github')) {
+      // First check environment variables
       const githubToken = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
       if (githubToken) {
         return {
           username: 'x-access-token',
           password: githubToken,
+          type: 'basic',
+        };
+      }
+
+      // Then check stored GitHub credentials from device flow login
+      const storedGitHub = loadGitHubCredentials();
+      if (storedGitHub) {
+        return {
+          username: 'x-access-token',
+          password: storedGitHub.access_token,
           type: 'basic',
         };
       }
