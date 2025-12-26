@@ -13,6 +13,7 @@ import {
   userModel,
 } from '../../../db/models';
 import { mergePullRequest, checkMergeability, getDefaultMergeMessage } from '../../../server/storage/merge';
+import { triggerAsyncReview } from '../../../ai/services/pr-review';
 import { exists } from '../../../utils/fs';
 
 export const pullsRouter = router({
@@ -174,6 +175,11 @@ export const pullsRouter = router({
 
       // Log activity
       await activityHelpers.logPrOpened(ctx.user.id, input.repoId, pr.number, pr.title);
+
+      // Trigger async AI review (fire-and-forget, doesn't block PR creation)
+      if (!input.isDraft) {
+        triggerAsyncReview(pr.id);
+      }
 
       return pr;
     }),
@@ -725,5 +731,52 @@ export const pullsRouter = router({
     )
     .query(async ({ input }) => {
       return prModel.listByAuthor(input.authorId, input.state);
+    }),
+
+  /**
+   * Trigger an AI review for a pull request
+   * Can be used to re-run review or run review on draft PRs
+   */
+  triggerAIReview: protectedProcedure
+    .input(
+      z.object({
+        prId: z.string().uuid(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const pr = await prModel.findById(input.prId);
+
+      if (!pr) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Pull request not found',
+        });
+      }
+
+      // Check if user has at least read access
+      const repo = await repoModel.findById(pr.repoId);
+      if (!repo) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Repository not found',
+        });
+      }
+
+      const isOwner = repo.ownerId === ctx.user.id;
+      const isAuthor = pr.authorId === ctx.user.id;
+      const hasAccess = isOwner || isAuthor || 
+        (await collaboratorModel.hasPermission(pr.repoId, ctx.user.id, 'read'));
+
+      if (!hasAccess) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have access to this pull request',
+        });
+      }
+
+      // Trigger the review asynchronously
+      triggerAsyncReview(pr.id);
+
+      return { triggered: true, prId: pr.id, prNumber: pr.number };
     }),
 });
