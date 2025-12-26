@@ -59,7 +59,7 @@ export { handleRemote, listRemotes, addRemote, removeRemote, renameRemote, getRe
 export { handleClone, handleCloneAsync, clone, cloneAsync, parseRepoUrl } from './clone';
 export { handleFetch, fetch, fetchAsync } from './fetch';
 export { handlePull, pull, pullAsync } from './pull';
-export { handlePush, push } from './push';
+export { handlePush, push, pushAsync } from './push';
 
 // Advanced features
 export { handleReflog, ReflogManager, updateReflog } from './reflog';

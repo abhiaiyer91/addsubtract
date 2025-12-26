@@ -72,7 +72,7 @@ wit config wit.autoStashOnSwitch false
 
 ```ini
 [wit]
-    hashAlgorithm = sha256
+    hashAlgorithm = sha1
     largeFileThreshold = 2097152
     autoStashOnSwitch = true
     chunkSize = 2097152
@@ -80,7 +80,7 @@ wit config wit.autoStashOnSwitch false
 
 | Key | Description | Default |
 |-----|-------------|---------|
-| `hashAlgorithm` | Hash algorithm (sha256/sha1) | `sha256` |
+| `hashAlgorithm` | Hash algorithm (sha1 for Git compat, sha256 for wit-only) | `sha1` |
 | `largeFileThreshold` | Size for large file handling | `2097152` (2MB) |
 | `autoStashOnSwitch` | Auto-save on branch switch | `true` |
 | `chunkSize` | Chunk size for large files | `2097152` (2MB) |
@@ -170,7 +170,7 @@ Complete `.wit/config`:
     bare = false
 
 [wit]
-    hashAlgorithm = sha256
+    hashAlgorithm = sha1
     largeFileThreshold = 2097152
     autoStashOnSwitch = true
 

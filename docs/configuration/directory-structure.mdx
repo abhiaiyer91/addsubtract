@@ -64,7 +64,7 @@ Repository configuration in INI format:
 [core]
     repositoryformatversion = 1
 [wit]
-    hashAlgorithm = sha256
+    hashAlgorithm = sha1
 [user]
     name = Your Name
 ```
@@ -250,7 +250,7 @@ Manifest:
 | `index` (JSON) | `index` (binary) | wit is human-readable |
 | `journal.json` | (none) | wit tracks all operations |
 | `branch-states/` | (none) | wit auto-stash |
-| SHA-256 | SHA-1 | wit uses secure hashes |
+| SHA-1 (Git compatible) | SHA-1 | Full GitHub/GitLab interop |
 | Large file chunks | (external LFS) | wit is built-in |
 
 ## Troubleshooting

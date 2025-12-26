@@ -37,7 +37,47 @@ export class SmartHttpClient {
     if (!this.baseUrl.endsWith('.git')) {
       this.baseUrl += '.git';
     }
-    this.credentials = credentials;
+    
+    // Use provided credentials or try to get from environment
+    this.credentials = credentials || this.getCredentialsFromEnv();
+  }
+
+  /**
+   * Try to get credentials from environment variables
+   */
+  private getCredentialsFromEnv(): Credentials | undefined {
+    // Check for GitHub token (most common)
+    const githubToken = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
+    if (githubToken) {
+      return {
+        type: 'bearer',
+        username: 'x-access-token',
+        password: githubToken,
+      };
+    }
+
+    // Check for generic git credentials
+    const gitToken = process.env.WIT_TOKEN || process.env.GIT_TOKEN;
+    if (gitToken) {
+      return {
+        type: 'bearer',
+        username: 'x-access-token',
+        password: gitToken,
+      };
+    }
+
+    // Check for username/password
+    const gitUser = process.env.WIT_USER || process.env.GIT_USER;
+    const gitPass = process.env.WIT_PASSWORD || process.env.GIT_PASSWORD;
+    if (gitUser && gitPass) {
+      return {
+        type: 'basic',
+        username: gitUser,
+        password: gitPass,
+      };
+    }
+
+    return undefined;
   }
 
   /**

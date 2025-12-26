@@ -22,7 +22,6 @@ import {
   resolveHead,
   getBranches,
   getTags,
-  RefAdvertisement,
 } from '../core/protocol';
 
 const colors = {
@@ -203,11 +202,8 @@ async function cloneRemoteAsync(url: string, destPath: string, options: CloneOpt
   // Create HTTP client first to discover remote's capabilities
   const client = new SmartHttpClient(httpUrl);
   
-  // Discover refs to determine object format (SHA-1 vs SHA-256)
-  // Most Git servers use SHA-1, so we initialize with SHA-1 for interop
-  // Initialize repository with SHA-1 for Git interoperability
-  // Git remotes currently use SHA-1 (SHA-256 support is experimental)
-  const repo = Repository.init(destPath, { hashAlgorithm: 'sha1' });
+  // Initialize repository (defaults to SHA-1 for Git interoperability)
+  const repo = Repository.init(destPath);
   const remoteManager = new RemoteManager(repo.gitDir);
   remoteManager.init();
 

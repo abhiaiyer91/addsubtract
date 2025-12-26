@@ -12,8 +12,8 @@ description: "A modern Git implementation in TypeScript with AI-powered features
 Git is powerful but has well-known issues. wit addresses them:
 
 | Problem | Git | wit |
-|---------|-----|-----|
-| Security | SHA-1 (broken) | SHA-256 by default |
+|---------|-----|-------|
+| GitHub Interop | Native | Full compatibility |
 | Large files | Needs LFS | Built-in chunking |
 | Undo mistakes | Reflog is cryptic | Simple `wit undo` |
 | Branch switching | Loses uncommitted work | Auto-stash per branch |
@@ -26,8 +26,8 @@ Git is powerful but has well-known issues. wit addresses them:
 ## Key Features
 
 <CardGroup cols={2}>
-  <Card title="SHA-256 Security" icon="shield-halved">
-    Secure by default with SHA-256 hashing instead of Git's deprecated SHA-1
+  <Card title="GitHub Compatible" icon="github">
+    Push and pull seamlessly with GitHub, GitLab, and any Git remote
   </Card>
   <Card title="AI-Powered" icon="robot">
     AI-generated commit messages, code review, and conflict resolution via OpenAI or Anthropic

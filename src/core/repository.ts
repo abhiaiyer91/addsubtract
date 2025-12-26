@@ -25,7 +25,8 @@ export interface RepositoryConfig {
 }
 
 const DEFAULT_CONFIG: RepositoryConfig = {
-  hashAlgorithm: 'sha256',
+  // Default to SHA-1 for Git interoperability (GitHub, GitLab, etc.)
+  hashAlgorithm: 'sha1',
   largeFileThreshold: CHUNK_THRESHOLD,
   autoStashOnSwitch: true,
 };
@@ -164,7 +165,8 @@ export class Repository {
     writeFile(path.join(repo.gitDir, 'HEAD'), 'ref: refs/heads/main\n');
 
     // Create config file with wit improvements
-    const hashAlgo = options.hashAlgorithm || 'sha256';
+    // Default to SHA-1 for Git interoperability
+    const hashAlgo = options.hashAlgorithm || 'sha1';
     const config = `[core]
     repositoryformatversion = 1
     filemode = true

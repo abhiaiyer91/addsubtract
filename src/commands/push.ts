@@ -19,6 +19,15 @@ import { Repository } from '../core/repository';
 import { RemoteManager } from '../core/remote';
 import { TsgitError, ErrorCode } from '../core/errors';
 import { exists, mkdirp, readDir, isDirectory } from '../utils/fs';
+import {
+  SmartHttpClient,
+  normalizeRepoUrl,
+  createPackfile,
+  updateRefUpdate,
+  createRefUpdate,
+  deleteRefUpdate,
+  getBranches,
+} from '../core/protocol';
 
 const colors = {
   green: (s: string) => `\x1b[32m${s}\x1b[0m`,
@@ -278,7 +287,274 @@ function copyAllObjects(src: string, dest: string): void {
 }
 
 /**
- * Push to a remote repository (network)
+ * Push to a remote repository (network) - async implementation
+ */
+async function pushToRemoteAsync(
+  repo: Repository,
+  remoteManager: RemoteManager,
+  remoteName: string,
+  remoteUrl: string,
+  refs: { local: string; remote: string }[],
+  options: PushOptions = {}
+): Promise<PushResult> {
+  const result: PushResult = {
+    remote: remoteName,
+    refs: [],
+  };
+
+  if (options.verbose) {
+    console.log(colors.dim(`Pushing to ${remoteName} (${remoteUrl})...`));
+  }
+
+  // Normalize URL for HTTP client
+  const httpUrl = normalizeRepoUrl(remoteUrl);
+  const client = new SmartHttpClient(httpUrl);
+
+  try {
+    // Step 1: Discover refs from remote
+    const advertisement = await client.discoverRefs('receive-pack');
+    
+    // Get remote branch hashes
+    const remoteBranches = getBranches(advertisement);
+    const remoteRefMap = new Map<string, string>();
+    for (const branch of remoteBranches) {
+      const branchName = branch.name.replace('refs/heads/', '');
+      remoteRefMap.set(branchName, branch.hash);
+    }
+
+    // Step 2: Prepare ref updates and collect objects to send
+    const refUpdates: { name: string; oldHash: string; newHash: string; force?: boolean }[] = [];
+    const objectsToSend: string[] = [];
+
+    for (const { local, remote } of refs) {
+      const localHash = repo.refs.resolve(local);
+      const remoteHash = remoteRefMap.get(remote) || null;
+
+      // Handle delete
+      if (options.delete) {
+        if (!remoteHash) {
+          result.refs.push({
+            ref: remote,
+            status: 'rejected',
+            message: 'Remote branch does not exist',
+          });
+          continue;
+        }
+
+        refUpdates.push(deleteRefUpdate(`refs/heads/${remote}`, remoteHash));
+        result.refs.push({
+          ref: remote,
+          status: 'deleted',
+          oldHash: remoteHash,
+        });
+        continue;
+      }
+
+      if (!localHash) {
+        result.refs.push({
+          ref: local,
+          status: 'rejected',
+          message: 'Local branch not found',
+        });
+        continue;
+      }
+
+      // Check if up to date
+      if (localHash === remoteHash) {
+        result.refs.push({
+          ref: remote,
+          status: 'up-to-date',
+          oldHash: remoteHash,
+          newHash: localHash,
+        });
+        continue;
+      }
+
+      // Check if can fast-forward (unless force)
+      if (!options.force && !options.forceWithLease && remoteHash) {
+        if (!canPushFastForward(repo, localHash, remoteHash)) {
+          result.refs.push({
+            ref: remote,
+            status: 'rejected',
+            oldHash: remoteHash,
+            newHash: localHash,
+            message: 'non-fast-forward update, use --force to override',
+          });
+          continue;
+        }
+      }
+
+      // For force-with-lease, verify expected hash
+      if (options.forceWithLease && remoteHash) {
+        const trackingHash = remoteManager.getTrackingBranchHash(remoteName, remote);
+        if (trackingHash !== remoteHash) {
+          result.refs.push({
+            ref: remote,
+            status: 'rejected',
+            oldHash: remoteHash,
+            newHash: localHash,
+            message: 'stale info, run fetch first',
+          });
+          continue;
+        }
+      }
+
+      // Dry run
+      if (options.dryRun) {
+        result.refs.push({
+          ref: remote,
+          status: remoteHash ? 'pushed' : 'new',
+          oldHash: remoteHash || undefined,
+          newHash: localHash,
+          message: '(dry run)',
+        });
+        continue;
+      }
+
+      // Add ref update
+      if (remoteHash) {
+        refUpdates.push(updateRefUpdate(`refs/heads/${remote}`, remoteHash, localHash, options.force));
+      } else {
+        refUpdates.push(createRefUpdate(`refs/heads/${remote}`, localHash));
+      }
+
+      // Collect objects to send (walk from local commit)
+      collectObjectsToSend(repo, localHash, remoteHash, objectsToSend);
+
+      result.refs.push({
+        ref: remote,
+        status: remoteHash ? 'pushed' : 'new',
+        oldHash: remoteHash || undefined,
+        newHash: localHash,
+      });
+    }
+
+    // Step 3: Create pack file if we have objects to send
+    if (refUpdates.length > 0 && !options.dryRun) {
+      // Build packable objects
+      const packableObjects = objectsToSend.map(hash => {
+        const { type, content } = repo.objects.readRawObject(hash);
+        return { type, data: content, hash };
+      });
+
+      // Create pack
+      const packData = packableObjects.length > 0 
+        ? createPackfile(packableObjects)
+        : Buffer.alloc(0);
+
+      // Step 4: Push to remote
+      const pushResult = await client.pushPack(refUpdates, packData, {
+        progress: options.verbose ? (info) => {
+          console.log(colors.dim(`  ${info.phase}: ${info.current}/${info.total}`));
+        } : undefined,
+      });
+
+      // Update results based on server response
+      if (!pushResult.ok) {
+        for (const refResult of pushResult.refResults) {
+          const existing = result.refs.find(r => r.ref === refResult.refName.replace('refs/heads/', ''));
+          if (existing && refResult.status === 'ng') {
+            existing.status = 'rejected';
+            existing.message = refResult.message || 'Server rejected';
+          }
+        }
+      }
+
+      // Update tracking branches for successful pushes
+      for (const ref of result.refs) {
+        if (ref.status === 'pushed' || ref.status === 'new') {
+          if (ref.newHash) {
+            remoteManager.updateTrackingBranch(remoteName, ref.ref, ref.newHash);
+          }
+        }
+      }
+    }
+
+    return result;
+  } catch (error) {
+    if (error instanceof Error) {
+      throw new TsgitError(
+        `Failed to push to '${remoteName}': ${error.message}`,
+        ErrorCode.OPERATION_FAILED,
+        [
+          'Check your network connection',
+          'Verify you have push access to the repository',
+          'For private repos, ensure you have proper authentication',
+        ]
+      );
+    }
+    throw error;
+  }
+}
+
+/**
+ * Collect objects that need to be sent to remote
+ */
+function collectObjectsToSend(
+  repo: Repository, 
+  localHash: string, 
+  remoteHash: string | null,
+  objects: string[]
+): void {
+  const visited = new Set<string>();
+  const queue = [localHash];
+
+  while (queue.length > 0) {
+    const hash = queue.shift()!;
+    
+    if (visited.has(hash)) continue;
+    if (hash === remoteHash) continue; // Stop at remote's known commit
+    
+    visited.add(hash);
+    
+    if (!objects.includes(hash)) {
+      objects.push(hash);
+    }
+
+    try {
+      const { type, content } = repo.objects.readRawObject(hash);
+      
+      if (type === 'commit') {
+        // Parse commit to get tree and parents
+        const commitStr = content.toString('utf8');
+        const treeMatch = commitStr.match(/^tree ([a-f0-9]+)/m);
+        if (treeMatch) {
+          queue.push(treeMatch[1]);
+        }
+        
+        const parentMatches = commitStr.matchAll(/^parent ([a-f0-9]+)/gm);
+        for (const match of parentMatches) {
+          if (match[1] !== remoteHash) {
+            queue.push(match[1]);
+          }
+        }
+      } else if (type === 'tree') {
+        // Parse tree to get blobs and subtrees
+        let offset = 0;
+        while (offset < content.length) {
+          const spaceIdx = content.indexOf(0x20, offset);
+          if (spaceIdx === -1) break;
+          
+          const nullIdx = content.indexOf(0x00, spaceIdx);
+          if (nullIdx === -1) break;
+          
+          const entryHash = content.slice(nullIdx + 1, nullIdx + 21).toString('hex');
+          if (!objects.includes(entryHash)) {
+            queue.push(entryHash);
+          }
+          
+          offset = nullIdx + 21;
+        }
+      }
+      // Blobs don't reference other objects
+    } catch {
+      // Object might not exist locally, skip
+    }
+  }
+}
+
+/**
+ * Push to a remote repository (network) - sync wrapper
  */
 function pushToRemote(
   repo: Repository,
@@ -288,37 +564,11 @@ function pushToRemote(
   refs: { local: string; remote: string }[],
   options: PushOptions = {}
 ): PushResult {
-  const result: PushResult = {
-    remote: remoteName,
-    refs: [],
-  };
-
-  // For network remotes, we need to implement the Git protocol
-  console.log(colors.dim(`Pushing to ${remoteName} (${remoteUrl})...`));
-  console.log();
-  console.log(colors.yellow('!') + ' Network push requires Git wire protocol implementation');
-  console.log(colors.dim('  In a full implementation, this would:'));
-  console.log(colors.dim('  1. Connect to the remote server'));
-  console.log(colors.dim('  2. Negotiate which objects to send'));
-  console.log(colors.dim('  3. Upload pack files'));
-  console.log(colors.dim('  4. Update remote refs'));
-  console.log();
-
-  for (const { local, remote } of refs) {
-    const localHash = repo.refs.resolve(local);
-    console.log(colors.dim(`  Would push ${local} -> ${remote} (${localHash?.slice(0, 7) || 'none'})`));
-
-    result.refs.push({
-      ref: remote,
-      status: 'rejected',
-      message: 'Network push not implemented',
-    });
-  }
-
-  console.log();
-  console.log(colors.cyan('ℹ') + ' For now, use local paths or interop with Git for network operations.');
-
-  return result;
+  throw new TsgitError(
+    'Use pushAsync for remote repositories',
+    ErrorCode.OPERATION_FAILED,
+    ['Remote pushing requires async operation']
+  );
 }
 
 /**
@@ -374,13 +624,13 @@ function pushTags(
 }
 
 /**
- * Push to remote
+ * Push to remote (async version)
  */
-export function push(
+export async function pushAsync(
   remoteName?: string,
   branchName?: string,
   options: PushOptions = {}
-): PushResult {
+): Promise<PushResult> {
   const repo = Repository.find();
   const remoteManager = new RemoteManager(repo.gitDir);
 
@@ -446,7 +696,7 @@ export function push(
     result = pushToLocal(repo, remoteManager, remote, remoteConfig.url, refs, options);
   } else {
     // Network push
-    result = pushToRemote(repo, remoteManager, remote, remoteConfig.url, refs, options);
+    result = await pushToRemoteAsync(repo, remoteManager, remote, remoteConfig.url, refs, options);
   }
 
   // Push tags if requested
@@ -463,6 +713,21 @@ export function push(
   }
 
   return result;
+}
+
+/**
+ * Push to remote (sync version - only for local repos)
+ */
+export function push(
+  remoteName?: string,
+  branchName?: string,
+  options: PushOptions = {}
+): PushResult {
+  throw new TsgitError(
+    'Synchronous push is not supported. Use pushAsync() instead.',
+    ErrorCode.OPERATION_FAILED,
+    ['Use: await pushAsync(remoteName, branchName, options)']
+  );
 }
 
 /**
@@ -513,9 +778,9 @@ function formatPushResults(result: PushResult, verbose: boolean): void {
 }
 
 /**
- * CLI handler for push command
+ * CLI handler for push command (async)
  */
-export function handlePush(args: string[]): void {
+async function handlePushAsync(args: string[]): Promise<void> {
   const options: PushOptions = {};
   const positional: string[] = [];
 
@@ -546,39 +811,44 @@ export function handlePush(args: string[]): void {
   const remoteName = positional[0];
   const branchName = positional[1];
 
-  try {
-    const result = push(remoteName, branchName, options);
+  const result = await pushAsync(remoteName, branchName, options);
 
-    // Format output
-    console.log(colors.dim(`To ${result.remote}`));
-    formatPushResults(result, options.verbose || false);
+  // Format output
+  console.log(colors.dim(`To ${result.remote}`));
+  formatPushResults(result, options.verbose || false);
 
-    // Summary
-    const pushed = result.refs.filter(r => r.status === 'pushed').length;
-    const newRefs = result.refs.filter(r => r.status === 'new').length;
-    const deleted = result.refs.filter(r => r.status === 'deleted').length;
-    const rejected = result.refs.filter(r => r.status === 'rejected').length;
+  // Summary
+  const pushed = result.refs.filter(r => r.status === 'pushed').length;
+  const newRefs = result.refs.filter(r => r.status === 'new').length;
+  const deleted = result.refs.filter(r => r.status === 'deleted').length;
+  const rejected = result.refs.filter(r => r.status === 'rejected').length;
 
-    if (pushed > 0 || newRefs > 0 || deleted > 0) {
-      const parts: string[] = [];
-      if (pushed > 0) parts.push(`${pushed} updated`);
-      if (newRefs > 0) parts.push(`${newRefs} new`);
-      if (deleted > 0) parts.push(`${deleted} deleted`);
+  if (pushed > 0 || newRefs > 0 || deleted > 0) {
+    const parts: string[] = [];
+    if (pushed > 0) parts.push(`${pushed} updated`);
+    if (newRefs > 0) parts.push(`${newRefs} new`);
+    if (deleted > 0) parts.push(`${deleted} deleted`);
 
-      console.log(colors.green('✓') + ` Push complete: ${parts.join(', ')}`);
-    } else if (rejected === 0) {
-      console.log(colors.dim('Everything up-to-date'));
-    }
+    console.log(colors.green('✓') + ` Push complete: ${parts.join(', ')}`);
+  } else if (rejected === 0) {
+    console.log(colors.dim('Everything up-to-date'));
+  }
 
-    if (rejected > 0) {
-      process.exit(1);
-    }
-  } catch (error) {
+  if (rejected > 0) {
+    process.exit(1);
+  }
+}
+
+/**
+ * CLI handler for push command
+ */
+export function handlePush(args: string[]): void {
+  handlePushAsync(args).catch(error => {
     if (error instanceof TsgitError) {
       console.error(error.format());
     } else if (error instanceof Error) {
       console.error(colors.red('error: ') + error.message);
     }
     process.exit(1);
-  }
+  });
 }

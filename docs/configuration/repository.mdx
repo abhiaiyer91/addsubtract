@@ -51,17 +51,17 @@ Bare repositories have no working directory (used for servers).
 
 ```ini
 [wit]
-    hashAlgorithm = sha256
+    hashAlgorithm = sha1
 ```
 
 | Value | Description |
 |-------|-------------|
-| `sha256` | Secure, modern (default) |
-| `sha1` | Git-compatible, deprecated |
+| `sha1` | Git-compatible (default) - works with GitHub/GitLab |
+| `sha256` | More secure, but no Git remote compatibility |
 
-<Warning>
-SHA-1 is cryptographically broken. Only use for Git compatibility.
-</Warning>
+<Note>
+wit defaults to SHA-1 for full GitHub/GitLab compatibility. SHA-256 is available for wit-to-wit workflows that don't need Git remotes.
+</Note>
 
 ### Auto-Stash on Switch
 
@@ -241,7 +241,7 @@ code .wit/config
     ignorecase = false
 
 [wit]
-    hashAlgorithm = sha256
+    hashAlgorithm = sha1
     largeFileThreshold = 5242880
     autoStashOnSwitch = true
     chunkSize = 2097152

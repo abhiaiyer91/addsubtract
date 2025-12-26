@@ -57,7 +57,7 @@ wit mirrors Git's conceptual model while making practical improvements:
 ├── HEAD              # Current branch reference
 ├── config            # Repository configuration (INI + JSON)
 ├── index             # JSON staging area (human-readable)
-├── objects/          # Content-addressable storage (SHA-256)
+├── objects/          # Content-addressable storage (SHA-1 for Git compat)
 │   └── ab/          # Objects by 2-char prefix
 ├── refs/
 │   ├── heads/       # Branch references
@@ -89,16 +89,16 @@ Objects are stored in a specific format:
 
 This is then compressed with zlib before writing to disk.
 
-**Security Issue**: SHA-1 has been cryptographically broken since 2017 (the "SHAttered" attack). While Git has partial mitigations, repositories remain vulnerable to collision attacks.
+**Note**: While SHA-1 has theoretical vulnerabilities, no practical attack against Git repositories has occurred. Git has mitigations for known attack patterns.
 
 ### wit's Approach
 
-wit defaults to **SHA-256** (64-character hex), providing significantly stronger security:
+wit defaults to **SHA-1** for full GitHub/GitLab compatibility, allowing seamless push/pull with any Git remote:
 
 ```typescript
 // src/utils/hash.ts
 export type HashAlgorithm = 'sha1' | 'sha256';
-let currentAlgorithm: HashAlgorithm = 'sha256';  // Default
+let currentAlgorithm: HashAlgorithm = 'sha1';  // Default for Git compatibility
 
 export function computeHash(data: Buffer | string): string {
   return crypto.createHash(currentAlgorithm).update(data).digest('hex');
@@ -111,7 +111,7 @@ export function hashObject(type: string, content: Buffer): string {
 }
 ```
 
-wit uses the same object format as Git (`{type} {size}\0{content}`) and the same zlib compression, ensuring conceptual compatibility while upgrading security:
+wit uses the same object format as Git (`{type} {size}\0{content}`) and the same zlib compression, ensuring full compatibility:
 
 ```typescript
 // src/utils/compression.ts
@@ -379,7 +379,7 @@ export class Refs {
 }
 ```
 
-The key addition: wit validates hash length against the configured algorithm (40 chars for SHA-1, 64 for SHA-256).
+The key addition: wit validates hash length against the configured algorithm (40 chars for SHA-1).
 
 ---
 
@@ -989,7 +989,7 @@ function levenshteinDistance(a: string, b: string): number {
 
 | Aspect | Git | wit |
 |--------|-----|-------|
-| **Hash Algorithm** | SHA-1 (broken) | SHA-256 (default) |
+| **Hash Algorithm** | SHA-1 | SHA-1 (Git compatible) |
 | **Index Format** | Binary | JSON (human-readable) |
 | **Large Files** | Git LFS (external) | Built-in chunking |
 | **Undo** | Reflog (complex) | Simple `undo` command |
@@ -1015,7 +1015,7 @@ This means users familiar with Git internals can understand wit immediately, whi
 
 ### What's Intentionally Different
 
-1. **SHA-256 by default**: Security over backwards compatibility
+1. **GitHub Compatible**: Full interop with GitHub, GitLab, and any Git remote
 2. **JSON index**: Debuggability over raw performance
 3. **Operation journal**: User-friendliness over minimal storage
 4. **Branch state**: Convenience over explicit control
@@ -1023,7 +1023,7 @@ This means users familiar with Git internals can understand wit immediately, whi
 
 ### What's Not Yet Implemented
 
-- Remote operations (push, pull, fetch, clone)
+- Push to remotes (clone, fetch, pull implemented)
 - Rebase
 - Cherry-pick
 - Revert
@@ -1068,7 +1068,7 @@ In addition to the core Git features (init, add, commit, status, log, diff, bran
 │  Tag       │            │            │ LargeFileHandler (chunks)│
 ├────────────┴────────────┴────────────┴──────────────────────────┤
 │                     Utilities (utils/*.ts)                       │
-│  hash (SHA-256) │ compression (zlib) │ fs (file operations)    │
+│  hash (SHA-1)   │ compression (zlib) │ fs (file operations)    │
 ├─────────────────────────────────────────────────────────────────┤
 │                     Visual UI (ui/*.ts)                          │
 │  TUI (terminal) │ Web UI (browser) │ Graph (ASCII art)         │

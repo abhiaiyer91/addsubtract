@@ -10,20 +10,20 @@ A modern Git implementation in TypeScript with AI-powered features.
 
 Git is powerful but has well-known usability issues. **wit** addresses them while adding modern features:
 
-| Problem | Git | wit |
-|---------|-----|-----|
-| Security | SHA-1 (broken) | SHA-256 by default |
-| Large files | Needs LFS | Built-in chunking |
-| Undo mistakes | Reflog is cryptic | Simple `wit undo` |
-| Branch switching | Loses uncommitted work | Auto-stash per branch |
-| Merge conflicts | Inline markers | Structured JSON |
-| Confusing commands | `checkout` does 5 things | Dedicated `switch`/`restore` |
-| Error messages | Cryptic | Helpful with suggestions |
-| Visual interface | External tools needed | Built-in TUI & Web UI |
-| Quick saves | No built-in solution | `wit wip` auto-message |
-| Fixing commits | `git commit --amend` verbose | Simple `wit amend` |
-| Branch cleanup | Manual process | `wit cleanup` |
-| AI assistance | None | Built-in AI commit messages, review, & more |
+| Problem            | Git                          | wit                                         |
+| ------------------ | ---------------------------- | ------------------------------------------- |
+| GitHub Interop     | Native                       | Full compatibility                          |
+| Large files        | Needs LFS                    | Built-in chunking                           |
+| Undo mistakes      | Reflog is cryptic            | Simple `wit undo`                           |
+| Branch switching   | Loses uncommitted work       | Auto-stash per branch                       |
+| Merge conflicts    | Inline markers               | Structured JSON                             |
+| Confusing commands | `checkout` does 5 things     | Dedicated `switch`/`restore`                |
+| Error messages     | Cryptic                      | Helpful with suggestions                    |
+| Visual interface   | External tools needed        | Built-in TUI & Web UI                       |
+| Quick saves        | No built-in solution         | `wit wip` auto-message                      |
+| Fixing commits     | `git commit --amend` verbose | Simple `wit amend`                          |
+| Branch cleanup     | Manual process               | `wit cleanup`                               |
+| AI assistance      | None                         | Built-in AI commit messages, review, & more |
 
 ## Features
 
@@ -271,6 +271,7 @@ wit ai resolve src/file.ts # Resolve specific file
 ### Web UI (`wit web`)
 
 Modern dashboard at http://localhost:3847 with:
+
 - **Commit graph** - Visual branch history
 - **Side-by-side diffs** - Syntax highlighted
 - **File browser** - With status icons
@@ -286,6 +287,7 @@ wit web --port 8080       # Custom port
 ### Terminal UI (`wit ui`)
 
 Interactive terminal interface:
+
 - Navigate with arrow keys
 - `a` to stage files
 - `c` to commit
@@ -309,7 +311,7 @@ Repository config is stored in `.wit/config`:
     repositoryformatversion = 1
     filemode = true
 [wit]
-    hashAlgorithm = sha256
+    hashAlgorithm = sha1
     largeFileThreshold = 2097152
     autoStashOnSwitch = true
 ```
@@ -317,25 +319,25 @@ Repository config is stored in `.wit/config`:
 ## Programmatic Usage
 
 ```typescript
-import { Repository } from 'wit';
+import { Repository } from "wit";
 
 // Initialize
-const repo = Repository.init('/path/to/project');
+const repo = Repository.init("/path/to/project");
 
 // Add and commit
-repo.add('file.ts');
-const hash = repo.commit('Add file');
+repo.add("file.ts");
+const hash = repo.commit("Add file");
 
 // Undo
 repo.journal.undo();
 
 // Search
-import { SearchEngine } from 'wit';
+import { SearchEngine } from "wit";
 const search = new SearchEngine(repo);
-const results = search.search('TODO');
+const results = search.search("TODO");
 
 // Work with scopes (monorepo)
-repo.scopeManager.setScope({ paths: ['packages/frontend/'] });
+repo.scopeManager.setScope({ paths: ["packages/frontend/"] });
 ```
 
 ## Directory Structure
@@ -354,6 +356,48 @@ repo.scopeManager.setScope({ paths: ['packages/frontend/'] });
 ├── journal.json      # Operation history (for undo)
 └── branch-states/    # Auto-stashed changes per branch
 ```
+
+# <<<<<<< HEAD
+
+## Keyboard Shortcuts (Web UI)
+
+| Shortcut     | Action             |
+| ------------ | ------------------ |
+| `Ctrl+P`     | Focus search       |
+| `Ctrl+Enter` | Open commit dialog |
+| `R`          | Refresh            |
+| `Escape`     | Close modal        |
+
+## Differences from Git
+
+### What's Better
+
+- **GitHub Compatible** - Push/pull seamlessly with GitHub, GitLab, and any Git remote
+- **Undo anything** - `wit undo` reverts any operation
+- **Auto-stash** - Never lose work when switching branches
+- **Built-in UI** - No external tools needed
+- **Clear commands** - `switch` for branches, `restore` for files
+- **Better errors** - Suggestions for typos and mistakes
+- **Large files** - Chunked storage without LFS
+- **Quick saves** - `wit wip` for instant WIP commits
+- **Easy amend** - `wit amend` is simpler than `git commit --amend`
+- **Branch cleanup** - `wit cleanup` finds and removes stale branches
+- **Statistics** - `wit stats` shows repo insights
+- **Snapshots** - Quick checkpoints without full commits
+- **Smart blame** - Color-coded, with relative dates
+- **Hooks** - Full hook system (pre-commit, post-commit, etc.)
+- **Submodules** - Nested repository support
+- **Worktrees** - Multiple working directories
+- **Reflog** - Reference log with time-based recovery
+- **GC** - Garbage collection with aggressive optimization
+
+### What's Missing (Planned)
+
+- Remote operations (push, pull, fetch, clone)
+- Rebase
+- Cherry-pick
+
+> > > > > > > cbf6640 (push)
 
 ## Examples
 
@@ -422,16 +466,17 @@ wit worktree remove ../feature-worktree  # Clean up when done
 
 ## Keyboard Shortcuts (Web UI)
 
-| Shortcut | Action |
-|----------|--------|
-| `Ctrl+P` | Focus search |
+| Shortcut     | Action             |
+| ------------ | ------------------ |
+| `Ctrl+P`     | Focus search       |
 | `Ctrl+Enter` | Open commit dialog |
-| `R` | Refresh |
-| `Escape` | Close modal |
+| `R`          | Refresh            |
+| `Escape`     | Close modal        |
 
 ## What's Different from Git
 
 ### Improvements
+
 - **SHA-256** - Secure by default
 - **Undo anything** - `wit undo` reverts any operation
 - **Auto-stash** - Never lose work when switching branches
@@ -443,6 +488,7 @@ wit worktree remove ../feature-worktree  # Clean up when done
 - **Quality of life** - `wip`, `amend`, `uncommit`, `cleanup`, `stats`, `snapshot`, `blame`
 
 ### Full Compatibility
+
 wit implements all standard Git functionality including cherry-pick, rebase, revert, stash, tags, bisect, hooks, submodules, worktrees, reflog, and garbage collection.
 
 ## License
