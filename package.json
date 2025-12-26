@@ -36,13 +36,20 @@
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^20.10.0",
+    "@types/pg": "^8.16.0",
+    "@types/uuid": "^10.0.0",
+    "drizzle-kit": "^0.31.8",
     "typescript": "^5.3.0",
     "vitest": "^4.0.16"
   },
   "dependencies": {
     "@mastra/core": "^1.0.0-beta.17",
+    "@trpc/server": "^11.8.1",
     "@types/blessed": "^0.1.27",
     "blessed": "^0.1.81",
+    "drizzle-orm": "^0.45.1",
+    "pg": "^8.16.3",
+    "uuid": "^13.0.0",
     "zod": "^4.2.1"
   },
   "engines": {
