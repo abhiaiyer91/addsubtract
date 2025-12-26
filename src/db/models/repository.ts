@@ -243,6 +243,13 @@ export const repoModel = {
       .set({ pushedAt: now, updatedAt: now })
       .where(eq(repositories.id, id));
   },
+
+  /**
+   * Increment forks count
+   */
+  async incrementForksCount(id: string): Promise<void> {
+    await this.incrementCounter(id, 'forksCount', 1);
+  },
 };
 
 export const collaboratorModel = {

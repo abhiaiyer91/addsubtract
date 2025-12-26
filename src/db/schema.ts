@@ -409,7 +409,7 @@ export const activities = pgTable('activities', {
     .references(() => users.id),
   repoId: uuid('repo_id').references(() => repositories.id, { onDelete: 'cascade' }),
 
-  type: text('type').notNull(), // 'push', 'pr_opened', 'issue_opened', etc.
+  type: text('type').notNull(), // 'push', 'pr_opened', 'issue_opened', 'fork', etc.
   payload: text('payload'), // JSON data
 
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),

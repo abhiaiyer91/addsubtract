@@ -11,7 +11,7 @@ import {
   labelModel,
   activityHelpers,
 } from '../../../db/models';
-import { BareRepository } from '../../../server/storage/repos';
+import { BareRepository, forkRepository, getRepoDiskPath } from '../../../server/storage/repos';
 import { exists } from '../../../utils/fs';
 
 /**
@@ -263,6 +263,156 @@ export const reposRouter = router({
       }
 
       return repoModel.delete(input.repoId);
+    }),
+
+  /**
+   * Fork a repository
+   * 
+   * Creates a new repository owned by the current user that is a fork
+   * of the specified source repository. Copies all branches, commits,
+   * and tags from the parent.
+   */
+  fork: protectedProcedure
+    .input(
+      z.object({
+        repoId: z.string().uuid(),
+        name: z.string().min(1).max(100).regex(/^[a-zA-Z0-9._-]+$/).optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      // Get source repository
+      const sourceRepo = await repoModel.findById(input.repoId);
+      if (!sourceRepo) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Repository not found',
+        });
+      }
+
+      // Check read permission on source
+      if (sourceRepo.isPrivate) {
+        const isOwner = sourceRepo.ownerId === ctx.user.id;
+        const hasAccess = isOwner || (await collaboratorModel.hasPermission(sourceRepo.id, ctx.user.id, 'read'));
+
+        if (!hasAccess) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'You do not have permission to fork this repository',
+          });
+        }
+      }
+
+      // Determine fork name
+      const forkName = input.name || sourceRepo.name;
+
+      // Check if user already has a repo with this name
+      const existingRepo = await repoModel.findByOwnerAndName(ctx.user.id, forkName);
+      if (existingRepo) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: `You already have a repository named '${forkName}'`,
+        });
+      }
+
+      // Get target disk path for the fork
+      const targetDiskPath = getRepoDiskPath(ctx.user.username, forkName);
+
+      // Create fork on disk
+      let storageResult;
+      try {
+        const reposDir = process.env.REPOS_DIR || './repos';
+        const sourceAbsolutePath = path.isAbsolute(sourceRepo.diskPath) 
+          ? sourceRepo.diskPath 
+          : path.join(process.cwd(), reposDir, sourceRepo.diskPath.replace(/^\/repos\//, ''));
+
+        storageResult = forkRepository(sourceAbsolutePath, targetDiskPath);
+      } catch (error) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: `Failed to fork repository on disk: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        });
+      }
+
+      // Create fork in database
+      const fork = await repoModel.create({
+        name: forkName,
+        description: sourceRepo.description,
+        isPrivate: sourceRepo.isPrivate,
+        ownerId: ctx.user.id,
+        ownerType: 'user',
+        diskPath: targetDiskPath,
+        defaultBranch: storageResult.defaultBranch,
+        isFork: true,
+        forkedFromId: sourceRepo.id,
+      });
+
+      // Increment forksCount on parent
+      await repoModel.incrementForksCount(sourceRepo.id);
+
+      // Create default labels
+      await labelModel.createDefaults(fork.id);
+
+      // Log activity for fork creation
+      await activityHelpers.logRepoForked(ctx.user.id, fork.id, sourceRepo.id, sourceRepo.name);
+
+      // Get source owner for response
+      const sourceOwner = await userModel.findById(sourceRepo.ownerId);
+
+      return {
+        ...fork,
+        forkedFrom: {
+          id: sourceRepo.id,
+          name: sourceRepo.name,
+          ownerId: sourceRepo.ownerId,
+          owner: sourceOwner ? {
+            id: sourceOwner.id,
+            username: sourceOwner.username,
+          } : null,
+        },
+        branches: storageResult.branches,
+      };
+    }),
+
+  /**
+   * Check if a fork can be created
+   * Useful for UI to show if fork button should be enabled
+   */
+  canFork: protectedProcedure
+    .input(
+      z.object({
+        repoId: z.string().uuid(),
+        name: z.string().optional(),
+      })
+    )
+    .query(async ({ input, ctx }) => {
+      // Check source repo exists
+      const sourceRepo = await repoModel.findById(input.repoId);
+      if (!sourceRepo) {
+        return { canFork: false, reason: 'Repository not found' };
+      }
+
+      // Check read permission
+      if (sourceRepo.isPrivate) {
+        const isOwner = sourceRepo.ownerId === ctx.user.id;
+        const hasAccess = isOwner || (await collaboratorModel.hasPermission(sourceRepo.id, ctx.user.id, 'read'));
+
+        if (!hasAccess) {
+          return { canFork: false, reason: 'You do not have permission to view this repository' };
+        }
+      }
+
+      // Check for name conflict
+      const forkName = input.name || sourceRepo.name;
+      const existingRepo = await repoModel.findByOwnerAndName(ctx.user.id, forkName);
+      if (existingRepo) {
+        return { 
+          canFork: false, 
+          reason: `You already have a repository named '${forkName}'`,
+          suggestedName: `${forkName}-fork`,
+        };
+      }
+
+      return { canFork: true };
     }),
 
   /**
