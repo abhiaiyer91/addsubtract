@@ -47,7 +47,7 @@ export class Repository {
   readonly objects: ObjectStore;
   readonly index: Index;
   readonly refs: Refs;
-  
+
   // New features
   readonly journal: Journal;
   readonly largeFiles: LargeFileHandler;
@@ -64,19 +64,19 @@ export class Repository {
   constructor(workDir: string, config: Partial<RepositoryConfig> = {}) {
     this.workDir = path.resolve(workDir);
     this.gitDir = path.join(this.workDir, '.wit');
-    
+
     // Load config from existing repo if it exists
     const loadedConfig = this.loadStoredConfig();
     this.config = { ...DEFAULT_CONFIG, ...loadedConfig, ...config };
-    
+
     // Set hash algorithm
     setHashAlgorithm(this.config.hashAlgorithm);
-    
+
     // Core components
     this.objects = new ObjectStore(this.gitDir);
     this.index = new Index(this.gitDir);
     this.refs = new Refs(this.gitDir);
-    
+
     // New feature components
     this.journal = new Journal(this.gitDir);
     this.largeFiles = new LargeFileHandler(this.gitDir);
@@ -240,14 +240,14 @@ export class Repository {
   addAll(): void {
     const ignorePatterns = loadIgnorePatterns(this.workDir);
     const files = walkDir(this.workDir, ignorePatterns);
-    
+
     for (const file of files) {
       const relativePath = path.relative(this.workDir, file);
       const content = readFile(file);
       const hash = this.objects.writeBlob(content);
       this.index.add(relativePath, hash, this.workDir);
     }
-    
+
     this.index.save();
   }
 
@@ -488,7 +488,7 @@ export class Repository {
    */
   private checkoutTree(commitHash: string): void {
     const commit = this.objects.readCommit(commitHash);
-    
+
     // Clear and rebuild index from tree
     this.index.clear();
     this.checkoutTreeRecursive(commit.treeHash, '');
@@ -512,7 +512,7 @@ export class Repository {
         const blob = this.objects.readBlob(entry.hash);
         mkdirp(path.dirname(fullPath));
         writeFile(fullPath, blob.content);
-        
+
         // Add to index
         this.index.add(relativePath, entry.hash, this.workDir);
       }
@@ -561,11 +561,30 @@ export class Repository {
   }
 
   /**
-   * Get default author info from environment or config
+   * Get default author info from environment, GitHub auth, git config, or defaults
    */
   private getDefaultAuthor(): Author {
-    const name = process.env.WIT_AUTHOR_NAME || process.env.GIT_AUTHOR_NAME || 'Anonymous';
-    const email = process.env.WIT_AUTHOR_EMAIL || process.env.GIT_AUTHOR_EMAIL || 'anonymous@example.com';
+    // Try environment variables first
+    let name = process.env.WIT_AUTHOR_NAME || process.env.GIT_AUTHOR_NAME;
+    let email = process.env.WIT_AUTHOR_EMAIL || process.env.GIT_AUTHOR_EMAIL;
+
+    // If not set, try GitHub credentials (from `wit github login`)
+    if (!name || !email) {
+      const githubInfo = this.readGitHubUserInfo();
+      if (!name) name = githubInfo.name;
+      if (!email) email = githubInfo.email;
+    }
+
+    // If not set, try reading from git config
+    if (!name || !email) {
+      const gitConfig = this.readGitConfig();
+      if (!name) name = gitConfig.name;
+      if (!email) email = gitConfig.email;
+    }
+
+    // Fall back to defaults
+    if (!name) name = 'Anonymous';
+    if (!email) email = 'anonymous@example.com';
 
     return {
       name,
@@ -573,6 +592,76 @@ export class Repository {
       timestamp: Math.floor(Date.now() / 1000),
       timezone: this.getTimezone(),
     };
+  }
+
+  /**
+   * Read user info from stored GitHub credentials
+   */
+  private readGitHubUserInfo(): { name?: string; email?: string } {
+    try {
+      const { loadGitHubCredentials } = require('./github');
+      const creds = loadGitHubCredentials();
+      if (creds) {
+        return {
+          name: creds.name,
+          email: creds.email,
+        };
+      }
+    } catch {
+      // GitHub module not available or no credentials
+    }
+    return {};
+  }
+
+  /**
+   * Read user info from git config (local repo config, then global)
+   */
+  private readGitConfig(): { name?: string; email?: string } {
+    const result: { name?: string; email?: string } = {};
+
+    // Try local .git/config first, then ~/.gitconfig
+    const configPaths = [
+      path.join(this.gitDir, 'config'),
+      path.join(process.env.HOME || '', '.gitconfig'),
+    ];
+
+    for (const configPath of configPaths) {
+      try {
+        if (!exists(configPath)) continue;
+
+        const content = readFileText(configPath);
+        const lines = content.split('\n');
+        let inUserSection = false;
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+
+          if (trimmed.startsWith('[')) {
+            inUserSection = trimmed.toLowerCase() === '[user]';
+            continue;
+          }
+
+          if (inUserSection) {
+            const nameMatch = trimmed.match(/^name\s*=\s*(.+)$/i);
+            if (nameMatch && !result.name) {
+              result.name = nameMatch[1].trim();
+            }
+
+            const emailMatch = trimmed.match(/^email\s*=\s*(.+)$/i);
+            if (emailMatch && !result.email) {
+              result.email = emailMatch[1].trim();
+            }
+          }
+        }
+
+        // Stop if we have both
+        if (result.name && result.email) break;
+      } catch {
+        // Ignore errors reading config
+      }
+    }
+
+    return result;
   }
 
   /**
@@ -616,9 +705,9 @@ export class Repository {
 
     const commit = this.objects.readCommit(hash);
     const blobHash = this.findBlobInTree(commit.treeHash, filePath.split('/'));
-    
+
     if (!blobHash) return null;
-    
+
     const blob = this.objects.readBlob(blobHash);
     return blob.content;
   }
@@ -628,7 +717,7 @@ export class Repository {
    */
   private findBlobInTree(treeHash: string, pathParts: string[]): string | null {
     const tree = this.objects.readTree(treeHash);
-    
+
     for (const entry of tree.entries) {
       if (entry.name === pathParts[0]) {
         if (pathParts.length === 1) {
@@ -639,7 +728,7 @@ export class Repository {
         }
       }
     }
-    
+
     return null;
   }
 }

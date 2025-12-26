@@ -161,9 +161,10 @@ Remote Operations:
   push [<remote>]       Update remote refs and objects
 
 GitHub Integration:
-  github login          Authenticate with GitHub
+  github login          Authenticate with GitHub (device flow)
   github logout         Remove stored GitHub credentials
   github status         Show authentication status
+  github token          Print access token (for scripting)
 
 Advanced Features:
   hooks                 Manage repository hooks
@@ -210,6 +211,13 @@ Plumbing Commands:
 Options:
   -h, --help            Show this help message
   -v, --version         Show version number
+
+Environment Variables:
+  GITHUB_TOKEN          GitHub personal access token (recommended)
+  GH_TOKEN              Alternative to GITHUB_TOKEN
+  WIT_GITHUB_CLIENT_ID  OAuth App client ID (for device flow login)
+  WIT_TOKEN             Generic wit authentication token
+  GIT_TOKEN             Generic git authentication token
 
 Examples:
   wit ui                    # Launch terminal UI

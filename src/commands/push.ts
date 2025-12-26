@@ -312,8 +312,19 @@ async function pushToRemoteAsync(
 
   try {
     // Step 1: Discover refs from remote
+    console.log(colors.dim('Discovering refs...'));
     const advertisement = await client.discoverRefs('receive-pack');
-    
+    console.log(colors.dim(`Found ${advertisement.refs.length} refs on remote`));
+    for (const ref of advertisement.refs.slice(0, 5)) {
+      console.log(colors.dim(`  ${ref.name}: ${ref.hash.slice(0, 7)}`));
+    }
+    // Show server capabilities
+    const caps = advertisement.capabilities;
+    if (caps && typeof caps === 'object') {
+      const capKeys = Object.keys(caps).slice(0, 10);
+      console.log(colors.dim(`Server capabilities: ${capKeys.join(', ')}...`));
+    }
+
     // Get remote branch hashes
     const remoteBranches = getBranches(advertisement);
     const remoteRefMap = new Map<string, string>();
@@ -437,17 +448,24 @@ async function pushToRemoteAsync(
         return { type, data: content, hash };
       });
 
-      // Create pack
-      const packData = packableObjects.length > 0 
-        ? createPackfile(packableObjects)
+      // Create pack (without delta compression for speed)
+      console.log(colors.dim(`Creating pack with ${packableObjects.length} objects...`));
+      const packData = packableObjects.length > 0
+        ? createPackfile(packableObjects, { useDelta: false })
         : Buffer.alloc(0);
+      console.log(colors.dim(`Pack size: ${packData.length} bytes`));
 
       // Step 4: Push to remote
+      console.log(colors.dim('Pushing to remote...'));
+      for (const refUpdate of refUpdates) {
+        console.log(colors.dim(`  Ref: ${refUpdate.name} ${refUpdate.oldHash?.slice(0, 7) || '(new)'} -> ${refUpdate.newHash.slice(0, 7)}`));
+      }
       const pushResult = await client.pushPack(refUpdates, packData, {
-        progress: options.verbose ? (info) => {
+        progress: (info) => {
           console.log(colors.dim(`  ${info.phase}: ${info.current}/${info.total}`));
-        } : undefined,
+        },
       });
+      console.log(colors.dim('Push complete'));
 
       // Update results based on server response
       if (!pushResult.ok) {
@@ -491,29 +509,36 @@ async function pushToRemoteAsync(
  * Collect objects that need to be sent to remote
  */
 function collectObjectsToSend(
-  repo: Repository, 
-  localHash: string, 
+  repo: Repository,
+  localHash: string,
   remoteHash: string | null,
   objects: string[]
 ): void {
+  // First, collect all objects reachable from remote (these already exist on server)
+  const remoteObjects = new Set<string>();
+  if (remoteHash) {
+    collectAllObjects(repo, remoteHash, remoteObjects);
+  }
+
+  // Now walk from local commit and only include objects NOT on remote
   const visited = new Set<string>();
   const queue = [localHash];
 
   while (queue.length > 0) {
     const hash = queue.shift()!;
-    
+
     if (visited.has(hash)) continue;
-    if (hash === remoteHash) continue; // Stop at remote's known commit
-    
+    if (remoteObjects.has(hash)) continue; // Skip objects already on remote
+
     visited.add(hash);
-    
+
     if (!objects.includes(hash)) {
       objects.push(hash);
     }
 
     try {
       const { type, content } = repo.objects.readRawObject(hash);
-      
+
       if (type === 'commit') {
         // Parse commit to get tree and parents
         const commitStr = content.toString('utf8');
@@ -521,12 +546,10 @@ function collectObjectsToSend(
         if (treeMatch) {
           queue.push(treeMatch[1]);
         }
-        
+
         const parentMatches = commitStr.matchAll(/^parent ([a-f0-9]+)/gm);
         for (const match of parentMatches) {
-          if (match[1] !== remoteHash) {
-            queue.push(match[1]);
-          }
+          queue.push(match[1]);
         }
       } else if (type === 'tree') {
         // Parse tree to get blobs and subtrees
@@ -534,19 +557,64 @@ function collectObjectsToSend(
         while (offset < content.length) {
           const spaceIdx = content.indexOf(0x20, offset);
           if (spaceIdx === -1) break;
-          
+
           const nullIdx = content.indexOf(0x00, spaceIdx);
           if (nullIdx === -1) break;
-          
+
           const entryHash = content.slice(nullIdx + 1, nullIdx + 21).toString('hex');
-          if (!objects.includes(entryHash)) {
-            queue.push(entryHash);
-          }
-          
+          queue.push(entryHash);
+
           offset = nullIdx + 21;
         }
       }
       // Blobs don't reference other objects
+    } catch {
+      // Object might not exist locally, skip
+    }
+  }
+}
+
+/**
+ * Collect ALL objects reachable from a given hash
+ */
+function collectAllObjects(
+  repo: Repository,
+  startHash: string,
+  objects: Set<string>
+): void {
+  const queue = [startHash];
+
+  while (queue.length > 0) {
+    const hash = queue.shift()!;
+
+    if (objects.has(hash)) continue;
+    objects.add(hash);
+
+    try {
+      const { type, content } = repo.objects.readRawObject(hash);
+
+      if (type === 'commit') {
+        const commitStr = content.toString('utf8');
+        const treeMatch = commitStr.match(/^tree ([a-f0-9]+)/m);
+        if (treeMatch) {
+          queue.push(treeMatch[1]);
+        }
+        // Don't walk parents - we just want objects reachable from this commit
+      } else if (type === 'tree') {
+        let offset = 0;
+        while (offset < content.length) {
+          const spaceIdx = content.indexOf(0x20, offset);
+          if (spaceIdx === -1) break;
+
+          const nullIdx = content.indexOf(0x00, spaceIdx);
+          if (nullIdx === -1) break;
+
+          const entryHash = content.slice(nullIdx + 1, nullIdx + 21).toString('hex');
+          queue.push(entryHash);
+
+          offset = nullIdx + 21;
+        }
+      }
     } catch {
       // Object might not exist locally, skip
     }

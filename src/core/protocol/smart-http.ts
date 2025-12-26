@@ -16,6 +16,7 @@ import {
   NULL_HASH,
 } from './types';
 import { parseRefAdvertisement, serializeCapabilities } from './refs-discovery';
+import { loadGitHubCredentials } from '../github';
 
 /**
  * Smart HTTP client for Git protocol operations
@@ -37,22 +38,32 @@ export class SmartHttpClient {
     if (!this.baseUrl.endsWith('.git')) {
       this.baseUrl += '.git';
     }
-    
+
     // Use provided credentials or try to get from environment
     this.credentials = credentials || this.getCredentialsFromEnv();
   }
 
   /**
-   * Try to get credentials from environment variables
+   * Try to get credentials from environment variables or stored credentials
    */
   private getCredentialsFromEnv(): Credentials | undefined {
-    // Check for GitHub token (most common)
+    // Check for GitHub token in environment (highest priority)
     const githubToken = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
     if (githubToken) {
       return {
-        type: 'bearer',
+        type: 'basic',
         username: 'x-access-token',
         password: githubToken,
+      };
+    }
+
+    // Check for stored GitHub credentials from 'wit github login'
+    const storedGitHub = loadGitHubCredentials();
+    if (storedGitHub) {
+      return {
+        type: 'basic',
+        username: 'x-access-token',
+        password: storedGitHub.access_token,
       };
     }
 
@@ -60,7 +71,7 @@ export class SmartHttpClient {
     const gitToken = process.env.WIT_TOKEN || process.env.GIT_TOKEN;
     if (gitToken) {
       return {
-        type: 'bearer',
+        type: 'basic',
         username: 'x-access-token',
         password: gitToken,
       };
@@ -85,7 +96,7 @@ export class SmartHttpClient {
    */
   async discoverRefs(service: 'upload-pack' | 'receive-pack'): Promise<RefAdvertisement> {
     const url = `${this.baseUrl}/info/refs?service=git-${service}`;
-    
+
     const response = await this.httpRequest({
       method: 'GET',
       url,
@@ -121,7 +132,7 @@ export class SmartHttpClient {
     const requestBody = this.buildFetchRequest(wants, haves, options);
 
     const url = `${this.baseUrl}/git-upload-pack`;
-    
+
     const response = await this.httpRequest({
       method: 'POST',
       url,
@@ -153,7 +164,7 @@ export class SmartHttpClient {
     const requestBody = this.buildPushRequest(refs, pack, options);
 
     const url = `${this.baseUrl}/git-receive-pack`;
-    
+
     const response = await this.httpRequest({
       method: 'POST',
       url,
@@ -166,7 +177,12 @@ export class SmartHttpClient {
     });
 
     if (response.status !== 200) {
-      throw new Error(`Push failed: ${response.status} ${response.statusText}`);
+      // Try to get more error details
+      let errorDetails = '';
+      if (response.body.length > 0) {
+        errorDetails = response.body.toString('utf8').slice(0, 500);
+      }
+      throw new Error(`Push failed: ${response.status} ${response.statusText}${errorDetails ? '\n' + errorDetails : ''}`);
     }
 
     // Parse the response
@@ -241,12 +257,12 @@ export class SmartHttpClient {
       }
 
       const lineStr = line.toString('utf8');
-      
+
       // Check for NAK/ACK
       if (lineStr.startsWith('NAK') || lineStr.startsWith('ACK')) {
         continue;
       }
-      
+
       // Check for shallow/unshallow lines (shallow clone response)
       if (lineStr.startsWith('shallow ') || lineStr.startsWith('unshallow ')) {
         continue;
@@ -308,11 +324,12 @@ export class SmartHttpClient {
   private buildPushRequest(refs: RefUpdate[], pack: Buffer, options?: PushOptions): Buffer {
     const parts: Buffer[] = [];
 
-    // Capabilities
+    // Capabilities - match what GitHub supports
+    // Note: We don't advertise ofs-delta since we send non-delta objects
     const caps = [
       'report-status',
       'side-band-64k',
-      'ofs-delta',
+      'agent=wit/2.0.0',
     ];
 
     if (options?.atomic) {
@@ -346,10 +363,14 @@ export class SmartHttpClient {
     // Flush packet to end commands
     parts.push(pktFlush());
 
-    // Pack data
-    parts.push(pack);
+    // Pack data (only if non-empty)
+    if (pack.length > 0) {
+      parts.push(pack);
+    }
 
-    return Buffer.concat(parts);
+    const result = Buffer.concat(parts);
+
+    return result;
   }
 
   /**
@@ -492,6 +513,7 @@ export class SmartHttpClient {
       port: url.port || (isHttps ? 443 : 80),
       path: url.pathname + url.search,
       headers,
+      timeout: 60000, // 60 second timeout
     };
 
     return new Promise((resolve, reject) => {
@@ -505,7 +527,7 @@ export class SmartHttpClient {
         res.on('end', () => {
           const body = Buffer.concat(chunks);
           const headers: Record<string, string> = {};
-          
+
           for (const [key, value] of Object.entries(res.headers)) {
             if (typeof value === 'string') {
               headers[key.toLowerCase()] = value;
@@ -525,6 +547,11 @@ export class SmartHttpClient {
 
       req.on('error', (err) => {
         reject(err);
+      });
+
+      req.on('timeout', () => {
+        req.destroy();
+        reject(new Error('Request timed out after 60 seconds'));
       });
 
       if (options.body) {
@@ -636,7 +663,7 @@ export function parseRemoteUrl(url: string): {
 export function normalizeRepoUrl(url: string): string {
   // Convert SSH to HTTPS for HTTP client
   const parsed = parseRemoteUrl(url);
-  
+
   if (parsed.protocol === 'ssh') {
     // Convert git@github.com:user/repo.git to https://github.com/user/repo.git
     let path = parsed.path;

@@ -16,10 +16,18 @@ import * as https from 'https';
 import { exists, readFileText, writeFile, mkdirp } from '../utils/fs';
 
 /**
- * GitHub OAuth configuration
- * Using a public client ID for wit - in production, you'd register your own
+ * GitHub OAuth configuration for wit
+ * 
+ * This is the official wit OAuth App client ID, registered at:
+ * https://github.com/settings/developers
+ * 
+ * Users can override with WIT_GITHUB_CLIENT_ID environment variable
+ * if they want to use their own OAuth App.
  */
-const GITHUB_CLIENT_ID = 'Iv1.your_client_id_here'; // Replace with actual registered OAuth App client ID
+const WIT_OFFICIAL_CLIENT_ID = 'Ov23liMqOvVmaVU7515C';
+
+// Allow override via environment variable for custom deployments
+const GITHUB_CLIENT_ID = process.env.WIT_GITHUB_CLIENT_ID || WIT_OFFICIAL_CLIENT_ID;
 
 /**
  * GitHub Device Flow response
@@ -59,6 +67,8 @@ export interface StoredGitHubCredentials {
   token_type: string;
   scope: string;
   username?: string;
+  name?: string;
+  email?: string;
   created_at: number;
 }
 
@@ -75,7 +85,7 @@ export function getGitHubCredentialsPath(): string {
  */
 export function loadGitHubCredentials(): StoredGitHubCredentials | null {
   const credPath = getGitHubCredentialsPath();
-  
+
   if (!exists(credPath)) {
     return null;
   }
@@ -94,13 +104,13 @@ export function loadGitHubCredentials(): StoredGitHubCredentials | null {
 export function saveGitHubCredentials(credentials: StoredGitHubCredentials): void {
   const credPath = getGitHubCredentialsPath();
   const dir = path.dirname(credPath);
-  
+
   if (!exists(dir)) {
     mkdirp(dir);
   }
 
   writeFile(credPath, JSON.stringify(credentials, null, 2));
-  
+
   // Set restrictive permissions on Unix-like systems
   if (process.platform !== 'win32') {
     const fs = require('fs');
@@ -113,7 +123,7 @@ export function saveGitHubCredentials(credentials: StoredGitHubCredentials): voi
  */
 export function deleteGitHubCredentials(): boolean {
   const credPath = getGitHubCredentialsPath();
-  
+
   if (!exists(credPath)) {
     return false;
   }
@@ -133,7 +143,7 @@ function httpsRequest(
 ): Promise<{ status: number; data: string }> {
   return new Promise((resolve, reject) => {
     const urlObj = new URL(url);
-    
+
     const reqOptions: https.RequestOptions = {
       ...options,
       hostname: urlObj.hostname,
@@ -150,11 +160,11 @@ function httpsRequest(
     });
 
     req.on('error', reject);
-    
+
     if (body) {
       req.write(body);
     }
-    
+
     req.end();
   });
 }
@@ -165,7 +175,18 @@ function httpsRequest(
  */
 export async function startDeviceFlow(clientId?: string): Promise<DeviceCodeResponse> {
   const effectiveClientId = clientId || GITHUB_CLIENT_ID;
-  
+
+  if (!effectiveClientId) {
+    throw new Error(
+      'GitHub OAuth client ID not configured.\n\n' +
+      'Please use a Personal Access Token instead:\n' +
+      '  1. Go to https://github.com/settings/tokens\n' +
+      '  2. Click "Generate new token (classic)"\n' +
+      '  3. Select scopes: repo, user:email\n' +
+      '  4. Copy the token and run: export GITHUB_TOKEN=ghp_your_token'
+    );
+  }
+
   const body = new URLSearchParams({
     client_id: effectiveClientId,
     scope: 'repo user:email',
@@ -200,7 +221,7 @@ export async function pollForToken(
   clientId?: string
 ): Promise<TokenResponse | 'pending' | 'slow_down' | 'expired'> {
   const effectiveClientId = clientId || GITHUB_CLIENT_ID;
-  
+
   const body = new URLSearchParams({
     client_id: effectiveClientId,
     device_code: deviceCode,
@@ -225,7 +246,7 @@ export async function pollForToken(
   }
 
   const data = JSON.parse(response.data);
-  
+
   if (data.error) {
     switch (data.error) {
       case 'authorization_pending':
@@ -424,6 +445,8 @@ export class GitHubManager {
       token_type: token.token_type,
       scope: token.scope,
       username: user.login,
+      name: user.name || undefined,
+      email: user.email || undefined,
       created_at: Date.now(),
     };
 
