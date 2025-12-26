@@ -38,11 +38,11 @@ Git is powerful but has well-known issues. wit addresses them:
   <Card title="Undo Anything" icon="rotate-left">
     Simple `wit undo` command reverts any operation with full journal history
   </Card>
-  <Card title="Auto-stash" icon="layer-group">
-    Never lose work when switching branches - changes are automatically saved and restored
+  <Card title="Self-Hosted Platform" icon="server">
+    Run your own Git server with `wit serve` - includes PRs, issues, and API
   </Card>
-  <Card title="Large File Support" icon="file-zipper">
-    Built-in chunked storage without needing Git LFS
+  <Card title="Agent Primitives" icon="brain">
+    Git-backed Filesystem and Knowledge primitives for building AI agents
   </Card>
   <Card title="Quality of Life" icon="heart">
     Commands like `wip`, `amend`, `uncommit`, `cleanup`, `stats`, and `snapshot`
@@ -96,6 +96,17 @@ wit ai commit -a -x
 - Better error messages with suggestions for typos
 - Operation journal for complete undo/redo support
 
+### Self-Hosted Platform
+- **Git Server** - Host repositories with `wit serve`
+- **Pull Requests** - Create and manage PRs from CLI with `wit pr`
+- **Issues** - Track issues with `wit issue`
+- **tRPC API** - Type-safe API for building integrations
+
+### Agent Primitives
+- **Filesystem** - Git-backed virtual filesystem with versioning
+- **Knowledge** - Content-addressable key-value store for agent memory
+- Automatic branching, rollback, and history tracking
+
 ## What's Next?
 
 <CardGroup cols={2}>
@@ -110,5 +121,11 @@ wit ai commit -a -x
   </Card>
   <Card title="AI Features" icon="robot" href="/features/ai-powered">
     Learn about AI-powered capabilities
+  </Card>
+  <Card title="Platform" icon="server" href="/platform/overview">
+    Self-hosted Git platform with PRs & issues
+  </Card>
+  <Card title="Primitives" icon="brain" href="/primitives/overview">
+    Build AI agents with git-backed primitives
   </Card>
 </CardGroup>

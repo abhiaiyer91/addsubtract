@@ -9,6 +9,8 @@ wit is a complete Git implementation written in TypeScript. This document explai
 
 ## High-Level Architecture
 
+### CLI Architecture
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                          CLI Layer                           │
@@ -25,6 +27,57 @@ wit is a complete Git implementation written in TypeScript. This document explai
 └─────────────────────────────────────────────────────────────┘
 ```
 
+### Platform Architecture
+
+wit also includes a full platform for hosting repositories:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         wit Platform                             │
+├─────────────────────────────────────────────────────────────────┤
+│  Web App (React)          │  API Server (Hono)                  │
+│  - Repository browser     │  - tRPC API                         │
+│  - Pull requests UI       │  - Git Smart HTTP                   │
+│  - Issues UI              │  - Health checks                    │
+├───────────────────────────┼─────────────────────────────────────┤
+│  CLI (wit)                │  Primitives                         │
+│  - Local git ops          │  - Filesystem (versioned files)     │
+│  - wit pr, wit issue      │  - Knowledge (key-value store)      │
+│  - wit serve              │  - Git-backed storage               │
+├───────────────────────────┴─────────────────────────────────────┤
+│                         Storage Layer                            │
+│  - Git Objects (filesystem)  - PostgreSQL (Drizzle ORM)         │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Database Schema
+
+The platform uses PostgreSQL for user data, PRs, and issues:
+
+| Table | Description |
+|-------|-------------|
+| `users` | User accounts and OAuth |
+| `organizations` | Teams and organizations |
+| `repositories` | Repository metadata |
+| `pull_requests` | Pull request data |
+| `issues` | Issue tracking |
+| `activities` | Activity feed |
+| `webhooks` | Webhook configurations |
+
+### tRPC API Routers
+
+The API is organized into routers:
+
+| Router | Purpose |
+|--------|---------|
+| `auth` | Login, logout, register |
+| `users` | User profiles |
+| `repos` | Repository CRUD, stars, search |
+| `pulls` | Pull request operations |
+| `issues` | Issue management |
+| `comments` | PR and issue comments |
+| `activity` | Activity feeds |
+
 ## Directory Structure
 
 ```
@@ -34,6 +87,9 @@ src/
 │   ├── add.ts             # wit add
 │   ├── commit.ts          # wit commit
 │   ├── push.ts            # wit push
+│   ├── pr.ts              # wit pr (pull requests)
+│   ├── issue.ts           # wit issue
+│   ├── serve.ts           # wit serve
 │   └── ...
 ├── core/                  # Core Git functionality
 │   ├── repository.ts      # Repository class
@@ -48,6 +104,42 @@ src/
 │       ├── smart-http.ts  # Smart HTTP client
 │       ├── pack.ts        # Pack utilities
 │       └── packfile-*.ts  # Packfile read/write
+├── server/                # Git server
+│   ├── index.ts           # Hono server
+│   ├── routes/
+│   │   └── git.ts         # Smart HTTP endpoints
+│   ├── middleware/
+│   │   └── auth.ts        # Authentication
+│   └── storage/
+│       ├── repos.ts       # Repository management
+│       └── sync.ts        # Database sync
+├── db/                    # Database layer
+│   ├── schema.ts          # Drizzle schema
+│   ├── models/            # Data access
+│   │   ├── user.ts
+│   │   ├── repository.ts
+│   │   ├── pull-request.ts
+│   │   └── issue.ts
+│   └── seed.ts            # Development data
+├── api/                   # API layer
+│   ├── client.ts          # API client
+│   └── trpc/              # tRPC setup
+│       ├── index.ts
+│       ├── trpc.ts
+│       ├── context.ts
+│       └── routers/
+│           ├── auth.ts
+│           ├── repos.ts
+│           ├── pulls.ts
+│           └── issues.ts
+├── primitives/            # Git-backed primitives
+│   ├── filesystem.ts      # Versioned file operations
+│   ├── knowledge.ts       # Key-value store
+│   └── types.ts           # Type definitions
+├── ai/                    # AI integration
+│   ├── agent.ts           # Mastra agent
+│   ├── mastra.ts          # Configuration
+│   └── tools/             # Agent tools
 ├── ui/                    # Visual interfaces
 │   ├── web-premium.ts     # Web UI
 │   ├── tui.ts             # Terminal UI

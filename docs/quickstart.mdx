@@ -208,6 +208,41 @@ wit ai commit -a -x
 wit ai review
 ```
 
+## Self-Hosted Platform (Optional)
+
+Run your own Git server with pull requests and issues.
+
+### Start a Server
+
+```bash
+# Start wit server
+wit serve --port 3000 --repos ./my-repos
+```
+
+### Push to Your Server
+
+```bash
+# Add remote to your project
+wit remote add origin http://localhost:3000/myuser/myproject.git
+wit push -u origin main
+```
+
+### Pull Requests & Issues
+
+```bash
+# Create a pull request
+wit pr create -t "Add feature"
+
+# List PRs
+wit pr list
+
+# Create an issue
+wit issue create "Bug: Login fails"
+
+# List issues
+wit issue list
+```
+
 ## Next Steps
 
 <CardGroup cols={2}>
@@ -219,6 +254,12 @@ wit ai review
   </Card>
   <Card title="AI Features" icon="robot" href="/features/ai-powered">
     Generate commit messages with AI
+  </Card>
+  <Card title="Self-Hosted Platform" icon="server" href="/platform/overview">
+    Host your own Git server
+  </Card>
+  <Card title="Agent Primitives" icon="brain" href="/primitives/overview">
+    Build AI agents with git-backed primitives
   </Card>
   <Card title="Configuration" icon="gear" href="/configuration/overview">
     Customize wit behavior

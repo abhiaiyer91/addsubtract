@@ -1,0 +1,379 @@
+---
+title: "Filesystem Primitive"
+description: "Git-backed virtual filesystem with automatic versioning"
+---
+
+# Filesystem Primitive
+
+The Filesystem primitive provides file operations with built-in versioning, branching, and rollback. Every change is automatically tracked through Git semantics.
+
+## Quick Start
+
+```typescript
+import { Filesystem } from 'wit/primitives';
+
+// Create a versioned workspace
+const fs = new Filesystem('./my-workspace');
+
+// File operations
+await fs.write('src/index.ts', 'console.log("hello")');
+const content = await fs.read('src/index.ts');
+
+// Commit changes
+await fs.commit('Added index file');
+
+// See history
+const commits = await fs.log();
+```
+
+## Creating a Filesystem
+
+```typescript
+import { Filesystem } from 'wit/primitives';
+
+// Creates or opens a workspace
+const fs = new Filesystem('./path/to/workspace');
+```
+
+The constructor:
+- Creates the directory if it doesn't exist
+- Initializes a `.wit` repository if not present
+- Opens existing repository if present
+
+## File Operations
+
+### Reading Files
+
+```typescript
+// Read as string
+const content = await fs.read('file.txt');
+// Returns null if file doesn't exist
+
+// Read as buffer (for binary files)
+const buffer = await fs.readBuffer('image.png');
+```
+
+### Writing Files
+
+```typescript
+// Write string content
+await fs.write('src/app.ts', 'console.log("hello")');
+
+// Write binary content
+await fs.write('data.bin', Buffer.from([0x00, 0x01, 0x02]));
+
+// Parent directories are created automatically
+await fs.write('deep/nested/path/file.txt', 'content');
+```
+
+### Appending to Files
+
+```typescript
+// Append to a file (creates if doesn't exist)
+await fs.append('log.txt', 'New log entry\n');
+```
+
+### Deleting Files
+
+```typescript
+// Returns true if deleted, false if didn't exist
+const deleted = await fs.delete('file.txt');
+```
+
+### Checking Existence
+
+```typescript
+const exists = await fs.exists('file.txt');
+```
+
+## Directory Operations
+
+### Listing Directory Contents
+
+```typescript
+// List directory (non-recursive)
+const entries = await fs.list('src');
+// Returns: [{ name: 'app.ts', path: 'src/app.ts', type: 'file' }, ...]
+
+// List recursively
+const allFiles = await fs.listRecursive('src');
+```
+
+### Creating Directories
+
+```typescript
+// Creates parent directories automatically
+await fs.mkdir('deep/nested/directory');
+```
+
+### Removing Directories
+
+```typescript
+// Removes directory and all contents
+const removed = await fs.rmdir('old-directory');
+```
+
+## Version Control
+
+### Committing Changes
+
+```typescript
+// Stage all changes and commit
+const commitHash = await fs.commit('Add feature X');
+```
+
+<Note>
+The commit method automatically stages all changes before committing.
+</Note>
+
+### Viewing Status
+
+```typescript
+const status = await fs.status();
+// Returns: [
+//   { path: 'new-file.txt', status: 'added' },
+//   { path: 'changed.txt', status: 'modified' },
+//   { path: 'removed.txt', status: 'deleted' },
+//   { path: 'untracked.txt', status: 'untracked' },
+// ]
+```
+
+### Viewing Diff
+
+```typescript
+// Get unified diff of all changes
+const diff = await fs.diff();
+console.log(diff);
+// Output: standard unified diff format
+```
+
+### Viewing History
+
+```typescript
+// Get commit history
+const commits = await fs.log(10); // Last 10 commits
+// Returns: [
+//   { hash: 'abc123...', message: 'Latest commit', author: 'Name <email>', date: Date },
+//   ...
+// ]
+```
+
+### Rollback
+
+```typescript
+// Undo the last commit (soft reset)
+await fs.rollback();
+
+// Hard reset to specific commit
+await fs.reset('abc123...');
+```
+
+## Branching
+
+### Creating Branches
+
+```typescript
+// Create a new branch
+await fs.branch('feature-x');
+```
+
+### Switching Branches
+
+```typescript
+// Switch to a branch
+await fs.checkout('feature-x');
+```
+
+### Getting Current Branch
+
+```typescript
+const branch = await fs.currentBranch();
+// Returns: 'main' or null if detached HEAD
+```
+
+### Listing Branches
+
+```typescript
+const branches = await fs.branches();
+// Returns: ['main', 'feature-x', 'experiment']
+```
+
+### Merging Branches
+
+```typescript
+const result = await fs.merge('feature-x');
+if (result.success) {
+  console.log('Merged successfully');
+} else {
+  console.log('Conflicts in:', result.conflicts);
+}
+```
+
+### Deleting Branches
+
+```typescript
+await fs.deleteBranch('feature-x');
+```
+
+## Utility Operations
+
+### Copy Files
+
+```typescript
+await fs.copy('src/template.ts', 'src/new-file.ts');
+```
+
+### Move/Rename Files
+
+```typescript
+await fs.move('old-name.ts', 'new-name.ts');
+```
+
+### Get File Stats
+
+```typescript
+const stat = await fs.stat('file.txt');
+// Returns: { size: 1234, modified: Date, created: Date, type: 'file' }
+// Returns null if path doesn't exist
+```
+
+### Find Files by Pattern
+
+```typescript
+// Glob pattern matching
+const tsFiles = await fs.glob('**/*.ts');
+// Returns: ['src/app.ts', 'src/utils/helper.ts', ...]
+
+const testFiles = await fs.glob('**/*.test.ts');
+```
+
+## Security
+
+The Filesystem includes path traversal protection:
+
+```typescript
+// This will throw an error
+await fs.read('../../../etc/passwd');
+// Error: Path traversal not allowed
+```
+
+All paths are resolved within the workspace directory.
+
+## Complete Example
+
+```typescript
+import { Filesystem } from 'wit/primitives';
+
+async function buildProject() {
+  const fs = new Filesystem('./project');
+  
+  // Set up project structure
+  await fs.write('package.json', JSON.stringify({
+    name: 'my-project',
+    version: '1.0.0',
+  }, null, 2));
+  
+  await fs.write('src/index.ts', `
+export function main() {
+  console.log('Hello, World!');
+}
+  `.trim());
+  
+  await fs.write('README.md', '# My Project\n\nA sample project.');
+  
+  // Commit initial setup
+  await fs.commit('Initial project setup');
+  
+  // Create a feature branch
+  await fs.branch('add-tests');
+  await fs.checkout('add-tests');
+  
+  // Add tests
+  await fs.write('src/index.test.ts', `
+import { main } from './index';
+
+test('main runs without error', () => {
+  expect(() => main()).not.toThrow();
+});
+  `.trim());
+  
+  await fs.commit('Add tests');
+  
+  // Check status
+  const status = await fs.status();
+  console.log('Status:', status);
+  
+  // View history
+  const history = await fs.log(5);
+  console.log('Recent commits:', history);
+  
+  // Merge back to main
+  await fs.checkout('main');
+  const result = await fs.merge('add-tests');
+  console.log('Merge result:', result);
+  
+  // Clean up branch
+  await fs.deleteBranch('add-tests');
+}
+
+buildProject();
+```
+
+## Type Definitions
+
+```typescript
+interface FileEntry {
+  name: string;      // File name
+  path: string;      // Relative path
+  type: 'file' | 'dir';
+}
+
+interface FileStatus {
+  path: string;
+  status: 'added' | 'modified' | 'deleted' | 'untracked';
+}
+
+interface FileStat {
+  size: number;
+  modified: Date;
+  created: Date;
+  type: 'file' | 'dir';
+}
+
+interface CommitInfo {
+  hash: string;
+  message: string;
+  author: string;
+  date: Date;
+}
+
+interface FsMergeResult {
+  success: boolean;
+  conflicts: string[];
+}
+```
+
+## Best Practices
+
+<Tip>
+**Commit frequently**: Each commit is a checkpoint you can return to. Commit after each meaningful change.
+</Tip>
+
+<Tip>
+**Use branches for experiments**: Create a branch before trying something risky. If it fails, just delete the branch.
+</Tip>
+
+<Tip>
+**Meaningful commit messages**: Write messages that explain why you made the change, not just what changed.
+</Tip>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Knowledge" icon="brain" href="/primitives/knowledge">
+    Key-value storage for agent memory
+  </Card>
+  <Card title="Primitives Overview" icon="cubes" href="/primitives/overview">
+    Learn about all primitives
+  </Card>
+</CardGroup>
