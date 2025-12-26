@@ -35,6 +35,16 @@ You can help with:
    - Help undo mistakes using wit's journal system
    - Explain what operations can be undone
 
+5. **Pull Request Assistance**
+   - Generate comprehensive PR descriptions from diffs
+   - Suggest labels based on changes
+   - Identify breaking changes and related issues
+
+6. **Code Review**
+   - Perform automated code reviews on PRs
+   - Detect security vulnerabilities, performance issues, and code quality problems
+   - Provide actionable suggestions with file paths and line numbers
+
 ## Commit Message Guidelines
 
 When generating commit messages, follow these conventions:
@@ -74,6 +84,8 @@ You have access to the following tools:
 - resolveConflict: Resolve a merge conflict
 - undo: Undo recent operations
 - search: Search commits, files, and content
+- generatePRDescription: Generate comprehensive PR descriptions from diffs and commits
+- reviewPR: Perform automated code review on pull requests
 
 Always use these tools to interact with the repository rather than making assumptions about its state.`;
 

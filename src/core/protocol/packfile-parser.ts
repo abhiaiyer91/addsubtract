@@ -1,4 +1,5 @@
 import * as zlib from 'zlib';
+import * as crypto from 'crypto';
 import { ObjectType } from '../types';
 import {
   PackObject,
@@ -14,7 +15,16 @@ import {
   verifyPackChecksum,
   applyDelta,
 } from './pack';
-import { hashObject } from '../../utils/hash';
+
+/**
+ * Hash a Git object using SHA-1 (Git's native format)
+ * Pack files from Git servers always use SHA-1
+ */
+function hashObjectSha1(type: string, content: Buffer): string {
+  const header = Buffer.from(`${type} ${content.length}\0`);
+  const store = Buffer.concat([header, content]);
+  return crypto.createHash('sha1').update(store).digest('hex');
+}
 
 /**
  * Result of parsing a pack file
@@ -132,6 +142,7 @@ export class PackfileParser {
 
   /**
    * Decompress zlib-compressed data from current position
+   * Git pack files use zlib with header (not raw deflate)
    */
   private decompressObject(expectedSize: number): Buffer {
     // We need to find the end of the compressed data
@@ -145,46 +156,26 @@ export class PackfileParser {
     while (attempts < maxAttempts) {
       try {
         const compressed = this.data.slice(this.offset, this.offset + windowSize);
-        const inflater = zlib.createInflateRaw();
         
-        // Use inflateRawSync for simplicity
+        // Git pack files use zlib with header (starts with 0x78)
+        // Use inflateSync (not inflateRawSync) for proper decompression
         let result: Buffer;
-        let consumed: number;
 
         try {
-          // Try to inflate the data
-          const chunks: Buffer[] = [];
-          let totalConsumed = 0;
-          let remaining = compressed;
-
-          while (remaining.length > 0) {
-            try {
-              const inflated = zlib.inflateRawSync(remaining, { finishFlush: zlib.constants.Z_SYNC_FLUSH });
-              chunks.push(inflated);
-              break;
-            } catch (e: unknown) {
-              if (e instanceof Error && 'code' in e && (e as NodeJS.ErrnoException).code === 'Z_BUF_ERROR') {
-                // Need more data
-                throw e;
-              }
-              throw e;
-            }
-          }
-
-          result = Buffer.concat(chunks);
+          result = zlib.inflateSync(compressed);
         } catch {
-          // Try with full buffer
+          // Fallback to raw deflate in case data doesn't have zlib header
           result = zlib.inflateRawSync(compressed);
         }
 
         // Calculate how many bytes were consumed
         // This is tricky with zlib - we need to find where the compressed data ends
-        consumed = this.findCompressedEnd(compressed, result.length);
+        const consumed = this.findCompressedEnd(compressed, result.length);
         
         this.offset += consumed;
         return result;
       } catch (e: unknown) {
-        if (e instanceof Error && e.message.includes('unexpected end')) {
+        if (e instanceof Error && (e.message.includes('unexpected end') || e.message.includes('need dictionary'))) {
           windowSize *= 2;
           attempts++;
           continue;
@@ -204,12 +195,16 @@ export class PackfileParser {
     let low = 1;
     let high = compressed.length;
     let lastGood = high;
+    
+    // Determine if we should use inflateSync or inflateRawSync
+    const useZlibHeader = compressed.length > 0 && compressed[0] === 0x78;
+    const inflate = useZlibHeader ? zlib.inflateSync : zlib.inflateRawSync;
 
     while (low <= high) {
       const mid = Math.floor((low + high) / 2);
       
       try {
-        const result = zlib.inflateRawSync(compressed.slice(0, mid));
+        const result = inflate(compressed.slice(0, mid));
         if (result.length === expectedOutputSize) {
           lastGood = mid;
           high = mid - 1;
@@ -241,7 +236,7 @@ export class PackfileParser {
           throw new Error(`Unknown pack object type: ${obj.type}`);
         }
 
-        const hash = hashObject(objectType, obj.data);
+        const hash = hashObjectSha1(objectType, obj.data);
         const parsed: ParsedObject = {
           type: objectType,
           data: obj.data,
@@ -275,7 +270,7 @@ export class PackfileParser {
 
         // Apply delta
         const resolvedData = applyDelta(base.data, obj.data);
-        const hash = hashObject(base.type, resolvedData);
+        const hash = hashObjectSha1(base.type, resolvedData);
 
         const parsed: ParsedObject = {
           type: base.type,
@@ -372,7 +367,12 @@ export function* iteratePackObjects(data: Buffer): Generator<{
     while (!found && offset + windowSize <= data.length) {
       try {
         const compressed = data.slice(offset, offset + windowSize);
-        zlib.inflateRawSync(compressed);
+        
+        // Determine if we should use inflateSync or inflateRawSync
+        const useZlibHeader = compressed.length > 0 && compressed[0] === 0x78;
+        const inflate = useZlibHeader ? zlib.inflateSync : zlib.inflateRawSync;
+        
+        inflate(compressed);
         
         // Find actual end
         let low = 1;
@@ -382,7 +382,7 @@ export function* iteratePackObjects(data: Buffer): Generator<{
         while (low <= high) {
           const mid = Math.floor((low + high) / 2);
           try {
-            zlib.inflateRawSync(compressed.slice(0, mid));
+            inflate(compressed.slice(0, mid));
             lastGood = mid;
             high = mid - 1;
           } catch {

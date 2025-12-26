@@ -417,7 +417,7 @@ All major workstreams are complete:
 When contributing:
 
 - Follow existing patterns in `src/commands/`
-- Use `TsgitError` for user-facing errors
+- Use `WitError` for user-facing errors
 - Include helpful suggestions in error messages
 - Add colors for terminal output
 - Document public functions with JSDoc

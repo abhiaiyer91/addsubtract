@@ -1,26 +1,25 @@
-/**
- * Repository Storage
- * Handles on-disk repository operations including fork creation
- */
-
 import * as path from 'path';
 import * as fs from 'fs';
 import { execSync } from 'child_process';
+import { Repository } from '../../core/repository';
+import { ObjectStore } from '../../core/object-store';
+import { Index } from '../../core/index';
+import { Refs } from '../../core/refs';
 import { exists, mkdirp } from '../../utils/fs';
 
 /**
- * Storage configuration
+ * Repository information
  */
-export interface StorageConfig {
-  basePath: string; // Base path for all repositories
-  useGit: boolean;  // Use native git commands (true) or wit (false)
+export interface RepoInfo {
+  owner: string;
+  name: string;
+  path: string;
+  bare: boolean;
 }
 
-const defaultConfig: StorageConfig = {
-  basePath: process.env.REPO_STORAGE_PATH || '/var/repos',
-  useGit: true, // Use native git for reliability
-};
-
+/**
+ * Storage error class
+ */
 export class StorageError extends Error {
   constructor(message: string, public readonly code: string) {
     super(message);
@@ -53,31 +52,217 @@ function exec(command: string, cwd?: string): string {
  * Generate disk path for a repository
  */
 export function getRepoDiskPath(
-  ownerId: string,
+  ownerUsername: string,
   repoName: string,
-  config: StorageConfig = defaultConfig
+  baseDir?: string
 ): string {
-  // Use first 2 chars of owner ID for sharding
-  const shard = ownerId.substring(0, 2);
-  return path.join(config.basePath, shard, ownerId, `${repoName}.git`);
+  const reposDir = baseDir || process.env.REPOS_DIR || './repos';
+  return path.join(reposDir, ownerUsername, `${repoName}.git`);
 }
 
 /**
- * Initialize a new bare repository on disk
+ * Repository manager for server-side repository storage
+ * Manages bare repositories organized by owner/repo structure
  */
-export function initBareRepository(
-  diskPath: string,
-  defaultBranch = 'main'
-): void {
-  // Create directory
-  mkdirp(diskPath);
+export class RepoManager {
+  private repoCache: Map<string, Repository> = new Map();
 
-  // Initialize bare repo
-  exec(`git init --bare --initial-branch=${defaultBranch}`, diskPath);
+  constructor(private baseDir: string) {
+    // Ensure base directory exists
+    mkdirp(this.baseDir);
+  }
 
-  // Configure the repository
-  exec('git config receive.denyNonFastForwards true', diskPath);
-  exec('git config core.sharedRepository group', diskPath);
+  /**
+   * Get the full path for a repository
+   */
+  private getRepoPath(owner: string, name: string): string {
+    // Normalize name - add .git suffix if not present
+    const repoName = name.endsWith('.git') ? name : `${name}.git`;
+    return path.join(this.baseDir, owner, repoName);
+  }
+
+  /**
+   * Get or create a repository
+   * Creates a bare repository if it doesn't exist
+   */
+  getRepo(owner: string, name: string, autoCreate: boolean = true): BareRepository | null {
+    const repoPath = this.getRepoPath(owner, name);
+    const cacheKey = `${owner}/${name}`;
+
+    // Check cache first
+    if (this.repoCache.has(cacheKey)) {
+      return this.repoCache.get(cacheKey) as BareRepository;
+    }
+
+    // Check if repo exists - for bare repos, check objects/ directly in repo path
+    if (exists(repoPath) && exists(path.join(repoPath, 'objects'))) {
+      const repo = new BareRepository(repoPath);
+      if (repo.isValid()) {
+        this.repoCache.set(cacheKey, repo);
+        return repo;
+      }
+    }
+
+    // Auto-create if enabled
+    if (autoCreate) {
+      const repo = this.initBareRepo(owner, name);
+      this.repoCache.set(cacheKey, repo);
+      return repo;
+    }
+
+    return null;
+  }
+
+  /**
+   * Initialize a new bare repository
+   */
+  initBareRepo(owner: string, name: string): Repository {
+    const repoPath = this.getRepoPath(owner, name);
+
+    if (exists(repoPath)) {
+      throw new Error(`Repository already exists: ${owner}/${name}`);
+    }
+
+    // Create owner directory
+    const ownerDir = path.join(this.baseDir, owner);
+    mkdirp(ownerDir);
+
+    // Create repository directory structure (bare repo)
+    mkdirp(repoPath);
+    mkdirp(path.join(repoPath, 'objects'));
+    mkdirp(path.join(repoPath, 'refs', 'heads'));
+    mkdirp(path.join(repoPath, 'refs', 'tags'));
+    mkdirp(path.join(repoPath, 'info'));
+
+    // For a bare repository, the git dir IS the repo path
+    // Write HEAD pointing to main branch
+    fs.writeFileSync(path.join(repoPath, 'HEAD'), 'ref: refs/heads/main\n');
+
+    // Write config for bare repository
+    const config = `[core]
+    repositoryformatversion = 0
+    filemode = true
+    bare = true
+[wit]
+    hashAlgorithm = sha1
+`;
+    fs.writeFileSync(path.join(repoPath, 'config'), config);
+
+    // Write description
+    fs.writeFileSync(
+      path.join(repoPath, 'description'),
+      `${owner}/${name} repository\n`
+    );
+
+    console.log(`[server] Initialized bare repository: ${owner}/${name}`);
+
+    // Create a repository object - for bare repos, workDir is the gitDir
+    return new BareRepository(repoPath);
+  }
+
+  /**
+   * Check if a repository exists
+   */
+  exists(owner: string, name: string): boolean {
+    const repoPath = this.getRepoPath(owner, name);
+    return exists(repoPath) && exists(path.join(repoPath, 'objects'));
+  }
+
+  /**
+   * List all repositories
+   */
+  listRepos(): RepoInfo[] {
+    const repos: RepoInfo[] = [];
+
+    if (!exists(this.baseDir)) {
+      return repos;
+    }
+
+    // List owner directories
+    const owners = fs.readdirSync(this.baseDir).filter(f => {
+      const fullPath = path.join(this.baseDir, f);
+      return fs.statSync(fullPath).isDirectory();
+    });
+
+    for (const owner of owners) {
+      const ownerDir = path.join(this.baseDir, owner);
+      const repoNames = fs.readdirSync(ownerDir).filter(f => {
+        const fullPath = path.join(ownerDir, f);
+        return fs.statSync(fullPath).isDirectory() && f.endsWith('.git');
+      });
+
+      for (const repoName of repoNames) {
+        const repoPath = path.join(ownerDir, repoName);
+        // Check if it's a valid repository
+        if (exists(path.join(repoPath, 'objects'))) {
+          repos.push({
+            owner,
+            name: repoName.replace(/\.git$/, ''),
+            path: repoPath,
+            bare: true,
+          });
+        }
+      }
+    }
+
+    return repos;
+  }
+
+  /**
+   * Delete a repository
+   */
+  deleteRepo(owner: string, name: string): void {
+    const repoPath = this.getRepoPath(owner, name);
+    const cacheKey = `${owner}/${name}`;
+
+    if (!exists(repoPath)) {
+      throw new Error(`Repository not found: ${owner}/${name}`);
+    }
+
+    // Remove from cache
+    this.repoCache.delete(cacheKey);
+
+    // Delete the repository directory
+    fs.rmSync(repoPath, { recursive: true, force: true });
+
+    console.log(`[server] Deleted repository: ${owner}/${name}`);
+  }
+
+  /**
+   * Clear the repository cache
+   */
+  clearCache(): void {
+    this.repoCache.clear();
+  }
+}
+
+/**
+ * Bare repository class - a repository without a working directory
+ * The git directory IS the repository directory
+ */
+export class BareRepository extends Repository {
+  constructor(repoPath: string) {
+    // For bare repos, we need to trick the Repository constructor
+    // The parent expects workDir/.wit to be gitDir
+    // But for bare repos, workDir IS gitDir
+    super(repoPath, { hashAlgorithm: 'sha1' });
+
+    // Override the gitDir to be the repoPath itself (not repoPath/.wit)
+    (this as any).gitDir = repoPath;
+    (this as any).workDir = repoPath;
+
+    // Reinitialize components with the correct gitDir
+    (this as any).objects = new ObjectStore(repoPath);
+    (this as any).index = new Index(repoPath);
+    (this as any).refs = new Refs(repoPath);
+  }
+
+  /**
+   * Check if this is a valid bare repository
+   */
+  isValid(): boolean {
+    return exists(path.join(this.gitDir, 'objects'));
+  }
 }
 
 /**
@@ -85,7 +270,7 @@ export function initBareRepository(
  * 
  * Creates a bare clone of the source repository at the target path,
  * preserving all branches, tags, and commit history. Sets up the
- * origin remote pointing to the parent repository.
+ * upstream remote pointing to the parent repository.
  * 
  * @param sourceRepoPath - Path to the source bare repository
  * @param targetPath - Path where the fork will be created
@@ -127,7 +312,7 @@ export function forkRepository(
     // Remove the origin remote that points to the local source
     exec('git remote remove origin', targetPath);
 
-    // Set up origin remote pointing to parent repository
+    // Set up upstream remote pointing to parent repository
     // This allows fetching upstream changes
     const remoteUrl = parentUrl || sourceRepoPath;
     exec(`git remote add upstream "${remoteUrl}"`, targetPath);
@@ -263,28 +448,6 @@ export function getRepositoryInfo(diskPath: string): {
 }
 
 /**
- * Copy a file or directory
- */
-export function copyPath(src: string, dest: string): void {
-  if (!exists(src)) {
-    throw new StorageError(`Source path not found: ${src}`, 'NOT_FOUND');
-  }
-
-  const stats = fs.statSync(src);
-  
-  if (stats.isDirectory()) {
-    mkdirp(dest);
-    const entries = fs.readdirSync(src, { withFileTypes: true });
-    for (const entry of entries) {
-      copyPath(path.join(src, entry.name), path.join(dest, entry.name));
-    }
-  } else {
-    mkdirp(path.dirname(dest));
-    fs.copyFileSync(src, dest);
-  }
-}
-
-/**
  * Check if repository has any commits
  */
 export function hasCommits(diskPath: string): boolean {
@@ -301,10 +464,9 @@ export function hasCommits(diskPath: string): boolean {
  */
 export function getRepoUrl(diskPath: string, serverBaseUrl: string): string {
   // Convert disk path to URL path
-  // e.g., /var/repos/ab/abc123/myrepo.git -> https://server.com/abc123/myrepo.git
   const parts = diskPath.split(path.sep);
   const repoWithExt = parts[parts.length - 1]; // myrepo.git
-  const ownerId = parts[parts.length - 2]; // owner ID
+  const owner = parts[parts.length - 2]; // owner username
   
-  return `${serverBaseUrl}/${ownerId}/${repoWithExt}`;
+  return `${serverBaseUrl}/${owner}/${repoWithExt}`;
 }
