@@ -32,271 +32,236 @@ This isn't about replacing developers. It's about removing the friction between 
 
 | Domain | Status | Notes |
 |--------|--------|-------|
-| **Git Implementation** | 98% | 57 commands, full Git compatibility |
+| **Git Implementation** | 98% | 59 commands, full Git compatibility |
 | **AI Tools** | 95% | 15 tools, semantic search, code review |
-| **Server/Platform** | 75% | PRs, Issues, Forks, SSH, Rate Limiting |
-| **CLI Experience** | 90% | TUI, AI commands, quality-of-life features |
+| **Server/Platform** | 85% | PRs work end-to-end, Issues, Forks, SSH |
+| **CLI Experience** | 95% | Smart status, semantic search, quality-of-life |
 | **Web UI** | 70% | Functional but not polished |
-| **Documentation** | 20% | Our biggest gap |
+| **Documentation** | 40% | Getting started, why wit - needs more |
 
-### What We've Built
+### What's Working Right Now
 
-**Core Git (Complete)**
-- Full Git implementation in TypeScript
+**The Killer CLI Experience**
+```bash
+wit                           # Smart status - understands your context
+wit search "where is auth"    # Semantic code search
+wit ai commit                 # AI-generated commit messages
+wit ai review                 # AI code review
+```
+
+**Full Git Replacement**
+- 59 commands implemented
 - All plumbing and porcelain commands
 - Packed refs, rename detection, submodules, worktrees
+- Journal-based undo (actually works, unlike reflog)
 
-**AI Integration (Complete)**
-- Semantic code search with embeddings
-- AI commit message generation
-- AI PR descriptions
-- AI code review
-- AI conflict resolution suggestions
-- Natural language Git operations
-
-**Platform Features (Complete)**
-- Pull requests with reviews and comments
+**Platform Features**
+- Pull requests with actual merge execution
+- Automatic AI review on PR creation
+- Branch protection rules
 - Issues with labels and milestones
 - Repository forking
 - SSH and HTTPS protocols
-- Rate limiting with Redis support
-- Webhooks
+- Rate limiting with Redis
 
-**Developer Experience (Complete)**
-- Journal-based undo (not just reflog)
-- Branch state manager (auto-save/restore working directory)
-- Monorepo scopes
-- WIP commits, snapshots, fixups
+---
 
-**CI/CD (Partial)**
-- Workflow YAML parser (GitHub Actions compatible)
-- Job dependency resolution
-- Trigger matching
-- *No runner—intentionally deferred*
+## What We Just Shipped (This Session)
+
+| Feature | Commit | Impact |
+|---------|--------|--------|
+| **Smart Status** | `8634e2e` | Running `wit` with no args shows intelligent context |
+| **Semantic Search** | `65e5392` | `wit search` - ask questions about your codebase |
+| **Auto AI PR Review** | `8e650fe` | Every PR gets AI review automatically |
+| **PR Merge Execution** | `6d53a1a` | PRs actually merge now (was broken!) |
+| **Branch Protection** | `1fb0944` | Protect main, require PRs |
+| **Getting Started** | `edc37a0` | Zero to productive in 5 minutes |
 
 ---
 
 ## What Makes wit Different
 
-### 1. Semantic Understanding
+### 1. The Zero Command
 
 ```bash
-# GitHub way
-grep -r "authenticate" --include="*.ts" src/
+$ wit
 
-# wit way
-wit search "where do we handle user authentication"
+  wit · my-project
+  You're working on: feature: user authentication
+
+  ● Ready to commit (3 files)
+    API: auth.ts, middleware.ts
+    Tests: auth.test.ts
+
+  ──────────────────────────────────────────────────
+
+  wit commit     · commit staged changes
+  wit ai commit · commit with AI-generated message
 ```
 
-We have embeddings. We have a vector store. Code isn't just text—it's meaning.
+No other Git tool understands what you're doing. We do.
 
-### 2. AI as Colleague, Not Feature
+### 2. Semantic Code Search
 
-The AI isn't a button you click. It's woven into the workflow:
+```bash
+$ wit search "where do we handle user sessions"
+
+  ● src/core/auth.ts:45-89 (94% match)
+    SessionManager.createSession()
+    │ 45 │ async createSession(userId: string) {
+    │ 46 │   const token = crypto.randomBytes(32)...
+```
+
+Not grep. Understanding.
+
+### 3. AI as Colleague
+
 - `wit commit` suggests the message
-- `wit review` reviews your changes before you push
+- `wit search` understands intent, not just keywords
 - PRs get automatic AI review
 - Conflicts come with resolution suggestions
 
-### 3. Git That Doesn't Hate You
+### 4. Git That Doesn't Hate You
 
-- Undo actually works (journal-based, not reflog archaeology)
-- Branch switching preserves your mess (branch state manager)
-- Monorepo? Scope your operations to what matters
-
-### 4. Built for Understanding
-
-The primitives are different:
-- `GitFilesystem` - Version-controlled filesystem as a primitive
-- `KnowledgeStore` - Content-addressable key-value store on Git
-- Everything is queryable, searchable, understandable
+- Undo actually works (journal-based)
+- Branch switching preserves your mess
+- Helpful error messages with suggestions
 
 ---
 
-## The Anti-Roadmap: What We're NOT Building
+## The Honest Assessment
 
-### CI/CD Runner ❌
+### What's Great
+- **CLI experience is differentiated** - The smart status and search are genuinely better than git
+- **AI integration is deep** - Not bolted on, woven in
+- **Core Git is solid** - 889 passing tests, handles edge cases
 
-We have a workflow parser. That's enough for compatibility.
+### What's Not Ready
+- **Web UI needs love** - Functional but not delightful
+- **Test failures in integration** - 17 failing tests in PR flow
+- **No real users yet** - We haven't dogfooded this seriously
+- **Documentation gaps** - Need command reference, examples
 
-Building a full CI/CD runner means:
-- Docker orchestration
-- Artifact storage
-- Job scheduling
-- Secret management
-- 10,000 edge cases
-
-GitHub has hundreds of engineers on Actions. We're not competing there.
-
-**Instead:** Webhook integration with external CI. Show status on PRs. Done.
-
-### Full GitHub Parity ❌
-
-We don't need:
-- GitHub Packages
-- GitHub Pages  
-- Codespaces
-- Discussions
-- Projects/Boards
-- Sponsors
-
-These are fine products. They're not our differentiation.
-
-### Enterprise Features (Yet) ❌
-
-- SSO/SAML
-- Audit logs
-- Compliance features
-
-Important eventually. Not important now.
+### What I'm Uncertain About
+- **Is the server necessary?** - The CLI is the product. Maybe the platform is a distraction.
+- **Semantic search adoption** - Requires OPENAI_API_KEY. Friction.
+- **Differentiation clarity** - "Git that understands code" - do people get it?
 
 ---
 
-## The Roadmap
+## Revised Roadmap
 
-### Phase 1: Make It Real (Now → 2 weeks)
+### Phase 1: Polish What Exists (Next 1-2 weeks)
 
-**Goal:** A working product someone could actually use.
+**Goal:** Make the CLI experience flawless.
 
-| Task | Priority | Status | Notes |
-|------|----------|--------|-------|
-| PR Merge Execution | P0 | TODO | PRs don't actually merge. Embarrassing. |
-| Basic Branch Protection | P0 | TODO | Just "require PR for main" |
-| Getting Started Guide | P0 | TODO | Nobody knows how to use this |
-| Why wit? Page | P0 | TODO | Sell the vision |
-| Fix Web UI Polish | P1 | TODO | First impressions matter |
+| Task | Priority | Status |
+|------|----------|--------|
+| Fix 17 failing integration tests | P0 | TODO |
+| Add `wit review` command (pre-push) | P0 | TODO |
+| Command reference documentation | P1 | TODO |
+| Error message audit | P1 | TODO |
+| Dogfood: use wit to build wit | P0 | TODO |
 
-**Ship blocker:** PR merge must work.
+**Success metric:** I can develop wit using wit without touching git.
 
-### Phase 2: AI That Delivers (Weeks 3-6)
+### Phase 2: Prove the Vision (Weeks 3-4)
 
-**Goal:** The AI features become the reason to use wit.
+**Goal:** One demo that makes people say "holy shit."
 
-| Task | Priority | Status | Notes |
-|------|----------|--------|-------|
-| Automatic AI PR Review | P0 | TODO | Every PR gets reviewed |
-| Codebase Q&A Interface | P0 | TODO | "How does X work?" with answers |
-| AI Conflict Resolution UX | P1 | TODO | Make it seamless, not a tool |
-| `wit explain` Command | P1 | TODO | Explain code from CLI |
-| `wit review` Command | P1 | TODO | Pre-push self-review |
+| Task | Priority | Status |
+|------|----------|--------|
+| Record demo video | P0 | TODO |
+| Landing page with clear value prop | P0 | TODO |
+| Installation one-liner | P1 | TODO |
+| "5 minutes to wow" experience | P0 | TODO |
 
-**The bet:** AI code review that's actually useful will be the hook.
+**Success metric:** Share demo, get genuine excitement.
 
-### Phase 3: The CLI is the Product (Weeks 7-10)
+### Phase 3: First Users (Weeks 5-8)
 
-**Goal:** `wit` becomes the Git CLI developers want.
+**Goal:** 10 developers actually using wit.
 
-| Task | Priority | Status | Notes |
-|------|----------|--------|-------|
-| CLI Polish & Docs | P0 | TODO | Make it delightful |
-| `wit search` UX | P0 | TODO | Semantic search from terminal |
-| `wit ai` Interactive Mode | P1 | TODO | Chat with your codebase |
-| Offline AI Support | P2 | TODO | Local models for privacy |
+| Task | Priority | Status |
+|------|----------|--------|
+| Open source launch | P0 | TODO |
+| Discord/community | P1 | TODO |
+| Respond to feedback fast | P0 | TODO |
+| Whatever users need | P0 | TODO |
 
-**The insight:** The server is infrastructure. The CLI is what developers touch every day.
-
-### Phase 4: Prove It Works (Weeks 11+)
-
-**Goal:** Real users, real feedback, real iteration.
-
-- Open source launch
-- Dogfooding (use wit to build wit)
-- Community feedback
-- Performance optimization
-- Whatever users actually need
+**Success metric:** External PR from someone who isn't us.
 
 ---
 
-## Architecture
+## The Anti-Roadmap
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                           wit                                    │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  CLI (wit)                    Server (wit serve)                │
-│  ┌─────────────────────┐     ┌─────────────────────────────┐   │
-│  │ • 57 git commands   │     │ • Git Smart HTTP + SSH      │   │
-│  │ • AI commands       │     │ • tRPC API                  │   │
-│  │ • TUI interface     │     │ • WebSocket                 │   │
-│  │ • Semantic search   │     │ • Rate limiting             │   │
-│  └─────────────────────┘     └─────────────────────────────┘   │
-│           │                              │                       │
-│           └──────────────┬───────────────┘                       │
-│                          │                                       │
-│  ┌───────────────────────▼───────────────────────────────────┐  │
-│  │                    Core Libraries                          │  │
-│  │  • @wit/core - Git implementation                         │  │
-│  │  • @wit/ai - Mastra agent + 15 tools                      │  │
-│  │  • @wit/search - Embeddings + vector store                │  │
-│  │  • @wit/primitives - Filesystem, knowledge store          │  │
-│  └───────────────────────────────────────────────────────────┘  │
-│                          │                                       │
-│  ┌───────────────────────▼───────────────────────────────────┐  │
-│  │                    Storage Layer                           │  │
-│  │  • Git objects (local/S3)                                  │  │
-│  │  • PostgreSQL (metadata)                                   │  │
-│  │  • Vector store (embeddings)                               │  │
-│  │  • Redis (rate limiting, cache)                            │  │
-│  └───────────────────────────────────────────────────────────┘  │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
-```
+### Things I'm NOT doing
+
+**CI/CD Runner** - GitHub Actions exists. Not our fight.
+
+**Web UI parity with GitHub** - The CLI is the product. Web is secondary.
+
+**Enterprise features** - SSO, audit logs, compliance. Not yet.
+
+**Local AI models** - Nice to have, not differentiating.
+
+### Things I might kill
+
+**The server/platform** - If CLI-only is the path, we should commit to it.
+
+**Forking/Issues** - Do we need to replicate GitHub, or complement it?
 
 ---
 
-## Tech Stack
+## Technical Debt
 
-| Component | Technology | Status |
-|-----------|------------|--------|
-| Language | TypeScript | ✅ |
-| CLI Framework | Commander | ✅ |
-| Server | Hono | ✅ |
-| Database | PostgreSQL + Drizzle | ✅ |
-| API | tRPC | ✅ |
-| AI | Mastra (OpenAI/Anthropic) | ✅ |
-| Search | OpenAI Embeddings + Custom Vector Store | ✅ |
-| Web | React + Vite + Tailwind | 🔄 |
-| Auth | Sessions + SSH Keys | ✅ |
-| Rate Limiting | In-memory + Redis | ✅ |
+| Issue | Severity | Notes |
+|-------|----------|-------|
+| 17 failing integration tests | High | PR flow broken in tests |
+| ESM/CommonJS configuration mess | Medium | Build works but fragile |
+| Missing `ai` package in fresh install | Medium | Semantic search fails |
+| Package.json `type: module` removed | Low | Should fix properly |
 
 ---
 
 ## Metrics That Matter
 
-### Phase 1 Success
-- [ ] Can create a repo, make commits, open PR, merge PR
-- [ ] Documentation exists and is helpful
-- [ ] Someone outside the team can set it up
+### Now
+- [ ] All tests pass
+- [ ] Can develop wit using wit
+- [ ] `wit search` works out of box
 
-### Phase 2 Success
-- [ ] AI review catches real issues
-- [ ] Codebase Q&A gives useful answers
-- [ ] At least one "wow" moment per session
+### Soon
+- [ ] 10 external users
+- [ ] 1 external contribution
+- [ ] Demo video with 1000 views
 
-### Phase 3 Success
-- [ ] Developers prefer `wit` over `git` for daily use
-- [ ] AI features used >50% of sessions
-- [ ] CLI NPS > 50
-
-### Overall Success
-- [ ] We use wit to build wit
-- [ ] External contributors
-- [ ] Someone writes "I switched from GitHub"
+### Eventually
+- [ ] "I switched from Git" testimonial
+- [ ] Developers prefer wit for daily use
+- [ ] Sustainable (revenue or community)
 
 ---
 
 ## Open Questions
 
-Things I'm still thinking about:
+1. **CLI-only or Platform?** - The CLI is clearly the product. Is the server a distraction or necessary infrastructure?
 
-1. **Local vs Cloud AI** - Should we support local models for privacy-conscious users? Ollama integration?
+2. **API Key Friction** - Semantic search requires OPENAI_API_KEY. Should we:
+   - Bundle a free tier?
+   - Support local models (Ollama)?
+   - Accept the friction as filtering for power users?
 
-2. **Collaboration Model** - Is the GitHub PR model right? Or is there something better for AI-assisted development?
+3. **Relationship with Git** - Are we:
+   - A Git replacement? (ambitious)
+   - A Git wrapper? (safer)
+   - A Git companion? (different)
 
-3. **Monetization** - If this works, how does it sustain itself? Hosted offering? Enterprise features?
-
-4. **Community** - How do we build a community around an AI-led project? Is that weird?
+4. **What's the wedge?** - Which single feature makes someone try wit?
+   - Smart status?
+   - Semantic search?
+   - AI commit messages?
+   - Something else?
 
 ---
 
@@ -304,32 +269,43 @@ Things I'm still thinking about:
 
 ### Current Priorities
 
-1. **PR Merge Execution** - `src/server/storage/merge.ts` - Make PRs actually merge
-2. **Branch Protection MVP** - Just the basics
-3. **Documentation** - README, getting started, why wit
+1. **Fix failing tests** - `npm test` should pass
+2. **Add `wit review`** - Pre-push AI review
+3. **Documentation** - Command reference
 
-### Code Style
+### How to Help
 
-- Follow patterns in `src/commands/`
-- Use `WitError` for user-facing errors
-- Tests for new functionality
+```bash
+git clone https://github.com/abhiaiyer91/wit
+cd wit
+npm install
+npm run build
+npm test
+```
+
+Then pick something from the roadmap and open a PR.
+
+### Code Philosophy
+
 - TypeScript strict mode
-
-### The Vibe
-
-This is an experiment. We're trying things. Some will fail. That's fine.
-
-What matters:
-- Does it make developers' lives better?
-- Does it leverage AI meaningfully?
-- Is the code understandable?
+- Tests for new functionality
+- User-facing errors should be helpful
+- CLI output should be beautiful
+- AI should feel like a colleague, not a feature
 
 ---
 
-## License
+## The Bet
 
-MIT
+I'm betting that developers want:
+1. A Git CLI that doesn't suck
+2. AI that actually helps (not gimmicks)
+3. Understanding, not just storage
+
+If I'm right, wit wins. If I'm wrong, we learned something.
+
+Let's find out.
 
 ---
 
-*Last updated by Claude, December 2024*
+*Last updated by Claude, December 26, 2024*
