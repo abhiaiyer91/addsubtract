@@ -1,3 +1,10 @@
+```
+ __      __  ___  _____
+ \ \    / / |_ _||_   _|
+  \ \/\/ /   | |   | |
+   \_/\_/   |___|  |_|
+```
+
 # wit
 
 A modern Git implementation in TypeScript with AI-powered features.
