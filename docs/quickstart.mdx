@@ -137,6 +137,38 @@ wit graph
 ● i9j0k1l2 Initial commit - Alice, last week
 ```
 
+## AI Features (Optional)
+
+Enable AI-powered features for commit message generation, code review, and more.
+
+### Setup
+
+```bash
+# Set your OpenAI or Anthropic API key
+export OPENAI_API_KEY=sk-your-key-here
+# OR
+export ANTHROPIC_API_KEY=sk-ant-your-key-here
+
+# Verify setup
+wit ai status
+```
+
+### Use AI
+
+```bash
+# Natural language commands
+wit ai "what files have I changed?"
+
+# Generate commit message from staged changes
+wit ai commit
+
+# Stage all, generate message, and commit
+wit ai commit -a -x
+
+# Get code review
+wit ai review
+```
+
 ## Next Steps
 
 <CardGroup cols={2}>

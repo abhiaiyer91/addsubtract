@@ -192,9 +192,33 @@ Complete `.wit/config`:
 [scope "backend"]
     paths = packages/backend/,packages/api/
 
-[ai]
-    enabled = true
-    model = gpt-4
+```
+
+## AI Configuration
+
+AI features are configured via environment variables rather than config files:
+
+```bash
+# OpenAI (default)
+export OPENAI_API_KEY=sk-your-key-here
+
+# OR Anthropic
+export ANTHROPIC_API_KEY=sk-ant-your-key-here
+
+# Optional: Change the model
+export WIT_AI_MODEL=anthropic/claude-sonnet-4-20250514
+```
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `OPENAI_API_KEY` | OpenAI API key | - |
+| `ANTHROPIC_API_KEY` | Anthropic API key | - |
+| `WIT_AI_MODEL` | Model to use | `openai/gpt-4o` |
+
+Check AI status:
+
+```bash
+wit ai status
 ```
 
 ## Next Steps

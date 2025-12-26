@@ -1,178 +1,356 @@
 ---
 title: AI-Powered Features
-description: "AI-generated commit messages and intelligent assistance"
+description: "AI-generated commit messages, code review, and intelligent assistance"
 ---
 
 # AI-Powered Features
 
-wit includes built-in AI capabilities powered by modern LLM technology.
+wit includes built-in AI capabilities powered by [Mastra](https://mastra.ai/), supporting OpenAI and Anthropic models.
 
 ## Overview
 
 AI features in wit help you:
-- Generate meaningful commit messages
+- Generate meaningful commit messages from your changes
 - Get intelligent code review suggestions
-- Understand complex diffs
+- Understand complex commits and diffs
 - Navigate your repository with natural language
+- Resolve merge conflicts with AI assistance
+
+## Setup
+
+### API Key Configuration
+
+AI features require an API key from OpenAI or Anthropic:
+
+```bash
+# For OpenAI (GPT-4o, GPT-4o-mini, etc.)
+export OPENAI_API_KEY=sk-your-key-here
+
+# OR for Anthropic (Claude)
+export ANTHROPIC_API_KEY=sk-ant-your-key-here
+```
+
+Add to your shell profile for persistence:
+
+```bash
+# ~/.bashrc or ~/.zshrc
+export OPENAI_API_KEY=sk-your-key-here
+```
+
+### Check Configuration
+
+```bash
+wit ai status
+```
+
+Output:
+```
+🤖 wit AI Status
+
+Available: ✅ Yes
+Model: openai/gpt-4o
+Provider: openai
+
+Environment Variables:
+  OPENAI_API_KEY: ✅ Set
+  ANTHROPIC_API_KEY: ❌ Not set
+  WIT_AI_MODEL: (not set, using default)
+```
+
+### Using Different Models
+
+```bash
+# Use Claude instead of GPT-4o
+export WIT_AI_MODEL=anthropic/claude-sonnet-4-20250514
+export ANTHROPIC_API_KEY=sk-ant-...
+
+# Use GPT-4o-mini (faster, cheaper)
+export WIT_AI_MODEL=openai/gpt-4o-mini
+export OPENAI_API_KEY=sk-...
+```
 
 ## AI Commands
 
+### Natural Language Commands
+
+Ask questions or give commands in plain English:
+
 ```bash
-wit ai <command>
+# Check status
+wit ai "what files have I changed?"
+wit ai "show me unstaged changes"
+
+# View history
+wit ai "show me the last 5 commits"
+wit ai "what did I commit yesterday?"
+
+# Branch operations
+wit ai "what branch am I on?"
+wit ai "list all branches"
+wit ai "switch to the main branch"
+
+# Search
+wit ai "find commits mentioning 'login'"
+wit ai "search for files containing 'TODO'"
 ```
 
 ### Generate Commit Messages
 
 ```bash
-# Stage your changes
+# First, stage your changes
 wit add .
 
 # Generate a commit message
 wit ai commit
 ```
 
-The AI analyzes your staged changes and suggests a descriptive commit message.
+**Output:**
+```
+🤖 Generating commit message...
 
-**Example:**
+📝 Suggested commit message:
 
+────────────────────────────────────────────────────────────────
+feat: add user authentication middleware
+
+- Implement JWT token validation
+- Add role-based access control
+- Create auth error handling
+────────────────────────────────────────────────────────────────
+
+To use this message, run:
+  wit commit -m "feat: add user authentication middleware"
+
+Or add --execute (-x) to commit directly:
+  wit ai commit -x
+```
+
+**Options:**
 ```bash
-$ wit add src/auth.ts src/login.tsx
-$ wit ai commit
-
-Suggested message:
-  "Add user authentication with login form
-
-   - Implement auth module with JWT token handling
-   - Create login form component with validation
-   - Add password strength indicator"
-
-Use this message? [Y/n]
+wit ai commit           # Generate message for staged changes
+wit ai commit -a        # Stage all tracked files + generate message
+wit ai commit -x        # Generate AND execute the commit
+wit ai commit -a -x     # Stage all, generate, and commit in one command
 ```
 
 ### Code Review
 
-```bash
-# Review staged changes
-wit ai review
-```
-
 Get AI-powered feedback on your changes:
-- Potential bugs
-- Style suggestions
-- Security concerns
-- Performance improvements
-
-### Explain Changes
 
 ```bash
-# Understand a diff
-wit ai explain HEAD~3..HEAD
+# Review all changes (staged + unstaged)
+wit ai review
+
+# Review only staged changes
+wit ai review --staged
 ```
 
-Get a plain-English explanation of what changed.
+**Example output:**
+```
+🔍 Reviewing changes...
 
-## Configuration
+## Code Review Summary
 
-### Set Up API Key
+### Issues Found
 
-AI features require an API key:
+1. **Warning** - `src/auth.ts:42`
+   Missing null check before accessing `user.email`
+   Suggestion: Add optional chaining: `user?.email`
+
+2. **Info** - `src/utils.ts:15`
+   Consider using const instead of let for `config`
+
+### Security Concerns
+- API key is being logged in debug mode (line 78)
+
+### Suggestions
+- Add input validation for the email field
+- Consider adding rate limiting to the auth endpoint
+```
+
+### Explain Commits
+
+Understand what a commit does:
 
 ```bash
-# Set your API key
-export MASTRA_API_KEY="your-api-key"
+# Explain the latest commit
+wit ai explain
+
+# Explain a specific commit
+wit ai explain HEAD~3
+wit ai explain abc1234
 ```
 
-Or add to your shell profile:
+**Example output:**
+```
+📖 Explaining commit...
+
+## Commit abc1234: "refactor: extract validation logic"
+
+This commit reorganizes the validation code by:
+
+1. **What it does**: Extracts inline validation logic from the 
+   UserController into a dedicated ValidationService class.
+
+2. **Why it was made**: This separation of concerns makes the code
+   more testable and follows the Single Responsibility Principle.
+
+3. **What it affects**: 
+   - `src/controllers/UserController.ts` (simplified)
+   - `src/services/ValidationService.ts` (new file)
+   - `src/tests/validation.test.ts` (new tests)
+```
+
+### Conflict Resolution
+
+Get AI help resolving merge conflicts:
 
 ```bash
-# ~/.bashrc or ~/.zshrc
-export MASTRA_API_KEY="your-api-key"
+# Start a merge
+wit merge feature-branch
+
+# If there are conflicts, ask for help
+wit ai resolve
+
+# Or resolve a specific file
+wit ai resolve src/config.ts
 ```
 
-### Configuration Options
-
-```ini
-# .wit/config
-[ai]
-    enabled = true
-    model = gpt-4
-    autoSuggest = false
+**Example output:**
 ```
+🔧 Resolving: src/config.ts
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `enabled` | Enable AI features | `true` |
-| `model` | AI model to use | `gpt-4` |
-| `autoSuggest` | Auto-suggest on commit | `false` |
+## Conflict Analysis
+
+**Our version (main):**
+- Sets `maxRetries` to 3
+- Uses synchronous file loading
+
+**Their version (feature-branch):**
+- Sets `maxRetries` to 5
+- Uses async file loading with error handling
+
+## Recommended Resolution
+
+I recommend keeping their version because:
+1. Higher retry count improves reliability
+2. Async loading prevents blocking the main thread
+3. Their error handling is more robust
+```
 
 ## AI Tools
 
-wit's AI system includes specialized tools:
+wit's AI agent has access to specialized tools:
 
 | Tool | Purpose |
 |------|---------|
-| `get-status` | Understand repository state |
-| `get-diff` | Analyze changes |
-| `get-log` | Review history |
-| `get-branches` | Navigate branches |
-| `stage-files` | Smart staging |
-| `create-commit` | Generate commits |
-| `search` | Intelligent search |
+| `getStatus` | Understand repository state |
+| `getDiff` | Analyze changes |
+| `getLog` | Review commit history |
+| `getBranches` | Navigate branches |
+| `stageFiles` | Stage files for commit |
+| `createCommit` | Create commits |
+| `switchBranch` | Switch branches |
+| `getMergeConflicts` | View merge conflicts |
+| `resolveConflict` | Resolve conflicts |
+| `undo` | Undo operations |
+| `search` | Search commits, files, content |
 
-## Examples
+## Programmatic Usage
 
-### Smart Commit Workflow
+Use AI features in your TypeScript code:
 
-```bash
-# Make your changes...
+```typescript
+import { getTsgitAgent, createTsgitMastra } from 'wit/ai';
 
-# Let AI suggest a commit message
-wit ai commit
+// Get the agent
+const agent = getTsgitAgent();
 
-# Or use the message directly
-wit ai commit --apply
+// Generate a response
+const result = await agent.generate('What files have changed?');
+console.log(result.text);
+
+// Stream a response
+const stream = await agent.stream('Review my staged changes');
+for await (const chunk of stream.textStream) {
+  process.stdout.write(chunk);
+}
 ```
 
-### Review Before Push
+### Using Individual Tools
 
-```bash
-# Review all changes on your branch
-wit ai review main..HEAD
+```typescript
+import { witTools } from 'wit/ai';
 
-# Get specific feedback
-wit ai review --focus security
+// Get repository status
+const status = await witTools.getStatus.execute({ path: '.' });
+console.log('Modified files:', status.modified);
+
+// Get diff
+const diff = await witTools.getDiff.execute({ 
+  staged: true,
+  contextLines: 5 
+});
+console.log(diff.summary);
+
+// Create a commit
+const commit = await witTools.createCommit.execute({
+  message: 'feat: add new feature',
+  all: true,
+});
+console.log('Committed:', commit.shortHash);
 ```
 
-### Understand History
+## Tips
 
-```bash
-# What happened in the last week?
-wit ai explain --since="1 week ago"
+1. **Be specific**: "Show commits from last week that modified auth files" works better than "show commits"
 
-# Summarize a branch
-wit ai summarize feature-branch
-```
+2. **Use context**: The AI understands git concepts:
+   - "What's the difference between my branch and main?"
+   - "Have I already committed the login changes?"
+
+3. **Iterate**: If the AI's first response isn't quite right, follow up with more details
+
+4. **Commit messages**: The AI follows conventional commits format. For best results:
+   - Stage related changes together
+   - Don't mix unrelated changes in one commit
+
+5. **Code review**: Run `wit ai review` before pushing to catch issues early
+
+## Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `OPENAI_API_KEY` | OpenAI API key for GPT models | - |
+| `ANTHROPIC_API_KEY` | Anthropic API key for Claude models | - |
+| `WIT_AI_MODEL` | Model to use | `openai/gpt-4o` |
+
+## Supported Models
+
+The AI integration uses `@mastra/core` which supports:
+
+- **OpenAI**: `openai/gpt-4o`, `openai/gpt-4o-mini`, `openai/gpt-4-turbo`
+- **Anthropic**: `anthropic/claude-sonnet-4-20250514`, `anthropic/claude-3-haiku`
+- **And more** via the Mastra model router
 
 ## Privacy & Security
 
 <Note>
 AI features send code to external APIs. Consider:
-- Don't use on sensitive/proprietary code
+- Don't use on sensitive/proprietary code without approval
 - Review AI suggestions before applying
-- Use local models for sensitive projects (coming soon)
+- Only diff content is sent, not your full repository
 </Note>
 
 ### What's Sent
-
 - Diff content (staged changes)
 - Commit messages (for context)
-- File paths (not full file contents)
+- File paths
 
 ### What's NOT Sent
-
-- Unstaged file contents
-- Repository history (unless explicitly requested)
-- Configuration files
+- Unstaged file contents (unless explicitly reviewing)
+- Full repository history
+- Configuration files with secrets
 
 ## Troubleshooting
 
@@ -180,29 +358,22 @@ AI features send code to external APIs. Consider:
   <Accordion title="AI features not working">
     Check your API key:
     ```bash
-    echo $MASTRA_API_KEY
+    wit ai status
     ```
-    Make sure it's set and valid.
+    Make sure `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` is set correctly.
   </Accordion>
   
   <Accordion title="Rate limiting">
     If you hit rate limits:
     - Wait a few minutes
     - Consider upgrading your API plan
-    - Use local models (coming soon)
+    - Use a faster/cheaper model like `openai/gpt-4o-mini`
   </Accordion>
   
   <Accordion title="Poor suggestions">
-    Help the AI with context:
-    ```bash
-    wit ai commit --context "Fixing bug #123"
-    ```
+    For better results:
+    - Stage related changes together
+    - Don't mix unrelated changes
+    - Be specific in natural language queries
   </Accordion>
 </AccordionGroup>
-
-## Coming Soon
-
-- Local model support (Ollama, LM Studio)
-- Custom prompts
-- Team-specific conventions
-- Commit message templates
