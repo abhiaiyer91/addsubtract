@@ -49,11 +49,13 @@
   "dependencies": {
     "@hono/node-server": "^1.19.7",
     "@mastra/core": "^1.0.0-beta.17",
+    "@trpc/client": "^11.8.1",
     "@types/blessed": "^0.1.27",
     "blessed": "^0.1.81",
     "drizzle-orm": "^0.45.1",
-    "pg": "^8.16.3",
     "hono": "^4.11.2",
+    "pg": "^8.16.3",
+    "superjson": "^2.2.6",
     "zod": "^4.2.1"
   },
   "engines": {

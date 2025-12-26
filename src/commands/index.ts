@@ -73,3 +73,7 @@ export { handleServe } from './serve';
 
 // Command help system
 export { COMMAND_HELP, formatCommandHelp, printCommandHelp, hasHelpFlag } from './command-help';
+
+// Platform commands (CLI extensions)
+export { handlePr, PR_HELP } from './pr';
+export { handleIssue, ISSUE_HELP } from './issue';
