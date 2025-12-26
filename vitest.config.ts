@@ -12,5 +12,8 @@ export default defineConfig({
     },
     testTimeout: 30000, // Increased for integration tests
     hookTimeout: 30000, // For beforeAll/afterAll in integration tests
+    // Run integration test files sequentially to avoid port conflicts
+    // (each file starts its own server on the same port)
+    fileParallelism: false,
   },
 });

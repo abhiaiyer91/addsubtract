@@ -123,9 +123,11 @@ export async function cleanupTestData(): Promise<void> {
 
 /**
  * Generate a unique test username
+ * Note: Username must match /^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?$/
+ * (alphanumeric with hyphens only, no underscores)
  */
 export function uniqueUsername(prefix = 'testuser'): string {
-  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 /**

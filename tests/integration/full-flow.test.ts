@@ -620,9 +620,10 @@ describe('E2E Integration', () => {
     });
 
     it('lists activity feed', async () => {
-      const api = createTestClient();
+      // Note: activity.feed requires authentication, use publicFeed for unauthenticated access
+      const authApi = createAuthenticatedClient(sessionToken);
       
-      const activity = await api.activity.feed.query({
+      const activity = await authApi.activity.feed.query({
         limit: 10,
       });
 
@@ -633,7 +634,8 @@ describe('E2E Integration', () => {
     it('lists activity for a specific user', async () => {
       const api = createTestClient();
       
-      const activity = await api.activity.byUser.query({
+      // Use the correct method name: forUser (not byUser)
+      const activity = await api.activity.forUser.query({
         userId,
         limit: 10,
       });

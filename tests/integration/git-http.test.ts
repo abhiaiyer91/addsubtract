@@ -155,14 +155,20 @@ describe('Git HTTP Protocol', () => {
   });
 
   describe('Error Handling', () => {
-    it('returns 404 for non-existent repo on upload-pack (no auto-create)', async () => {
-      const fakeRepoName = 'definitely-does-not-exist-' + Date.now();
+    it('auto-creates repository on upload-pack for non-existent repo', async () => {
+      // Note: The server auto-creates repos on both upload-pack and receive-pack
+      // This is intentional behavior to simplify git operations
+      const fakeRepoName = 'auto-created-on-upload-' + Date.now();
       
       const response = await fetch(
         `${API_URL}/${testUsername}/${fakeRepoName}.git/info/refs?service=git-upload-pack`
       );
       
-      expect(response.status).toBe(404);
+      // Server auto-creates the repo and returns 200
+      expect(response.ok).toBe(true);
+      expect(response.headers.get('content-type')).toBe(
+        'application/x-git-upload-pack-advertisement'
+      );
     });
   });
 });
