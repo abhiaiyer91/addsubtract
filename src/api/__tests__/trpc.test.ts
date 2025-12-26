@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   appRouter,
   createTestContext,
@@ -179,18 +179,15 @@ describe('tRPC API', () => {
       expect(appRouter).toBeDefined();
     });
 
-    it('should have all required routers', () => {
-      // Access router procedure map to verify structure
-      const routerProcedures = appRouter._def.procedures;
-
-      // Check that main routers exist
-      expect(routerProcedures['auth.me']).toBeDefined();
-      expect(routerProcedures['users.get']).toBeDefined();
-      expect(routerProcedures['repos.list']).toBeDefined();
-      expect(routerProcedures['pulls.list']).toBeDefined();
-      expect(routerProcedures['issues.list']).toBeDefined();
-      expect(routerProcedures['comments.listPrComments']).toBeDefined();
-      expect(routerProcedures['activity.publicFeed']).toBeDefined();
+    it('should have all required sub-routers', () => {
+      // Check that main routers exist by accessing them
+      expect(appRouter.auth).toBeDefined();
+      expect(appRouter.users).toBeDefined();
+      expect(appRouter.repos).toBeDefined();
+      expect(appRouter.pulls).toBeDefined();
+      expect(appRouter.issues).toBeDefined();
+      expect(appRouter.comments).toBeDefined();
+      expect(appRouter.activity).toBeDefined();
     });
   });
 
@@ -238,177 +235,144 @@ describe('tRPC API', () => {
     });
   });
 
-  describe('Auth Router Procedures', () => {
-    it('should have me procedure', () => {
-      expect(appRouter._def.procedures['auth.me']).toBeDefined();
-    });
-
-    it('should have register procedure', () => {
-      expect(appRouter._def.procedures['auth.register']).toBeDefined();
-    });
-
-    it('should have login procedure', () => {
-      expect(appRouter._def.procedures['auth.login']).toBeDefined();
-    });
-
-    it('should have logout procedure', () => {
-      expect(appRouter._def.procedures['auth.logout']).toBeDefined();
-    });
-
-    it('should have updateProfile procedure', () => {
-      expect(appRouter._def.procedures['auth.updateProfile']).toBeDefined();
+  describe('Auth Router', () => {
+    it('should have auth router with expected procedures', () => {
+      const authRouter = appRouter.auth;
+      expect(authRouter).toBeDefined();
+      expect(authRouter.me).toBeDefined();
+      expect(authRouter.register).toBeDefined();
+      expect(authRouter.login).toBeDefined();
+      expect(authRouter.logout).toBeDefined();
+      expect(authRouter.updateProfile).toBeDefined();
+      expect(authRouter.changePassword).toBeDefined();
+      expect(authRouter.logoutAll).toBeDefined();
     });
   });
 
-  describe('Users Router Procedures', () => {
-    it('should have get procedure', () => {
-      expect(appRouter._def.procedures['users.get']).toBeDefined();
-    });
-
-    it('should have search procedure', () => {
-      expect(appRouter._def.procedures['users.search']).toBeDefined();
-    });
-
-    it('should have repos procedure', () => {
-      expect(appRouter._def.procedures['users.repos']).toBeDefined();
-    });
-  });
-
-  describe('Repos Router Procedures', () => {
-    it('should have list procedure', () => {
-      expect(appRouter._def.procedures['repos.list']).toBeDefined();
-    });
-
-    it('should have get procedure', () => {
-      expect(appRouter._def.procedures['repos.get']).toBeDefined();
-    });
-
-    it('should have create procedure', () => {
-      expect(appRouter._def.procedures['repos.create']).toBeDefined();
-    });
-
-    it('should have delete procedure', () => {
-      expect(appRouter._def.procedures['repos.delete']).toBeDefined();
-    });
-
-    it('should have star procedure', () => {
-      expect(appRouter._def.procedures['repos.star']).toBeDefined();
-    });
-
-    it('should have unstar procedure', () => {
-      expect(appRouter._def.procedures['repos.unstar']).toBeDefined();
-    });
-
-    it('should have search procedure', () => {
-      expect(appRouter._def.procedures['repos.search']).toBeDefined();
+  describe('Users Router', () => {
+    it('should have users router with expected procedures', () => {
+      const usersRouter = appRouter.users;
+      expect(usersRouter).toBeDefined();
+      expect(usersRouter.get).toBeDefined();
+      expect(usersRouter.getById).toBeDefined();
+      expect(usersRouter.search).toBeDefined();
+      expect(usersRouter.repos).toBeDefined();
+      expect(usersRouter.stars).toBeDefined();
+      expect(usersRouter.orgs).toBeDefined();
+      expect(usersRouter.update).toBeDefined();
+      expect(usersRouter.checkUsername).toBeDefined();
     });
   });
 
-  describe('Pulls Router Procedures', () => {
-    it('should have list procedure', () => {
-      expect(appRouter._def.procedures['pulls.list']).toBeDefined();
-    });
-
-    it('should have get procedure', () => {
-      expect(appRouter._def.procedures['pulls.get']).toBeDefined();
-    });
-
-    it('should have create procedure', () => {
-      expect(appRouter._def.procedures['pulls.create']).toBeDefined();
-    });
-
-    it('should have merge procedure', () => {
-      expect(appRouter._def.procedures['pulls.merge']).toBeDefined();
-    });
-
-    it('should have close procedure', () => {
-      expect(appRouter._def.procedures['pulls.close']).toBeDefined();
-    });
-
-    it('should have addReview procedure', () => {
-      expect(appRouter._def.procedures['pulls.addReview']).toBeDefined();
-    });
-
-    it('should have addComment procedure', () => {
-      expect(appRouter._def.procedures['pulls.addComment']).toBeDefined();
+  describe('Repos Router', () => {
+    it('should have repos router with expected procedures', () => {
+      const reposRouter = appRouter.repos;
+      expect(reposRouter).toBeDefined();
+      expect(reposRouter.list).toBeDefined();
+      expect(reposRouter.get).toBeDefined();
+      expect(reposRouter.getById).toBeDefined();
+      expect(reposRouter.create).toBeDefined();
+      expect(reposRouter.update).toBeDefined();
+      expect(reposRouter.delete).toBeDefined();
+      expect(reposRouter.star).toBeDefined();
+      expect(reposRouter.unstar).toBeDefined();
+      expect(reposRouter.isStarred).toBeDefined();
+      expect(reposRouter.watch).toBeDefined();
+      expect(reposRouter.unwatch).toBeDefined();
+      expect(reposRouter.isWatching).toBeDefined();
+      expect(reposRouter.search).toBeDefined();
+      expect(reposRouter.stargazers).toBeDefined();
+      expect(reposRouter.watchers).toBeDefined();
+      expect(reposRouter.forks).toBeDefined();
+      expect(reposRouter.addCollaborator).toBeDefined();
+      expect(reposRouter.removeCollaborator).toBeDefined();
+      expect(reposRouter.collaborators).toBeDefined();
     });
   });
 
-  describe('Issues Router Procedures', () => {
-    it('should have list procedure', () => {
-      expect(appRouter._def.procedures['issues.list']).toBeDefined();
-    });
-
-    it('should have get procedure', () => {
-      expect(appRouter._def.procedures['issues.get']).toBeDefined();
-    });
-
-    it('should have create procedure', () => {
-      expect(appRouter._def.procedures['issues.create']).toBeDefined();
-    });
-
-    it('should have close procedure', () => {
-      expect(appRouter._def.procedures['issues.close']).toBeDefined();
-    });
-
-    it('should have reopen procedure', () => {
-      expect(appRouter._def.procedures['issues.reopen']).toBeDefined();
-    });
-
-    it('should have addComment procedure', () => {
-      expect(appRouter._def.procedures['issues.addComment']).toBeDefined();
-    });
-
-    it('should have addLabel procedure', () => {
-      expect(appRouter._def.procedures['issues.addLabel']).toBeDefined();
-    });
-
-    it('should have removeLabel procedure', () => {
-      expect(appRouter._def.procedures['issues.removeLabel']).toBeDefined();
+  describe('Pulls Router', () => {
+    it('should have pulls router with expected procedures', () => {
+      const pullsRouter = appRouter.pulls;
+      expect(pullsRouter).toBeDefined();
+      expect(pullsRouter.list).toBeDefined();
+      expect(pullsRouter.get).toBeDefined();
+      expect(pullsRouter.getById).toBeDefined();
+      expect(pullsRouter.getWithAuthor).toBeDefined();
+      expect(pullsRouter.create).toBeDefined();
+      expect(pullsRouter.update).toBeDefined();
+      expect(pullsRouter.merge).toBeDefined();
+      expect(pullsRouter.close).toBeDefined();
+      expect(pullsRouter.reopen).toBeDefined();
+      expect(pullsRouter.addReview).toBeDefined();
+      expect(pullsRouter.reviews).toBeDefined();
+      expect(pullsRouter.addComment).toBeDefined();
+      expect(pullsRouter.comments).toBeDefined();
+      expect(pullsRouter.updateComment).toBeDefined();
+      expect(pullsRouter.deleteComment).toBeDefined();
+      expect(pullsRouter.labels).toBeDefined();
+      expect(pullsRouter.addLabel).toBeDefined();
+      expect(pullsRouter.removeLabel).toBeDefined();
+      expect(pullsRouter.listByAuthor).toBeDefined();
     });
   });
 
-  describe('Comments Router Procedures', () => {
-    it('should have createPrComment procedure', () => {
-      expect(appRouter._def.procedures['comments.createPrComment']).toBeDefined();
-    });
-
-    it('should have createIssueComment procedure', () => {
-      expect(appRouter._def.procedures['comments.createIssueComment']).toBeDefined();
-    });
-
-    it('should have updatePrComment procedure', () => {
-      expect(appRouter._def.procedures['comments.updatePrComment']).toBeDefined();
-    });
-
-    it('should have updateIssueComment procedure', () => {
-      expect(appRouter._def.procedures['comments.updateIssueComment']).toBeDefined();
-    });
-
-    it('should have deletePrComment procedure', () => {
-      expect(appRouter._def.procedures['comments.deletePrComment']).toBeDefined();
-    });
-
-    it('should have deleteIssueComment procedure', () => {
-      expect(appRouter._def.procedures['comments.deleteIssueComment']).toBeDefined();
+  describe('Issues Router', () => {
+    it('should have issues router with expected procedures', () => {
+      const issuesRouter = appRouter.issues;
+      expect(issuesRouter).toBeDefined();
+      expect(issuesRouter.list).toBeDefined();
+      expect(issuesRouter.get).toBeDefined();
+      expect(issuesRouter.getById).toBeDefined();
+      expect(issuesRouter.getWithAuthor).toBeDefined();
+      expect(issuesRouter.create).toBeDefined();
+      expect(issuesRouter.update).toBeDefined();
+      expect(issuesRouter.close).toBeDefined();
+      expect(issuesRouter.reopen).toBeDefined();
+      expect(issuesRouter.assign).toBeDefined();
+      expect(issuesRouter.unassign).toBeDefined();
+      expect(issuesRouter.addComment).toBeDefined();
+      expect(issuesRouter.comments).toBeDefined();
+      expect(issuesRouter.updateComment).toBeDefined();
+      expect(issuesRouter.deleteComment).toBeDefined();
+      expect(issuesRouter.labels).toBeDefined();
+      expect(issuesRouter.addLabel).toBeDefined();
+      expect(issuesRouter.removeLabel).toBeDefined();
+      expect(issuesRouter.listByAuthor).toBeDefined();
+      expect(issuesRouter.listByAssignee).toBeDefined();
+      expect(issuesRouter.listLabels).toBeDefined();
+      expect(issuesRouter.createLabel).toBeDefined();
+      expect(issuesRouter.updateLabel).toBeDefined();
+      expect(issuesRouter.deleteLabel).toBeDefined();
     });
   });
 
-  describe('Activity Router Procedures', () => {
-    it('should have forRepo procedure', () => {
-      expect(appRouter._def.procedures['activity.forRepo']).toBeDefined();
+  describe('Comments Router', () => {
+    it('should have comments router with expected procedures', () => {
+      const commentsRouter = appRouter.comments;
+      expect(commentsRouter).toBeDefined();
+      expect(commentsRouter.getPrComment).toBeDefined();
+      expect(commentsRouter.getIssueComment).toBeDefined();
+      expect(commentsRouter.createPrComment).toBeDefined();
+      expect(commentsRouter.createIssueComment).toBeDefined();
+      expect(commentsRouter.updatePrComment).toBeDefined();
+      expect(commentsRouter.updateIssueComment).toBeDefined();
+      expect(commentsRouter.deletePrComment).toBeDefined();
+      expect(commentsRouter.deleteIssueComment).toBeDefined();
+      expect(commentsRouter.listPrComments).toBeDefined();
+      expect(commentsRouter.listIssueComments).toBeDefined();
+      expect(commentsRouter.listPrFileComments).toBeDefined();
     });
+  });
 
-    it('should have forUser procedure', () => {
-      expect(appRouter._def.procedures['activity.forUser']).toBeDefined();
-    });
-
-    it('should have feed procedure', () => {
-      expect(appRouter._def.procedures['activity.feed']).toBeDefined();
-    });
-
-    it('should have publicFeed procedure', () => {
-      expect(appRouter._def.procedures['activity.publicFeed']).toBeDefined();
+  describe('Activity Router', () => {
+    it('should have activity router with expected procedures', () => {
+      const activityRouter = appRouter.activity;
+      expect(activityRouter).toBeDefined();
+      expect(activityRouter.forRepo).toBeDefined();
+      expect(activityRouter.forUser).toBeDefined();
+      expect(activityRouter.feed).toBeDefined();
+      expect(activityRouter.publicFeed).toBeDefined();
+      expect(activityRouter.get).toBeDefined();
     });
   });
 
