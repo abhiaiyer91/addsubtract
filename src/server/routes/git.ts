@@ -10,12 +10,18 @@ import { serializeCapabilities } from '../../core/protocol/refs-discovery';
 import { createPackfile, PackableObject } from '../../core/protocol/packfile-writer';
 import { parsePackfile } from '../../core/protocol/packfile-parser';
 import { ObjectType } from '../../core/types';
+import { repoModel, userModel, activityModel } from '../../db/models';
+import { isConnected } from '../../db';
+import { gitAuthMiddleware } from '../middleware/auth';
 
 /**
  * Git Smart HTTP server routes
  */
 export function createGitRoutes(repoManager: RepoManager): Hono {
   const app = new Hono();
+
+  // Apply auth middleware to all git routes
+  app.use('*', gitAuthMiddleware);
 
   /**
    * GET /:owner/:repo/info/refs
@@ -85,6 +91,11 @@ export function createGitRoutes(repoManager: RepoManager): Hono {
       // Build and send packfile
       const response = buildUploadPackResponse(repository, wants, haves, capabilities);
 
+      // Log clone/fetch activity (only if it's a full clone with no haves)
+      if (haves.length === 0) {
+        await logCloneActivity(owner, repo, c);
+      }
+
       // Convert Buffer to Uint8Array for Response compatibility
       return new Response(new Uint8Array(response), {
         status: 200,
@@ -123,6 +134,9 @@ export function createGitRoutes(repoManager: RepoManager): Hono {
 
       // Process the push
       const result = processReceivePack(repository, commands, packData, capabilities);
+
+      // After successful push, update database
+      await handleDatabaseIntegration(owner, repo, repository.gitDir, commands, c);
 
       // Convert Buffer to Uint8Array for Response compatibility
       return new Response(new Uint8Array(result), {
@@ -545,6 +559,137 @@ function processReceivePack(
   }
 
   return Buffer.concat(parts);
+}
+
+/**
+ * Log clone activity to the database
+ */
+async function logCloneActivity(
+  owner: string,
+  repo: string,
+  c: any
+): Promise<void> {
+  // Skip if database is not connected
+  if (!(await isConnected())) {
+    return;
+  }
+
+  try {
+    const repoName = repo.replace(/\.git$/, '');
+    const dbRepoResult = await repoModel.findByPath(owner, repoName);
+
+    if (!dbRepoResult) {
+      return;
+    }
+
+    const authenticatedUser = c.get('user');
+    
+    // Only log if we have an authenticated user
+    if (authenticatedUser) {
+      // Note: We could add a 'clone' activity type, but for now we'll skip
+      // since it's not in the defined ActivityType enum
+      console.log(`[server] Clone by ${authenticatedUser.username}: ${owner}/${repoName}`);
+    }
+  } catch (error) {
+    // Log error but don't fail the clone
+    console.error('[server] Clone activity logging error:', error);
+  }
+}
+
+/**
+ * Handle database integration after a successful push
+ */
+async function handleDatabaseIntegration(
+  owner: string,
+  repo: string,
+  diskPath: string,
+  commands: RefCommand[],
+  c: any
+): Promise<void> {
+  // Skip if database is not connected
+  if (!(await isConnected())) {
+    return;
+  }
+
+  try {
+    const repoName = repo.replace(/\.git$/, '');
+
+    // Get or create repository in database
+    let dbRepoResult = await repoModel.findByPath(owner, repoName);
+    let dbRepo = dbRepoResult?.repo;
+    let dbUser = dbRepoResult?.owner && 'username' in dbRepoResult.owner ? dbRepoResult.owner : null;
+
+    if (!dbRepo) {
+      // Find user by username
+      const user = await userModel.findByUsername(owner);
+
+      if (user) {
+        dbRepo = await repoModel.create({
+          ownerId: user.id,
+          ownerType: 'user',
+          name: repoName,
+          diskPath,
+          defaultBranch: 'main',
+          isPrivate: false,
+        });
+        dbUser = user;
+        console.log(`[server] Created database record for ${owner}/${repoName}`);
+      } else {
+        // Create placeholder user if not exists
+        const newUser = await userModel.create({
+          username: owner,
+          email: `${owner}@placeholder.local`,
+          name: owner,
+        });
+
+        dbRepo = await repoModel.create({
+          ownerId: newUser.id,
+          ownerType: 'user',
+          name: repoName,
+          diskPath,
+          defaultBranch: 'main',
+          isPrivate: false,
+        });
+        dbUser = newUser;
+        console.log(`[server] Created placeholder user and database record for ${owner}/${repoName}`);
+      }
+    }
+
+    // Update pushed_at timestamp
+    if (dbRepo) {
+      await repoModel.updatePushedAt(dbRepo.id);
+    }
+
+    // Log activity if we have both repo and user
+    // Try to get authenticated user from context, fallback to owner
+    const authenticatedUser = c.get('user');
+    const actorId = authenticatedUser?.id || dbUser?.id;
+
+    if (dbRepo && actorId && commands.length > 0) {
+      // Get the first command's ref info for activity logging
+      const firstCommand = commands[0];
+      const refName = firstCommand.refName;
+      const branch = refName.startsWith('refs/heads/') ? refName.slice(11) : refName;
+
+      await activityModel.create({
+        actorId,
+        repoId: dbRepo.id,
+        type: 'push',
+        payload: {
+          branch,
+          commits: commands.map(cmd => ({
+            sha: cmd.newHash,
+            message: `${cmd.oldHash.slice(0, 7)}..${cmd.newHash.slice(0, 7)}`,
+          })),
+        },
+      });
+
+      console.log(`[server] Logged push activity for ${owner}/${repoName}`);
+    }
+  } catch (error) {
+    // Log error but don't fail the push
+    console.error('[server] Database integration error:', error);
+  }
 }
 
 /**
