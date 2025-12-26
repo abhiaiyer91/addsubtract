@@ -66,6 +66,9 @@ import {
   // Command help
   printCommandHelp,
   hasHelpFlag,
+  // Platform commands
+  handlePr,
+  handleIssue,
 } from './commands';
 import { handleHooks } from './core/hooks';
 import { handleSubmodule } from './core/submodule';
@@ -180,6 +183,19 @@ Server:
   serve --port <n>      Start server on specified port
   serve --repos <path>  Set repository storage directory
 
+Platform Commands:
+  pr create             Create pull request from current branch
+  pr list               List pull requests
+  pr view <number>      View pull request details
+  pr merge <number>     Merge a pull request
+  pr close <number>     Close a pull request
+  
+  issue create <title>  Create new issue
+  issue list            List issues
+  issue view <number>   View issue details
+  issue close <number>  Close an issue
+  issue comment <n>     Add comment to issue
+
 Quality of Life:
   amend                 Quickly fix the last commit
   wip                   Quick WIP commit with auto-generated message
@@ -279,6 +295,8 @@ const COMMANDS = [
   'hooks', 'submodule', 'worktree', 'reflog', 'gc',
   // Server
   'serve',
+  // Platform commands
+  'pr', 'issue',
   'help',
 ];
 
@@ -751,6 +769,29 @@ function main(): void {
       case 'serve':
         handleServe(args.slice(args.indexOf('serve') + 1));
         break;
+
+      // Platform commands
+      case 'pr':
+        handlePr(args.slice(args.indexOf('pr') + 1)).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
+          }
+          process.exit(1);
+        });
+        return; // Exit main() to let async handle complete
+
+      case 'issue':
+        handleIssue(args.slice(args.indexOf('issue') + 1)).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
+          }
+          process.exit(1);
+        });
+        return; // Exit main() to let async handle complete
 
       default: {
         // Provide suggestions for unknown commands
