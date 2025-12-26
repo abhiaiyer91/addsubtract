@@ -1,33 +1,97 @@
 ---
 title: Hooks
-description: "Customize behavior at key points in the workflow"
+description: "Customize behavior at key points in the workflow - no Husky needed"
 ---
 
 # Hooks
 
-Hooks let you run custom scripts at key points in the version control workflow.
+wit has first-class hook support built-in, eliminating the need for external packages like Husky, lint-staged, or commitlint setup tools.
 
-## Overview
+## Why wit Hooks Replace Husky
 
-wit supports hooks similar to Git, allowing you to:
-- Validate commits before they're created
-- Run tests automatically
-- Format code on commit
-- Send notifications after actions
-- Enforce team policies
+| Feature | Husky | wit |
+|---------|-------|-----|
+| Installation | `npm install husky` | Built-in |
+| Setup | `npx husky install` | `wit hooks setup` |
+| Config file | `.husky/` directory | `.wit/hooks.json` |
+| Lint-staged | Separate package | Built-in `staged` config |
+| Auto-install | Requires `prepare` script | `wit hooks sync` in postinstall |
+
+## Quick Start
+
+```bash
+# Set up hooks for your project (like husky install)
+wit hooks setup --sample
+
+# Sync hooks after config changes
+wit hooks sync
+```
+
+## Configuration File
+
+wit uses `.wit/hooks.json` for hook configuration:
+
+```json
+{
+  "hooks": {
+    "pre-commit": "npm run lint",
+    "commit-msg": "npx commitlint --edit $1"
+  },
+  "staged": {
+    "\\.(ts|tsx)$": ["eslint --fix", "prettier --write"],
+    "\\.(json|md)$": "prettier --write"
+  },
+  "enabled": true
+}
+```
+
+### Config Locations
+
+wit looks for config in these locations (in order):
+1. `.wit/hooks.json` (recommended)
+2. `wit.config.json`
+3. `package.json` under `"wit"` key
 
 ## Available Hooks
 
-| Hook | Triggered |
-|------|-----------|
-| `pre-commit` | Before commit is created |
-| `post-commit` | After commit is created |
-| `pre-merge` | Before merge starts |
-| `post-merge` | After merge completes |
-| `pre-push` | Before push (future) |
-| `post-checkout` | After branch switch |
+| Hook | Triggered | Can Abort |
+|------|-----------|-----------|
+| `pre-commit` | Before commit is created | Yes |
+| `post-commit` | After commit is created | No |
+| `commit-msg` | After commit message entered | Yes |
+| `pre-push` | Before push to remote | Yes |
+| `post-merge` | After merge completes | No |
+| `pre-rebase` | Before rebase starts | Yes |
+| `post-checkout` | After branch switch | No |
+| `prepare-commit-msg` | Before message editor opens | No |
 
 ## Commands
+
+### Setup Hooks
+
+```bash
+# Initialize hooks for the project
+wit hooks setup
+
+# With sample configuration
+wit hooks setup --sample
+```
+
+### Add Hook Commands
+
+```bash
+# Add a command to a hook type
+wit hooks add pre-commit "npm run lint"
+wit hooks add pre-commit "npm test"
+wit hooks add commit-msg "npx commitlint --edit \$1"
+```
+
+### Sync Configuration
+
+```bash
+# Apply .wit/hooks.json to actual hook scripts
+wit hooks sync
+```
 
 ### List Hooks
 
@@ -37,73 +101,122 @@ wit hooks
 
 Output:
 ```
+Hooks Status
+
+Config: .wit/hooks.json
+  Run "wit hooks sync" to apply config changes
+
 Installed hooks:
-  ✓ pre-commit
-  ✓ post-commit
-  
-Available templates:
-  • pre-push
-  • pre-merge
-  • post-merge
+
+  ● pre-commit
+    .wit/hooks/pre-commit
+  ● commit-msg
+    .wit/hooks/commit-msg
 ```
 
-### Install Hook
+### Other Commands
 
 ```bash
-wit hooks install <hook-name>
+wit hooks install <type>   # Install a hook from template
+wit hooks remove <type>    # Remove a hook
+wit hooks show <type>      # Show hook content
+wit hooks run <type>       # Run a hook manually
 ```
 
-**Examples:**
+## Lint-Staged Style Configuration
 
-```bash
-wit hooks install pre-commit
-wit hooks install post-commit
+The `staged` config runs commands only on staged files matching patterns:
+
+```json
+{
+  "staged": {
+    "\\.(ts|tsx)$": ["eslint --fix", "prettier --write"],
+    "\\.(css|scss)$": "stylelint --fix",
+    "\\.(json|md)$": "prettier --write"
+  }
+}
 ```
 
-### Remove Hook
+### Pattern Syntax
 
-```bash
-wit hooks remove <hook-name>
+- Uses JavaScript regex patterns
+- Files are passed as arguments to commands
+- Use `{}` placeholder to control file position:
+
+```json
+{
+  "staged": {
+    "\\.ts$": "eslint {} --fix"
+  }
+}
 ```
 
-### Run Hook Manually
+## Automatic Setup with npm
 
-```bash
-wit hooks run <hook-name>
+Add to your `package.json`:
+
+```json
+{
+  "scripts": {
+    "postinstall": "wit hooks sync"
+  }
+}
 ```
 
-Useful for testing hooks:
+This ensures all team members get the same hooks after `npm install`.
 
-```bash
-wit hooks run pre-commit
+## Hook Definition Formats
+
+### Simple String
+
+```json
+{
+  "hooks": {
+    "pre-commit": "npm run lint"
+  }
+}
 ```
 
-## Hook Location
+### Array of Commands
 
-Hooks are stored in `.wit/hooks/`:
-
+```json
+{
+  "hooks": {
+    "pre-commit": ["npm run lint", "npm test"]
+  }
+}
 ```
-.wit/
-└── hooks/
-    ├── pre-commit
-    └── post-commit
+
+### Full Definition Object
+
+```json
+{
+  "hooks": {
+    "pre-commit": {
+      "run": "npm run lint",
+      "files": ["\\.ts$", "\\.tsx$"],
+      "skip": false
+    }
+  }
+}
 ```
 
-## Writing Hooks
+## Writing Custom Hooks
 
 ### Basic Structure
 
-Hooks are executable scripts:
+Hooks are shell scripts in `.wit/hooks/`:
 
 ```bash
 #!/bin/bash
 # .wit/hooks/pre-commit
 
-# Your logic here
 npm run lint
+if [ $? -ne 0 ]; then
+    echo "Lint failed. Please fix errors before committing."
+    exit 1
+fi
 
-# Exit 0 = success (allow operation)
-# Exit non-zero = failure (block operation)
 exit 0
 ```
 
@@ -114,104 +227,10 @@ Block commits that don't meet criteria:
 ```bash
 #!/bin/bash
 # Run linter
-npm run lint
-if [ $? -ne 0 ]; then
-    echo "Lint failed. Please fix errors before committing."
-    exit 1
-fi
+npm run lint || exit 1
 
 # Run tests
-npm test
-if [ $? -ne 0 ]; then
-    echo "Tests failed. Please fix before committing."
-    exit 1
-fi
-
-exit 0
-```
-
-### Post-commit Hook
-
-Actions after commit succeeds:
-
-```bash
-#!/bin/bash
-# Send notification
-curl -X POST https://slack.webhook.url \
-  -d '{"text": "New commit: '"$(wit log -1 --oneline)"'"}'
-
-# Update documentation
-npm run docs:build
-```
-
-### Pre-merge Hook
-
-Validate before merge:
-
-```bash
-#!/bin/bash
-# Ensure tests pass on both branches
-npm test
-if [ $? -ne 0 ]; then
-    echo "Tests must pass before merging."
-    exit 1
-fi
-```
-
-## Examples
-
-### Lint Staged Files
-
-```bash
-#!/bin/bash
-# pre-commit: Only lint staged files
-
-STAGED_FILES=$(wit diff --staged --name-only | grep -E '\.(ts|tsx|js|jsx)$')
-
-if [ -n "$STAGED_FILES" ]; then
-    echo "Linting staged files..."
-    npx eslint $STAGED_FILES
-    if [ $? -ne 0 ]; then
-        exit 1
-    fi
-fi
-
-exit 0
-```
-
-### Prevent WIP Commits on Main
-
-```bash
-#!/bin/bash
-# pre-commit: Block WIP commits on main
-
-BRANCH=$(wit rev-parse --abbrev-ref HEAD)
-COMMIT_MSG_FILE="$1"
-
-if [ "$BRANCH" = "main" ]; then
-    if grep -qi "^WIP" "$COMMIT_MSG_FILE" 2>/dev/null; then
-        echo "WIP commits not allowed on main branch."
-        exit 1
-    fi
-fi
-
-exit 0
-```
-
-### Format on Commit
-
-```bash
-#!/bin/bash
-# pre-commit: Auto-format staged files
-
-# Get staged files
-STAGED=$(wit diff --staged --name-only)
-
-# Format them
-echo "$STAGED" | xargs npx prettier --write
-
-# Re-stage formatted files
-echo "$STAGED" | xargs wit add
+npm test || exit 1
 
 exit 0
 ```
@@ -236,15 +255,98 @@ fi
 exit 0
 ```
 
+### Pre-push Hook
+
+Run tests before pushing:
+
+```bash
+#!/bin/bash
+# pre-push: Run full test suite
+
+npm test
+if [ $? -ne 0 ]; then
+    echo "Tests must pass before pushing."
+    exit 1
+fi
+
+exit 0
+```
+
+## Bypassing Hooks
+
+Use `--no-verify` to skip hooks:
+
+```bash
+wit commit -m "WIP" --no-verify
+wit push --no-verify
+wit merge feature-branch --no-verify
+```
+
 ## Hook Environment
 
-Hooks have access to:
+Hooks have access to these environment variables:
 
 | Variable | Description |
 |----------|-------------|
-| `$PWD` | Repository root |
-| `$WIT_DIR` | `.wit` directory |
-| `$1`, `$2`, etc. | Hook-specific arguments |
+| `$WIT_DIR` | `.wit` directory path |
+| `$WIT_WORK_DIR` | Repository root |
+| `$WIT_HOOK_TYPE` | Current hook type |
+| `$WIT_COMMIT` | Commit hash (post-commit) |
+| `$WIT_BRANCH` | Current branch name |
+
+## Migration from Husky
+
+### Before (Husky + lint-staged)
+
+```json
+// package.json
+{
+  "devDependencies": {
+    "husky": "^8.0.0",
+    "lint-staged": "^13.0.0"
+  },
+  "scripts": {
+    "prepare": "husky install"
+  },
+  "lint-staged": {
+    "*.ts": ["eslint --fix", "prettier --write"]
+  }
+}
+```
+
+```bash
+# .husky/pre-commit
+#!/bin/sh
+npx lint-staged
+```
+
+### After (wit only)
+
+```json
+// .wit/hooks.json
+{
+  "hooks": {
+    "pre-commit": "npm run lint"
+  },
+  "staged": {
+    "\\.ts$": ["eslint --fix", "prettier --write"]
+  }
+}
+```
+
+```json
+// package.json
+{
+  "scripts": {
+    "postinstall": "wit hooks sync"
+  }
+}
+```
+
+**Remove these packages:**
+- husky
+- lint-staged
+- @commitlint/cli (use wit's built-in validation)
 
 ## Best Practices
 
@@ -252,25 +354,18 @@ Hooks have access to:
 **Keep hooks fast**
 
 Long-running hooks slow down your workflow. For expensive operations:
-- Run only on changed files
+- Run only on changed files (use `staged` config)
 - Use background jobs for non-blocking tasks
 - Consider CI for comprehensive checks
 </Tip>
 
 <Tip>
-**Make hooks shareable**
+**Version control your config**
 
-Store hook scripts in the repository:
-```
-scripts/
-└── hooks/
-    └── pre-commit
-```
-
-Then install:
+Commit `.wit/hooks.json` to share hooks with your team:
 ```bash
-cp scripts/hooks/pre-commit .wit/hooks/
-chmod +x .wit/hooks/pre-commit
+wit add .wit/hooks.json
+wit commit -m "chore: configure project hooks"
 ```
 </Tip>
 
@@ -290,18 +385,13 @@ fi
 
 <AccordionGroup>
   <Accordion title="Hook not running">
-    Ensure the hook is executable:
-    ```bash
-    chmod +x .wit/hooks/pre-commit
-    ```
+    1. Check if hooks are synced: `wit hooks`
+    2. Run sync: `wit hooks sync`
+    3. Check permissions: `ls -la .wit/hooks/`
   </Accordion>
   
-  <Accordion title="Hook blocking commits">
-    Test the hook manually:
-    ```bash
-    wit hooks run pre-commit
-    ```
-    Check its exit code.
+  <Accordion title="Config changes not applied">
+    Run `wit hooks sync` after editing `.wit/hooks.json`
   </Accordion>
   
   <Accordion title="Bypassing hooks temporarily">
@@ -309,5 +399,12 @@ fi
     ```bash
     wit commit -m "WIP" --no-verify
     ```
+  </Accordion>
+  
+  <Accordion title="Hooks work locally but not for team">
+    Ensure:
+    1. `.wit/hooks.json` is committed
+    2. `postinstall` script calls `wit hooks sync`
+    3. Team members run `npm install` after pulling
   </Accordion>
 </AccordionGroup>

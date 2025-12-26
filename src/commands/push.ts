@@ -28,6 +28,7 @@ import {
   deleteRefUpdate,
   getBranches,
 } from '../core/protocol';
+import { HookManager } from '../core/hooks';
 
 const colors = {
   green: (s: string) => `\x1b[32m${s}\x1b[0m`,
@@ -50,6 +51,7 @@ export interface PushOptions {
   dryRun?: boolean;
   verbose?: boolean;
   all?: boolean;
+  noVerify?: boolean;
 }
 
 /**
@@ -871,6 +873,8 @@ async function handlePushAsync(args: string[]): Promise<void> {
       options.verbose = true;
     } else if (arg === '--all') {
       options.all = true;
+    } else if (arg === '--no-verify') {
+      options.noVerify = true;
     } else if (!arg.startsWith('-')) {
       positional.push(arg);
     }
@@ -878,6 +882,24 @@ async function handlePushAsync(args: string[]): Promise<void> {
 
   const remoteName = positional[0];
   const branchName = positional[1];
+
+  // Run pre-push hook (unless --no-verify)
+  if (!options.noVerify) {
+    const repo = Repository.find();
+    const hookManager = new HookManager(repo.gitDir, repo.workDir);
+    const currentBranch = repo.refs.getCurrentBranch();
+    
+    const prePushError = await hookManager.shouldAbort('pre-push', {
+      branch: currentBranch || branchName || undefined,
+    });
+    if (prePushError) {
+      throw new TsgitError(
+        'pre-push hook failed',
+        ErrorCode.HOOK_FAILED,
+        [prePushError, 'Use --no-verify to bypass hooks']
+      );
+    }
+  }
 
   const result = await pushAsync(remoteName, branchName, options);
 

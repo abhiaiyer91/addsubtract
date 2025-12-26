@@ -75,15 +75,15 @@ export interface HookContext {
 export type ProgrammaticHook = (context: HookContext) => Promise<{ success: boolean; message?: string; modifiedMessage?: string }>;
 
 /**
- * Hook configuration
+ * Hook manager configuration
  */
-export interface HookConfig {
+export interface HookManagerConfig {
   enabled: boolean;
   timeout: number;  // in milliseconds
   parallel: boolean;  // run multiple hooks in parallel
 }
 
-const DEFAULT_CONFIG: HookConfig = {
+const DEFAULT_CONFIG: HookManagerConfig = {
   enabled: true,
   timeout: 30000,  // 30 seconds
   parallel: false,
@@ -268,9 +268,9 @@ exit 0
 export class HookManager {
   private hooksDir: string;
   private programmaticHooks: Map<HookType, ProgrammaticHook[]> = new Map();
-  private config: HookConfig;
+  private config: HookManagerConfig;
 
-  constructor(private gitDir: string, private workDir: string, config: Partial<HookConfig> = {}) {
+  constructor(private gitDir: string, private workDir: string, config: Partial<HookManagerConfig> = {}) {
     this.hooksDir = path.join(gitDir, 'hooks');
     this.config = { ...DEFAULT_CONFIG, ...config };
   }
@@ -696,6 +696,62 @@ const colors = {
   bold: (s: string) => `\x1b[1m${s}\x1b[0m`,
 };
 
+// Import hook config utilities
+import {
+  loadHookConfig,
+  saveHookConfig,
+  generateHookScript,
+  generateStagedHookScript,
+  initHookConfig,
+  createSampleConfig,
+  HookConfig,
+} from './hook-config';
+
+/**
+ * Sync hooks from config to .wit/hooks directory
+ */
+function syncHooksFromConfig(hookManager: HookManager, workDir: string): number {
+  const config = loadHookConfig(workDir);
+  if (!config) {
+    return 0;
+  }
+
+  let synced = 0;
+  const hookTypes: HookType[] = [
+    'pre-commit', 'post-commit', 'pre-push', 'post-merge',
+    'pre-rebase', 'commit-msg', 'post-checkout', 'pre-receive', 'prepare-commit-msg'
+  ];
+
+  // Generate hooks from config
+  for (const hookType of hookTypes) {
+    const script = generateHookScript(hookType, config);
+    if (script) {
+      hookManager.installHook(hookType, script);
+      synced++;
+    }
+  }
+
+  // Generate lint-staged style pre-commit hook if configured
+  if (config.staged && Object.keys(config.staged).length > 0) {
+    const stagedScript = generateStagedHookScript(config);
+    if (stagedScript) {
+      // Merge with existing pre-commit if present
+      const existingPreCommit = hookManager.readHook('pre-commit');
+      if (existingPreCommit && !existingPreCommit.includes('lint-staged style')) {
+        // Append staged commands to existing pre-commit
+        const combined = existingPreCommit.replace('exit 0', '') + '\n' + 
+          stagedScript.split('\n').slice(5).join('\n');
+        hookManager.installHook('pre-commit', combined);
+      } else {
+        hookManager.installHook('pre-commit', stagedScript);
+      }
+      synced++;
+    }
+  }
+
+  return synced;
+}
+
 /**
  * CLI handler for hooks command
  */
@@ -712,10 +768,20 @@ export function handleHooks(args: string[]): void {
     case 'list':
     case undefined: {
       const hooks = hookManager.listHooks();
+      const config = loadHookConfig(repo.workDir);
+      
+      console.log(colors.bold('Hooks Status\n'));
+      
+      if (config) {
+        console.log(colors.cyan('Config:') + ` .wit/hooks.json`);
+        console.log(colors.dim('  Run "wit hooks sync" to apply config changes\n'));
+      }
       
       if (hooks.length === 0) {
         console.log(colors.dim('No hooks installed'));
-        console.log(colors.dim('Use "wit hooks install <hook-type>" to install a hook'));
+        console.log(colors.dim('\nQuick start:'));
+        console.log(colors.dim('  wit hooks setup              # Create hooks.json config'));
+        console.log(colors.dim('  wit hooks install <type>     # Install a single hook'));
         return;
       }
 
@@ -727,6 +793,86 @@ export function handleHooks(args: string[]): void {
         console.log(`  ${status} ${hook.type}`);
         console.log(colors.dim(`    ${hook.path}`));
       }
+      break;
+    }
+
+    case 'setup': {
+      // Like husky install - sets up hooks for the project
+      const sample = args.includes('--sample') || args.includes('-s');
+      
+      // Initialize hooks directory
+      hookManager.init();
+      
+      // Create hooks.json config
+      const configPath = initHookConfig(repo.workDir, sample);
+      
+      console.log(colors.green('✓') + ' Hooks setup complete!');
+      console.log(colors.dim(`\nCreated: ${configPath}`));
+      
+      if (sample) {
+        console.log(colors.dim('\nSample config includes:'));
+        console.log(colors.dim('  • pre-commit: npm run lint'));
+        console.log(colors.dim('  • commit-msg: commitlint'));
+        console.log(colors.dim('  • staged: eslint + prettier for TS/TSX files'));
+      }
+      
+      console.log(colors.dim('\nNext steps:'));
+      console.log(colors.dim('  1. Edit .wit/hooks.json to customize hooks'));
+      console.log(colors.dim('  2. Run "wit hooks sync" to apply changes'));
+      console.log(colors.dim('  3. Add "wit hooks sync" to your npm postinstall script'));
+      break;
+    }
+
+    case 'sync': {
+      // Sync hooks from config file to .wit/hooks
+      const synced = syncHooksFromConfig(hookManager, repo.workDir);
+      
+      if (synced === 0) {
+        console.log(colors.yellow('!') + ' No hooks defined in config');
+        console.log(colors.dim('  Run "wit hooks setup --sample" to create a sample config'));
+      } else {
+        console.log(colors.green('✓') + ` Synced ${synced} hook(s) from config`);
+      }
+      break;
+    }
+
+    case 'add': {
+      // Add a hook command to config (like husky add)
+      const hookType = args[1] as HookType;
+      const command = args.slice(2).join(' ');
+      
+      if (!hookType || !command) {
+        console.error(colors.red('error: ') + 'Usage: wit hooks add <hook-type> <command>');
+        console.error('\nExample:');
+        console.error('  wit hooks add pre-commit "npm run lint"');
+        console.error('  wit hooks add commit-msg "npx commitlint --edit $1"');
+        process.exit(1);
+      }
+
+      if (!HOOK_TEMPLATES[hookType]) {
+        console.error(colors.red('error: ') + `Unknown hook type: ${hookType}`);
+        process.exit(1);
+      }
+
+      // Load or create config
+      let config = loadHookConfig(repo.workDir) || { hooks: {}, staged: {}, enabled: true };
+      
+      // Add or append command
+      const existing = config.hooks?.[hookType];
+      if (existing) {
+        if (typeof existing === 'string') {
+          config.hooks![hookType] = [existing, command];
+        } else if (Array.isArray(existing)) {
+          existing.push(command);
+        }
+      } else {
+        config.hooks = config.hooks || {};
+        config.hooks[hookType] = command;
+      }
+      
+      saveHookConfig(repo.workDir, config);
+      console.log(colors.green('✓') + ` Added command to ${hookType} hook`);
+      console.log(colors.dim('  Run "wit hooks sync" to apply changes'));
       break;
     }
 
@@ -845,14 +991,19 @@ export function handleHooks(args: string[]): void {
 
     default:
       console.error(colors.red('error: ') + `Unknown subcommand: ${subcommand}`);
-      console.error('\nUsage:');
+      console.error('\n' + colors.bold('Usage:'));
       console.error('  wit hooks                       List installed hooks');
-      console.error('  wit hooks init                  Initialize hooks directory');
+      console.error('  wit hooks setup [--sample]      Set up hooks for project (like husky install)');
+      console.error('  wit hooks add <type> <cmd>      Add a hook command to config');
+      console.error('  wit hooks sync                  Sync hooks from config');
       console.error('  wit hooks install <type>        Install a hook from template');
       console.error('  wit hooks remove <type>         Remove a hook');
       console.error('  wit hooks show <type>           Show hook content');
-      console.error('  wit hooks template <type>       Show hook template');
       console.error('  wit hooks run <type> [args...]  Run a hook manually');
+      console.error('\n' + colors.bold('Examples:'));
+      console.error('  wit hooks setup --sample        # Create sample hooks config');
+      console.error('  wit hooks add pre-commit "npm run lint"');
+      console.error('  wit hooks sync                  # Apply config to hooks');
       process.exit(1);
   }
 }
