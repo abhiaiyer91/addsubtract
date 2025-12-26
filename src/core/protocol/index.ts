@@ -109,3 +109,14 @@ export {
   parseRemoteUrl,
   normalizeRepoUrl,
 } from './smart-http';
+
+// SSH client
+export {
+  SSHGitClient,
+  SSHAuthOptions,
+  ParsedSSHUrl,
+  parseSSHUrl,
+  isSSHUrl,
+  sshToHttps,
+  httpsToSsh,
+} from './ssh-client';

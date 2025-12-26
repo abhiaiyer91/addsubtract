@@ -14,7 +14,7 @@ import { Repository } from '../core/repository';
 import { RemoteManager } from '../core/remote';
 import { MergeManager } from '../core/merge';
 import { TsgitError, ErrorCode } from '../core/errors';
-import { fetch, FetchResult } from './fetch';
+import { fetchAsync, FetchResult } from './fetch';
 
 const colors = {
   green: (s: string) => `\x1b[32m${s}\x1b[0m`,
@@ -100,13 +100,13 @@ function countCommitsBetween(repo: Repository, fromHash: string, toHash: string)
 }
 
 /**
- * Pull changes from remote
+ * Pull changes from remote (async version)
  */
-export function pull(
+export async function pullAsync(
   remoteName?: string,
   branchName?: string,
   options: PullOptions = {}
-): PullResult {
+): Promise<PullResult> {
   const repo = Repository.find();
   const remoteManager = new RemoteManager(repo.gitDir);
 
@@ -173,7 +173,7 @@ export function pull(
 
   // Fetch from remote
   console.log(colors.dim(`Fetching from ${remote}...`));
-  const fetchResults = fetch(remote, `refs/heads/${branch}`, { 
+  const fetchResults = await fetchAsync(remote, `refs/heads/${branch}`, { 
     verbose: options.verbose 
   });
   const fetchResult = fetchResults.length > 0 ? fetchResults[0] : null;
@@ -256,6 +256,21 @@ export function pull(
 
   result.fetchResult = fetchResult;
   return result;
+}
+
+/**
+ * Pull changes from remote (sync version - only for local repos)
+ */
+export function pull(
+  remoteName?: string,
+  branchName?: string,
+  options: PullOptions = {}
+): PullResult {
+  throw new TsgitError(
+    'Synchronous pull is not supported. Use pullAsync() instead.',
+    ErrorCode.OPERATION_FAILED,
+    ['Use: await pullAsync(remoteName, branchName, options)']
+  );
 }
 
 /**
@@ -378,9 +393,9 @@ function performRebase(
 }
 
 /**
- * CLI handler for pull command
+ * CLI handler for pull command (async)
  */
-export function handlePull(args: string[]): void {
+async function handlePullAsync(args: string[]): Promise<void> {
   const options: PullOptions = {};
   const positional: string[] = [];
 
@@ -411,43 +426,48 @@ export function handlePull(args: string[]): void {
   const remoteName = positional[0];
   const branchName = positional[1];
 
-  try {
-    const result = pull(remoteName, branchName, options);
+  const result = await pullAsync(remoteName, branchName, options);
 
-    // Display result
-    switch (result.mergeResult.status) {
-      case 'up-to-date':
-        // Already displayed
-        break;
+  // Display result
+  switch (result.mergeResult.status) {
+    case 'up-to-date':
+      // Already displayed
+      break;
 
-      case 'fast-forward':
-        console.log(colors.green('✓') + ' Fast-forward');
-        if (result.mergeResult.commits > 0) {
-          console.log(colors.dim(`  ${result.mergeResult.commits} commit(s) pulled`));
-        }
-        break;
+    case 'fast-forward':
+      console.log(colors.green('✓') + ' Fast-forward');
+      if (result.mergeResult.commits > 0) {
+        console.log(colors.dim(`  ${result.mergeResult.commits} commit(s) pulled`));
+      }
+      break;
 
-      case 'merge':
-        console.log(colors.green('✓') + ' Merge complete');
-        break;
+    case 'merge':
+      console.log(colors.green('✓') + ' Merge complete');
+      break;
 
-      case 'conflict':
-        console.log(colors.yellow('!') + ' Merge conflicts detected');
-        console.log(colors.dim('  Fix conflicts and run:'));
-        console.log(colors.dim('    wit add <resolved files>'));
-        console.log(colors.dim('    wit commit'));
-        break;
+    case 'conflict':
+      console.log(colors.yellow('!') + ' Merge conflicts detected');
+      console.log(colors.dim('  Fix conflicts and run:'));
+      console.log(colors.dim('    wit add <resolved files>'));
+      console.log(colors.dim('    wit commit'));
+      break;
 
-      case 'rebase':
-        // Message already displayed
-        break;
-    }
-  } catch (error) {
+    case 'rebase':
+      // Message already displayed
+      break;
+  }
+}
+
+/**
+ * CLI handler for pull command
+ */
+export function handlePull(args: string[]): void {
+  handlePullAsync(args).catch(error => {
     if (error instanceof TsgitError) {
       console.error(error.format());
     } else if (error instanceof Error) {
       console.error(colors.red('error: ') + error.message);
     }
     process.exit(1);
-  }
+  });
 }

@@ -5,7 +5,7 @@
  */
 
 import { eq, and, desc, asc } from 'drizzle-orm';
-import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
+import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import {
   workflowRuns,
   jobRuns,
@@ -19,13 +19,14 @@ import {
   type WorkflowRunState,
   type WorkflowRunConclusion,
 } from '../schema';
+import type * as schema from '../schema';
 
 // ============================================================================
 // Types
 // ============================================================================
 
 /** Database instance type */
-export type Database = PostgresJsDatabase;
+export type Database = NodePgDatabase<typeof schema>;
 
 /** Update payload for workflow runs */
 export interface UpdateWorkflowRun {
