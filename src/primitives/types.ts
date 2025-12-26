@@ -60,8 +60,7 @@ export interface MergeResult {
   success: boolean;
   /** List of conflicting files if merge failed */
   conflicts?: string[];
- * Shared types for Knowledge primitive
- */
+}
 
 /**
  * Options for configuring a Knowledge instance

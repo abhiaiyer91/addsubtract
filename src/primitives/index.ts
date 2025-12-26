@@ -11,13 +11,10 @@ export {
   type FileStatus,
   type FileStat,
   type CommitInfo,
-  type MergeResult,
 } from './filesystem';
 
-// Re-export types for convenience
-export * from './types';
- *
- * Building blocks for agent-centric applications backed by Git.
- */
+// Export filesystem MergeResult with a different name to avoid conflict with core/merge
+export { type MergeResult as FilesystemMergeResult } from './filesystem';
 
+// Knowledge primitive - Git-backed key-value store
 export { Knowledge, type KnowledgeOptions, type HistoryEntry } from './knowledge';

@@ -2,3 +2,25 @@ node_modules
 dist
 .wit
 example/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test
+coverage/
+
+# Misc
+.DS_Store
+repos/
