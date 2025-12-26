@@ -137,6 +137,45 @@ wit graph
 ● i9j0k1l2 Initial commit - Alice, last week
 ```
 
+## Working with GitHub
+
+### Login to GitHub
+
+```bash
+wit github login
+```
+
+This opens a browser to authenticate. Once logged in, your credentials are stored securely.
+
+### Clone a Repository
+
+```bash
+wit clone https://github.com/user/repo.git
+cd repo
+```
+
+### Push Changes
+
+```bash
+# Make changes
+echo "update" >> README.md
+wit add .
+wit commit -m "Update readme"
+
+# Push to GitHub
+wit push origin main
+```
+
+### Pull Changes
+
+```bash
+wit pull
+```
+
+<Tip>
+wit uses your GitHub profile for commit author information automatically after login.
+</Tip>
+
 ## AI Features (Optional)
 
 Enable AI-powered features for commit message generation, code review, and more.

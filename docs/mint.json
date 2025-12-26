@@ -33,18 +33,31 @@
     {
       "name": "API Reference",
       "url": "/api-reference"
+    },
+    {
+      "name": "Architecture",
+      "url": "/architecture"
     }
   ],
   "anchors": [
     {
       "name": "GitHub",
       "icon": "github",
+<<<<<<< HEAD
       "url": "https://github.com/abhiaiyer91/wit"
+=======
+      "url": "https://github.com/your-org/wit"
+>>>>>>> 382fb97 (push)
     },
     {
       "name": "Community",
       "icon": "discord",
       "url": "https://discord.gg/wit"
+    },
+    {
+      "name": "Roadmap",
+      "icon": "map",
+      "url": "https://github.com/your-org/wit/blob/main/ROADMAP.md"
     }
   ],
   "navigation": [
@@ -53,15 +66,18 @@
       "pages": [
         "introduction",
         "quickstart",
-        "installation"
+        "installation",
+        "contributing"
       ]
     },
     {
       "group": "Commands",
       "pages": [
         "commands/overview",
+        "commands/reference",
         "commands/basic-workflow",
         "commands/branches",
+        "commands/remotes",
         "commands/undo-history",
         "commands/quality-of-life",
         "commands/merge",
@@ -80,6 +96,7 @@
     {
       "group": "Features",
       "pages": [
+        "features/github",
         "features/ai-powered",
         "features/monorepo-scopes",
         "features/large-files",
@@ -102,11 +119,23 @@
       "pages": [
         "api-reference/overview",
         "api-reference/repository",
+        "api-reference/objects",
         "api-reference/search"
+      ]
+    },
+    {
+      "group": "Architecture",
+      "pages": [
+        "architecture/overview"
       ]
     }
   ],
   "footerSocials": {
+<<<<<<< HEAD
     "github": "https://github.com/abhiaiyer91/wit"
+=======
+    "github": "https://github.com/your-org/wit",
+    "discord": "https://discord.gg/wit"
+>>>>>>> 382fb97 (push)
   }
 }

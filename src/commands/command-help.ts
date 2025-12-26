@@ -1036,6 +1036,27 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
     ],
     seeAlso: ['gc', 'cat-file'],
   },
+
+  // ============ Server ============
+  serve: {
+    name: 'serve',
+    summary: 'Start a Git HTTP server for hosting repositories',
+    usage: 'wit serve [options]',
+    description: 'Start an HTTP server that implements Git Smart HTTP protocol, allowing clients to clone from and push to repositories hosted on this server.',
+    options: [
+      { flag: '--port <number>', description: 'Port to listen on (default: 3000)' },
+      { flag: '--repos <path>', description: 'Directory to store repositories (default: ./repos)' },
+      { flag: '--host <hostname>', description: 'Hostname to bind to (default: 0.0.0.0)' },
+      { flag: '--verbose', description: 'Enable verbose logging' },
+    ],
+    examples: [
+      { command: 'wit serve', description: 'Start server on port 3000' },
+      { command: 'wit serve --port 8080', description: 'Start server on port 8080' },
+      { command: 'wit serve --repos /var/git', description: 'Use custom repository directory' },
+      { command: 'wit serve --verbose', description: 'Enable verbose logging' },
+    ],
+    seeAlso: ['clone', 'push', 'fetch'],
+  },
 };
 
 /**
