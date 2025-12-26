@@ -10,6 +10,24 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: wit
+          POSTGRES_PASSWORD: wit
+          POSTGRES_DB: wit
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://wit:wit@localhost:5432/wit
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -25,6 +43,9 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Run database migrations
+        run: npm run db:push
 
       - name: Run tests
         run: npm test
