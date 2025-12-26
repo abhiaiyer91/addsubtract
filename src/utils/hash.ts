@@ -19,7 +19,10 @@ const HASH_CONFIGS: Record<HashAlgorithm, HashConfig> = {
   sha256: { algorithm: 'sha256', digestLength: 64 },
 };
 
-let currentAlgorithm: HashAlgorithm = 'sha256';
+// Default to SHA-1 for Git interoperability
+// Git servers (GitHub, GitLab, etc.) use SHA-1
+// SHA-256 can be enabled for wit-to-wit repos if desired
+let currentAlgorithm: HashAlgorithm = 'sha1';
 
 /**
  * Set the hash algorithm for the repository

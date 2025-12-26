@@ -16,6 +16,7 @@ import {
   NULL_HASH,
 } from './types';
 import { parseRefAdvertisement, serializeCapabilities } from './refs-discovery';
+import { loadGitHubCredentials } from '../github';
 
 /**
  * Smart HTTP client for Git protocol operations
@@ -37,7 +38,57 @@ export class SmartHttpClient {
     if (!this.baseUrl.endsWith('.git')) {
       this.baseUrl += '.git';
     }
-    this.credentials = credentials;
+
+    // Use provided credentials or try to get from environment
+    this.credentials = credentials || this.getCredentialsFromEnv();
+  }
+
+  /**
+   * Try to get credentials from environment variables or stored credentials
+   */
+  private getCredentialsFromEnv(): Credentials | undefined {
+    // Check for GitHub token in environment (highest priority)
+    const githubToken = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
+    if (githubToken) {
+      return {
+        type: 'basic',
+        username: 'x-access-token',
+        password: githubToken,
+      };
+    }
+
+    // Check for stored GitHub credentials from 'wit github login'
+    const storedGitHub = loadGitHubCredentials();
+    if (storedGitHub) {
+      return {
+        type: 'basic',
+        username: 'x-access-token',
+        password: storedGitHub.access_token,
+      };
+    }
+
+    // Check for generic git credentials
+    const gitToken = process.env.WIT_TOKEN || process.env.GIT_TOKEN;
+    if (gitToken) {
+      return {
+        type: 'basic',
+        username: 'x-access-token',
+        password: gitToken,
+      };
+    }
+
+    // Check for username/password
+    const gitUser = process.env.WIT_USER || process.env.GIT_USER;
+    const gitPass = process.env.WIT_PASSWORD || process.env.GIT_PASSWORD;
+    if (gitUser && gitPass) {
+      return {
+        type: 'basic',
+        username: gitUser,
+        password: gitPass,
+      };
+    }
+
+    return undefined;
   }
 
   /**
@@ -126,7 +177,12 @@ export class SmartHttpClient {
     });
 
     if (response.status !== 200) {
-      throw new Error(`Push failed: ${response.status} ${response.statusText}`);
+      // Try to get more error details
+      let errorDetails = '';
+      if (response.body.length > 0) {
+        errorDetails = response.body.toString('utf8').slice(0, 500);
+      }
+      throw new Error(`Push failed: ${response.status} ${response.statusText}${errorDetails ? '\n' + errorDetails : ''}`);
     }
 
     // Parse the response
@@ -143,10 +199,15 @@ export class SmartHttpClient {
     const caps = [
       'multi_ack_detailed',
       'side-band-64k',
-      'thin-pack',
       'ofs-delta',
       'no-progress',
     ];
+
+    // Only request thin-pack if we have local objects
+    // For fresh clones (no haves), thin-pack could cause unresolvable deltas
+    if (haves.length > 0) {
+      caps.push('thin-pack');
+    }
 
     if (options?.depth) {
       caps.push('shallow');
@@ -195,9 +256,15 @@ export class SmartHttpClient {
         continue;
       }
 
-      // Check for NAK/ACK
       const lineStr = line.toString('utf8');
+
+      // Check for NAK/ACK
       if (lineStr.startsWith('NAK') || lineStr.startsWith('ACK')) {
+        continue;
+      }
+
+      // Check for shallow/unshallow lines (shallow clone response)
+      if (lineStr.startsWith('shallow ') || lineStr.startsWith('unshallow ')) {
         continue;
       }
 
@@ -206,11 +273,11 @@ export class SmartHttpClient {
         const channel = line[0];
 
         if (channel === SideBandChannel.PACK_DATA) {
-          // Pack data
+          // Pack data (sideband channel 1)
           packParts.push(line.slice(1));
           inPack = true;
         } else if (channel === SideBandChannel.PROGRESS) {
-          // Progress message
+          // Progress message (sideband channel 2)
           const msg = line.slice(1).toString('utf8');
           progressMessages.push(msg);
           if (options?.progress) {
@@ -226,12 +293,20 @@ export class SmartHttpClient {
             }
           }
         } else if (channel === SideBandChannel.ERROR) {
-          // Error message
+          // Error message (sideband channel 3)
           const errorMsg = line.slice(1).toString('utf8');
           throw new Error(`Server error: ${errorMsg}`);
-        } else if (!inPack) {
-          // Could be pack data without sideband
+        } else if (inPack) {
+          // Already receiving pack data in non-sideband mode, continue collecting
           packParts.push(line);
+        } else {
+          // Not in sideband mode - check if this is actual pack data
+          // Pack data starts with 'PACK' signature
+          if (line.length >= 4 && line.slice(0, 4).toString('ascii') === 'PACK') {
+            packParts.push(line);
+            inPack = true;
+          }
+          // Otherwise skip unknown lines (protocol negotiation)
         }
       }
     }
@@ -249,11 +324,12 @@ export class SmartHttpClient {
   private buildPushRequest(refs: RefUpdate[], pack: Buffer, options?: PushOptions): Buffer {
     const parts: Buffer[] = [];
 
-    // Capabilities
+    // Capabilities - match what GitHub supports
+    // Note: We don't advertise ofs-delta since we send non-delta objects
     const caps = [
       'report-status',
       'side-band-64k',
-      'ofs-delta',
+      'agent=wit/2.0.0',
     ];
 
     if (options?.atomic) {
@@ -287,10 +363,14 @@ export class SmartHttpClient {
     // Flush packet to end commands
     parts.push(pktFlush());
 
-    // Pack data
+    // Pack data (only if non-empty)
+    if (pack.length > 0) {
     parts.push(pack);
+    }
 
-    return Buffer.concat(parts);
+    const result = Buffer.concat(parts);
+
+    return result;
   }
 
   /**
@@ -433,6 +513,7 @@ export class SmartHttpClient {
       port: url.port || (isHttps ? 443 : 80),
       path: url.pathname + url.search,
       headers,
+      timeout: 60000, // 60 second timeout
     };
 
     return new Promise((resolve, reject) => {
@@ -466,6 +547,11 @@ export class SmartHttpClient {
 
       req.on('error', (err) => {
         reject(err);
+      });
+
+      req.on('timeout', () => {
+        req.destroy();
+        reject(new Error('Request timed out after 60 seconds'));
       });
 
       if (options.body) {

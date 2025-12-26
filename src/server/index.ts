@@ -2,22 +2,37 @@
  * Server Entrypoint
  * 
  * Main entry point for running wit as a Git server supporting
- * both HTTP and SSH protocols.
+ * HTTP (via Hono) and SSH protocols.
  */
 
+import { Hono } from 'hono';
+import { serve, ServerType } from '@hono/node-server';
+import { logger } from 'hono/logger';
+import { cors } from 'hono/cors';
+import { trpcServer } from '@hono/trpc-server';
+import { createGitRoutes } from './routes/git';
+import { RepoManager } from './storage/repos';
+import { syncReposToDatabase } from './storage/sync';
+import { appRouter, createContext } from '../api/trpc';
 import * as path from 'path';
 import * as fs from 'fs';
-import * as http from 'http';
+import { initDatabase, healthCheck as dbHealthCheck, isConnected as isDbConnected } from '../db';
 import { SSHServer, generateHostKey, SSHServerOptions } from './ssh';
 import { SSHKeyManager, FileBasedAccessControl } from './ssh/keys';
 import { Repository } from '../core/repository';
 
 /**
- * Server configuration
+ * Server configuration options
  */
-export interface ServerConfig {
-  /** Repository storage root */
-  repoRoot: string;
+export interface ServerOptions {
+  /** Port to listen on for HTTP */
+  port: number;
+  /** Base directory for repositories */
+  reposDir: string;
+  /** Enable verbose logging */
+  verbose?: boolean;
+  /** Hostname to bind to (default: 0.0.0.0) */
+  host?: string;
   /** SSH server options */
   ssh?: {
     /** Enable SSH server */
@@ -33,474 +48,347 @@ export interface ServerConfig {
     /** Banner message */
     banner?: string;
   };
-  /** HTTP server options */
-  http?: {
-    /** Enable HTTP server */
-    enabled: boolean;
-    /** HTTP port (default: 8080) */
-    port?: number;
-    /** HTTP host (default: 0.0.0.0) */
-    host?: string;
-  };
-  /** Data directory for configuration and keys */
+  /** Data directory for SSH keys and config */
   dataDir?: string;
 }
 
 /**
- * Default configuration
+ * Server instance
  */
-const DEFAULT_CONFIG: ServerConfig = {
-  repoRoot: './repositories',
-  ssh: {
-    enabled: true,
-    port: 22,
-    host: '0.0.0.0',
-  },
-  http: {
-    enabled: true,
-    port: 8080,
-    host: '0.0.0.0',
-  },
-};
-
-/**
- * Git Server
- * 
- * Combined SSH and HTTP server for hosting Git repositories.
- */
-export class GitServer {
-  private config: ServerConfig;
-  private sshServer?: SSHServer;
-  private httpServer?: http.Server;
-  private keyManager?: SSHKeyManager;
-  private running = false;
-
-  constructor(config: Partial<ServerConfig> = {}) {
-    this.config = { ...DEFAULT_CONFIG, ...config };
-    
-    // Ensure directories exist
-    fs.mkdirSync(this.config.repoRoot, { recursive: true });
-    if (this.config.dataDir) {
-      fs.mkdirSync(this.config.dataDir, { recursive: true });
-    }
-  }
-
-  /**
-   * Start all enabled servers
-   */
-  async start(): Promise<void> {
-    if (this.running) {
-      throw new Error('Server is already running');
-    }
-
-    const promises: Promise<void>[] = [];
-
-    if (this.config.ssh?.enabled) {
-      promises.push(this.startSSHServer());
-    }
-
-    if (this.config.http?.enabled) {
-      promises.push(this.startHTTPServer());
-    }
-
-    await Promise.all(promises);
-    this.running = true;
-
-    console.log('Git server started successfully');
-  }
-
-  /**
-   * Stop all servers
-   */
-  async stop(): Promise<void> {
-    if (!this.running) {
-      return;
-    }
-
-    const promises: Promise<void>[] = [];
-
-    if (this.sshServer) {
-      promises.push(this.sshServer.stop());
-    }
-
-    if (this.httpServer) {
-      promises.push(new Promise((resolve) => {
-        this.httpServer!.close(() => resolve());
-      }));
-    }
-
-    await Promise.all(promises);
-    this.running = false;
-
-    console.log('Git server stopped');
-  }
-
-  /**
-   * Get the SSH key manager
-   */
-  getKeyManager(): SSHKeyManager | undefined {
-    return this.keyManager;
-  }
-
-  /**
-   * Get the SSH server
-   */
-  getSSHServer(): SSHServer | undefined {
-    return this.sshServer;
-  }
-
-  /**
-   * Start SSH server
-   */
-  private async startSSHServer(): Promise<void> {
-    const sshConfig = this.config.ssh!;
-    
-    // Load or generate host keys
-    const hostKeys = await this.loadHostKeys();
-
-    // Initialize key manager with file-based storage
-    const keysDir = this.config.dataDir 
-      ? path.join(this.config.dataDir, 'keys')
-      : path.join(this.config.repoRoot, '.wit-server', 'keys');
-    
-    const accessConfigDir = this.config.dataDir
-      ? path.join(this.config.dataDir, 'access')
-      : path.join(this.config.repoRoot, '.wit-server', 'access');
-
-    fs.mkdirSync(keysDir, { recursive: true });
-    fs.mkdirSync(accessConfigDir, { recursive: true });
-
-    const accessControl = new FileBasedAccessControl(accessConfigDir);
-    this.keyManager = new SSHKeyManager({
-      storagePath: keysDir,
-      accessControl,
-    });
-
-    const options: SSHServerOptions = {
-      hostKeys,
-      port: sshConfig.port || 22,
-      host: sshConfig.host || '0.0.0.0',
-      repoRoot: this.config.repoRoot,
-      allowAnonymousRead: sshConfig.allowAnonymousRead || false,
-      banner: sshConfig.banner,
-    };
-
-    this.sshServer = new SSHServer(options, this.keyManager);
-
-    // Set up event handlers
-    this.sshServer.on('connection', (session) => {
-      console.log(`SSH connection from ${session.remoteAddress}`);
-    });
-
-    this.sshServer.on('authenticated', (session) => {
-      console.log(`SSH authenticated: ${session.username}`);
-    });
-
-    this.sshServer.on('git-command', (session, command) => {
-      console.log(`Git ${command.service}: ${command.repoPath} (${session.username})`);
-    });
-
-    this.sshServer.on('error', (error, session) => {
-      console.error(`SSH error${session ? ` (${session.username})` : ''}: ${error.message}`);
-    });
-
-    await this.sshServer.start();
-  }
-
-  /**
-   * Start HTTP server
-   */
-  private async startHTTPServer(): Promise<void> {
-    const httpConfig = this.config.http!;
-
-    this.httpServer = http.createServer((req, res) => {
-      this.handleHTTPRequest(req, res);
-    });
-
-    return new Promise((resolve, reject) => {
-      this.httpServer!.on('error', reject);
-      
-      this.httpServer!.listen(
-        httpConfig.port || 8080,
-        httpConfig.host || '0.0.0.0',
-        () => {
-          console.log(`HTTP server listening on ${httpConfig.host || '0.0.0.0'}:${httpConfig.port || 8080}`);
-          resolve();
-        }
-      );
-    });
-  }
-
-  /**
-   * Handle HTTP requests
-   */
-  private handleHTTPRequest(req: http.IncomingMessage, res: http.ServerResponse): void {
-    const url = new URL(req.url || '/', `http://${req.headers.host}`);
-    const pathname = url.pathname;
-
-    // CORS headers
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-
-    if (req.method === 'OPTIONS') {
-      res.writeHead(204);
-      res.end();
-      return;
-    }
-
-    // API routes
-    if (pathname.startsWith('/api/')) {
-      this.handleAPIRequest(req, res, pathname.slice(5));
-      return;
-    }
-
-    // Git smart HTTP protocol
-    if (pathname.includes('/info/refs') || 
-        pathname.endsWith('/git-upload-pack') ||
-        pathname.endsWith('/git-receive-pack')) {
-      this.handleGitHTTPRequest(req, res, pathname);
-      return;
-    }
-
-    // Default: not found
-    res.writeHead(404, { 'Content-Type': 'text/plain' });
-    res.end('Not Found');
-  }
-
-  /**
-   * Handle API requests
-   */
-  private handleAPIRequest(req: http.IncomingMessage, res: http.ServerResponse, path: string): void {
-    res.setHeader('Content-Type', 'application/json');
-
-    try {
-      switch (path) {
-        case 'status':
-          res.writeHead(200);
-          res.end(JSON.stringify({
-            status: 'ok',
-            ssh: this.sshServer ? this.sshServer.getStats() : null,
-            repos: this.listRepositories(),
-          }));
-          break;
-
-        case 'keys':
-          if (!this.keyManager) {
-            res.writeHead(503);
-            res.end(JSON.stringify({ error: 'SSH server not enabled' }));
-            return;
-          }
-
-          if (req.method === 'GET') {
-            this.keyManager.getAllKeys().then((keys) => {
-              res.writeHead(200);
-              res.end(JSON.stringify({ keys }));
-            });
-          } else if (req.method === 'POST') {
-            this.handleAddKey(req, res);
-          } else if (req.method === 'DELETE') {
-            this.handleDeleteKey(req, res);
-          }
-          break;
-
-        case 'repos':
-          res.writeHead(200);
-          res.end(JSON.stringify({ repos: this.listRepositories() }));
-          break;
-
-        default:
-          res.writeHead(404);
-          res.end(JSON.stringify({ error: 'Not found' }));
-      }
-    } catch (err) {
-      res.writeHead(500);
-      res.end(JSON.stringify({ error: (err as Error).message }));
-    }
-  }
-
-  /**
-   * Handle Git smart HTTP protocol requests
-   */
-  private handleGitHTTPRequest(
-    req: http.IncomingMessage,
-    res: http.ServerResponse,
-    pathname: string
-  ): void {
-    // This is a simplified handler - in production you'd want full Git smart HTTP support
-    // For now, we focus on SSH and provide basic HTTP discovery
-    
-    res.writeHead(501, { 'Content-Type': 'text/plain' });
-    res.end('Git smart HTTP not fully implemented. Please use SSH.');
-  }
-
-  /**
-   * Handle adding a new SSH key
-   */
-  private async handleAddKey(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
-    const body = await this.readRequestBody(req);
-    
-    try {
-      const { userId, title, publicKey } = JSON.parse(body);
-
-      if (!userId || !title || !publicKey) {
-        res.writeHead(400);
-        res.end(JSON.stringify({ error: 'Missing required fields: userId, title, publicKey' }));
-        return;
-      }
-
-      const key = await this.keyManager!.addKey({
-        userId,
-        title,
-        publicKey,
-        keyType: 'ssh-rsa', // Will be updated by addKey
-        isActive: true,
-      });
-
-      res.writeHead(201);
-      res.end(JSON.stringify({ key }));
-    } catch (err) {
-      res.writeHead(400);
-      res.end(JSON.stringify({ error: (err as Error).message }));
-    }
-  }
-
-  /**
-   * Handle deleting an SSH key
-   */
-  private async handleDeleteKey(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
-    const url = new URL(req.url || '/', `http://${req.headers.host}`);
-    const keyId = url.searchParams.get('id');
-
-    if (!keyId) {
-      res.writeHead(400);
-      res.end(JSON.stringify({ error: 'Missing key id' }));
-      return;
-    }
-
-    const deleted = await this.keyManager!.removeKey(keyId);
-
-    if (deleted) {
-      res.writeHead(200);
-      res.end(JSON.stringify({ success: true }));
-    } else {
-      res.writeHead(404);
-      res.end(JSON.stringify({ error: 'Key not found' }));
-    }
-  }
-
-  /**
-   * Load or generate SSH host keys
-   */
-  private async loadHostKeys(): Promise<Buffer[]> {
-    const sshConfig = this.config.ssh!;
-    const hostKeys: Buffer[] = [];
-
-    // Try to load from configured paths
-    if (sshConfig.hostKeyPaths) {
-      for (const keyPath of sshConfig.hostKeyPaths) {
-        if (fs.existsSync(keyPath)) {
-          hostKeys.push(fs.readFileSync(keyPath));
-        }
-      }
-    }
-
-    // If no keys loaded, check default locations or generate
-    if (hostKeys.length === 0) {
-      const keyDir = this.config.dataDir
-        ? path.join(this.config.dataDir, 'ssh')
-        : path.join(this.config.repoRoot, '.wit-server', 'ssh');
-      
-      fs.mkdirSync(keyDir, { recursive: true });
-
-      const rsaKeyPath = path.join(keyDir, 'ssh_host_rsa_key');
-      const ed25519KeyPath = path.join(keyDir, 'ssh_host_ed25519_key');
-
-      // Load or generate RSA key
-      if (fs.existsSync(rsaKeyPath)) {
-        hostKeys.push(fs.readFileSync(rsaKeyPath));
-      } else {
-        console.log('Generating RSA host key...');
-        const rsaKey = await generateHostKey('rsa');
-        fs.writeFileSync(rsaKeyPath, rsaKey, { mode: 0o600 });
-        hostKeys.push(rsaKey);
-      }
-
-      // Load or generate Ed25519 key
-      if (fs.existsSync(ed25519KeyPath)) {
-        hostKeys.push(fs.readFileSync(ed25519KeyPath));
-      } else {
-        console.log('Generating Ed25519 host key...');
-        const ed25519Key = await generateHostKey('ed25519');
-        fs.writeFileSync(ed25519KeyPath, ed25519Key, { mode: 0o600 });
-        hostKeys.push(ed25519Key);
-      }
-    }
-
-    return hostKeys;
-  }
-
-  /**
-   * List repositories
-   */
-  private listRepositories(): string[] {
-    const repos: string[] = [];
-
-    const entries = fs.readdirSync(this.config.repoRoot, { withFileTypes: true });
-    for (const entry of entries) {
-      if (entry.isDirectory()) {
-        const repoPath = path.join(this.config.repoRoot, entry.name);
-        
-        // Check if it's a bare repo or has .wit directory
-        if (entry.name.endsWith('.git') || 
-            fs.existsSync(path.join(repoPath, '.wit')) ||
-            fs.existsSync(path.join(repoPath, 'HEAD'))) {
-          repos.push(entry.name);
-        }
-      }
-    }
-
-    return repos;
-  }
-
-  /**
-   * Read request body
-   */
-  private readRequestBody(req: http.IncomingMessage): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const chunks: Buffer[] = [];
-      
-      req.on('data', (chunk: Buffer) => {
-        chunks.push(chunk);
-      });
-
-      req.on('end', () => {
-        resolve(Buffer.concat(chunks).toString());
-      });
-
-      req.on('error', reject);
-    });
-  }
+export interface WitServer {
+  /** The Hono app instance */
+  app: Hono;
+  /** The underlying HTTP server */
+  server: ServerType;
+  /** Repository manager */
+  repoManager: RepoManager;
+  /** SSH server (if enabled) */
+  sshServer?: SSHServer;
+  /** SSH key manager (if SSH enabled) */
+  keyManager?: SSHKeyManager;
+  /** Stop the server */
+  stop: () => Promise<void>;
 }
 
 /**
- * Create and start a Git server with the given configuration
+ * Create and configure the Hono app
  */
-export async function startServer(config: Partial<ServerConfig> = {}): Promise<GitServer> {
-  const server = new GitServer(config);
-  await server.start();
-  return server;
+export function createApp(repoManager: RepoManager, options: { verbose?: boolean } = {}): Hono {
+  const app = new Hono();
+
+  // Add logger middleware if verbose
+  if (options.verbose) {
+    app.use('*', logger());
+  }
+
+  // Enable CORS for web clients
+  app.use('*', cors({
+    origin: '*',
+    allowMethods: ['GET', 'POST', 'OPTIONS'],
+    allowHeaders: ['Content-Type', 'Authorization'],
+  }));
+
+  // Health check endpoint
+  app.get('/health', async (c) => {
+    const dbStatus = await dbHealthCheck();
+    
+    return c.json({
+      status: dbStatus.ok ? 'ok' : 'degraded',
+      version: '2.0.0',
+      timestamp: new Date().toISOString(),
+      database: {
+        connected: dbStatus.ok,
+        latency: dbStatus.latency,
+      },
+    });
+  });
+
+  // List repositories endpoint
+  app.get('/repos', (c) => {
+    const repos = repoManager.listRepos();
+    return c.json({
+      count: repos.length,
+      repositories: repos.map(r => ({
+        owner: r.owner,
+        name: r.name,
+        url: `/${r.owner}/${r.name}.git`,
+      })),
+    });
+  });
+
+  // Sync repositories to database
+  app.post('/sync', async (c) => {
+    const results = await syncReposToDatabase(repoManager);
+    return c.json({
+      message: 'Sync complete',
+      results,
+      summary: {
+        created: results.filter(r => r.action === 'created').length,
+        skipped: results.filter(r => r.action === 'skipped').length,
+        errors: results.filter(r => r.action === 'error').length,
+      },
+    });
+  });
+
+  // tRPC API routes
+  app.use('/trpc/*', trpcServer({
+    router: appRouter,
+    createContext: (_opts, c) => createContext(c),
+  }));
+
+  // Git Smart HTTP routes
+  const gitRoutes = createGitRoutes(repoManager);
+  app.route('/', gitRoutes);
+
+  // 404 handler
+  app.notFound((c) => {
+    return c.json({ error: 'Not found' }, 404);
+  });
+
+  // Error handler
+  app.onError((err, c) => {
+    console.error('[server] Error:', err);
+    return c.json({ error: err.message }, 500);
+  });
+
+  return app;
+}
+
+/**
+ * Start the Git server
+ */
+export function startServer(options: ServerOptions): WitServer {
+  const { port, reposDir, verbose = false, host = '0.0.0.0' } = options;
+
+  // Initialize database if DATABASE_URL is set
+  const databaseUrl = process.env.DATABASE_URL;
+  if (databaseUrl) {
+    try {
+      initDatabase(databaseUrl);
+      console.log('✓ Database connected');
+    } catch (error) {
+      console.error('✗ Database connection failed:', error instanceof Error ? error.message : error);
+      console.warn('⚠ Running without database');
+    }
+  } else {
+    console.warn('⚠ DATABASE_URL not set - running without database');
+  }
+
+  // Resolve repos directory
+  const absoluteReposDir = path.resolve(reposDir);
+
+  // Create repository manager
+  const repoManager = new RepoManager(absoluteReposDir);
+
+  // Create app
+  const app = createApp(repoManager, { verbose });
+
+  // Start HTTP server
+  const server = serve({
+    fetch: app.fetch,
+    port,
+    hostname: host,
+  });
+
+  // Initialize SSH server if enabled
+  let sshServer: SSHServer | undefined;
+  let keyManager: SSHKeyManager | undefined;
+
+  if (options.ssh?.enabled) {
+    startSSHServer(options, absoluteReposDir).then(result => {
+      sshServer = result.sshServer;
+      keyManager = result.keyManager;
+    }).catch(err => {
+      console.error('✗ SSH server failed to start:', err.message);
+    });
+  }
+
+  const sshInfo = options.ssh?.enabled 
+    ? `\n║   SSH URL:  ssh://git@${host === '0.0.0.0' ? 'localhost' : host}:${options.ssh?.port || 22}                          ${(options.ssh?.port || 22).toString().length === 2 ? ' ' : ''}║`
+    : '';
+
+  console.log(`
+╔══════════════════════════════════════════════════════════════╗
+║                                                              ║
+║   🚀 wit server is running!                                  ║
+║                                                              ║
+║   HTTP URL: http://${host === '0.0.0.0' ? 'localhost' : host}:${port}                              ${port.toString().length === 4 ? ' ' : ''}║
+║   tRPC API: http://${host === '0.0.0.0' ? 'localhost' : host}:${port}/trpc                         ${port.toString().length === 4 ? ' ' : ''}║${sshInfo}
+║   Repositories: ${absoluteReposDir.slice(0, 40).padEnd(41)}║
+║                                                              ║
+║   Clone: wit clone http://localhost:${port}/owner/repo.git     ${port.toString().length === 4 ? ' ' : ''}║
+║   Push:  wit push origin main                                ║
+║                                                              ║
+║   Press Ctrl+C to stop                                       ║
+║                                                              ║
+╚══════════════════════════════════════════════════════════════╝
+`);
+
+  // List existing repositories
+  const repos = repoManager.listRepos();
+  if (repos.length > 0) {
+    console.log(`Existing repositories:`);
+    for (const repo of repos) {
+      console.log(`  - ${repo.owner}/${repo.name}`);
+    }
+    console.log('');
+  }
+
+  return {
+    app,
+    server,
+    repoManager,
+    sshServer,
+    keyManager,
+    stop: async () => {
+      const promises: Promise<void>[] = [];
+      
+      promises.push(new Promise<void>((resolve) => {
+        server.close(() => {
+          console.log('[server] HTTP server stopped');
+          resolve();
+        });
+      }));
+
+      if (sshServer) {
+        promises.push(sshServer.stop().then(() => {
+          console.log('[server] SSH server stopped');
+        }));
+      }
+
+      await Promise.all(promises);
+    },
+  };
+}
+
+/**
+ * Start the SSH server
+ */
+async function startSSHServer(
+  options: ServerOptions,
+  reposDir: string
+): Promise<{ sshServer: SSHServer; keyManager: SSHKeyManager }> {
+  const sshConfig = options.ssh!;
+  
+  // Load or generate host keys
+  const hostKeys = await loadHostKeys(options);
+
+  // Initialize key manager with file-based storage
+  const dataDir = options.dataDir || path.join(reposDir, '.wit-server');
+  const keysDir = path.join(dataDir, 'keys');
+  const accessConfigDir = path.join(dataDir, 'access');
+
+  fs.mkdirSync(keysDir, { recursive: true });
+  fs.mkdirSync(accessConfigDir, { recursive: true });
+
+  const accessControl = new FileBasedAccessControl(accessConfigDir);
+  const keyManager = new SSHKeyManager({
+    storagePath: keysDir,
+    accessControl,
+  });
+
+  const sshOptions: SSHServerOptions = {
+    hostKeys,
+    port: sshConfig.port || 22,
+    host: sshConfig.host || options.host || '0.0.0.0',
+    repoRoot: reposDir,
+    allowAnonymousRead: sshConfig.allowAnonymousRead || false,
+    banner: sshConfig.banner,
+  };
+
+  const sshServer = new SSHServer(sshOptions, keyManager);
+
+  // Set up event handlers
+  sshServer.on('connection', (session) => {
+    console.log(`[ssh] Connection from ${session.remoteAddress}`);
+  });
+
+  sshServer.on('authenticated', (session) => {
+    console.log(`[ssh] Authenticated: ${session.username}`);
+  });
+
+  sshServer.on('git-command', (session, command) => {
+    console.log(`[ssh] Git ${command.service}: ${command.repoPath} (${session.username})`);
+  });
+
+  sshServer.on('error', (error, session) => {
+    console.error(`[ssh] Error${session ? ` (${session.username})` : ''}: ${error.message}`);
+  });
+
+  await sshServer.start();
+  console.log(`✓ SSH server listening on port ${sshConfig.port || 22}`);
+
+  return { sshServer, keyManager };
+}
+
+/**
+ * Load or generate SSH host keys
+ */
+async function loadHostKeys(options: ServerOptions): Promise<Buffer[]> {
+  const sshConfig = options.ssh!;
+  const hostKeys: Buffer[] = [];
+
+  // Try to load from configured paths
+  if (sshConfig.hostKeyPaths) {
+    for (const keyPath of sshConfig.hostKeyPaths) {
+      if (fs.existsSync(keyPath)) {
+        hostKeys.push(fs.readFileSync(keyPath));
+      }
+    }
+  }
+
+  // If no keys loaded, check default locations or generate
+  if (hostKeys.length === 0) {
+    const dataDir = options.dataDir || path.join(options.reposDir, '.wit-server');
+    const keyDir = path.join(dataDir, 'ssh');
+    
+    fs.mkdirSync(keyDir, { recursive: true });
+
+    const rsaKeyPath = path.join(keyDir, 'ssh_host_rsa_key');
+    const ed25519KeyPath = path.join(keyDir, 'ssh_host_ed25519_key');
+
+    // Load or generate RSA key
+    if (fs.existsSync(rsaKeyPath)) {
+      hostKeys.push(fs.readFileSync(rsaKeyPath));
+    } else {
+      console.log('Generating RSA host key...');
+      const rsaKey = await generateHostKey('rsa');
+      fs.writeFileSync(rsaKeyPath, rsaKey, { mode: 0o600 });
+      hostKeys.push(rsaKey);
+    }
+
+    // Load or generate Ed25519 key
+    if (fs.existsSync(ed25519KeyPath)) {
+      hostKeys.push(fs.readFileSync(ed25519KeyPath));
+    } else {
+      console.log('Generating Ed25519 host key...');
+      const ed25519Key = await generateHostKey('ed25519');
+      fs.writeFileSync(ed25519KeyPath, ed25519Key, { mode: 0o600 });
+      hostKeys.push(ed25519Key);
+    }
+  }
+
+  return hostKeys;
 }
 
 /**
  * Create a new repository
  */
-export function createRepository(repoRoot: string, name: string): Repository {
-  const repoPath = path.join(repoRoot, name.endsWith('.git') ? name : `${name}.git`);
+export function createRepository(reposDir: string, owner: string, name: string): Repository {
+  const repoPath = path.join(reposDir, owner, name.endsWith('.git') ? name : `${name}.git`);
+  fs.mkdirSync(path.dirname(repoPath), { recursive: true });
   fs.mkdirSync(repoPath, { recursive: true });
   return Repository.init(repoPath);
 }
 
-// Re-export SSH server components
+/**
+ * Export for use as a module
+ */
+export { RepoManager } from './storage/repos';
+export { createGitRoutes } from './routes/git';
+export { syncReposToDatabase, syncRepoToDatabase } from './storage/sync';
+export { authMiddleware, gitAuthMiddleware, requireAuth } from './middleware/auth';
+
+// SSH exports
 export { SSHServer, SSHKeyManager, generateHostKey } from './ssh';
 export * from './ssh/types';

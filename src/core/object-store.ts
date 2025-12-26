@@ -57,19 +57,30 @@ export class ObjectStore {
   }
 
   /**
-   * Write raw object data with type
+   * Write a raw object (type + data) directly to the store
+   * Used when importing objects from pack files (Git interop uses SHA-1)
    */
-  writeRaw(type: ObjectType, content: Buffer): string {
-    const hash = hashObject(type, content);
+  writeRawObject(type: ObjectType, data: Buffer, expectedHash?: string): string {
+    // When expectedHash is provided (from Git packfile), use it directly
+    // This enables Git interop where remote objects use SHA-1
+    const hash = expectedHash || hashObject(type, data);
+    
     const objectPath = this.getObjectPath(hash);
 
     if (!exists(objectPath)) {
-      const buffer = createObjectBuffer(type, content);
+      const buffer = createObjectBuffer(type, data);
       const compressed = compress(buffer);
       writeFile(objectPath, compressed);
     }
 
     return hash;
+  }
+
+  /**
+   * Alias for writeRawObject for backwards compatibility
+   */
+  writeRaw(type: ObjectType, content: Buffer): string {
+    return this.writeRawObject(type, content);
   }
 
   /**

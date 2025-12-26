@@ -10,7 +10,7 @@ The `Repository` class is the main entry point for all repository operations.
 ## Import
 
 ```typescript
-import { Repository } from 'tsgit';
+import { Repository } from 'wit';
 ```
 
 ## Static Methods
@@ -71,7 +71,7 @@ const repo = Repository.open('/path/to/repo');
 
 ### Repository.isRepository()
 
-Check if a directory is a tsgit repository.
+Check if a directory is a wit repository.
 
 ```typescript
 static isRepository(path: string): boolean
@@ -516,7 +516,7 @@ getFileContent(path: string, options?: { staged?: boolean }): string
 | Property | Type | Description |
 |----------|------|-------------|
 | `path` | `string` | Repository root path |
-| `tsgitDir` | `string` | `.tsgit` directory path |
+| `witDir` | `string` | `.wit` directory path |
 | `workingDir` | `string` | Working directory path |
 | `config` | `Config` | Repository configuration |
 | `journal` | `Journal` | Operation journal (for undo) |
@@ -524,7 +524,7 @@ getFileContent(path: string, options?: { staged?: boolean }): string
 ## Example: Full Workflow
 
 ```typescript
-import { Repository } from 'tsgit';
+import { Repository } from 'wit';
 
 // Open or create repo
 const repo = Repository.isRepository('.')

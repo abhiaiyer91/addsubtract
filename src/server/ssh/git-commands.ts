@@ -506,7 +506,7 @@ export class GitCommandHandler {
    */
   private async storeObject(repo: Repository, obj: { type: string; data: Buffer; hash?: string }): Promise<void> {
     const type = obj.type as 'blob' | 'tree' | 'commit' | 'tag';
-    repo.objects.writeRaw(type, obj.data);
+    repo.objects.writeRawObject(type, obj.data, obj.hash);
   }
 
   /**
