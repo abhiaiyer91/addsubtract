@@ -57,6 +57,22 @@ export class ObjectStore {
   }
 
   /**
+   * Write raw object data with type
+   */
+  writeRaw(type: ObjectType, content: Buffer): string {
+    const hash = hashObject(type, content);
+    const objectPath = this.getObjectPath(hash);
+
+    if (!exists(objectPath)) {
+      const buffer = createObjectBuffer(type, content);
+      const compressed = compress(buffer);
+      writeFile(objectPath, compressed);
+    }
+
+    return hash;
+  }
+
+  /**
    * Read a Git object from the store
    */
   readObject(hash: string): GitObject {
