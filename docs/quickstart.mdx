@@ -1,11 +1,11 @@
 ---
 title: Quick Start
-description: "Get up and running with tsgit in 5 minutes"
+description: "Get up and running with wit in 5 minutes"
 ---
 
 # Quick Start
 
-This guide will help you get started with tsgit in just a few minutes.
+This guide will help you get started with wit in just a few minutes.
 
 ## Prerequisites
 
@@ -15,12 +15,12 @@ This guide will help you get started with tsgit in just a few minutes.
 ## Installation
 
 ```bash
-# Clone and build tsgit
-git clone https://github.com/your-username/tsgit.git
-cd tsgit
+# Clone and build wit
+git clone https://github.com/abhiaiyer91/wit.git
+cd wit
 npm install
 npm run build
-npm link   # Makes 'tsgit' available globally
+npm link   # Makes 'wit' available globally
 ```
 
 ## Your First Repository
@@ -30,12 +30,12 @@ npm link   # Makes 'tsgit' available globally
 ```bash
 mkdir my-project
 cd my-project
-tsgit init
+wit init
 ```
 
 You'll see:
 ```
-Initialized empty tsgit repository in /path/to/my-project/.tsgit
+Initialized empty wit repository in /path/to/my-project/.wit
 ```
 
 ### Add and Commit Files
@@ -45,22 +45,22 @@ Initialized empty tsgit repository in /path/to/my-project/.tsgit
 echo "# My Project" > README.md
 
 # Stage the file
-tsgit add README.md
+wit add README.md
 
 # Commit with a message
-tsgit commit -m "Initial commit"
+wit commit -m "Initial commit"
 ```
 
 ### Check Status
 
 ```bash
-tsgit status
+wit status
 ```
 
 ### View History
 
 ```bash
-tsgit log
+wit log
 ```
 
 ## Essential Commands
@@ -69,38 +69,38 @@ tsgit log
 
 ```bash
 # Stage all tracked files and commit
-tsgit commit -a -m "Update everything"
+wit commit -a -m "Update everything"
 ```
 
 ### Quick WIP Save
 
 ```bash
 # Save work-in-progress with auto-generated message
-tsgit wip -a
+wit wip -a
 ```
 
 ### Switch Branches
 
 ```bash
 # Create and switch to a new branch
-tsgit switch -c feature-branch
+wit switch -c feature-branch
 
 # Switch back to main
-tsgit switch main
+wit switch main
 ```
 
 <Note>
-tsgit automatically saves your uncommitted changes when switching branches, so you never lose work!
+wit automatically saves your uncommitted changes when switching branches, so you never lose work!
 </Note>
 
 ### Undo Mistakes
 
 ```bash
 # Undo the last operation (commit, branch creation, etc.)
-tsgit undo
+wit undo
 
 # Undo the last 3 operations
-tsgit undo --steps 3
+wit undo --steps 3
 ```
 
 ## Visual Interfaces
@@ -108,7 +108,7 @@ tsgit undo --steps 3
 ### Web UI
 
 ```bash
-tsgit web
+wit web
 ```
 
 Opens a modern dashboard at `http://localhost:3847` with:
@@ -120,7 +120,7 @@ Opens a modern dashboard at `http://localhost:3847` with:
 ### Terminal UI
 
 ```bash
-tsgit ui
+wit ui
 ```
 
 Interactive terminal interface with keyboard navigation.
@@ -128,13 +128,119 @@ Interactive terminal interface with keyboard navigation.
 ### ASCII Graph
 
 ```bash
-tsgit graph
+wit graph
 ```
 
 ```
 ● a1b2c3d4 (main) Latest commit - Alice, today
 ● e5f6g7h8 Add feature - Bob, yesterday
 ● i9j0k1l2 Initial commit - Alice, last week
+```
+
+## Working with GitHub
+
+### Login to GitHub
+
+```bash
+wit github login
+```
+
+This opens a browser to authenticate. Once logged in, your credentials are stored securely.
+
+### Clone a Repository
+
+```bash
+wit clone https://github.com/user/repo.git
+cd repo
+```
+
+### Push Changes
+
+```bash
+# Make changes
+echo "update" >> README.md
+wit add .
+wit commit -m "Update readme"
+
+# Push to GitHub
+wit push origin main
+```
+
+### Pull Changes
+
+```bash
+wit pull
+```
+
+<Tip>
+wit uses your GitHub profile for commit author information automatically after login.
+</Tip>
+
+## AI Features (Optional)
+
+Enable AI-powered features for commit message generation, code review, and more.
+
+### Setup
+
+```bash
+# Set your OpenAI or Anthropic API key
+export OPENAI_API_KEY=sk-your-key-here
+# OR
+export ANTHROPIC_API_KEY=sk-ant-your-key-here
+
+# Verify setup
+wit ai status
+```
+
+### Use AI
+
+```bash
+# Natural language commands
+wit ai "what files have I changed?"
+
+# Generate commit message from staged changes
+wit ai commit
+
+# Stage all, generate message, and commit
+wit ai commit -a -x
+
+# Get code review
+wit ai review
+```
+
+## Self-Hosted Platform (Optional)
+
+Run your own Git server with pull requests and issues.
+
+### Start a Server
+
+```bash
+# Start wit server
+wit serve --port 3000 --repos ./my-repos
+```
+
+### Push to Your Server
+
+```bash
+# Add remote to your project
+wit remote add origin http://localhost:3000/myuser/myproject.git
+wit push -u origin main
+```
+
+### Pull Requests & Issues
+
+```bash
+# Create a pull request
+wit pr create -t "Add feature"
+
+# List PRs
+wit pr list
+
+# Create an issue
+wit issue create "Bug: Login fails"
+
+# List issues
+wit issue list
 ```
 
 ## Next Steps
@@ -149,7 +255,13 @@ tsgit graph
   <Card title="AI Features" icon="robot" href="/features/ai-powered">
     Generate commit messages with AI
   </Card>
+  <Card title="Self-Hosted Platform" icon="server" href="/platform/overview">
+    Host your own Git server
+  </Card>
+  <Card title="Agent Primitives" icon="brain" href="/primitives/overview">
+    Build AI agents with git-backed primitives
+  </Card>
   <Card title="Configuration" icon="gear" href="/configuration/overview">
-    Customize tsgit behavior
+    Customize wit behavior
   </Card>
 </CardGroup>

@@ -1,0 +1,314 @@
+---
+title: "Pull Requests"
+description: "Create and manage pull requests from the command line"
+---
+
+# Pull Requests
+
+Manage pull requests directly from your terminal with `wit pr`. Create, review, merge, and close PRs without leaving your workflow.
+
+<Note>
+Pull request commands require a wit server. Start one with `wit serve` or connect to an existing wit platform.
+</Note>
+
+## Quick Start
+
+```bash
+# Create a PR from your current branch
+wit pr create
+
+# List open PRs
+wit pr list
+
+# View PR details
+wit pr view 123
+
+# Merge a PR
+wit pr merge 123
+```
+
+## Command Reference
+
+```bash
+wit pr <command> [options]
+```
+
+| Command | Description |
+|---------|-------------|
+| `create` | Create a pull request from current branch |
+| `list` | List pull requests |
+| `view <number>` | View pull request details |
+| `checkout <number>` | Checkout a PR locally |
+| `merge <number>` | Merge a pull request |
+| `close <number>` | Close a pull request |
+| `reopen <number>` | Reopen a closed pull request |
+
+## Creating Pull Requests
+
+### Basic Usage
+
+```bash
+# Create PR from current branch to main
+wit pr create
+
+# Specify target branch
+wit pr create -b develop
+
+# With a title
+wit pr create -t "Add user authentication"
+
+# With title and description
+wit pr create -t "Add login" -m "Implements OAuth login flow"
+```
+
+### What Happens
+
+1. wit determines the current branch
+2. Gets the remote repository info from `origin`
+3. Creates a PR targeting the specified base branch (default: `main`)
+4. Returns the PR number and URL
+
+### Example Output
+
+```
+Creating pull request...
+  feature-auth → main
+  Add user authentication
+
+✓ Created pull request #42
+  http://localhost:3000/myuser/myproject/pulls/42
+```
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `-b, --base <branch>` | Target branch (default: main) |
+| `-t, --title <title>` | PR title (default: last commit message) |
+| `-m, --body <text>` | PR description |
+
+## Listing Pull Requests
+
+```bash
+# List open PRs (default)
+wit pr list
+
+# List closed PRs
+wit pr list --state closed
+
+# List merged PRs
+wit pr list --state merged
+
+# List all PRs
+wit pr list --state all
+```
+
+### Example Output
+
+```
+Open pull requests:
+
+● #42 Add user authentication
+  feature-auth → main by alice
+
+● #38 Fix login bug
+  fix-login → main by bob
+
+● #35 Update documentation
+  docs-update → main by charlie
+```
+
+The status indicator shows:
+- 🟢 `●` Green = Open
+- 🟣 `●` Purple = Merged  
+- 🔴 `●` Red = Closed
+
+## Viewing Pull Request Details
+
+```bash
+wit pr view 42
+```
+
+### Example Output
+
+```
+[OPEN] Add user authentication #42
+────────────────────────────────────────────────────────
+Author:  alice
+Branch:  feature-auth → main
+Created: 1/15/2024
+
+Implements OAuth login with GitHub and Google providers.
+
+- Add OAuth configuration
+- Create login endpoints
+- Add session management
+
+View online: http://localhost:3000/myuser/myproject/pulls/42
+```
+
+## Checking Out a PR Locally
+
+Review a PR by checking it out:
+
+```bash
+wit pr checkout 42
+```
+
+This:
+1. Fetches the PR's commits
+2. Creates a local branch `pr-42`
+3. Switches to that branch
+
+### Example Output
+
+```
+Fetching PR #42: Add user authentication
+  feature-auth → main
+
+✓ Created branch pr-42
+✓ Switched to branch pr-42
+```
+
+Now you can:
+- Run tests locally
+- Review the code
+- Make additional changes
+
+## Merging Pull Requests
+
+```bash
+# Merge using default method
+wit pr merge 42
+
+# Specify merge method
+wit pr merge 42 --method squash
+wit pr merge 42 --method rebase
+```
+
+### Merge Methods
+
+| Method | Description |
+|--------|-------------|
+| `merge` | Create a merge commit (default) |
+| `squash` | Squash all commits into one |
+| `rebase` | Rebase commits onto target |
+
+### Example Output
+
+```
+Merging PR #42: Add user authentication
+
+✓ Merged PR #42
+  Merge commit: a1b2c3d4
+```
+
+## Closing and Reopening
+
+```bash
+# Close without merging
+wit pr close 42
+
+# Reopen a closed PR
+wit pr reopen 42
+```
+
+## Complete Workflow Example
+
+```bash
+# 1. Create a feature branch
+wit switch -c add-payments
+
+# 2. Make changes
+echo "payment code" > payments.ts
+wit add .
+wit commit -m "Add payment processing"
+
+# 3. Push to remote
+wit push -u origin add-payments
+
+# 4. Create PR
+wit pr create -t "Add payment processing" -b main
+
+# 5. After review, merge
+wit pr merge 1
+
+# 6. Clean up
+wit switch main
+wit pull
+wit branch -d add-payments
+```
+
+## Error Handling
+
+### Not on a Branch
+
+```
+error: Not on a branch (detached HEAD)
+hint: Switch to a branch with: wit switch <branch>
+```
+
+### Creating PR from main
+
+```
+error: Cannot create PR from main branch
+hint: Create a feature branch first: wit switch -c my-feature
+```
+
+### No Remote Origin
+
+```
+error: No remote origin configured
+hint: Add a remote with: wit remote add origin <url>
+hint: Or clone from a remote repository
+```
+
+### Server Not Running
+
+```
+error: Failed to connect to server
+hint: Start the server with: wit serve
+```
+
+## API Usage
+
+Use PRs programmatically via the tRPC API:
+
+```typescript
+import { getApiClient } from 'wit/api';
+
+const api = getApiClient();
+
+// Create a PR
+const pr = await api.pulls.create('owner', 'repo', {
+  title: 'My PR',
+  sourceBranch: 'feature',
+  targetBranch: 'main',
+  headSha: 'abc123...',
+  baseSha: 'def456...',
+});
+
+// List PRs
+const prs = await api.pulls.list('owner', 'repo', { state: 'open' });
+
+// Merge
+await api.pulls.merge('owner', 'repo', 42, { mergeMethod: 'squash' });
+```
+
+## Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `WIT_SERVER_URL` | Server URL (default: http://localhost:3000) |
+| `WIT_API_TOKEN` | Authentication token |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Issues" icon="circle-exclamation" href="/platform/issues">
+    Track issues from CLI
+  </Card>
+  <Card title="Git Server" icon="server" href="/platform/server">
+    Set up your own server
+  </Card>
+</CardGroup>

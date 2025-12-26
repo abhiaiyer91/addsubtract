@@ -1,0 +1,311 @@
+---
+title: "Issues"
+description: "Track issues and bugs from the command line"
+---
+
+# Issues
+
+Track bugs, features, and tasks with `wit issue`. Create, view, and manage issues without leaving your terminal.
+
+<Note>
+Issue commands require a wit server. Start one with `wit serve` or connect to an existing wit platform.
+</Note>
+
+## Quick Start
+
+```bash
+# Create an issue
+wit issue create "Bug: Login button not working"
+
+# List open issues
+wit issue list
+
+# View issue details
+wit issue view 42
+
+# Close an issue
+wit issue close 42
+```
+
+## Command Reference
+
+```bash
+wit issue <command> [options]
+```
+
+| Command | Description |
+|---------|-------------|
+| `create` | Create a new issue |
+| `list` | List issues |
+| `view <number>` | View issue details |
+| `close <number>` | Close an issue |
+| `reopen <number>` | Reopen a closed issue |
+| `comment <number>` | Add a comment |
+
+## Creating Issues
+
+### Basic Usage
+
+```bash
+# Create with title as argument
+wit issue create "Bug: Login button not working"
+
+# Create with title flag
+wit issue create -t "Feature request: Dark mode"
+
+# With description
+wit issue create -t "Add dark mode" -m "Users have requested a dark theme option"
+
+# With labels
+wit issue create -t "Bug: Crash on startup" -l "bug,critical"
+```
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `-t, --title <title>` | Issue title |
+| `-m, --body <text>` | Issue description |
+| `-l, --labels <labels>` | Comma-separated labels |
+
+### Example Output
+
+```
+Creating issue: Bug: Login button not working
+
+✓ Created issue #15
+  http://localhost:3000/myuser/myproject/issues/15
+```
+
+## Listing Issues
+
+```bash
+# List open issues (default)
+wit issue list
+
+# List closed issues
+wit issue list --state closed
+
+# List all issues
+wit issue list --state all
+```
+
+### Example Output
+
+```
+Open issues:
+
+● #15 Bug: Login button not working
+  by alice on 1/15/2024
+  Labels: bug, high-priority
+
+● #12 Feature: Add dark mode
+  by bob on 1/10/2024
+  Labels: enhancement
+
+● #8 Documentation needs update
+  by charlie on 1/5/2024
+```
+
+The status indicator shows:
+- 🟢 `●` Green = Open
+- 🔴 `●` Red = Closed
+
+## Viewing Issue Details
+
+```bash
+wit issue view 15
+```
+
+### Example Output
+
+```
+[OPEN] Bug: Login button not working #15
+────────────────────────────────────────────────────────
+Author:  alice
+Created: 1/15/2024
+Labels:  bug, high-priority
+
+The login button on the homepage doesn't respond to clicks.
+
+Steps to reproduce:
+1. Go to the homepage
+2. Click the "Login" button
+3. Nothing happens
+
+Expected: Should open login modal
+
+View online: http://localhost:3000/myuser/myproject/issues/15
+```
+
+## Adding Comments
+
+```bash
+# Add a comment to an issue
+wit issue comment 15 "I can reproduce this on Chrome 120"
+
+# Longer comments
+wit issue comment 15 "Fixed in commit abc123. The click handler was missing."
+```
+
+### Example Output
+
+```
+✓ Added comment to issue #15
+```
+
+## Closing and Reopening
+
+```bash
+# Close an issue
+wit issue close 15
+
+# Reopen a closed issue
+wit issue reopen 15
+```
+
+### Example Output
+
+```
+✓ Closed issue #15
+```
+
+```
+✓ Reopened issue #15
+```
+
+## Complete Workflow Example
+
+```bash
+# 1. Create an issue for a bug
+wit issue create -t "Bug: API returns 500 error" -m "When calling /api/users, getting 500 error" -l "bug"
+
+# Output: ✓ Created issue #20
+
+# 2. Create a branch to fix it
+wit switch -c fix-api-error
+
+# 3. Make the fix
+# ... edit files ...
+wit add .
+wit commit -m "Fix API error handling"
+
+# 4. Add a comment with the fix
+wit issue comment 20 "Fixed in branch fix-api-error"
+
+# 5. Create a PR
+wit pr create -t "Fix API error handling"
+
+# 6. After PR is merged, close the issue
+wit issue close 20
+```
+
+## Linking Issues and PRs
+
+Reference issues in commit messages and PR descriptions:
+
+```bash
+# In commit message
+wit commit -m "Fix login button - closes #15"
+
+# The PR description can reference the issue
+wit pr create -t "Fix login button" -m "Fixes #15 by adding click handler"
+```
+
+## Error Handling
+
+### Missing Title
+
+```
+error: Issue title required
+usage: wit issue create "Title here"
+   or: wit issue create -t "Title here"
+```
+
+### No Remote Origin
+
+```
+error: No remote origin configured
+hint: Add a remote with: wit remote add origin <url>
+hint: Or clone from a remote repository
+```
+
+### Server Not Running
+
+```
+error: Failed to connect to server
+hint: Start the server with: wit serve
+```
+
+### Issue Not Found
+
+```
+error: Issue #999 not found
+```
+
+## API Usage
+
+Use issues programmatically via the tRPC API:
+
+```typescript
+import { getApiClient } from 'wit/api';
+
+const api = getApiClient();
+
+// Create an issue
+const issue = await api.issues.create('owner', 'repo', {
+  title: 'Bug report',
+  body: 'Description here',
+  labels: ['bug'],
+});
+
+// List issues
+const issues = await api.issues.list('owner', 'repo', { state: 'open' });
+
+// Add comment
+await api.issues.addComment('owner', 'repo', 15, 'This is fixed now');
+
+// Close
+await api.issues.close('owner', 'repo', 15);
+```
+
+## Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `WIT_SERVER_URL` | Server URL (default: http://localhost:3000) |
+| `WIT_API_TOKEN` | Authentication token |
+
+## Tips
+
+<Tip>
+**Quick issue creation**: Use the positional argument for fast issue creation:
+```bash
+wit issue create "Quick bug report"
+```
+</Tip>
+
+<Tip>
+**Labels**: Define labels in your repository settings, then use them when creating issues:
+```bash
+wit issue create -t "New feature" -l "enhancement,v2.0"
+```
+</Tip>
+
+<Tip>
+**Closing via commits**: Use keywords in commit messages to auto-close issues:
+- `closes #15`
+- `fixes #15`
+- `resolves #15`
+</Tip>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Pull Requests" icon="code-pull-request" href="/platform/pull-requests">
+    Create and manage PRs
+  </Card>
+  <Card title="Git Server" icon="server" href="/platform/server">
+    Set up your own server
+  </Card>
+</CardGroup>
