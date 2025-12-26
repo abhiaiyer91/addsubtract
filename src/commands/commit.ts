@@ -8,6 +8,7 @@ import { Journal, StateSnapshot } from '../core/journal';
 import { TsgitError, Errors, ErrorCode } from '../core/errors';
 import { Author } from '../core/types';
 import { updateReflog } from './reflog';
+import { HookManager } from '../core/hooks';
 
 /**
  * Options for commit command
@@ -51,11 +52,12 @@ export interface CommitResult {
  * // Amend previous commit
  * wit commit --amend -m "new message"
  */
-export function commitWithOptions(
+export async function commitWithOptions(
   repo: Repository,
   options: CommitOptions
-): CommitResult {
+): Promise<CommitResult> {
   const journal = new Journal(repo.gitDir);
+  const hookManager = new HookManager(repo.gitDir, repo.workDir);
 
   // Validate message
   if (!options.message || options.message.trim() === '') {
@@ -104,6 +106,39 @@ export function commitWithOptions(
     throw Errors.nothingToCommit();
   }
 
+  // Run pre-commit hook (unless --no-verify)
+  if (!options.noVerify) {
+    const stagedFiles = repo.index.getEntries().map(e => e.path);
+    const preCommitError = await hookManager.shouldAbort('pre-commit', {
+      files: stagedFiles,
+      branch: repo.refs.getCurrentBranch() || undefined,
+    });
+    if (preCommitError) {
+      throw new TsgitError(
+        'pre-commit hook failed',
+        ErrorCode.HOOK_FAILED,
+        [preCommitError, 'Use --no-verify to bypass hooks']
+      );
+    }
+  }
+
+  // Run commit-msg hook (unless --no-verify)
+  let finalMessage = options.message;
+  if (!options.noVerify) {
+    const commitMsgResult = await hookManager.runHook('commit-msg', {
+      commitMessage: options.message,
+      branch: repo.refs.getCurrentBranch() || undefined,
+    });
+    if (!commitMsgResult.success) {
+      const errorMsg = commitMsgResult.stderr || commitMsgResult.stdout || 'commit-msg hook rejected the commit';
+      throw new TsgitError(
+        'commit-msg hook failed',
+        ErrorCode.HOOK_FAILED,
+        [errorMsg.trim(), 'Use --no-verify to bypass hooks']
+      );
+    }
+  }
+
   // Dry run mode
   if (options.dryRun) {
     const entries = repo.index.getEntries();
@@ -131,7 +166,7 @@ export function commitWithOptions(
   }
 
   // Create the commit
-  const hash = repo.commit(options.message, author);
+  const hash = repo.commit(finalMessage, author);
   const branch = repo.refs.getCurrentBranch();
 
   // Capture state after operation
@@ -144,15 +179,15 @@ export function commitWithOptions(
   // Record in journal
   journal.record(
     'commit',
-    [options.message.slice(0, 50)],
-    `Committed: ${options.message.split('\n')[0].slice(0, 50)}`,
+    [finalMessage.slice(0, 50)],
+    `Committed: ${finalMessage.split('\n')[0].slice(0, 50)}`,
     beforeState,
     afterState,
     { commitHash: hash }
   );
 
   // Update reflog
-  const messageFirstLineForReflog = options.message.split('\n')[0].slice(0, 50);
+  const messageFirstLineForReflog = finalMessage.split('\n')[0].slice(0, 50);
   updateReflog(
     repo.gitDir,
     repo.workDir,
@@ -174,8 +209,18 @@ export function commitWithOptions(
     );
   }
 
+  // Run post-commit hook (fire and forget, errors logged but don't fail)
+  if (!options.noVerify) {
+    hookManager.runHook('post-commit', {
+      commitHash: hash,
+      branch: branch || undefined,
+    }).catch((err) => {
+      console.error(`post-commit hook error: ${err.message}`);
+    });
+  }
+
   const shortHash = hash.slice(0, 8);
-  const messageFirstLine = options.message.split('\n')[0];
+  const messageFirstLine = finalMessage.split('\n')[0];
   let resultMessage: string;
 
   if (branch) {
@@ -229,7 +274,7 @@ function getTimezone(): string {
 /**
  * Legacy commit function for backward compatibility
  */
-export function commit(message: string): void {
+export async function commit(message: string): Promise<void> {
   if (!message || message.trim() === '') {
     console.error('error: empty commit message');
     process.exit(1);
@@ -237,7 +282,7 @@ export function commit(message: string): void {
 
   try {
     const repo = Repository.find();
-    const result = commitWithOptions(repo, { message });
+    const result = await commitWithOptions(repo, { message });
     console.log(result.message);
   } catch (error) {
     if (error instanceof TsgitError) {
@@ -252,7 +297,7 @@ export function commit(message: string): void {
 /**
  * CLI handler for commit command
  */
-export function handleCommit(args: string[]): void {
+export async function handleCommit(args: string[]): Promise<void> {
   const repo = Repository.find();
   const options: CommitOptions = {
     message: '',
@@ -295,6 +340,7 @@ export function handleCommit(args: string[]): void {
     console.error('  --amend              Amend the previous commit');
     console.error('  --allow-empty        Allow empty commits');
     console.error('  --author <author>    Override author (format: "Name <email>")');
+    console.error('  --no-verify          Skip pre-commit and commit-msg hooks');
     console.error('  --dry-run            Show what would be committed');
     console.error('\nExamples:');
     console.error('  wit commit -m "Add feature"');
@@ -304,7 +350,7 @@ export function handleCommit(args: string[]): void {
   }
 
   try {
-    const result = commitWithOptions(repo, options);
+    const result = await commitWithOptions(repo, options);
     console.log(result.message);
   } catch (error) {
     if (error instanceof TsgitError) {

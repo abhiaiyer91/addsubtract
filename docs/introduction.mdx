@@ -1,51 +1,54 @@
 ---
 title: Introduction
-description: "A modern Git implementation in TypeScript that fixes Git's most frustrating problems"
+description: "A modern Git implementation in TypeScript with AI-powered features"
 ---
 
-# Welcome to tsgit
+# Welcome to wit
 
-tsgit is a modern Git implementation in TypeScript that addresses many of Git's well-known usability issues while maintaining compatibility with Git concepts.
+**wit** is a modern Git implementation in TypeScript that addresses many of Git's well-known usability issues while adding powerful new features like AI assistance, built-in visual interfaces, and a robust undo system.
 
-## Why tsgit?
+## Why wit?
 
-Git is powerful but has well-known issues. tsgit addresses them:
+Git is powerful but has well-known issues. wit addresses them:
 
-| Problem | Git | tsgit |
+| Problem | Git | wit |
 |---------|-----|-------|
-| Security | SHA-1 (broken) | SHA-256 default |
+| GitHub Interop | Native | Full compatibility |
 | Large files | Needs LFS | Built-in chunking |
-| Undo mistakes | Reflog is cryptic | Simple `tsgit undo` |
+| Undo mistakes | Reflog is cryptic | Simple `wit undo` |
 | Branch switching | Loses uncommitted work | Auto-stash per branch |
 | Merge conflicts | Inline markers | Structured JSON |
 | Confusing commands | `checkout` does 5 things | Dedicated `switch`/`restore` |
 | Error messages | Cryptic | Helpful with suggestions |
 | Visual interface | External tools needed | Built-in TUI & Web UI |
-| Quick saves | No built-in solution | `tsgit wip` auto-message |
-| Fixing commits | `git commit --amend` verbose | Simple `tsgit amend` |
-| Branch cleanup | Manual process | `tsgit cleanup` |
-| Repository stats | External tools | Built-in `tsgit stats` |
+| AI assistance | None | Commit messages, review, & more |
 
 ## Key Features
 
 <CardGroup cols={2}>
-  <Card title="SHA-256 Security" icon="shield-halved">
-    Secure by default with SHA-256 hashing instead of Git's deprecated SHA-1
+  <Card title="GitHub Compatible" icon="github">
+    Push and pull seamlessly with GitHub, GitLab, and any Git remote
+  </Card>
+  <Card title="AI-Powered" icon="robot">
+    AI-generated commit messages, code review, and conflict resolution via OpenAI or Anthropic
   </Card>
   <Card title="Built-in UI" icon="window">
     Web UI and Terminal UI included - no external tools needed
   </Card>
   <Card title="Undo Anything" icon="rotate-left">
-    Simple `tsgit undo` command reverts any operation
+    Simple `wit undo` command reverts any operation with full journal history
   </Card>
-  <Card title="AI-Powered" icon="robot">
-    AI-generated commit messages and code review support
+  <Card title="Self-Hosted Platform" icon="server">
+    Run your own Git server with `wit serve` - includes PRs, issues, and API
   </Card>
-  <Card title="Auto-stash" icon="layer-group">
-    Never lose work when switching branches
+  <Card title="Agent Primitives" icon="brain">
+    Git-backed Filesystem and Knowledge primitives for building AI agents
   </Card>
-  <Card title="Large File Support" icon="file-zipper">
-    Built-in chunked storage without LFS
+  <Card title="Quality of Life" icon="heart">
+    Commands like `wip`, `amend`, `uncommit`, `cleanup`, `stats`, and `snapshot`
+  </Card>
+  <Card title="Full Git Compatibility" icon="code-branch">
+    Cherry-pick, rebase, revert, stash, tags, bisect, hooks, worktrees, and more
   </Card>
 </CardGroup>
 
@@ -53,24 +56,62 @@ Git is powerful but has well-known issues. tsgit addresses them:
 
 ```bash
 # Initialize a new repository
-tsgit init
+wit init
 
 # Add files and commit
-tsgit add .
-tsgit commit -m "Initial commit"
+wit add .
+wit commit -m "Initial commit"
 
 # Made a mistake? Just undo it
-tsgit undo
+wit undo
 
 # Launch visual interface
-tsgit web
+wit web
+
+# Use AI to generate commit messages
+wit ai commit -a -x
 ```
+
+## What's Included
+
+### Core Version Control
+- All standard Git operations: add, commit, branch, merge, diff, log
+- History rewriting: cherry-pick, rebase, revert
+- Advanced features: stash, tags, bisect, hooks, submodules, worktrees
+
+### AI Features
+- Natural language commands: `wit ai "what files changed?"`
+- Commit message generation: `wit ai commit`
+- Code review: `wit ai review`
+- Conflict resolution: `wit ai resolve`
+
+### Visual Interfaces
+- **Web UI** - Modern dashboard with commit graph, diffs, file browser
+- **Terminal UI** - Interactive interface with keyboard navigation
+- **ASCII Graph** - Commit history visualization in terminal
+
+### Developer Experience
+- Quality of life commands (`wip`, `amend`, `uncommit`, `cleanup`, `stats`)
+- Monorepo scopes for working with repository subsets
+- Better error messages with suggestions for typos
+- Operation journal for complete undo/redo support
+
+### Self-Hosted Platform
+- **Git Server** - Host repositories with `wit serve`
+- **Pull Requests** - Create and manage PRs from CLI with `wit pr`
+- **Issues** - Track issues with `wit issue`
+- **tRPC API** - Type-safe API for building integrations
+
+### Agent Primitives
+- **Filesystem** - Git-backed virtual filesystem with versioning
+- **Knowledge** - Content-addressable key-value store for agent memory
+- Automatic branching, rollback, and history tracking
 
 ## What's Next?
 
 <CardGroup cols={2}>
   <Card title="Quick Start" icon="rocket" href="/quickstart">
-    Get up and running with tsgit in minutes
+    Get up and running with wit in minutes
   </Card>
   <Card title="Installation" icon="download" href="/installation">
     Detailed installation instructions
@@ -78,7 +119,13 @@ tsgit web
   <Card title="Commands" icon="terminal" href="/commands/overview">
     Explore all available commands
   </Card>
-  <Card title="API Reference" icon="code" href="/api-reference/overview">
-    Use tsgit programmatically in your projects
+  <Card title="AI Features" icon="robot" href="/features/ai-powered">
+    Learn about AI-powered capabilities
+  </Card>
+  <Card title="Platform" icon="server" href="/platform/overview">
+    Self-hosted Git platform with PRs & issues
+  </Card>
+  <Card title="Primitives" icon="brain" href="/primitives/overview">
+    Build AI agents with git-backed primitives
   </Card>
 </CardGroup>

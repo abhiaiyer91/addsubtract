@@ -3,7 +3,7 @@
  * Side-by-side diff, syntax highlighting, interactive staging
  */
 
-import { diff, DiffLine, createHunks, DiffHunk } from '../core/diff';
+import { diff, DiffLine, createHunks, DiffHunk, FileDiff } from '../core/diff';
 
 /**
  * Diff display modes
@@ -552,6 +552,287 @@ export function getWordDiffStyles(): string {
     .word-remove {
       background: rgba(248, 81, 73, 0.4);
       border-radius: 2px;
+    }
+  `;
+}
+
+/**
+ * Render a rename header for the diff view
+ */
+export function renderRenameHeader(fileDiff: FileDiff): string {
+  if (!fileDiff.isRename) {
+    return '';
+  }
+
+  return `
+    <div class="diff-rename-header">
+      <span class="rename-icon">↔</span>
+      <span class="rename-label">Renamed:</span>
+      <span class="rename-old-path">${escapeHtml(fileDiff.oldPath)}</span>
+      <span class="rename-arrow">→</span>
+      <span class="rename-new-path">${escapeHtml(fileDiff.newPath)}</span>
+      <span class="rename-similarity">(${fileDiff.similarity}% similar)</span>
+    </div>
+  `;
+}
+
+/**
+ * Escape HTML special characters (exported for external use)
+ */
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+/**
+ * Get CSS styles for rename headers
+ */
+export function getRenameStyles(): string {
+  return `
+    .diff-rename-header {
+      background: rgba(136, 87, 212, 0.15);
+      border: 1px solid rgba(136, 87, 212, 0.3);
+      border-radius: 6px;
+      padding: 8px 12px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+    }
+
+    .rename-icon {
+      color: #a371f7;
+      font-size: 16px;
+    }
+
+    .rename-label {
+      color: #a371f7;
+      font-weight: 500;
+    }
+
+    .rename-old-path {
+      color: #f85149;
+      font-family: monospace;
+      text-decoration: line-through;
+      opacity: 0.8;
+    }
+
+    .rename-arrow {
+      color: #8b949e;
+    }
+
+    .rename-new-path {
+      color: #7ee787;
+      font-family: monospace;
+    }
+
+    .rename-similarity {
+      color: #8b949e;
+      margin-left: auto;
+    }
+  `;
+}
+
+/**
+ * Render a complete FileDiff with rename support
+ */
+export function renderFileDiff(
+  fileDiff: FileDiff,
+  mode: DiffMode = 'split'
+): string {
+  let html = '<div class="file-diff-container">';
+  
+  // Add rename header if applicable
+  if (fileDiff.isRename) {
+    html += renderRenameHeader(fileDiff);
+  }
+  
+  // Render the file header
+  const headerClass = fileDiff.isRename ? 'diff-header-rename' :
+                      fileDiff.isNew ? 'diff-header-new' :
+                      fileDiff.isDeleted ? 'diff-header-deleted' : 'diff-header-modified';
+  
+  html += `<div class="diff-file-header ${headerClass}">`;
+  
+  if (fileDiff.isRename) {
+    html += `<span class="file-path">${escapeHtml(fileDiff.oldPath)} → ${escapeHtml(fileDiff.newPath)}</span>`;
+  } else if (fileDiff.isNew) {
+    html += `<span class="file-status-badge new">NEW</span>`;
+    html += `<span class="file-path">${escapeHtml(fileDiff.newPath)}</span>`;
+  } else if (fileDiff.isDeleted) {
+    html += `<span class="file-status-badge deleted">DELETED</span>`;
+    html += `<span class="file-path">${escapeHtml(fileDiff.oldPath)}</span>`;
+  } else {
+    html += `<span class="file-path">${escapeHtml(fileDiff.oldPath)}</span>`;
+  }
+  
+  html += '</div>';
+  
+  // Render the diff content
+  if (fileDiff.isBinary) {
+    html += '<div class="binary-file-notice">Binary file - contents not shown</div>';
+  } else if (fileDiff.hunks.length > 0) {
+    // Flatten hunks to DiffLines for rendering
+    const allLines: DiffLine[] = [];
+    for (const hunk of fileDiff.hunks) {
+      allLines.push(...hunk.lines);
+    }
+    
+    const language = detectLanguage(fileDiff.newPath || fileDiff.oldPath);
+    
+    if (mode === 'split') {
+      html += renderSplitDiffContent(allLines, language);
+    } else {
+      html += renderUnifiedDiffContent(fileDiff.hunks, language);
+    }
+  } else {
+    html += '<div class="no-changes-notice">No content changes</div>';
+  }
+  
+  html += '</div>';
+  return html;
+}
+
+/**
+ * Render split diff content
+ */
+function renderSplitDiffContent(lines: DiffLine[], language: string): string {
+  const splitLines = toSplitView(lines);
+
+  const rows = splitLines.map(line => {
+    const leftClass = line.leftType === 'remove' ? 'diff-remove' : 
+                      line.leftType === 'empty' ? 'diff-empty' : '';
+    const rightClass = line.rightType === 'add' ? 'diff-add' : 
+                       line.rightType === 'empty' ? 'diff-empty' : '';
+
+    const leftNum = line.leftLineNum !== null ? line.leftLineNum : '';
+    const rightNum = line.rightLineNum !== null ? line.rightLineNum : '';
+
+    const leftCode = line.leftContent ? highlightCode(line.leftContent, language) : '&nbsp;';
+    const rightCode = line.rightContent ? highlightCode(line.rightContent, language) : '&nbsp;';
+
+    return `
+      <tr>
+        <td class="line-num ${leftClass}">${leftNum}</td>
+        <td class="line-content ${leftClass}">${leftCode}</td>
+        <td class="line-num ${rightClass}">${rightNum}</td>
+        <td class="line-content ${rightClass}">${rightCode}</td>
+      </tr>
+    `;
+  }).join('');
+
+  return `
+    <div class="diff-container split-diff">
+      <table class="diff-table">
+        <thead>
+          <tr>
+            <th colspan="2" class="diff-header-left">Original</th>
+            <th colspan="2" class="diff-header-right">Modified</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+/**
+ * Render unified diff content
+ */
+function renderUnifiedDiffContent(hunks: DiffHunk[], language: string): string {
+  let html = '<div class="diff-container unified-diff">';
+
+  for (const hunk of hunks) {
+    html += `<div class="diff-hunk-header">@@ -${hunk.oldStart},${hunk.oldCount} +${hunk.newStart},${hunk.newCount} @@</div>`;
+    
+    for (const line of hunk.lines) {
+      const lineClass = line.type === 'add' ? 'diff-add' : 
+                        line.type === 'remove' ? 'diff-remove' : 'diff-context';
+      const prefix = line.type === 'add' ? '+' : line.type === 'remove' ? '-' : ' ';
+      const lineNum = line.type === 'add' ? line.newLineNum : line.oldLineNum;
+      const code = highlightCode(line.content, language);
+
+      html += `
+        <div class="diff-line ${lineClass}">
+          <span class="line-num">${lineNum || ''}</span>
+          <span class="line-prefix">${prefix}</span>
+          <span class="line-content">${code}</span>
+        </div>
+      `;
+    }
+  }
+
+  html += '</div>';
+  return html;
+}
+
+/**
+ * Get additional CSS for file diff containers
+ */
+export function getFileDiffStyles(): string {
+  return `
+    .file-diff-container {
+      margin-bottom: 16px;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .diff-file-header {
+      background: #161b22;
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 1px solid #30363d;
+    }
+
+    .diff-header-new {
+      background: rgba(46, 160, 67, 0.1);
+    }
+
+    .diff-header-deleted {
+      background: rgba(248, 81, 73, 0.1);
+    }
+
+    .diff-header-rename {
+      background: rgba(136, 87, 212, 0.1);
+    }
+
+    .file-status-badge {
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 500;
+      text-transform: uppercase;
+    }
+
+    .file-status-badge.new {
+      background: rgba(46, 160, 67, 0.2);
+      color: #7ee787;
+    }
+
+    .file-status-badge.deleted {
+      background: rgba(248, 81, 73, 0.2);
+      color: #f85149;
+    }
+
+    .file-path {
+      font-family: monospace;
+      color: #c9d1d9;
+    }
+
+    .binary-file-notice,
+    .no-changes-notice {
+      padding: 16px;
+      text-align: center;
+      color: #8b949e;
+      font-style: italic;
     }
   `;
 }
