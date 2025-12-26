@@ -1,29 +1,37 @@
-import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { IssueForm } from '@/components/issue/issue-form';
 import { RepoHeader } from './components/repo-header';
+import { Loading } from '@/components/ui/loading';
 import { isAuthenticated } from '@/lib/auth';
+import { trpc } from '@/lib/trpc';
 
 export function NewIssuePage() {
   const { owner, repo } = useParams<{ owner: string; repo: string }>();
   const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState(false);
   const authenticated = isAuthenticated();
 
-  const handleSubmit = async (data: { title: string; body: string }) => {
-    setIsLoading(true);
-    try {
-      // TODO: Call tRPC mutation
-      console.log('Creating issue:', data);
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+  // Fetch repository data to get the repo ID
+  const { data: repoData, isLoading: repoLoading } = trpc.repos.get.useQuery(
+    { owner: owner!, repo: repo! },
+    { enabled: !!owner && !!repo }
+  );
 
-      // Mock: redirect to the new issue
-      navigate(`/${owner}/${repo}/issues/16`);
-    } catch (error) {
-      console.error('Failed to create issue:', error);
-    } finally {
-      setIsLoading(false);
-    }
+  // Create issue mutation
+  const createIssueMutation = trpc.issues.create.useMutation({
+    onSuccess: (data) => {
+      // Redirect to the new issue
+      navigate(`/${owner}/${repo}/issues/${data.number}`);
+    },
+  });
+
+  const handleSubmit = async (data: { title: string; body: string }) => {
+    if (!repoData?.repo.id) return;
+
+    createIssueMutation.mutate({
+      repoId: repoData.repo.id,
+      title: data.title,
+      body: data.body,
+    });
   };
 
   if (!authenticated) {
@@ -37,11 +45,24 @@ export function NewIssuePage() {
     );
   }
 
+  if (repoLoading) {
+    return (
+      <div className="space-y-6">
+        <RepoHeader owner={owner!} repo={repo!} />
+        <Loading text="Loading..." />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <RepoHeader owner={owner!} repo={repo!} />
       <div className="max-w-3xl">
-        <IssueForm onSubmit={handleSubmit} isLoading={isLoading} />
+        <IssueForm
+          onSubmit={handleSubmit}
+          isLoading={createIssueMutation.isPending}
+          error={createIssueMutation.error?.message}
+        />
       </div>
     </div>
   );

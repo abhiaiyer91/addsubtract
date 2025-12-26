@@ -6,51 +6,47 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { login as authLogin } from '@/lib/auth';
+import { trpc } from '@/lib/trpc';
 
 export function LoginPage() {
   const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     usernameOrEmail: '',
     password: '',
   });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      // TODO: Replace with actual tRPC mutation
-      // const result = await trpc.auth.login.mutate(formData);
-      
-      // Mock login for now
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Mock successful login
+  const loginMutation = trpc.auth.login.useMutation({
+    onSuccess: (data) => {
+      // Store token and user info
       authLogin(
         {
-          id: '1',
-          username: formData.usernameOrEmail.includes('@') 
-            ? formData.usernameOrEmail.split('@')[0] 
-            : formData.usernameOrEmail,
-          email: formData.usernameOrEmail.includes('@')
-            ? formData.usernameOrEmail
-            : `${formData.usernameOrEmail}@example.com`,
-          name: null,
-          avatarUrl: null,
+          id: data.user.id,
+          username: data.user.username,
+          email: data.user.email,
+          name: data.user.name || null,
+          avatarUrl: data.user.avatarUrl || null,
         },
-        'mock-token-12345'
+        data.sessionId
       );
-
       navigate('/');
-    } catch (err) {
-      setError('Invalid username or password');
-    } finally {
-      setIsLoading(false);
-    }
+    },
+    onError: (err) => {
+      setError(err.message || 'Invalid username or password');
+    },
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    loginMutation.mutate({
+      usernameOrEmail: formData.usernameOrEmail,
+      password: formData.password,
+    });
   };
+
+  const isLoading = loginMutation.isPending;
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[80vh]">

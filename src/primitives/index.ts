@@ -2,6 +2,7 @@
  * Wit Primitives
  * 
  * High-level abstractions built on top of wit core for agent workspaces.
+ * Building blocks for agent-centric applications backed by Git.
  */
 
 // Filesystem primitive - Git-backed virtual filesystem
@@ -11,13 +12,11 @@ export {
   type FileStatus,
   type FileStat,
   type CommitInfo,
-  type MergeResult,
+  type FsMergeResult,
 } from './filesystem';
+
+// Knowledge primitive - Key-value store with history
+export { Knowledge, type KnowledgeOptions, type HistoryEntry } from './knowledge';
 
 // Re-export types for convenience
 export * from './types';
- *
- * Building blocks for agent-centric applications backed by Git.
- */
-
-export { Knowledge, type KnowledgeOptions, type HistoryEntry } from './knowledge';

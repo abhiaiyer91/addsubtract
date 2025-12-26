@@ -6,65 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PrCard } from '@/components/pr/pr-card';
 import { RepoHeader } from './components/repo-header';
+import { Loading } from '@/components/ui/loading';
 import { isAuthenticated } from '@/lib/auth';
-
-// Mock pull requests
-const mockPullRequests = [
-  {
-    id: '1',
-    number: 42,
-    title: 'Add new authentication system with OAuth2 support',
-    state: 'open' as const,
-    author: { username: 'johndoe', avatarUrl: null },
-    sourceBranch: 'feature/oauth2',
-    targetBranch: 'main',
-    createdAt: new Date(Date.now() - 3600000),
-    labels: [
-      { id: '1', name: 'enhancement', color: 'a2eeef', description: null, repoId: '1', createdAt: new Date() },
-    ],
-    commentsCount: 5,
-  },
-  {
-    id: '2',
-    number: 41,
-    title: 'Fix memory leak in file upload handler',
-    state: 'open' as const,
-    author: { username: 'janesmith', avatarUrl: null },
-    sourceBranch: 'fix/memory-leak',
-    targetBranch: 'main',
-    createdAt: new Date(Date.now() - 86400000),
-    labels: [
-      { id: '2', name: 'bug', color: 'd73a4a', description: null, repoId: '1', createdAt: new Date() },
-    ],
-    commentsCount: 3,
-  },
-  {
-    id: '3',
-    number: 40,
-    title: 'Update documentation for API endpoints',
-    state: 'merged' as const,
-    author: { username: 'bobwilson', avatarUrl: null },
-    sourceBranch: 'docs/api-update',
-    targetBranch: 'main',
-    createdAt: new Date(Date.now() - 86400000 * 3),
-    labels: [
-      { id: '3', name: 'documentation', color: '0075ca', description: null, repoId: '1', createdAt: new Date() },
-    ],
-    commentsCount: 1,
-  },
-  {
-    id: '4',
-    number: 39,
-    title: 'Refactor database connection pooling',
-    state: 'closed' as const,
-    author: { username: 'johndoe', avatarUrl: null },
-    sourceBranch: 'refactor/db-pool',
-    targetBranch: 'main',
-    createdAt: new Date(Date.now() - 86400000 * 7),
-    labels: [],
-    commentsCount: 8,
-  },
-];
+import { trpc } from '@/lib/trpc';
 
 export function PullsPage() {
   const { owner, repo } = useParams<{ owner: string; repo: string }>();
@@ -74,21 +18,49 @@ export function PullsPage() {
 
   const currentState = searchParams.get('state') || 'open';
 
-  // TODO: Fetch real data with tRPC
-  const pullRequests = mockPullRequests.filter((pr) => {
-    if (currentState === 'all') return true;
-    return pr.state === currentState;
+  // Fetch repository data to get the repo ID
+  const { data: repoData, isLoading: repoLoading } = trpc.repos.get.useQuery(
+    { owner: owner!, repo: repo! },
+    { enabled: !!owner && !!repo }
+  );
+
+  // Fetch pull requests
+  const { data: pullsData, isLoading: pullsLoading } = trpc.pulls.list.useQuery(
+    {
+      repoId: repoData?.repo.id!,
+      state: currentState === 'open' ? 'open' : currentState === 'closed' ? 'closed' : undefined,
+      limit: 50,
+    },
+    { enabled: !!repoData?.repo.id }
+  );
+
+  const isLoading = repoLoading || pullsLoading;
+
+  // Get pull requests
+  const pullRequests = pullsData || [];
+
+  // Filter by search query
+  const filteredPulls = pullRequests.filter((pr) => {
+    if (!searchQuery) return true;
+    return pr.title.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
-  const counts = {
-    open: mockPullRequests.filter((pr) => pr.state === 'open').length,
-    closed: mockPullRequests.filter((pr) => pr.state === 'closed' || pr.state === 'merged').length,
-    all: mockPullRequests.length,
-  };
+  // Count PRs by state
+  const openCount = pullRequests.filter(pr => pr.state === 'open').length;
+  const closedCount = pullRequests.filter(pr => pr.state === 'closed' || pr.state === 'merged').length;
 
   const handleStateChange = (state: string) => {
     setSearchParams({ state });
   };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <RepoHeader owner={owner!} repo={repo!} />
+        <Loading text="Loading pull requests..." />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -117,13 +89,13 @@ export function PullsPage() {
               <GitPullRequest className="h-4 w-4" />
               Open
               <span className="ml-1 px-1.5 py-0.5 text-xs bg-muted rounded">
-                {counts.open}
+                {currentState === 'open' ? filteredPulls.length : openCount}
               </span>
             </TabsTrigger>
             <TabsTrigger value="closed" className="gap-2">
               Closed
               <span className="ml-1 px-1.5 py-0.5 text-xs bg-muted rounded">
-                {counts.closed}
+                {currentState === 'closed' ? filteredPulls.length : closedCount}
               </span>
             </TabsTrigger>
           </TabsList>
@@ -143,7 +115,7 @@ export function PullsPage() {
       </div>
 
       {/* Pull request list */}
-      {pullRequests.length === 0 ? (
+      {filteredPulls.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           <GitPullRequest className="h-12 w-12 mx-auto mb-4 opacity-50" />
           <p className="text-lg font-medium">No pull requests found</p>
@@ -155,8 +127,27 @@ export function PullsPage() {
         </div>
       ) : (
         <div className="space-y-3">
-          {pullRequests.map((pr) => (
-            <PrCard key={pr.id} pr={pr} owner={owner!} repo={repo!} />
+          {filteredPulls.map((pr) => (
+            <PrCard
+              key={pr.id}
+              pr={{
+                id: pr.id,
+                number: pr.number,
+                title: pr.title,
+                state: pr.state,
+                author: {
+                  username: pr.author?.username || 'Unknown',
+                  avatarUrl: pr.author?.avatarUrl || null,
+                },
+                sourceBranch: pr.sourceBranch,
+                targetBranch: pr.targetBranch,
+                createdAt: new Date(pr.createdAt),
+                labels: pr.labels || [],
+                commentsCount: 0, // TODO: Add comments count to API
+              }}
+              owner={owner!}
+              repo={repo!}
+            />
           ))}
         </div>
       )}

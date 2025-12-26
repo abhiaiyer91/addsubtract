@@ -13,7 +13,7 @@ import {
 
 export const issuesRouter = router({
   /**
-   * List issues for a repository
+   * List issues for a repository (with author and labels)
    */
   list: publicProcedure
     .input(
@@ -27,17 +27,32 @@ export const issuesRouter = router({
       })
     )
     .query(async ({ input }) => {
-      return issueModel.listByRepo(input.repoId, {
+      const issues = await issueModel.listByRepo(input.repoId, {
         state: input.state,
         authorId: input.authorId,
         assigneeId: input.assigneeId,
         limit: input.limit,
         offset: input.offset,
       });
+
+      // Fetch authors and labels for each issue
+      const issuesWithDetails = await Promise.all(
+        issues.map(async (issue) => {
+          const result = await issueModel.findWithAuthor(issue.id);
+          const labels = await issueLabelModel.listByIssue(issue.id);
+          return {
+            ...issue,
+            author: result?.author ?? null,
+            labels,
+          };
+        })
+      );
+
+      return issuesWithDetails;
     }),
 
   /**
-   * Get a single issue by number
+   * Get a single issue by number (with author, labels, assignee)
    */
   get: publicProcedure
     .input(
@@ -56,7 +71,26 @@ export const issuesRouter = router({
         });
       }
 
-      return issue;
+      // Get author
+      const authorResult = await issueModel.findWithAuthor(issue.id);
+      const author = authorResult?.author ?? null;
+
+      // Get labels
+      const labels = await issueLabelModel.listByIssue(issue.id);
+
+      // Get assignee if assigned
+      let assignee = null;
+      if (issue.assigneeId) {
+        const { userModel } = await import('../../../db/models');
+        assignee = await userModel.findById(issue.assigneeId);
+      }
+
+      return {
+        ...issue,
+        author,
+        labels,
+        assignee,
+      };
     }),
 
   /**
