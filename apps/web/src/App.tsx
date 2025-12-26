@@ -18,6 +18,7 @@ import { IssuesPage } from './routes/repo/issues';
 import { IssueDetailPage } from './routes/repo/issue-detail';
 import { NewIssuePage } from './routes/repo/issue-new';
 import { SettingsPage } from './routes/settings';
+import { NewRepoPage } from './routes/new';
 
 export function App() {
   return (
@@ -30,6 +31,7 @@ export function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/new" element={<NewRepoPage />} />
 
             {/* User/Org profile */}
             <Route path="/:owner" element={<OwnerPage />} />

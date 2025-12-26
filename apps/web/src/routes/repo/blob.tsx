@@ -5,19 +5,8 @@ import { BranchSelector } from '@/components/repo/branch-selector';
 import { CodeViewer } from '@/components/repo/code-viewer';
 import { RepoHeader } from './components/repo-header';
 import { isAuthenticated } from '@/lib/auth';
-
-// Mock file content
-const mockFileContent = `import React from 'react';
-import ReactDOM from 'react-dom/client';
-import { App } from './App';
-import './styles/globals.css';
-
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
-`;
+import { trpc } from '@/lib/trpc';
+import { Loading } from '@/components/ui/loading';
 
 export function BlobPage() {
   const { owner, repo, ref, '*': path } = useParams<{
@@ -32,13 +21,44 @@ export function BlobPage() {
   const filename = filePath.split('/').pop() || '';
   const authenticated = isAuthenticated();
 
-  // TODO: Fetch real data with tRPC
-  const fileContent = mockFileContent;
+  // Fetch real file data from tRPC
+  const { data: fileData, isLoading: fileLoading, error: fileError } = trpc.repos.getFile.useQuery(
+    { owner: owner!, repo: repo!, ref: currentRef, path: filePath },
+    { enabled: !!owner && !!repo && !!filePath }
+  );
 
-  const branches = [
-    { name: 'main', sha: 'abc123', isDefault: true },
-    { name: 'develop', sha: 'def456' },
-  ];
+  // Fetch branches
+  const { data: branchesData } = trpc.repos.getBranches.useQuery(
+    { owner: owner!, repo: repo! },
+    { enabled: !!owner && !!repo }
+  );
+
+  const fileContent = fileData?.content || '';
+  const branches = branchesData?.map(b => ({
+    name: b.name,
+    sha: b.sha,
+    isDefault: b.isDefault,
+  })) || [];
+
+  if (fileLoading) {
+    return (
+      <div className="space-y-6">
+        <RepoHeader owner={owner!} repo={repo!} />
+        <Loading />
+      </div>
+    );
+  }
+
+  if (fileError) {
+    return (
+      <div className="space-y-6">
+        <RepoHeader owner={owner!} repo={repo!} />
+        <div className="p-4 text-center text-muted-foreground">
+          {fileError.message || 'File not found'}
+        </div>
+      </div>
+    );
+  }
 
   // Build breadcrumb parts
   const pathParts = filePath.split('/').filter(Boolean);

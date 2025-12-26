@@ -11,6 +11,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { isAuthenticated, getUser } from '@/lib/auth';
+import { trpc } from '@/lib/trpc';
+import { Loading } from '@/components/ui/loading';
 
 export function HomePage() {
   const authenticated = isAuthenticated();
@@ -108,11 +110,28 @@ function LandingView() {
 }
 
 function DashboardView({ username }: { username: string }) {
-  // Mock data for now - would be fetched from tRPC
-  const recentRepos = [
-    { owner: username, name: 'my-project', description: 'A sample project', updatedAt: new Date() },
-    { owner: username, name: 'docs', description: 'Documentation', updatedAt: new Date() },
-  ];
+  // Fetch real repositories from tRPC
+  const { data: reposData, isLoading } = trpc.repos.list.useQuery(
+    { owner: username },
+    { enabled: !!username }
+  );
+
+  const recentRepos = reposData?.map(repo => ({
+    owner: username,
+    name: repo.name,
+    description: repo.description,
+    updatedAt: repo.updatedAt,
+  })) || [];
+
+  if (isLoading) {
+    return (
+      <div className="grid md:grid-cols-3 gap-8">
+        <div className="md:col-span-2">
+          <Loading />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="grid md:grid-cols-3 gap-8">
@@ -120,30 +139,45 @@ function DashboardView({ username }: { username: string }) {
       <div className="md:col-span-2 space-y-6">
         <div>
           <h2 className="text-xl font-semibold mb-4">Recent repositories</h2>
-          <div className="space-y-3">
-            {recentRepos.map((repo) => (
-              <Card key={`${repo.owner}/${repo.name}`}>
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <Code2 className="h-5 w-5 text-muted-foreground" />
-                    <div>
-                      <Link
-                        to={`/${repo.owner}/${repo.name}`}
-                        className="font-medium hover:text-primary transition-colors"
-                      >
-                        {repo.owner}/{repo.name}
-                      </Link>
-                      {repo.description && (
-                        <p className="text-sm text-muted-foreground">
-                          {repo.description}
-                        </p>
-                      )}
+          {recentRepos.length === 0 ? (
+            <Card>
+              <CardContent className="p-6 text-center text-muted-foreground">
+                <Code2 className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>No repositories yet</p>
+                <p className="text-sm mt-2">
+                  Create your first repository to get started.
+                </p>
+                <Button className="mt-4" asChild>
+                  <Link to="/new">Create repository</Link>
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {recentRepos.map((repo) => (
+                <Card key={`${repo.owner}/${repo.name}`}>
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <Code2 className="h-5 w-5 text-muted-foreground" />
+                      <div>
+                        <Link
+                          to={`/${repo.owner}/${repo.name}`}
+                          className="font-medium hover:text-primary transition-colors"
+                        >
+                          {repo.owner}/{repo.name}
+                        </Link>
+                        {repo.description && (
+                          <p className="text-sm text-muted-foreground">
+                            {repo.description}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </div>
 
         <div>

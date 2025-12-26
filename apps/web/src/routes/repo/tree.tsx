@@ -2,15 +2,8 @@ import { useParams } from 'react-router-dom';
 import { FileTree, type TreeEntry } from '@/components/repo/file-tree';
 import { BranchSelector } from '@/components/repo/branch-selector';
 import { RepoHeader } from './components/repo-header';
-
-// Mock data
-const mockTree: TreeEntry[] = [
-  { name: 'components', path: 'src/components', type: 'directory' },
-  { name: 'lib', path: 'src/lib', type: 'directory' },
-  { name: 'App.tsx', path: 'src/App.tsx', type: 'file', size: 1234 },
-  { name: 'index.tsx', path: 'src/index.tsx', type: 'file', size: 456 },
-  { name: 'styles.css', path: 'src/styles.css', type: 'file', size: 2048 },
-];
+import { trpc } from '@/lib/trpc';
+import { Loading } from '@/components/ui/loading';
 
 export function TreePage() {
   const { owner, repo, ref, '*': path } = useParams<{
@@ -23,13 +16,39 @@ export function TreePage() {
   const currentRef = ref || 'main';
   const currentPath = path || '';
 
-  // TODO: Fetch real data with tRPC
-  const tree = mockTree;
+  // Fetch real tree data from tRPC
+  const { data: treeData, isLoading: treeLoading } = trpc.repos.getTree.useQuery(
+    { owner: owner!, repo: repo!, ref: currentRef, path: currentPath },
+    { enabled: !!owner && !!repo }
+  );
 
-  const branches = [
-    { name: 'main', sha: 'abc123', isDefault: true },
-    { name: 'develop', sha: 'def456' },
-  ];
+  // Fetch branches
+  const { data: branchesData } = trpc.repos.getBranches.useQuery(
+    { owner: owner!, repo: repo! },
+    { enabled: !!owner && !!repo }
+  );
+
+  const tree: TreeEntry[] = treeData?.entries?.map(entry => ({
+    name: entry.name,
+    path: entry.path,
+    type: entry.type,
+    size: entry.size,
+  })) || [];
+
+  const branches = branchesData?.map(b => ({
+    name: b.name,
+    sha: b.sha,
+    isDefault: b.isDefault,
+  })) || [];
+
+  if (treeLoading) {
+    return (
+      <div className="space-y-6">
+        <RepoHeader owner={owner!} repo={repo!} />
+        <Loading />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
