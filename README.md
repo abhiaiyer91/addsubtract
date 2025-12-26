@@ -7,7 +7,7 @@
 
 A modern Git implementation in TypeScript with AI-powered features.
 
-[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://github.com/nicholasgriffintn/wit)
+[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://github.com/abhiaiyer91/wit)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D22.13.0-brightgreen.svg)](https://nodejs.org)
 
@@ -46,7 +46,7 @@ Git is powerful but has well-known usability issues. **wit** addresses them whil
 ## Installation
 
 ```bash
-git clone https://github.com/nicholasgriffintn/wit.git
+git clone https://github.com/abhiaiyer91/wit.git
 cd wit
 npm install
 npm run build
