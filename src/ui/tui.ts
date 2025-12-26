@@ -4,10 +4,11 @@
  */
 
 import * as blessed from 'blessed';
+import * as fs from 'fs';
 import * as path from 'path';
 import { Repository } from '../core/repository';
 import { Commit } from '../core/object';
-import { diff, DiffLine } from '../core/diff';
+import { diff, DiffLine, DiffHunk, createHunks, isBinary } from '../core/diff';
 
 // Type augmentation for blessed
 declare module 'blessed' {
@@ -37,6 +38,20 @@ export class TsgitTUI {
 
   private currentView: 'main' | 'log' | 'diff' | 'branches' = 'main';
   private selectedFile: string | null = null;
+  
+  // Diff view state
+  private fullDiffBox!: blessed.Widgets.ListElement;
+  private diffFiles: Array<{
+    path: string;
+    status: 'staged' | 'modified' | 'untracked' | 'deleted';
+    hunks: DiffHunk[];
+    isBinary: boolean;
+    isNew: boolean;
+    isDeleted: boolean;
+  }> = [];
+  private currentDiffFileIndex: number = 0;
+  private currentDiffHunkIndex: number = 0;
+  private expandedHunks: Set<string> = new Set(); // "fileIdx:hunkIdx" format
 
   constructor(repo: Repository) {
     this.repo = repo;
@@ -209,6 +224,32 @@ export class TsgitTUI {
         border: { fg: 'white' },
       },
     });
+    
+    // Full-screen diff view (hidden by default)
+    this.fullDiffBox = blessed.list({
+      parent: this.screen,
+      label: ' Diff View (q/Esc: close, j/k: navigate, s: stage hunk, Enter: expand/collapse) ',
+      top: 0,
+      left: 0,
+      width: '100%',
+      height: '100%',
+      border: { type: 'line' },
+      tags: true,
+      keys: true,
+      vi: true,
+      mouse: true,
+      hidden: true,
+      scrollable: true,
+      alwaysScroll: true,
+      style: {
+        border: { fg: 'magenta' },
+        selected: { bg: 'blue', fg: 'white' },
+        item: { fg: 'white' },
+      },
+      scrollbar: {
+        style: { bg: 'magenta' },
+      },
+    });
   }
 
   /**
@@ -344,6 +385,26 @@ export class TsgitTUI {
       this.branchBox.hide();
       this.screen.render();
     });
+    
+    // Full diff view key bindings
+    this.fullDiffBox.key(['escape', 'q'], () => {
+      this.closeFullDiffView();
+    });
+    
+    this.fullDiffBox.key(['s'], () => {
+      this.stageSelectedHunk();
+    });
+    
+    this.fullDiffBox.on('select', () => {
+      this.toggleHunkExpansion();
+    });
+    
+    // 'd' key to open full diff view
+    this.screen.key(['d'], () => {
+      if (this.currentView !== 'diff') {
+        this.showFullDiffView();
+      }
+    });
   }
 
   /**
@@ -472,20 +533,451 @@ export class TsgitTUI {
   }
 
   /**
-   * Show diff for a file
+   * Show diff for a file in the side panel
    */
   private showFileDiff(filePath: string): void {
     try {
-      // For now, show a placeholder
-      // In a real implementation, would compute the actual diff
-      const content = `{bold}Diff for: ${filePath}{/bold}\n\n` +
-        `{gray-fg}Select a modified file to see changes{/gray-fg}`;
+      const fileDiff = this.computeFileDiff(filePath);
       
+      if (!fileDiff) {
+        this.diffBox.setContent(`{bold}Diff for: ${filePath}{/bold}\n\n{gray-fg}No changes to show{/gray-fg}`);
+        this.screen.render();
+        return;
+      }
+      
+      if (fileDiff.isBinary) {
+        this.diffBox.setContent(`{bold}Diff for: ${filePath}{/bold}\n\n{yellow-fg}Binary file - cannot display diff{/yellow-fg}`);
+        this.screen.render();
+        return;
+      }
+      
+      // Format the diff for display
+      const content = this.formatDiffForDisplay(fileDiff, filePath);
       this.diffBox.setContent(content);
       this.screen.render();
     } catch (error) {
-      this.diffBox.setContent('{red-fg}Error loading diff{/red-fg}');
+      this.diffBox.setContent(`{red-fg}Error loading diff: ${error instanceof Error ? error.message : 'Unknown error'}{/red-fg}`);
       this.screen.render();
+    }
+  }
+  
+  /**
+   * Compute the diff for a single file
+   */
+  private computeFileDiff(filePath: string): { hunks: DiffHunk[]; isBinary: boolean; isNew: boolean; isDeleted: boolean } | null {
+    const status = this.repo.status();
+    const fullPath = path.join(this.repo.workDir, filePath);
+    
+    // Check what type of change this is
+    const isStaged = status.staged.some(f => f === filePath || f.startsWith(filePath));
+    const isModified = status.modified.includes(filePath);
+    const isUntracked = status.untracked.includes(filePath);
+    const isDeleted = status.deleted.includes(filePath);
+    
+    if (!isStaged && !isModified && !isUntracked && !isDeleted) {
+      return null;
+    }
+    
+    try {
+      let oldContent = '';
+      let newContent = '';
+      
+      if (isUntracked) {
+        // New file - all additions
+        if (!fs.existsSync(fullPath)) return null;
+        const content = fs.readFileSync(fullPath);
+        if (isBinary(content)) {
+          return { hunks: [], isBinary: true, isNew: true, isDeleted: false };
+        }
+        newContent = content.toString('utf-8');
+        return { hunks: createHunks(diff(oldContent, newContent)), isBinary: false, isNew: true, isDeleted: false };
+      }
+      
+      if (isDeleted) {
+        // Deleted file - all deletions
+        const indexEntry = this.repo.index.get(filePath);
+        if (indexEntry) {
+          const blob = this.repo.objects.readBlob(indexEntry.hash);
+          if (isBinary(blob.content)) {
+            return { hunks: [], isBinary: true, isNew: false, isDeleted: true };
+          }
+          oldContent = blob.content.toString('utf-8');
+        }
+        return { hunks: createHunks(diff(oldContent, newContent)), isBinary: false, isNew: false, isDeleted: true };
+      }
+      
+      // Modified or staged file - compute diff against index or HEAD
+      const indexEntry = this.repo.index.get(filePath);
+      if (indexEntry) {
+        const blob = this.repo.objects.readBlob(indexEntry.hash);
+        if (isBinary(blob.content)) {
+          return { hunks: [], isBinary: true, isNew: false, isDeleted: false };
+        }
+        oldContent = blob.content.toString('utf-8');
+      }
+      
+      if (fs.existsSync(fullPath)) {
+        const content = fs.readFileSync(fullPath);
+        if (isBinary(content)) {
+          return { hunks: [], isBinary: true, isNew: false, isDeleted: false };
+        }
+        newContent = content.toString('utf-8');
+      }
+      
+      if (oldContent === newContent) {
+        return null;
+      }
+      
+      return { hunks: createHunks(diff(oldContent, newContent)), isBinary: false, isNew: false, isDeleted: false };
+    } catch (error) {
+      return null;
+    }
+  }
+  
+  /**
+   * Format diff hunks for display in the side panel
+   */
+  private formatDiffForDisplay(fileDiff: { hunks: DiffHunk[]; isNew: boolean; isDeleted: boolean }, filePath: string): string {
+    let content = `{bold}Diff for: ${filePath}{/bold}\n`;
+    
+    if (fileDiff.isNew) {
+      content += `{green-fg}(new file){/green-fg}\n`;
+    } else if (fileDiff.isDeleted) {
+      content += `{red-fg}(deleted){/red-fg}\n`;
+    }
+    
+    content += '\n';
+    
+    if (fileDiff.hunks.length === 0) {
+      content += '{gray-fg}No differences found{/gray-fg}';
+      return content;
+    }
+    
+    for (const hunk of fileDiff.hunks) {
+      content += `{cyan-fg}@@ -${hunk.oldStart},${hunk.oldCount} +${hunk.newStart},${hunk.newCount} @@{/cyan-fg}\n`;
+      
+      for (const line of hunk.lines) {
+        const lineNum = this.formatLineNumber(line);
+        const truncatedContent = this.truncateLine(line.content, 60);
+        
+        switch (line.type) {
+          case 'add':
+            content += `{green-fg}${lineNum} + ${truncatedContent}{/green-fg}\n`;
+            break;
+          case 'remove':
+            content += `{red-fg}${lineNum} - ${truncatedContent}{/red-fg}\n`;
+            break;
+          case 'context':
+            content += `{white-fg}${lineNum}   ${truncatedContent}{/white-fg}\n`;
+            break;
+        }
+      }
+      content += '\n';
+    }
+    
+    return content;
+  }
+  
+  /**
+   * Format line number for display
+   */
+  private formatLineNumber(line: DiffLine): string {
+    const num = line.type === 'add' ? line.newLineNum : line.oldLineNum;
+    return (num?.toString() || '').padStart(4, ' ');
+  }
+  
+  /**
+   * Truncate long lines
+   */
+  private truncateLine(content: string, maxLength: number): string {
+    if (content.length <= maxLength) {
+      return content;
+    }
+    return content.substring(0, maxLength - 3) + '...';
+  }
+  
+  /**
+   * Show full-screen diff view
+   */
+  private showFullDiffView(): void {
+    try {
+      this.computeAllDiffs();
+      
+      if (this.diffFiles.length === 0) {
+        this.showMessage('No changes to display');
+        return;
+      }
+      
+      this.currentView = 'diff';
+      this.currentDiffFileIndex = 0;
+      this.currentDiffHunkIndex = 0;
+      this.expandedHunks.clear();
+      
+      // Expand all hunks by default
+      this.diffFiles.forEach((file, fileIdx) => {
+        file.hunks.forEach((_, hunkIdx) => {
+          this.expandedHunks.add(`${fileIdx}:${hunkIdx}`);
+        });
+      });
+      
+      this.renderFullDiffView();
+      this.fullDiffBox.show();
+      this.fullDiffBox.focus();
+      this.screen.render();
+    } catch (error) {
+      this.showMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+  
+  /**
+   * Compute diffs for all changed files
+   */
+  private computeAllDiffs(): void {
+    const status = this.repo.status();
+    this.diffFiles = [];
+    
+    // Process staged files
+    for (const filePath of status.staged) {
+      const cleanPath = filePath.replace(' (deleted)', '');
+      const fileDiff = this.computeFileDiff(cleanPath);
+      if (fileDiff) {
+        this.diffFiles.push({
+          path: cleanPath,
+          status: 'staged',
+          hunks: fileDiff.hunks,
+          isBinary: fileDiff.isBinary,
+          isNew: fileDiff.isNew,
+          isDeleted: fileDiff.isDeleted,
+        });
+      }
+    }
+    
+    // Process modified files
+    for (const filePath of status.modified) {
+      const fileDiff = this.computeFileDiff(filePath);
+      if (fileDiff) {
+        this.diffFiles.push({
+          path: filePath,
+          status: 'modified',
+          hunks: fileDiff.hunks,
+          isBinary: fileDiff.isBinary,
+          isNew: fileDiff.isNew,
+          isDeleted: fileDiff.isDeleted,
+        });
+      }
+    }
+    
+    // Process untracked files
+    for (const filePath of status.untracked) {
+      const fileDiff = this.computeFileDiff(filePath);
+      if (fileDiff) {
+        this.diffFiles.push({
+          path: filePath,
+          status: 'untracked',
+          hunks: fileDiff.hunks,
+          isBinary: fileDiff.isBinary,
+          isNew: true,
+          isDeleted: false,
+        });
+      }
+    }
+    
+    // Process deleted files
+    for (const filePath of status.deleted) {
+      const fileDiff = this.computeFileDiff(filePath);
+      if (fileDiff) {
+        this.diffFiles.push({
+          path: filePath,
+          status: 'deleted',
+          hunks: fileDiff.hunks,
+          isBinary: fileDiff.isBinary,
+          isNew: false,
+          isDeleted: true,
+        });
+      }
+    }
+  }
+  
+  /**
+   * Render the full diff view
+   */
+  private renderFullDiffView(): void {
+    const items: string[] = [];
+    
+    for (let fileIdx = 0; fileIdx < this.diffFiles.length; fileIdx++) {
+      const file = this.diffFiles[fileIdx];
+      
+      // File header
+      let statusLabel = '';
+      let statusColor = 'white';
+      switch (file.status) {
+        case 'staged':
+          statusLabel = '[S]';
+          statusColor = 'green';
+          break;
+        case 'modified':
+          statusLabel = '[M]';
+          statusColor = 'yellow';
+          break;
+        case 'untracked':
+          statusLabel = '[?]';
+          statusColor = 'red';
+          break;
+        case 'deleted':
+          statusLabel = '[D]';
+          statusColor = 'red';
+          break;
+      }
+      
+      let fileLabel = `{bold}{${statusColor}-fg}${statusLabel}{/${statusColor}-fg} ${file.path}{/bold}`;
+      if (file.isNew) fileLabel += ' {green-fg}(new file){/green-fg}';
+      if (file.isDeleted) fileLabel += ' {red-fg}(deleted){/red-fg}';
+      if (file.isBinary) fileLabel += ' {yellow-fg}(binary){/yellow-fg}';
+      items.push(fileLabel);
+      
+      if (file.isBinary) {
+        items.push('  {yellow-fg}Binary file - cannot display diff{/yellow-fg}');
+        items.push('');
+        continue;
+      }
+      
+      // Hunks
+      for (let hunkIdx = 0; hunkIdx < file.hunks.length; hunkIdx++) {
+        const hunk = file.hunks[hunkIdx];
+        const hunkKey = `${fileIdx}:${hunkIdx}`;
+        const isExpanded = this.expandedHunks.has(hunkKey);
+        const expandIcon = isExpanded ? '▼' : '▶';
+        
+        items.push(`  {cyan-fg}${expandIcon} @@ -${hunk.oldStart},${hunk.oldCount} +${hunk.newStart},${hunk.newCount} @@{/cyan-fg}`);
+        
+        if (isExpanded) {
+          for (const line of hunk.lines) {
+            const lineNum = this.formatLineNumber(line);
+            const content = this.truncateLine(line.content, 100);
+            
+            switch (line.type) {
+              case 'add':
+                items.push(`    {green-fg}${lineNum} + ${content}{/green-fg}`);
+                break;
+              case 'remove':
+                items.push(`    {red-fg}${lineNum} - ${content}{/red-fg}`);
+                break;
+              case 'context':
+                items.push(`    {white-fg}${lineNum}   ${content}{/white-fg}`);
+                break;
+            }
+          }
+        }
+      }
+      
+      items.push('');
+    }
+    
+    if (items.length === 0) {
+      items.push('{gray-fg}No changes to display{/gray-fg}');
+    }
+    
+    this.fullDiffBox.setItems(items);
+  }
+  
+  /**
+   * Close the full diff view
+   */
+  private closeFullDiffView(): void {
+    this.fullDiffBox.hide();
+    this.currentView = 'main';
+    this.filesBox.focus();
+    this.screen.render();
+  }
+  
+  /**
+   * Toggle hunk expansion
+   */
+  private toggleHunkExpansion(): void {
+    const selected = (this.fullDiffBox as any).selected as number;
+    const items = (this.fullDiffBox as any).items as any[];
+    
+    if (selected === undefined || !items || !items[selected]) return;
+    
+    const itemContent = items[selected].content || items[selected].toString();
+    
+    // Check if this is a hunk header line
+    if (itemContent.includes('@@') && itemContent.includes('▼') || itemContent.includes('▶')) {
+      // Find which file and hunk this corresponds to
+      let currentFile = -1;
+      let currentHunk = -1;
+      
+      for (let i = 0; i <= selected; i++) {
+        const content = items[i]?.content || items[i]?.toString() || '';
+        if (content.includes('{bold}') && (content.includes('[S]') || content.includes('[M]') || content.includes('[?]') || content.includes('[D]'))) {
+          currentFile++;
+          currentHunk = -1;
+        } else if (content.includes('@@') && content.includes('-')) {
+          currentHunk++;
+        }
+      }
+      
+      if (currentFile >= 0 && currentHunk >= 0) {
+        const hunkKey = `${currentFile}:${currentHunk}`;
+        if (this.expandedHunks.has(hunkKey)) {
+          this.expandedHunks.delete(hunkKey);
+        } else {
+          this.expandedHunks.add(hunkKey);
+        }
+        this.renderFullDiffView();
+        this.fullDiffBox.select(selected);
+        this.screen.render();
+      }
+    }
+  }
+  
+  /**
+   * Stage the selected hunk
+   */
+  private stageSelectedHunk(): void {
+    const selected = (this.fullDiffBox as any).selected as number;
+    const items = (this.fullDiffBox as any).items as any[];
+    
+    if (selected === undefined || !items) return;
+    
+    // Find which file this belongs to
+    let currentFile = -1;
+    
+    for (let i = 0; i <= selected; i++) {
+      const content = items[i]?.content || items[i]?.toString() || '';
+      if (content.includes('{bold}') && (content.includes('[M]') || content.includes('[?]') || content.includes('[D]'))) {
+        currentFile++;
+      } else if (content.includes('[S]')) {
+        currentFile++;
+      }
+    }
+    
+    if (currentFile >= 0 && currentFile < this.diffFiles.length) {
+      const file = this.diffFiles[currentFile];
+      
+      // Only stage if it's not already staged
+      if (file.status !== 'staged') {
+        try {
+          if (file.status === 'deleted') {
+            // For deleted files, we need to remove from index
+            this.repo.index.remove(file.path);
+            this.repo.index.save();
+          } else {
+            this.repo.add(file.path);
+          }
+          this.showMessage(`Staged: ${file.path}`);
+          
+          // Refresh the diff view
+          this.computeAllDiffs();
+          this.renderFullDiffView();
+          this.refresh();
+          this.screen.render();
+        } catch (error) {
+          this.showMessage(`Error staging: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      } else {
+        this.showMessage('File is already staged');
+      }
     }
   }
 
