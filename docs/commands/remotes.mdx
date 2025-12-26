@@ -40,7 +40,22 @@ wit clone -b develop https://github.com/user/repo.git
 
 # Shallow clone (faster, less history)
 wit clone --depth 1 https://github.com/user/repo.git
+
+# Bare clone (no working directory)
+wit clone --bare https://github.com/user/repo.git
+
+# Clone without checking out
+wit clone -n https://github.com/user/repo.git
 ```
+
+| Option | Description |
+|--------|-------------|
+| `--depth <n>` | Create a shallow clone with only n commits of history |
+| `-b, --branch <name>` | Clone only the specified branch |
+| `--bare` | Create a bare repository (no working directory) |
+| `-n, --no-checkout` | Don't checkout HEAD after cloning |
+| `-o, --origin <name>` | Use `<name>` instead of 'origin' for the remote |
+| `--single-branch` | Clone only one branch |
 
 ## Remotes
 
@@ -68,6 +83,9 @@ wit remote show origin
 
 # Update remote URL
 wit remote set-url origin https://github.com/user/new-repo.git
+
+# Get remote URL
+wit remote get-url origin
 ```
 
 ## Fetch
@@ -86,7 +104,21 @@ wit fetch --all
 
 # Fetch and prune deleted remote branches
 wit fetch --prune
+
+# Fetch with tags
+wit fetch --tags
 ```
+
+### Fetch Options
+
+| Option | Description |
+|--------|-------------|
+| `--all` | Fetch from all configured remotes |
+| `-p, --prune` | Remove remote-tracking refs that no longer exist on the remote |
+| `-t, --tags` | Fetch all tags from the remote |
+| `--depth <n>` | Deepen a shallow clone to n commits |
+| `-v, --verbose` | Be more verbose |
+| `-n, --dry-run` | Show what would be done without making changes |
 
 After fetching, you can see what changed:
 
@@ -114,7 +146,49 @@ wit pull --rebase
 
 # Pull and auto-stash local changes
 wit pull --autostash
+
+# Only fast-forward (fail if not possible)
+wit pull --ff-only
 ```
+
+### Pull Options
+
+| Option | Description |
+|--------|-------------|
+| `-r, --rebase` | Rebase local commits on top of fetched commits |
+| `--ff-only` | Only update if fast-forward is possible |
+| `--no-ff` | Create a merge commit even for fast-forward |
+| `--autostash` | Automatically stash/unstash local changes |
+| `-v, --verbose` | Be more verbose |
+
+### Pull Strategies
+
+<Tabs>
+  <Tab title="Merge (default)">
+    ```bash
+    # Creates a merge commit if branches have diverged
+    wit pull
+    ```
+    
+    Best for: Preserving complete history of parallel development
+  </Tab>
+  <Tab title="Rebase">
+    ```bash
+    # Replays your commits on top of remote changes
+    wit pull --rebase
+    ```
+    
+    Best for: Keeping a linear, clean history
+  </Tab>
+  <Tab title="Fast-forward only">
+    ```bash
+    # Only succeeds if no local commits exist
+    wit pull --ff-only
+    ```
+    
+    Best for: Ensuring you don't accidentally create merge commits
+  </Tab>
+</Tabs>
 
 ### Pull Conflicts
 
@@ -151,18 +225,49 @@ wit push --all
 # Push tags
 wit push --tags
 
+# Delete remote branch
+wit push --delete origin old-branch
+
 # Force push (use with caution!)
 wit push --force
 wit push -f
+
+# Safer force push
+wit push --force-with-lease
 ```
 
 ### Push Options
 
-```bash
-# Dry run - show what would be pushed
-wit push --dry-run
+| Option | Description |
+|--------|-------------|
+| `-u, --set-upstream` | Set upstream tracking for the branch |
+| `-f, --force` | Force push (overwrites remote history) |
+| `--force-with-lease` | Force push only if remote hasn't changed |
+| `--tags` | Push all local tags |
+| `-d, --delete` | Delete the specified remote branch |
+| `--all` | Push all branches |
+| `-n, --dry-run` | Show what would be pushed without pushing |
+| `-v, --verbose` | Be more verbose |
 
-# Push with lease (safer force push)
+<Warning>
+**Force Push Warning**: Using `--force` can overwrite remote history and cause problems for collaborators. Prefer `--force-with-lease` which checks that the remote hasn't changed before pushing.
+</Warning>
+
+### Push Rejections
+
+If your push is rejected, it usually means the remote has changes you don't have:
+
+```bash
+# Push rejected - remote has new commits
+wit push
+# ! [rejected]        main -> main (non-fast-forward)
+# error: failed to push some refs
+
+# Solution: Pull first, then push
+wit pull
+wit push
+
+# Or if you're sure, force push
 wit push --force-with-lease
 ```
 
@@ -243,49 +348,46 @@ wit pull
 
 # See tracking configuration
 wit branch -vv
+
+# Set up tracking manually
+wit branch --set-upstream-to=origin/main main
 ```
 
-## Examples
-
-### First Push to New Repository
+## Complete Workflow Example
 
 ```bash
-# Initialize and commit
-wit init
-wit add .
-wit commit -m "Initial commit"
+# 1. Clone a repository
+wit clone https://github.com/user/repo.git my-project
+cd my-project
 
-# Add remote and push
-wit remote add origin https://github.com/user/new-repo.git
-wit push -u origin main
-```
+# 2. Check remotes
+wit remote -v
+# origin    https://github.com/user/repo.git (fetch)
+# origin    https://github.com/user/repo.git (push)
 
-### Sync Fork with Upstream
+# 3. Create a feature branch and make changes
+wit switch -c feature-x
+echo "new feature" > feature.txt
+wit add feature.txt
+wit commit -m "Add new feature"
 
-```bash
-# Fetch upstream changes
-wit fetch upstream
+# 4. Push the new branch
+wit push -u origin feature-x
 
-# Checkout main and merge
-wit checkout main
-wit merge upstream/main
+# 5. Later, get updates from origin
+wit fetch origin
 
-# Push to your fork
-wit push origin main
-```
+# 6. Merge updates into your branch
+wit pull origin main
 
-### Push a Feature Branch
+# 7. Push your updated branch
+wit push
 
-```bash
-# Create and switch to feature branch
-wit switch -c feature/awesome
-
-# Make changes and commit
-wit add .
-wit commit -m "Add awesome feature"
-
-# Push feature branch
-wit push -u origin feature/awesome
+# 8. After merge, clean up
+wit switch main
+wit pull
+wit branch -d feature-x
+wit push --delete origin feature-x
 ```
 
 ## Troubleshooting
@@ -321,3 +423,22 @@ wit push --force
 wit push -u origin branch-name
 ```
 
+## Tips
+
+<AccordionGroup>
+  <Accordion title="Keep fetched data fresh">
+    Run `wit fetch` regularly to stay up-to-date with remote changes without affecting your working directory.
+  </Accordion>
+  
+  <Accordion title="Use upstream tracking">
+    Set up tracking with `wit push -u` so future pushes/pulls just work with `wit push` and `wit pull`.
+  </Accordion>
+  
+  <Accordion title="Prefer --force-with-lease">
+    When you need to force push, use `--force-with-lease` to prevent accidentally overwriting someone else's work.
+  </Accordion>
+  
+  <Accordion title="Clean up stale branches">
+    Use `wit fetch --prune` to remove tracking branches for remote branches that have been deleted.
+  </Accordion>
+</AccordionGroup>

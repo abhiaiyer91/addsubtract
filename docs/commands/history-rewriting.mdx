@@ -1,0 +1,383 @@
+---
+title: History Rewriting
+description: Modify commit history with reset, revert, cherry-pick, and rebase
+---
+
+# History Rewriting
+
+wit provides powerful commands for modifying commit history. Use these carefully - some operations can permanently alter your repository's history.
+
+## Overview
+
+| Command | Effect | Safe for shared branches? |
+|---------|--------|---------------------------|
+| `revert` | Creates new commit that undoes changes | Yes |
+| `reset` | Moves branch pointer, optionally changes files | No |
+| `cherry-pick` | Copies commits to current branch | Yes |
+| `rebase` | Replays commits onto different base | No |
+
+## Revert
+
+Create a new commit that undoes the changes from a previous commit. This is the safest way to undo changes on shared branches.
+
+```bash
+# Revert a single commit
+wit revert <commit>
+
+# Revert multiple commits
+wit revert <commit1> <commit2>
+
+# Revert without creating a commit (stage changes only)
+wit revert -n <commit>
+
+# Revert a merge commit (specify parent)
+wit revert -m 1 <merge-commit>
+```
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `-n, --no-commit` | Stage the reverted changes without committing |
+| `-m, --mainline <n>` | For merge commits, specify which parent (1 or 2) |
+| `-s, --signoff` | Add Signed-off-by line to commit message |
+| `--continue` | Continue after resolving conflicts |
+| `--abort` | Abort the revert operation |
+| `--skip` | Skip current commit and continue |
+
+### Examples
+
+```bash
+# Revert the last commit
+wit revert HEAD
+
+# Output:
+# ✓ Revert completed: 1 commit(s) created
+#   abc1234
+
+# Revert a specific commit
+wit revert abc1234
+
+# Revert multiple commits (creates one revert commit per original)
+wit revert abc1234 def5678
+
+# Revert a merge commit
+wit revert -m 1 abc1234
+```
+
+### Handling Conflicts
+
+```bash
+# If revert causes conflicts:
+wit revert abc1234
+# error: Revert stopped due to conflicts in 2 file(s)
+# 
+# Conflicts in:
+#   src/file1.ts
+#   src/file2.ts
+
+# Resolve conflicts, then continue
+wit add src/file1.ts src/file2.ts
+wit revert --continue
+
+# Or abort the revert
+wit revert --abort
+```
+
+## Reset
+
+Move the current branch pointer to a different commit. This can also modify the staging area and working directory.
+
+```bash
+# Undo commit, keep changes staged
+wit reset --soft HEAD~1
+
+# Undo commit, keep changes unstaged (default)
+wit reset --mixed HEAD~1
+
+# Undo commit, discard all changes
+wit reset --hard HEAD~1
+
+# Unstage a file
+wit reset <file>
+```
+
+### Reset Modes
+
+| Mode | HEAD | Index (Staging) | Working Directory |
+|------|------|-----------------|-------------------|
+| `--soft` | Moved | Unchanged | Unchanged |
+| `--mixed` (default) | Moved | Reset | Unchanged |
+| `--hard` | Moved | Reset | Reset |
+
+### Revision Syntax
+
+```bash
+# Go back 1 commit
+wit reset HEAD~1
+wit reset HEAD^
+
+# Go back 3 commits
+wit reset HEAD~3
+wit reset HEAD^^^
+
+# Reset to specific commit
+wit reset abc1234
+
+# Reset to branch
+wit reset origin/main
+```
+
+### Examples
+
+```bash
+# Undo last commit but keep changes staged (ready to recommit)
+wit reset --soft HEAD~1
+# ✓ Reset soft to abc1234
+#   Was: def5678
+# Your changes are still staged.
+
+# Undo last commit, unstage changes (for editing before recommit)
+wit reset HEAD~1
+# ✓ Reset mixed to abc1234
+#   Was: def5678
+# Your changes are preserved but unstaged.
+
+# Completely discard last 3 commits
+wit reset --hard HEAD~3
+# ✓ Reset hard to abc1234
+#   Was: def5678
+# Working directory has been reset.
+
+# Unstage a file
+wit reset src/file.ts
+# Unstaged: src/file.ts
+```
+
+<Warning>
+**Danger Zone**: `wit reset --hard` discards changes permanently. Always double-check before using it. Consider `wit snapshot` first.
+</Warning>
+
+### Recovering from Hard Reset
+
+```bash
+# If you accidentally reset --hard, use undo
+wit undo
+
+# Or check the reflog
+wit reflog
+wit reset --hard <previous-hash>
+```
+
+## Cherry-pick
+
+Apply changes from specific commits to the current branch.
+
+```bash
+# Apply a single commit
+wit cherry-pick <commit>
+
+# Apply multiple commits
+wit cherry-pick <commit1> <commit2> <commit3>
+
+# Apply without committing
+wit cherry-pick -n <commit>
+
+# Continue after resolving conflicts
+wit cherry-pick --continue
+
+# Abort cherry-pick
+wit cherry-pick --abort
+
+# Skip current commit
+wit cherry-pick --skip
+```
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `-n, --no-commit` | Apply changes without creating a commit |
+| `-s, --signoff` | Add Signed-off-by line |
+| `--continue` | Continue after resolving conflicts |
+| `--abort` | Abort the operation |
+| `--skip` | Skip current commit and continue |
+
+### Examples
+
+```bash
+# Cherry-pick a bug fix from another branch
+wit cherry-pick abc1234
+
+# Output:
+# ✓ Cherry-pick completed: 1 commit(s) applied
+#   def5678
+
+# Cherry-pick multiple commits
+wit cherry-pick abc1234 def5678 ghi9012
+
+# Cherry-pick without committing (combine multiple picks)
+wit cherry-pick -n abc1234
+wit cherry-pick -n def5678
+wit commit -m "Combined cherry-picks"
+```
+
+### Handling Conflicts
+
+```bash
+# If cherry-pick causes conflicts:
+wit cherry-pick abc1234
+# error: Cherry-pick stopped due to conflicts in 1 file(s)
+
+# Resolve conflicts
+# Edit the conflicted files
+wit add resolved-file.ts
+wit cherry-pick --continue
+
+# Or skip this commit
+wit cherry-pick --skip
+
+# Or abort entirely
+wit cherry-pick --abort
+```
+
+### Use Cases
+
+<AccordionGroup>
+  <Accordion title="Backport a fix">
+    ```bash
+    # On main branch, get the fix commit hash
+    wit log --oneline
+    # abc1234 Fix security vulnerability
+    
+    # Switch to release branch
+    wit switch release-1.0
+    
+    # Apply the fix
+    wit cherry-pick abc1234
+    ```
+  </Accordion>
+  
+  <Accordion title="Extract commits from a branch">
+    ```bash
+    # Pick specific commits from feature branch to main
+    wit switch main
+    wit cherry-pick feature~3  # Third commit from tip
+    wit cherry-pick feature~2  # Second commit from tip
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Rebase
+
+Reapply commits on top of another base commit. This creates a linear history.
+
+```bash
+# Rebase current branch onto main
+wit rebase main
+
+# Rebase onto a specific commit
+wit rebase <commit>
+
+# Interactive rebase (coming soon)
+wit rebase -i HEAD~3
+
+# Continue after resolving conflicts
+wit rebase --continue
+
+# Abort rebase
+wit rebase --abort
+
+# Skip current commit
+wit rebase --skip
+```
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `--onto <newbase>` | Rebase onto a different base |
+| `--continue` | Continue after resolving conflicts |
+| `--abort` | Abort and restore original branch |
+| `--skip` | Skip current commit |
+
+### How Rebase Works
+
+```
+Before rebase:
+      A---B---C  (feature)
+     /
+D---E---F---G  (main)
+
+After `wit rebase main`:
+              A'--B'--C'  (feature)
+             /
+D---E---F---G  (main)
+```
+
+### Examples
+
+```bash
+# Update feature branch with latest main
+wit switch feature
+wit rebase main
+
+# Output:
+# Rebasing feature onto main...
+# ✓ Successfully rebased 3 commits
+
+# If conflicts occur:
+# Resolve conflicts in the file
+wit add resolved-file.ts
+wit rebase --continue
+```
+
+<Warning>
+**Never rebase shared branches**: Rebasing rewrites commit history. If others have based work on your commits, rebasing will cause problems. Only rebase local, unpushed commits.
+</Warning>
+
+## Comparison: When to Use What
+
+| Scenario | Command | Why |
+|----------|---------|-----|
+| Undo a pushed commit | `revert` | Creates new history, safe for shared branches |
+| Undo local commits | `reset` | Cleaner history, commits not shared yet |
+| Copy a fix to another branch | `cherry-pick` | Applies specific changes without merging |
+| Update feature branch | `rebase` or `merge` | Rebase for linear history, merge to preserve history |
+| Combine recent commits | `reset --soft` then `commit` | Squash without interactive rebase |
+
+## Safety Tips
+
+<CardGroup cols={2}>
+  <Card title="Create a backup first" icon="shield">
+    ```bash
+    wit snapshot create "before rebase"
+    wit rebase main
+    ```
+  </Card>
+  
+  <Card title="Check reflog for recovery" icon="clock-rotate-left">
+    ```bash
+    wit reflog
+    wit reset --hard HEAD@{2}
+    ```
+  </Card>
+  
+  <Card title="Use wit undo" icon="rotate-left">
+    ```bash
+    # Many operations can be undone
+    wit undo
+    ```
+  </Card>
+  
+  <Card title="Don't rewrite shared history" icon="users">
+    Only rebase/reset commits that haven't been pushed.
+  </Card>
+</CardGroup>
+
+## Related Commands
+
+- [`wit undo`](/commands/undo-history#undo) - Undo recent operations
+- [`wit reflog`](/commands/advanced#reflog) - View history of HEAD changes
+- [`wit amend`](/commands/quality-of-life#amend) - Modify the last commit
+- [`wit uncommit`](/commands/undo-history#uncommit) - Undo last commit keeping changes staged

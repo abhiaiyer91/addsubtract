@@ -1,0 +1,476 @@
+---
+title: CI/CD Engine
+description: Built-in GitHub Actions-compatible CI/CD workflows
+---
+
+# CI/CD Engine
+
+wit includes a built-in CI/CD engine that can parse and validate GitHub Actions-compatible workflow files. Define your workflows in `.wit/workflows/` and wit understands them natively.
+
+<Note>
+The CI/CD engine currently focuses on workflow parsing and validation. Execution support is planned for future releases.
+</Note>
+
+## Quick Start
+
+```bash
+# Initialize workflows directory with sample
+wit init  # Creates .wit/workflows/ with sample
+
+# Validate a workflow
+wit ci validate .wit/workflows/ci.yml
+```
+
+## Workflow Location
+
+Workflows are stored in `.wit/workflows/*.yml`:
+
+```
+.wit/
+└── workflows/
+    ├── ci.yml
+    ├── deploy.yml
+    └── test.yml
+```
+
+## Workflow Syntax
+
+wit supports GitHub Actions workflow syntax:
+
+```yaml
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run tests
+        run: npm test
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run linter
+        run: npm run lint
+```
+
+## Triggers
+
+### Push Trigger
+
+```yaml
+on:
+  push:
+    branches:
+      - main
+      - 'release/**'
+    branches-ignore:
+      - 'wip/**'
+    tags:
+      - 'v*'
+    paths:
+      - 'src/**'
+      - 'package.json'
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+```
+
+### Pull Request Trigger
+
+```yaml
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+    paths:
+      - 'src/**'
+```
+
+### Schedule Trigger
+
+```yaml
+on:
+  schedule:
+    - cron: '0 2 * * *'  # Daily at 2 AM
+```
+
+### Manual Trigger
+
+```yaml
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+```
+
+### Multiple Triggers
+
+```yaml
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+```
+
+## Jobs
+
+### Basic Job
+
+```yaml
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Hello, World!"
+```
+
+### Job Dependencies
+
+```yaml
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: npm run build
+
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - run: npm test
+
+  deploy:
+    needs: [build, test]
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./deploy.sh
+```
+
+wit automatically determines the correct job order based on dependencies.
+
+### Matrix Strategy
+
+```yaml
+jobs:
+  test:
+    strategy:
+      matrix:
+        node: [18, 20, 22]
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm test
+```
+
+### Conditional Jobs
+
+```yaml
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./deploy.sh
+```
+
+## Steps
+
+### Run Commands
+
+```yaml
+steps:
+  - name: Run tests
+    run: npm test
+
+  - name: Multi-line script
+    run: |
+      echo "Building..."
+      npm run build
+      echo "Done!"
+
+  - name: With working directory
+    run: npm test
+    working-directory: ./packages/core
+```
+
+### Use Actions
+
+```yaml
+steps:
+  - name: Checkout
+    uses: actions/checkout@v4
+
+  - name: Setup Node
+    uses: actions/setup-node@v4
+    with:
+      node-version: '20'
+      cache: 'npm'
+
+  - name: Use local action
+    uses: ./.github/actions/my-action
+```
+
+### Environment Variables
+
+```yaml
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      CI: true
+    steps:
+      - name: With step env
+        env:
+          NODE_ENV: production
+        run: npm run build
+```
+
+## Services
+
+```yaml
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+```
+
+## Concurrency
+
+```yaml
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+```
+
+## Permissions
+
+```yaml
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+```
+
+## Programmatic API
+
+wit exposes the CI engine programmatically:
+
+```typescript
+import { CIEngine, createCIEngine } from 'wit/ci';
+
+// Create engine for a repository
+const engine = createCIEngine('/path/to/repo');
+
+// Load all workflows
+const workflows = engine.load();
+
+// Find workflows that match a trigger
+const matching = engine.findMatchingWorkflows({
+  event: 'push',
+  branch: 'main',
+  paths: ['src/index.ts'],
+});
+
+// Get job execution order
+for (const workflow of matching) {
+  const jobOrder = engine.getJobOrder(workflow.workflow);
+  console.log('Jobs:', jobOrder);
+  
+  // Get parallel jobs
+  const completed = new Set<string>();
+  const parallel = engine.getParallelJobs(workflow.workflow, completed);
+  console.log('Can run in parallel:', parallel);
+}
+
+// Validate a workflow
+const result = engine.validate(yamlContent);
+if (!result.valid) {
+  console.error('Errors:', result.errors);
+}
+```
+
+## Validation
+
+wit validates workflows for common errors:
+
+```typescript
+import { validateWorkflowFile } from 'wit/ci';
+
+const result = validateWorkflowFile(yamlContent);
+
+if (!result.valid) {
+  for (const error of result.errors) {
+    console.error(`${error.path}: ${error.message}`);
+  }
+}
+```
+
+### Validated Elements
+
+- Required fields (`name`, `on`, `jobs`)
+- Valid trigger events
+- Job dependency cycles
+- Step structure
+- Expression syntax (`${{ ... }}`)
+- Cron expressions
+
+## Example Workflows
+
+### Node.js CI
+
+```yaml
+name: Node.js CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [18, 20]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm test
+```
+
+### Deploy on Tag
+
+```yaml
+name: Deploy
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm ci
+      - run: npm run build
+      - run: npm run deploy
+        env:
+          DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
+```
+
+### Scheduled Maintenance
+
+```yaml
+name: Maintenance
+
+on:
+  schedule:
+    - cron: '0 3 * * 0'  # Weekly on Sunday at 3 AM
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm run cleanup
+      - run: npm run report
+```
+
+## Comparison with GitHub Actions
+
+| Feature | GitHub Actions | wit CI |
+|---------|----------------|--------|
+| Workflow syntax | YAML | YAML (compatible) |
+| Triggers | Full support | Parsing + matching |
+| Job dependencies | Full support | Full support |
+| Matrix builds | Full support | Parsing support |
+| Execution | Cloud runners | Planned |
+| Local validation | Limited | Built-in |
+
+## Future Plans
+
+- Local workflow execution
+- Container step support
+- Action marketplace integration
+- Parallel job execution
+- Artifact handling
+
+## Related
+
+- [GitHub Actions Documentation](https://docs.github.com/en/actions)
+- [`wit hooks`](/features/hooks) - Git hooks for local automation

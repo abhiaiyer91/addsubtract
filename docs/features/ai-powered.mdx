@@ -45,15 +45,15 @@ wit ai status
 
 Output:
 ```
-🤖 wit AI Status
+wit AI Status
 
-Available: ✅ Yes
+Available: Yes
 Model: openai/gpt-4o
 Provider: openai
 
 Environment Variables:
-  OPENAI_API_KEY: ✅ Set
-  ANTHROPIC_API_KEY: ❌ Not set
+  OPENAI_API_KEY: Set
+  ANTHROPIC_API_KEY: Not set
   WIT_AI_MODEL: (not set, using default)
 ```
 
@@ -106,17 +106,17 @@ wit ai commit
 
 **Output:**
 ```
-🤖 Generating commit message...
+Generating commit message...
 
-📝 Suggested commit message:
+Suggested commit message:
 
-────────────────────────────────────────────────────────────────
+----------------------------------------------------------------
 feat: add user authentication middleware
 
 - Implement JWT token validation
 - Add role-based access control
 - Create auth error handling
-────────────────────────────────────────────────────────────────
+----------------------------------------------------------------
 
 To use this message, run:
   wit commit -m "feat: add user authentication middleware"
@@ -147,7 +147,7 @@ wit ai review --staged
 
 **Example output:**
 ```
-🔍 Reviewing changes...
+Reviewing changes...
 
 ## Code Review Summary
 
@@ -183,7 +183,7 @@ wit ai explain abc1234
 
 **Example output:**
 ```
-📖 Explaining commit...
+Explaining commit...
 
 ## Commit abc1234: "refactor: extract validation logic"
 
@@ -218,7 +218,7 @@ wit ai resolve src/config.ts
 
 **Example output:**
 ```
-🔧 Resolving: src/config.ts
+Resolving: src/config.ts
 
 ## Conflict Analysis
 
@@ -240,21 +240,43 @@ I recommend keeping their version because:
 
 ## AI Tools
 
-wit's AI agent has access to specialized tools:
+wit's AI agent has access to specialized tools that give it full capabilities:
+
+### Repository Understanding
 
 | Tool | Purpose |
 |------|---------|
-| `getStatus` | Understand repository state |
-| `getDiff` | Analyze changes |
+| `getStatus` | Understand repository state (staged, modified, untracked files) |
+| `getDiff` | Analyze changes between commits or working directory |
 | `getLog` | Review commit history |
-| `getBranches` | Navigate branches |
+| `getBranches` | Navigate and list branches |
+| `search` | Intelligent code and commit search |
+
+### Taking Actions
+
+| Tool | Purpose |
+|------|---------|
 | `stageFiles` | Stage files for commit |
-| `createCommit` | Create commits |
-| `switchBranch` | Switch branches |
-| `getMergeConflicts` | View merge conflicts |
-| `resolveConflict` | Resolve conflicts |
-| `undo` | Undo operations |
-| `search` | Search commits, files, content |
+| `createCommit` | Generate and create commits |
+| `switchBranch` | Switch to a different branch |
+| `undo` | Undo recent operations |
+
+### Conflict Resolution
+
+| Tool | Purpose |
+|------|---------|
+| `getMergeConflicts` | Retrieve structured conflict information |
+| `resolveConflict` | Apply a resolution to a conflict |
+
+The AI agent can use these tools to perform complex multi-step operations like:
+
+```bash
+# AI can understand this request and use multiple tools
+wit ai "stage all test files and commit with a descriptive message"
+
+# Or help resolve conflicts
+wit ai "show me the conflicts and help me resolve them"
+```
 
 ## Programmatic Usage
 

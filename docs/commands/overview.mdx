@@ -16,14 +16,29 @@ wit provides a comprehensive set of commands organized by functionality. Many co
   <Card title="Branches" icon="code-branch" href="/commands/branches">
     Branch management: branch, switch, checkout
   </Card>
+  <Card title="Remote Operations" icon="cloud" href="/commands/remotes">
+    Work with remotes: clone, fetch, pull, push, remote
+  </Card>
+  <Card title="Stash" icon="box-archive" href="/commands/stash">
+    Temporarily save changes: stash, pop, apply
+  </Card>
+  <Card title="Merge" icon="code-merge" href="/commands/merge">
+    Merging and conflict resolution
+  </Card>
+  <Card title="History Rewriting" icon="clock-rotate-left" href="/commands/history-rewriting">
+    Modify history: reset, revert, cherry-pick, rebase
+  </Card>
+  <Card title="Tags" icon="tag" href="/commands/tags">
+    Release management: tag, lightweight, annotated
+  </Card>
   <Card title="Undo & History" icon="rotate-left" href="/commands/undo-history">
     Powerful undo capabilities: undo, history, restore, uncommit, reset
   </Card>
   <Card title="Quality of Life" icon="wand-magic-sparkles" href="/commands/quality-of-life">
     Productivity boosters: wip, amend, fixup, snapshot, cleanup, stats, blame
   </Card>
-  <Card title="Merge" icon="code-merge" href="/commands/merge">
-    Merging and conflict resolution
+  <Card title="Debugging" icon="bug" href="/commands/debugging">
+    Find bugs: bisect, show, clean
   </Card>
   <Card title="Advanced" icon="gear" href="/commands/advanced">
     Hooks, submodules, worktrees, reflog, garbage collection, plumbing
@@ -37,11 +52,15 @@ wit provides a comprehensive set of commands organized by functionality. Many co
 | Command | Description |
 |---------|-------------|
 | `wit init` | Create a new repository |
+| `wit clone <url>` | Clone a repository |
 | `wit add <files>` | Stage files for commit |
 | `wit commit -m "msg"` | Create a commit |
 | `wit status` | Show working tree status |
 | `wit log` | Show commit history |
 | `wit switch <branch>` | Switch branches |
+| `wit pull` | Fetch and merge changes |
+| `wit push` | Push changes to remote |
+| `wit stash` | Temporarily save changes |
 | `wit undo` | Undo the last operation |
 | `wit wip` | Quick WIP commit |
 | `wit ai commit` | AI-generated commit message |
@@ -132,6 +151,8 @@ wit aims to be more intuitive than Git:
 | `git stash` (manual) | Auto-stash on switch | Automatic |
 | `git reflog` (cryptic) | `wit undo` | Simple undo |
 | No AI | `wit ai commit` | AI assistance |
+| Complex merge conflicts | Structured JSON conflicts | Easier resolution |
+| Git LFS required | Built-in large file handling | No setup needed |
 
 ## Full Command List
 

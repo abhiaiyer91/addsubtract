@@ -74,9 +74,13 @@
         "commands/basic-workflow",
         "commands/branches",
         "commands/remotes",
+        "commands/stash",
+        "commands/merge",
+        "commands/history-rewriting",
+        "commands/tags",
         "commands/undo-history",
         "commands/quality-of-life",
-        "commands/merge",
+        "commands/debugging",
         "commands/advanced"
       ]
     },
@@ -94,6 +98,7 @@
       "pages": [
         "features/github",
         "features/ai-powered",
+        "features/ci-cd",
         "features/monorepo-scopes",
         "features/large-files",
         "features/hooks",
