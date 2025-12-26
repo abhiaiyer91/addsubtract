@@ -16,6 +16,9 @@ export { resolveConflictTool } from './resolve-conflict.js';
 export { undoTool } from './undo.js';
 export { searchTool } from './search.js';
 export { semanticSearchTool, indexRepositoryTool, getIndexStatusTool } from './semantic-search.js';
+export { generatePRDescriptionTool, PR_DESCRIPTION_PROMPT } from './generate-pr-description.js';
+export { reviewPRTool, CODE_REVIEW_PROMPT, formatReviewComment } from './review-pr.js';
+export type { ReviewCategory } from './review-pr.js';
 
 import { getStatusTool } from './get-status.js';
 import { getDiffTool } from './get-diff.js';
@@ -29,6 +32,8 @@ import { resolveConflictTool } from './resolve-conflict.js';
 import { undoTool } from './undo.js';
 import { searchTool } from './search.js';
 import { semanticSearchTool, indexRepositoryTool, getIndexStatusTool } from './semantic-search.js';
+import { generatePRDescriptionTool } from './generate-pr-description.js';
+import { reviewPRTool } from './review-pr.js';
 
 /**
  * All wit tools bundled together for easy registration with an agent
@@ -48,4 +53,6 @@ export const witTools = {
   semanticSearch: semanticSearchTool,
   indexRepository: indexRepositoryTool,
   getIndexStatus: getIndexStatusTool,
+  generatePRDescription: generatePRDescriptionTool,
+  reviewPR: reviewPRTool,
 };
