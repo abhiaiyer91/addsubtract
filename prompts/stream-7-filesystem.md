@@ -414,7 +414,9 @@ export class Filesystem {
   /**
    * Merge a branch into current
    */
-  async merge(branchName: string): Promise<{ success: boolean; conflicts?: string[] }> {
+  async merge(
+    branchName: string
+  ): Promise<{ success: boolean; conflicts?: string[] }> {
     try {
       this.repo.merge(branchName);
       return { success: true };
@@ -743,4 +745,3 @@ describe("Filesystem", () => {
 
 - wit core (`src/core/repository.ts`, `src/core/index.ts`, `src/core/refs.ts`)
 - glob package for file matching
-
