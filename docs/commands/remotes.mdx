@@ -1,0 +1,323 @@
+---
+title: "Remote Operations"
+description: "Clone, fetch, pull, and push to remote repositories"
+---
+
+# Remote Operations
+
+wit provides full support for remote Git operations, allowing you to collaborate with others using any Git hosting service including GitHub, GitLab, Bitbucket, or self-hosted servers.
+
+## Quick Reference
+
+| Command | Description |
+|---------|-------------|
+| `wit clone <url>` | Clone a repository |
+| `wit remote add <name> <url>` | Add a remote |
+| `wit fetch [remote]` | Download objects from remote |
+| `wit pull [remote]` | Fetch and merge |
+| `wit push [remote] [branch]` | Upload changes to remote |
+
+## Clone
+
+Clone a repository from a remote URL:
+
+```bash
+# Clone into a new directory
+wit clone https://github.com/user/repo.git
+
+# Clone into a specific directory
+wit clone https://github.com/user/repo.git my-project
+
+# Clone into current directory
+wit clone https://github.com/user/repo.git .
+```
+
+### Clone Options
+
+```bash
+# Clone a specific branch
+wit clone -b develop https://github.com/user/repo.git
+
+# Shallow clone (faster, less history)
+wit clone --depth 1 https://github.com/user/repo.git
+```
+
+## Remotes
+
+Manage remote repository connections:
+
+```bash
+# List all remotes
+wit remote
+
+# List remotes with URLs
+wit remote -v
+
+# Add a new remote
+wit remote add origin https://github.com/user/repo.git
+wit remote add upstream https://github.com/original/repo.git
+
+# Remove a remote
+wit remote remove upstream
+
+# Rename a remote
+wit remote rename origin github
+
+# Show remote details
+wit remote show origin
+
+# Update remote URL
+wit remote set-url origin https://github.com/user/new-repo.git
+```
+
+## Fetch
+
+Download objects and refs from a remote without merging:
+
+```bash
+# Fetch from origin (default remote)
+wit fetch
+
+# Fetch from a specific remote
+wit fetch upstream
+
+# Fetch all remotes
+wit fetch --all
+
+# Fetch and prune deleted remote branches
+wit fetch --prune
+```
+
+After fetching, you can see what changed:
+
+```bash
+# Compare local and remote
+wit log main..origin/main
+
+# See all remote branches
+wit branch -r
+```
+
+## Pull
+
+Fetch from remote and merge into current branch:
+
+```bash
+# Pull from tracking branch
+wit pull
+
+# Pull from specific remote/branch
+wit pull origin main
+
+# Pull with rebase instead of merge
+wit pull --rebase
+
+# Pull and auto-stash local changes
+wit pull --autostash
+```
+
+### Pull Conflicts
+
+If there are conflicts during pull:
+
+```bash
+# See conflicts
+wit merge --conflicts
+
+# Resolve and continue
+wit merge --continue
+
+# Or abort
+wit merge --abort
+```
+
+## Push
+
+Upload local commits to a remote repository:
+
+```bash
+# Push current branch to tracking remote
+wit push
+
+# Push to specific remote/branch
+wit push origin main
+
+# Push and set upstream tracking
+wit push -u origin main
+
+# Push all branches
+wit push --all
+
+# Push tags
+wit push --tags
+
+# Force push (use with caution!)
+wit push --force
+wit push -f
+```
+
+### Push Options
+
+```bash
+# Dry run - show what would be pushed
+wit push --dry-run
+
+# Push with lease (safer force push)
+wit push --force-with-lease
+```
+
+## Authentication
+
+### GitHub Authentication
+
+The recommended way to authenticate with GitHub:
+
+```bash
+# Login with OAuth (opens browser)
+wit github login
+
+# Check authentication status
+wit github status
+
+# Logout
+wit github logout
+```
+
+### Environment Variables
+
+You can also use environment variables:
+
+```bash
+# GitHub token
+export GITHUB_TOKEN=ghp_xxxxxxxxxxxx
+
+# Or use GH CLI token
+export GH_TOKEN=ghp_xxxxxxxxxxxx
+```
+
+### Personal Access Tokens
+
+For other Git hosts, use personal access tokens:
+
+```bash
+# Token in URL (not recommended for shared machines)
+wit clone https://token@github.com/user/repo.git
+
+# Or set in environment
+export WIT_TOKEN=your-token
+```
+
+## Working with Forks
+
+Common fork workflow:
+
+```bash
+# Clone your fork
+wit clone https://github.com/you/repo.git
+cd repo
+
+# Add upstream remote
+wit remote add upstream https://github.com/original/repo.git
+
+# Fetch upstream changes
+wit fetch upstream
+
+# Merge upstream into your branch
+wit merge upstream/main
+
+# Push to your fork
+wit push origin main
+```
+
+## Tracking Branches
+
+Set up tracking between local and remote branches:
+
+```bash
+# Push and set upstream
+wit push -u origin feature
+
+# After this, you can just use:
+wit push
+wit pull
+
+# See tracking configuration
+wit branch -vv
+```
+
+## Examples
+
+### First Push to New Repository
+
+```bash
+# Initialize and commit
+wit init
+wit add .
+wit commit -m "Initial commit"
+
+# Add remote and push
+wit remote add origin https://github.com/user/new-repo.git
+wit push -u origin main
+```
+
+### Sync Fork with Upstream
+
+```bash
+# Fetch upstream changes
+wit fetch upstream
+
+# Checkout main and merge
+wit checkout main
+wit merge upstream/main
+
+# Push to your fork
+wit push origin main
+```
+
+### Push a Feature Branch
+
+```bash
+# Create and switch to feature branch
+wit switch -c feature/awesome
+
+# Make changes and commit
+wit add .
+wit commit -m "Add awesome feature"
+
+# Push feature branch
+wit push -u origin feature/awesome
+```
+
+## Troubleshooting
+
+### "Authentication failed"
+
+```bash
+# Check if logged in
+wit github status
+
+# Re-login
+wit github logout
+wit github login
+```
+
+### "Updates were rejected"
+
+Your local branch is behind the remote:
+
+```bash
+# Option 1: Pull first
+wit pull
+wit push
+
+# Option 2: Force push (if you know what you're doing)
+wit push --force
+```
+
+### "No upstream branch"
+
+```bash
+# Set upstream when pushing
+wit push -u origin branch-name
+```
+

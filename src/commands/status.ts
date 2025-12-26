@@ -21,6 +21,32 @@ export function status(): void {
       const head = repo.refs.getHead();
       console.log(`HEAD detached at ${colors.cyan(head.target.slice(0, 7))}`);
     }
+    
+    // Check for merge in progress
+    const mergeState = repo.mergeManager.getState();
+    if (mergeState) {
+      console.log();
+      console.log(colors.yellow('You have unmerged paths.'));
+      console.log(`  (fix conflicts and run "wit commit")`);
+      console.log(`  (use "wit merge --abort" to abort the merge)`);
+      console.log();
+      console.log(`Merging: ${colors.cyan(mergeState.sourceBranch)} into ${colors.cyan(mergeState.targetBranch)}`);
+      
+      if (mergeState.conflicts.length > 0) {
+        console.log();
+        console.log('Unmerged paths:');
+        console.log('  (use "wit add <file>..." to mark resolution)');
+        console.log();
+        for (const conflict of mergeState.conflicts) {
+          const isResolved = mergeState.resolved.includes(conflict.path);
+          if (isResolved) {
+            console.log(`        ${colors.green('resolved:   ' + conflict.path)}`);
+          } else {
+            console.log(`        ${colors.red('both modified:   ' + conflict.path)}`);
+          }
+        }
+      }
+    }
     console.log();
 
     // Show staged changes

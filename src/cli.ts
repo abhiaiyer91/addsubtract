@@ -49,6 +49,8 @@ import {
   handleFetch,
   handlePull,
   handlePush,
+  // GitHub integration
+  handleGitHub,
   // Plumbing commands
   handleRevParse,
   handleUpdateRef,
@@ -59,6 +61,18 @@ import {
   // Advanced features
   handleReflog,
   handleGC,
+  // Server command
+  handleServe,
+  // Command help
+  printCommandHelp,
+  hasHelpFlag,
+  // Platform commands
+  handlePr,
+  handleIssue,
+  // Platform management
+  handleUp,
+  handleDown,
+  handlePlatformStatus,
 } from './commands';
 import { handleHooks } from './core/hooks';
 import { handleSubmodule } from './core/submodule';
@@ -155,12 +169,43 @@ Remote Operations:
   pull [<remote>]       Fetch and integrate with local branch
   push [<remote>]       Update remote refs and objects
 
+GitHub Integration:
+  github login          Authenticate with GitHub (device flow)
+  github logout         Remove stored GitHub credentials
+  github status         Show authentication status
+  github token          Print access token (for scripting)
+
 Advanced Features:
   hooks                 Manage repository hooks
   submodule             Manage submodules
   worktree              Manage multiple working trees
   reflog                Show reference log
   gc                    Run garbage collection
+
+Server:
+  serve                 Start Git HTTP server for hosting repos
+  serve --port <n>      Start server on specified port
+  serve --repos <path>  Set repository storage directory
+
+Platform Commands:
+  pr create             Create pull request from current branch
+  pr list               List pull requests
+  pr view <number>      View pull request details
+  pr merge <number>     Merge a pull request
+  pr close <number>     Close a pull request
+  pr review [<number>]  AI code review using CodeRabbit
+  pr review-status      Check CodeRabbit configuration
+  
+  issue create <title>  Create new issue
+  issue list            List issues
+  issue view <number>   View issue details
+  issue close <number>  Close an issue
+  issue comment <n>     Add comment to issue
+
+Self-Hosting (run your own GitHub):
+  up                    Start the wit platform (database + server + web UI)
+  down                  Stop all wit services
+  platform-status       Show status of running services
 
 Quality of Life:
   amend                 Quickly fix the last commit
@@ -180,10 +225,13 @@ Monorepo Support:
 AI-Powered Features:
   ai <query>            Natural language git commands
   ai commit [-a] [-x]   Generate commit message from changes
-  ai review             AI code review of changes
+  ai review             AI code review of local changes (uses LLM)
   ai explain [ref]      Explain a commit
   ai resolve [file]     AI-assisted conflict resolution
   ai status             Show AI configuration
+  
+  pr review [<number>]  AI PR review using CodeRabbit
+  pr review --configure Set up CodeRabbit API key
 
 Plumbing Commands:
   cat-file <hash>       Provide content or type info for objects
@@ -200,6 +248,13 @@ Plumbing Commands:
 Options:
   -h, --help            Show this help message
   -v, --version         Show version number
+
+Environment Variables:
+  GITHUB_TOKEN          GitHub personal access token (recommended)
+  GH_TOKEN              Alternative to GITHUB_TOKEN
+  WIT_GITHUB_CLIENT_ID  OAuth App client ID (for device flow login)
+  WIT_TOKEN             Generic wit authentication token
+  GIT_TOKEN             Generic git authentication token
 
 Examples:
   wit ui                    # Launch terminal UI
@@ -226,6 +281,9 @@ Examples:
   wit fetch origin           # Fetch from origin
   wit pull                   # Pull current branch
   wit push -u origin main    # Push and set upstream
+  wit github login           # Login to GitHub
+  wit github status          # Check GitHub auth status
+  wit serve --port 3000      # Start Git server
 `;
 
 const COMMANDS = [
@@ -245,8 +303,16 @@ const COMMANDS = [
   'cherry-pick', 'rebase', 'revert',
   // Remote commands
   'remote', 'clone', 'fetch', 'pull', 'push',
+  // GitHub integration
+  'github',
   // Advanced features
   'hooks', 'submodule', 'worktree', 'reflog', 'gc',
+  // Server
+  'serve',
+  // Platform commands
+  'pr', 'issue',
+  // Platform management
+  'up', 'down', 'platform-status',
   'help',
 ];
 
@@ -330,7 +396,22 @@ function main(): void {
   // For commands that do their own argument parsing, use raw args after command
   const rawArgs = args.slice(1);
 
+  // Check for --help or -h flag on a specific command first
+  // This handles: wit add --help, wit commit -h, etc.
+  if (command && COMMANDS.includes(command) && command !== 'help' && (options.help || hasHelpFlag(rawArgs))) {
+    if (printCommandHelp(command)) {
+      return;
+    }
+  }
+
+  // Check for general help: wit --help, wit help, wit help <command>
   if (options.help || command === 'help') {
+    // Check if help is requested for a specific command
+    if (command === 'help' && cmdArgs.length > 0) {
+      if (printCommandHelp(cmdArgs[0])) {
+        return;
+      }
+    }
     console.log(HELP);
     return;
   }
@@ -356,18 +437,20 @@ function main(): void {
         break;
 
       case 'commit':
-        // Use new commit handler for full options
-        if (options.all || cmdArgs.length > 0) {
-          handleCommit([...cmdArgs, ...(options.message ? ['-m', options.message as string] : []), ...(options.all ? ['-a'] : [])]);
-        } else {
-          const message = options.message as string;
-          if (!message) {
-            console.error('error: switch `m\' requires a value');
-            process.exit(1);
+        // Use new commit handler for full options (now async for hooks)
+        handleCommit([
+          ...cmdArgs,
+          ...(options.message ? ['-m', options.message as string] : []),
+          ...(options.all ? ['-a'] : []),
+        ]).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
           }
-          commit(message);
-        }
-        break;
+          process.exit(1);
+        });
+        return; // Exit main() to let async handle complete
 
       case 'status':
         status();
@@ -425,8 +508,15 @@ function main(): void {
           options.continue ? ['--continue'] : [],
           options.conflicts ? ['--conflicts'] : [],
           options.message ? ['-m', options.message as string] : []
-        ));
-        break;
+        )).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
+          }
+          process.exit(1);
+        });
+        return; // Exit main() to let async handle complete
 
       case 'undo':
         handleUndo(cmdArgs.concat(
@@ -665,6 +755,18 @@ function main(): void {
         handlePush(args.slice(args.indexOf('push') + 1));
         break;
 
+      // GitHub integration
+      case 'github':
+        handleGitHub(args.slice(args.indexOf('github') + 1)).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
+          }
+          process.exit(1);
+        });
+        return; // Exit main() to let async handle complete
+
       // Advanced features
       case 'hooks':
         handleHooks(cmdArgs);
@@ -688,6 +790,67 @@ function main(): void {
       case 'gc':
         handleGC(cmdArgs);
         break;
+
+      case 'serve':
+        handleServe(args.slice(args.indexOf('serve') + 1));
+        break;
+
+      // Platform commands
+      case 'pr':
+        handlePr(args.slice(args.indexOf('pr') + 1)).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
+          }
+          process.exit(1);
+        });
+        return; // Exit main() to let async handle complete
+
+      case 'issue':
+        handleIssue(args.slice(args.indexOf('issue') + 1)).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
+          }
+          process.exit(1);
+        });
+        return; // Exit main() to let async handle complete
+
+      // Platform management commands
+      case 'up':
+        handleUp(args.slice(args.indexOf('up') + 1)).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
+          }
+          process.exit(1);
+        });
+        return;
+
+      case 'down':
+        handleDown(args.slice(args.indexOf('down') + 1)).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
+          }
+          process.exit(1);
+        });
+        return;
+
+      case 'platform-status':
+        handlePlatformStatus(args.slice(args.indexOf('platform-status') + 1)).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
+          }
+          process.exit(1);
+        });
+        return;
 
       default: {
         // Provide suggestions for unknown commands

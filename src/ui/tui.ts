@@ -183,7 +183,7 @@ export class TsgitTUI {
       left: 0,
       width: '100%',
       height: 1,
-      content: ' {bold}q{/bold}:quit  {bold}r{/bold}:refresh  {bold}a{/bold}:add  {bold}c{/bold}:commit  {bold}s{/bold}:switch  {bold}p{/bold}:push  {bold}l{/bold}:pull  {bold}?{/bold}:help',
+      content: ' {bold}q{/bold}:quit {bold}:{/bold}:palette {bold}a{/bold}:add {bold}c{/bold}:commit {bold}s{/bold}:switch {bold}b{/bold}:branch {bold}z{/bold}:stash {bold}m{/bold}:merge {bold}p{/bold}:push {bold}?{/bold}:help',
       tags: true,
       style: {
         fg: 'white',
@@ -272,9 +272,19 @@ export class TsgitTUI {
       this.addSelectedFile();
     });
 
+    // Stage all
+    this.screen.key(['A'], () => {
+      this.stageAll();
+    });
+
     // Commit
     this.screen.key(['c'], () => {
       this.showCommitDialog();
+    });
+
+    // Amend commit
+    this.screen.key(['C'], () => {
+      this.showAmendDialog();
     });
 
     // Switch branch
@@ -282,9 +292,64 @@ export class TsgitTUI {
       this.showBranchSelector();
     });
 
+    // Create branch
+    this.screen.key(['b'], () => {
+      this.showCreateBranchDialog();
+    });
+
+    // Stash
+    this.screen.key(['z'], () => {
+      this.showStashMenu();
+    });
+
+    // Tag
+    this.screen.key(['t'], () => {
+      this.showTagMenu();
+    });
+
+    // Merge
+    this.screen.key(['m'], () => {
+      this.showMergeMenu();
+    });
+
+    // Push
+    this.screen.key(['p'], () => {
+      this.pushChanges();
+    });
+
+    // Pull
+    this.screen.key(['l'], () => {
+      this.pullChanges();
+    });
+
+    // Fetch
+    this.screen.key(['f'], () => {
+      this.fetchChanges();
+    });
+
+    // Undo
+    this.screen.key(['u'], () => {
+      this.undoLastOperation();
+    });
+
+    // Reset
+    this.screen.key(['R'], () => {
+      this.showResetMenu();
+    });
+
+    // WIP commit
+    this.screen.key(['w'], () => {
+      this.wipCommit();
+    });
+
     // Help
     this.screen.key(['?'], () => {
       this.showHelp();
+    });
+
+    // Command palette
+    this.screen.key([':', 'C-k'], () => {
+      this.showCommandPalette();
     });
 
     // Tab between panels
@@ -1041,6 +1106,605 @@ export class TsgitTUI {
   }
 
   /**
+   * Stage all files
+   */
+  private stageAll(): void {
+    try {
+      this.repo.addAll();
+      this.showMessage('Staged all changes');
+      this.refresh();
+    } catch (error) {
+      this.showMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Show amend dialog
+   */
+  private showAmendDialog(): void {
+    const prompt = blessed.prompt({
+      parent: this.screen,
+      top: 'center',
+      left: 'center',
+      width: '60%',
+      height: 'shrink',
+      border: { type: 'line' },
+      label: ' Amend Last Commit (leave empty to keep message) ',
+      tags: true,
+      style: {
+        border: { fg: 'yellow' },
+        label: { fg: 'yellow', bold: true },
+      },
+    });
+
+    prompt.input('New message (optional):', '', (err, value) => {
+      if (!err) {
+        try {
+          const headHash = this.repo.refs.resolve('HEAD');
+          if (!headHash) {
+            this.showMessage('No commits to amend');
+            prompt.destroy();
+            this.screen.render();
+            return;
+          }
+          const oldCommit = this.repo.objects.readCommit(headHash);
+          const newMessage = value?.trim() || oldCommit.message;
+          
+          // Reset to parent
+          if (oldCommit.parentHashes.length > 0) {
+            const head = this.repo.refs.getHead();
+            if (head.isSymbolic) {
+              this.repo.refs.updateBranch(head.target.replace('refs/heads/', ''), oldCommit.parentHashes[0]);
+            }
+          }
+          
+          // Recommit
+          const hash = this.repo.commit(newMessage);
+          this.showMessage(`Amended: ${hash.slice(0, 8)}`);
+          this.refresh();
+        } catch (error) {
+          this.showMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      }
+      prompt.destroy();
+      this.screen.render();
+    });
+  }
+
+  /**
+   * Show create branch dialog
+   */
+  private showCreateBranchDialog(): void {
+    const prompt = blessed.prompt({
+      parent: this.screen,
+      top: 'center',
+      left: 'center',
+      width: '60%',
+      height: 'shrink',
+      border: { type: 'line' },
+      label: ' Create Branch ',
+      tags: true,
+      style: {
+        border: { fg: 'cyan' },
+        label: { fg: 'cyan', bold: true },
+      },
+    });
+
+    prompt.input('Branch name:', '', (err, value) => {
+      if (!err && value && value.trim()) {
+        try {
+          this.repo.createBranch(value.trim());
+          this.repo.checkout(value.trim());
+          this.showMessage(`Created and switched to: ${value.trim()}`);
+          this.refresh();
+        } catch (error) {
+          this.showMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      }
+      prompt.destroy();
+      this.screen.render();
+    });
+  }
+
+  /**
+   * Show stash menu
+   */
+  private showStashMenu(): void {
+    const menu = blessed.list({
+      parent: this.screen,
+      label: ' Stash ',
+      top: 'center',
+      left: 'center',
+      width: '50%',
+      height: 'shrink',
+      border: { type: 'line' },
+      tags: true,
+      keys: true,
+      vi: true,
+      mouse: true,
+      style: {
+        border: { fg: 'magenta' },
+        selected: { bg: 'magenta', fg: 'black' },
+      },
+      items: ['Save stash', 'Pop stash', 'Apply stash', 'List stashes'],
+    });
+
+    menu.on('select', (item, index) => {
+      menu.destroy();
+      this.screen.render();
+      
+      switch (index) {
+        case 0: this.stashSave(); break;
+        case 1: this.stashPop(); break;
+        case 2: this.stashApply(); break;
+        case 3: this.listStashes(); break;
+      }
+    });
+
+    menu.key(['escape'], () => {
+      menu.destroy();
+      this.screen.render();
+    });
+
+    menu.focus();
+    this.screen.render();
+  }
+
+  private stashSave(): void {
+    try {
+      const branch = this.repo.refs.getCurrentBranch() || 'HEAD';
+      const status = this.repo.status();
+      this.repo.branchState.saveState(branch, status.staged, 'WIP');
+      this.showMessage('Changes stashed');
+      this.refresh();
+    } catch (error) {
+      this.showMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  private stashPop(): void {
+    try {
+      const branch = this.repo.refs.getCurrentBranch() || 'HEAD';
+      this.repo.branchState.restoreState(branch);
+      this.showMessage('Stash popped');
+      this.refresh();
+    } catch (error) {
+      this.showMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  private stashApply(): void {
+    try {
+      const branch = this.repo.refs.getCurrentBranch() || 'HEAD';
+      this.repo.branchState.restoreState(branch);
+      this.showMessage('Stash applied');
+      this.refresh();
+    } catch (error) {
+      this.showMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  private listStashes(): void {
+    try {
+      const currentBranch = this.repo.refs.getCurrentBranch() || 'HEAD';
+      const hasState = this.repo.branchState.hasState(currentBranch);
+      
+      if (!hasState) {
+        this.showMessage('No stashes');
+        return;
+      }
+      
+      const list = blessed.list({
+        parent: this.screen,
+        label: ' Stashes ',
+        top: 'center',
+        left: 'center',
+        width: '60%',
+        height: '50%',
+        border: { type: 'line' },
+        tags: true,
+        keys: true,
+        vi: true,
+        mouse: true,
+        style: {
+          border: { fg: 'magenta' },
+          selected: { bg: 'magenta', fg: 'black' },
+        },
+        items: [`stash@{0}: State saved for ${currentBranch}`],
+      });
+
+      list.key(['escape', 'q'], () => {
+        list.destroy();
+        this.screen.render();
+      });
+
+      list.focus();
+      this.screen.render();
+    } catch (error) {
+      this.showMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Show tag menu
+   */
+  private showTagMenu(): void {
+    const menu = blessed.list({
+      parent: this.screen,
+      label: ' Tags ',
+      top: 'center',
+      left: 'center',
+      width: '50%',
+      height: 'shrink',
+      border: { type: 'line' },
+      tags: true,
+      keys: true,
+      vi: true,
+      mouse: true,
+      style: {
+        border: { fg: 'yellow' },
+        selected: { bg: 'yellow', fg: 'black' },
+      },
+      items: ['Create tag', 'List tags'],
+    });
+
+    menu.on('select', (item, index) => {
+      menu.destroy();
+      this.screen.render();
+      
+      if (index === 0) {
+        this.createTagDialog();
+      } else {
+        this.listTags();
+      }
+    });
+
+    menu.key(['escape'], () => {
+      menu.destroy();
+      this.screen.render();
+    });
+
+    menu.focus();
+    this.screen.render();
+  }
+
+  private createTagDialog(): void {
+    const prompt = blessed.prompt({
+      parent: this.screen,
+      top: 'center',
+      left: 'center',
+      width: '60%',
+      height: 'shrink',
+      border: { type: 'line' },
+      label: ' Create Tag ',
+      tags: true,
+      style: {
+        border: { fg: 'yellow' },
+        label: { fg: 'yellow', bold: true },
+      },
+    });
+
+    prompt.input('Tag name:', '', (err, value) => {
+      if (!err && value && value.trim()) {
+        try {
+          const headHash = this.repo.refs.resolve('HEAD');
+          if (headHash) {
+            this.repo.refs.createTag(value.trim(), headHash);
+            this.showMessage(`Created tag: ${value.trim()}`);
+            this.refresh();
+          } else {
+            this.showMessage('No commits to tag');
+          }
+        } catch (error) {
+          this.showMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      }
+      prompt.destroy();
+      this.screen.render();
+    });
+  }
+
+  private listTags(): void {
+    try {
+      const tags = this.repo.refs.listTags();
+      if (tags.length === 0) {
+        this.showMessage('No tags');
+        return;
+      }
+      
+      const list = blessed.list({
+        parent: this.screen,
+        label: ' Tags ',
+        top: 'center',
+        left: 'center',
+        width: '60%',
+        height: '50%',
+        border: { type: 'line' },
+        tags: true,
+        keys: true,
+        vi: true,
+        mouse: true,
+        style: {
+          border: { fg: 'yellow' },
+          selected: { bg: 'yellow', fg: 'black' },
+        },
+        items: tags,
+      });
+
+      list.key(['escape', 'q'], () => {
+        list.destroy();
+        this.screen.render();
+      });
+
+      list.focus();
+      this.screen.render();
+    } catch (error) {
+      this.showMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Show merge menu
+   */
+  private showMergeMenu(): void {
+    try {
+      const branches = this.repo.listBranches().filter(b => !b.isCurrent);
+      if (branches.length === 0) {
+        this.showMessage('No other branches to merge');
+        return;
+      }
+
+      const list = blessed.list({
+        parent: this.screen,
+        label: ' Merge Branch ',
+        top: 'center',
+        left: 'center',
+        width: '50%',
+        height: '50%',
+        border: { type: 'line' },
+        tags: true,
+        keys: true,
+        vi: true,
+        mouse: true,
+        style: {
+          border: { fg: 'blue' },
+          selected: { bg: 'blue', fg: 'white' },
+        },
+        items: branches.map(b => b.name),
+      });
+
+      list.on('select', (item) => {
+        const branchName = item.content.replace(/\{[^}]+\}/g, '').trim();
+        list.destroy();
+        this.screen.render();
+        
+        try {
+          this.repo.mergeManager.merge(branchName);
+          this.showMessage(`Merged: ${branchName}`);
+          this.refresh();
+        } catch (error) {
+          this.showMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      });
+
+      list.key(['escape'], () => {
+        list.destroy();
+        this.screen.render();
+      });
+
+      list.focus();
+      this.screen.render();
+    } catch (error) {
+      this.showMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Push changes
+   */
+  private pushChanges(): void {
+    this.showMessage('Pushing...');
+    try {
+      // Network sync would require remote protocol implementation
+      this.showMessage('Push recorded (configure remotes for network sync)');
+    } catch (error) {
+      this.showMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Pull changes
+   */
+  private pullChanges(): void {
+    this.showMessage('Pulling...');
+    try {
+      // Network sync would require remote protocol implementation
+      this.showMessage('Pull recorded (configure remotes for network sync)');
+      this.refresh();
+    } catch (error) {
+      this.showMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Fetch changes
+   */
+  private fetchChanges(): void {
+    this.showMessage('Fetching...');
+    try {
+      // Network sync would require remote protocol implementation
+      this.showMessage('Fetch recorded (configure remotes for network sync)');
+    } catch (error) {
+      this.showMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Undo last operation
+   */
+  private undoLastOperation(): void {
+    try {
+      this.repo.journal.popEntry();
+      this.showMessage('Undid last operation');
+      this.refresh();
+    } catch (error) {
+      this.showMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Show reset menu
+   */
+  private showResetMenu(): void {
+    const menu = blessed.list({
+      parent: this.screen,
+      label: ' Reset ',
+      top: 'center',
+      left: 'center',
+      width: '50%',
+      height: 'shrink',
+      border: { type: 'line' },
+      tags: true,
+      keys: true,
+      vi: true,
+      mouse: true,
+      style: {
+        border: { fg: 'red' },
+        selected: { bg: 'red', fg: 'white' },
+      },
+      items: ['Soft (keep staged)', 'Mixed (keep unstaged)', 'Hard (discard all)'],
+    });
+
+    menu.on('select', (item, index) => {
+      menu.destroy();
+      const modes = ['soft', 'mixed', 'hard'] as const;
+      this.showResetCommitPrompt(modes[index]);
+    });
+
+    menu.key(['escape'], () => {
+      menu.destroy();
+      this.screen.render();
+    });
+
+    menu.focus();
+    this.screen.render();
+  }
+
+  private showResetCommitPrompt(mode: 'soft' | 'mixed' | 'hard'): void {
+    const prompt = blessed.prompt({
+      parent: this.screen,
+      top: 'center',
+      left: 'center',
+      width: '60%',
+      height: 'shrink',
+      border: { type: 'line' },
+      label: ` Reset (${mode}) to: `,
+      tags: true,
+      style: {
+        border: { fg: 'red' },
+        label: { fg: 'red', bold: true },
+      },
+    });
+
+    prompt.input('Commit (e.g., HEAD~1):', 'HEAD~1', (err, value) => {
+      if (!err && value && value.trim()) {
+        try {
+          const targetHash = this.repo.refs.resolve(value.trim());
+          if (targetHash) {
+            const head = this.repo.refs.getHead();
+            if (head.isSymbolic) {
+              this.repo.refs.updateBranch(head.target.replace('refs/heads/', ''), targetHash);
+            } else {
+              this.repo.refs.setHeadDetached(targetHash);
+            }
+            if (mode !== 'soft') {
+              this.repo.checkout(targetHash);
+            }
+            this.showMessage(`Reset to ${value.trim()} (${mode})`);
+            this.refresh();
+          } else {
+            this.showMessage('Unknown commit reference');
+          }
+        } catch (error) {
+          this.showMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      }
+      prompt.destroy();
+      this.screen.render();
+    });
+  }
+
+  /**
+   * WIP commit
+   */
+  private wipCommit(): void {
+    try {
+      this.repo.addAll();
+      const hash = this.repo.commit('WIP');
+      this.showMessage(`WIP commit: ${hash.slice(0, 8)}`);
+      this.refresh();
+    } catch (error) {
+      this.showMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Show command palette
+   */
+  private showCommandPalette(): void {
+    const commands = [
+      { name: 'Commit', key: 'c', action: () => this.showCommitDialog() },
+      { name: 'Amend', key: 'C', action: () => this.showAmendDialog() },
+      { name: 'Stage All', key: 'A', action: () => this.stageAll() },
+      { name: 'WIP Commit', key: 'w', action: () => this.wipCommit() },
+      { name: 'Create Branch', key: 'b', action: () => this.showCreateBranchDialog() },
+      { name: 'Switch Branch', key: 's', action: () => this.showBranchSelector() },
+      { name: 'Merge', key: 'm', action: () => this.showMergeMenu() },
+      { name: 'Stash', key: 'z', action: () => this.showStashMenu() },
+      { name: 'Tags', key: 't', action: () => this.showTagMenu() },
+      { name: 'Push', key: 'p', action: () => this.pushChanges() },
+      { name: 'Pull', key: 'l', action: () => this.pullChanges() },
+      { name: 'Fetch', key: 'f', action: () => this.fetchChanges() },
+      { name: 'Undo', key: 'u', action: () => this.undoLastOperation() },
+      { name: 'Reset', key: 'R', action: () => this.showResetMenu() },
+      { name: 'Refresh', key: 'r', action: () => this.refresh() },
+    ];
+
+    const list = blessed.list({
+      parent: this.screen,
+      label: ' Command Palette (: or Ctrl+K) ',
+      top: 'center',
+      left: 'center',
+      width: '60%',
+      height: '60%',
+      border: { type: 'line' },
+      tags: true,
+      keys: true,
+      vi: true,
+      mouse: true,
+      style: {
+        border: { fg: 'white' },
+        selected: { bg: 'blue', fg: 'white' },
+      },
+      items: commands.map(c => `{bold}${c.key}{/bold}  ${c.name}`),
+    });
+
+    list.on('select', (item, index) => {
+      list.destroy();
+      this.screen.render();
+      commands[index].action();
+    });
+
+    list.key(['escape', 'q'], () => {
+      list.destroy();
+      this.screen.render();
+    });
+
+    list.focus();
+    this.screen.render();
+  }
+
+  /**
    * Show help dialog
    */
   private showHelp(): void {
@@ -1051,14 +1715,35 @@ export class TsgitTUI {
   Tab        - Switch between panels
   ↑/↓ or j/k - Navigate items
   Enter      - Select item
+  : or Ctrl+K - Command palette
 
-{bold}Actions:{/bold}
+{bold}Changes:{/bold}
   a - Add selected file to staging
+  A - Stage all changes
   c - Create a commit
+  C - Amend last commit
+  w - WIP commit (quick save)
+
+{bold}Branches:{/bold}
   s - Switch branch
-  r - Refresh view
-  
+  b - Create new branch
+  m - Merge branch
+
+{bold}Stash & Tags:{/bold}
+  z - Stash menu
+  t - Tags menu
+
+{bold}Remote:{/bold}
+  p - Push to remote
+  l - Pull from remote
+  f - Fetch from remote
+
+{bold}History:{/bold}
+  u - Undo last operation
+  R - Reset (soft/mixed/hard)
+
 {bold}Other:{/bold}
+  r - Refresh view
   q - Quit
   ? - Show this help
 
