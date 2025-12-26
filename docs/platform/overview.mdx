@@ -1,0 +1,184 @@
+---
+title: "Platform Overview"
+description: "Self-hosted Git platform with wit"
+---
+
+# wit Platform
+
+wit isn't just a Git client—it's a complete, self-hosted code collaboration platform that can replace GitHub for teams who want full control over their infrastructure.
+
+## What's Included
+
+<CardGroup cols={2}>
+  <Card title="Git Server" icon="server" href="/platform/server">
+    Host repositories with push/pull over HTTP
+  </Card>
+  <Card title="Pull Requests" icon="code-pull-request" href="/platform/pull-requests">
+    Create, review, and merge PRs from the CLI
+  </Card>
+  <Card title="Issues" icon="circle-exclamation" href="/platform/issues">
+    Track issues and bugs from the command line
+  </Card>
+  <Card title="tRPC API" icon="plug" href="/api-reference/overview">
+    Type-safe API for building integrations
+  </Card>
+</CardGroup>
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         wit Platform                             │
+├─────────────────────────────────────────────────────────────────┤
+│  Web App (React)          │  API Server (Hono)                  │
+│  - Repository browser     │  - tRPC API                         │
+│  - Pull requests UI       │  - Git Smart HTTP                   │
+│  - Issues UI              │  - WebSocket (realtime)             │
+├───────────────────────────┼─────────────────────────────────────┤
+│  CLI (wit)                │  Core Libraries                     │
+│  - Local git ops          │  - @wit/core (git impl)             │
+│  - Remote sync            │  - @wit/ai (mastra)                 │
+│  - PR/Issue commands      │  - @wit/protocol (smart http)       │
+├───────────────────────────┴─────────────────────────────────────┤
+│                         Storage Layer                            │
+│  - Object Store (filesystem)  - Database (PostgreSQL)           │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## Quick Start
+
+### 1. Start the Server
+
+```bash
+# Start wit server on port 3000
+wit serve --port 3000 --repos ./my-repos
+```
+
+### 2. Push a Repository
+
+```bash
+# In your project directory
+wit init
+wit add .
+wit commit -m "Initial commit"
+wit remote add origin http://localhost:3000/myuser/myproject.git
+wit push -u origin main
+```
+
+### 3. Collaborate
+
+```bash
+# Create a pull request
+wit pr create -t "Add new feature" -b main
+
+# List pull requests
+wit pr list
+
+# Create an issue
+wit issue create "Bug: Login button not working"
+```
+
+## Database Setup
+
+For full functionality (users, PRs, issues), wit uses PostgreSQL:
+
+```bash
+# Set database URL
+export DATABASE_URL="postgresql://user:pass@localhost:5432/wit"
+
+# Start server with database
+wit serve --port 3000 --repos ./repos
+```
+
+Without a database, wit still works for basic push/pull operations.
+
+## Tech Stack
+
+| Component | Technology |
+|-----------|------------|
+| Server | Node.js, Hono |
+| Database | PostgreSQL, Drizzle ORM |
+| API | tRPC (type-safe) |
+| Auth | OAuth, JWT sessions |
+| Storage | Filesystem (Git objects) |
+
+## Self-Hosting Options
+
+### Docker
+
+```bash
+# Clone the repo
+git clone https://github.com/abhiaiyer91/wit.git
+cd wit
+
+# Start with Docker Compose
+docker-compose up -d
+```
+
+### Manual Installation
+
+```bash
+# Clone and build
+git clone https://github.com/abhiaiyer91/wit.git
+cd wit
+npm install
+npm run build
+
+# Set up database
+export DATABASE_URL="postgresql://..."
+npm run db:push
+
+# Start server
+wit serve --port 3000 --repos ./repos
+```
+
+## Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DATABASE_URL` | PostgreSQL connection string | - |
+| `PORT` | Server port | 3000 |
+| `REPOS_DIR` | Repository storage directory | ./repos |
+| `JWT_SECRET` | Secret for JWT tokens | (generated) |
+
+## API Access
+
+The platform exposes a tRPC API for building integrations:
+
+```typescript
+import { createTRPCClient } from '@trpc/client';
+import type { AppRouter } from 'wit/api';
+
+const client = createTRPCClient<AppRouter>({
+  url: 'http://localhost:3000/trpc',
+});
+
+// List repositories
+const repos = await client.repos.list.query({ owner: 'myuser' });
+
+// Create a pull request
+const pr = await client.pulls.create.mutate({
+  owner: 'myuser',
+  repo: 'myproject',
+  title: 'Add feature',
+  sourceBranch: 'feature',
+  targetBranch: 'main',
+});
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Start the Server" icon="server" href="/platform/server">
+    Learn about wit serve options
+  </Card>
+  <Card title="Pull Requests" icon="code-pull-request" href="/platform/pull-requests">
+    Create and manage PRs
+  </Card>
+  <Card title="Issues" icon="circle-exclamation" href="/platform/issues">
+    Track issues from CLI
+  </Card>
+  <Card title="API Reference" icon="plug" href="/api-reference/overview">
+    Build integrations
+  </Card>
+</CardGroup>

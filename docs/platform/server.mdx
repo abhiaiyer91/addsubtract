@@ -1,0 +1,313 @@
+---
+title: "Git Server"
+description: "Host Git repositories with wit serve"
+---
+
+# Git Server
+
+wit includes a built-in Git server that accepts push and pull over HTTP. Run your own GitHub-like infrastructure with a single command.
+
+## Quick Start
+
+```bash
+# Start the server
+wit serve
+
+# Server is now running at http://localhost:3000
+```
+
+## Command Reference
+
+```bash
+wit serve [options]
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--port <number>` | Port to listen on | 3000 |
+| `--repos <path>` | Directory to store repositories | ./repos |
+| `--host <hostname>` | Hostname to bind to | 0.0.0.0 |
+| `--verbose` | Enable verbose logging | false |
+| `-h, --help` | Show help message | - |
+
+## Examples
+
+### Basic Usage
+
+```bash
+# Start on default port 3000
+wit serve
+
+# Start on a different port
+wit serve --port 8080
+
+# Custom repository directory
+wit serve --repos /var/git/repositories
+
+# Verbose logging for debugging
+wit serve --verbose
+```
+
+### Production Setup
+
+```bash
+# Full production configuration
+wit serve \
+  --port 3000 \
+  --repos /var/git/repos \
+  --host 0.0.0.0
+```
+
+## Using the Server
+
+Once the server is running, you can interact with it using standard git commands.
+
+### Clone a Repository
+
+```bash
+wit clone http://localhost:3000/owner/repo.git
+```
+
+### Push to Create a New Repository
+
+Repositories are created automatically on first push:
+
+```bash
+# Initialize a local repository
+wit init my-project
+cd my-project
+echo "# My Project" > README.md
+wit add .
+wit commit -m "Initial commit"
+
+# Add remote and push (creates repo on server)
+wit remote add origin http://localhost:3000/myuser/my-project.git
+wit push -u origin main
+```
+
+### Fetch and Pull
+
+```bash
+wit fetch origin
+wit pull origin main
+```
+
+## Server Output
+
+When you start the server, you'll see:
+
+```
+╔══════════════════════════════════════════════════════════════╗
+║                                                              ║
+║   🚀 wit server is running!                                  ║
+║                                                              ║
+║   HTTP URL: http://localhost:3000                            ║
+║   tRPC API: http://localhost:3000/trpc                       ║
+║   Repositories: /path/to/repos                               ║
+║                                                              ║
+║   Clone: wit clone http://localhost:3000/owner/repo.git      ║
+║   Push:  wit push origin main                                ║
+║                                                              ║
+║   Press Ctrl+C to stop                                       ║
+║                                                              ║
+╚══════════════════════════════════════════════════════════════╝
+
+Existing repositories:
+  - alice/project-a
+  - bob/project-b
+```
+
+## API Endpoints
+
+The server exposes several endpoints:
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /health` | Health check with database status |
+| `GET /repos` | List all repositories |
+| `POST /sync` | Sync filesystem repos to database |
+| `/trpc/*` | tRPC API endpoints |
+| `/:owner/:repo.git/*` | Git Smart HTTP protocol |
+
+### Health Check
+
+```bash
+curl http://localhost:3000/health
+```
+
+Response:
+```json
+{
+  "status": "ok",
+  "version": "2.0.0",
+  "timestamp": "2024-01-15T10:30:00.000Z",
+  "database": {
+    "connected": true,
+    "latency": 5
+  }
+}
+```
+
+### List Repositories
+
+```bash
+curl http://localhost:3000/repos
+```
+
+Response:
+```json
+{
+  "count": 2,
+  "repositories": [
+    { "owner": "alice", "name": "project-a", "url": "/alice/project-a.git" },
+    { "owner": "bob", "name": "project-b", "url": "/bob/project-b.git" }
+  ]
+}
+```
+
+## Database Integration
+
+For full platform features (users, PRs, issues), connect to PostgreSQL:
+
+```bash
+# Set database URL
+export DATABASE_URL="postgresql://user:password@localhost:5432/wit"
+
+# Start server - it will connect to the database
+wit serve --port 3000 --repos ./repos
+```
+
+Without a database, the server works for basic Git operations but won't have:
+- User accounts
+- Pull requests
+- Issues
+- Activity tracking
+
+## Repository Storage
+
+Repositories are stored as bare Git repositories:
+
+```
+repos/
+├── alice/
+│   └── project-a.git/
+│       ├── HEAD
+│       ├── config
+│       ├── objects/
+│       └── refs/
+└── bob/
+    └── project-b.git/
+```
+
+## Running in Docker
+
+```dockerfile
+FROM node:22-alpine
+
+WORKDIR /app
+COPY . .
+RUN npm install && npm run build
+
+EXPOSE 3000
+VOLUME /repos
+
+CMD ["node", "dist/cli.js", "serve", "--repos", "/repos"]
+```
+
+```bash
+docker build -t wit-server .
+docker run -p 3000:3000 -v ./my-repos:/repos wit-server
+```
+
+## Using with docker-compose
+
+```yaml
+version: '3.8'
+
+services:
+  wit:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./repos:/repos
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/wit
+    depends_on:
+      - db
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: wit
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
+```
+
+## Graceful Shutdown
+
+The server handles shutdown signals gracefully:
+
+```bash
+# Ctrl+C or kill signal
+Shutting down server...
+[server] Server stopped
+```
+
+This ensures in-progress operations complete before shutdown.
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Port already in use">
+    ```bash
+    # Find what's using the port
+    lsof -i :3000
+    
+    # Use a different port
+    wit serve --port 3001
+    ```
+  </Accordion>
+  
+  <Accordion title="Permission denied on repos directory">
+    ```bash
+    # Create directory with correct permissions
+    mkdir -p ./repos
+    chmod 755 ./repos
+    ```
+  </Accordion>
+  
+  <Accordion title="Database connection failed">
+    Check your `DATABASE_URL` environment variable:
+    ```bash
+    echo $DATABASE_URL
+    # Should be: postgresql://user:pass@host:port/dbname
+    ```
+    
+    The server will continue without database features if connection fails.
+  </Accordion>
+  
+  <Accordion title="Push rejected">
+    Make sure the repository URL matches the pattern:
+    ```
+    http://localhost:3000/{owner}/{repo}.git
+    ```
+    
+    The owner and repo will be extracted from the URL.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Pull Requests" icon="code-pull-request" href="/platform/pull-requests">
+    Create and manage PRs
+  </Card>
+  <Card title="Issues" icon="circle-exclamation" href="/platform/issues">
+    Track issues
+  </Card>
+</CardGroup>

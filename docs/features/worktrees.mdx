@@ -25,23 +25,23 @@ You can:
 ### Add Worktree
 
 ```bash
-tsgit worktree add <path> <branch>
+wit worktree add <path> <branch>
 ```
 
 **Examples:**
 
 ```bash
 # Create worktree for existing branch
-tsgit worktree add ../feature-worktree feature-branch
+wit worktree add ../feature-worktree feature-branch
 
 # Create worktree with new branch
-tsgit worktree add ../hotfix-worktree -b hotfix-123
+wit worktree add ../hotfix-worktree -b hotfix-123
 ```
 
 ### List Worktrees
 
 ```bash
-tsgit worktree list
+wit worktree list
 ```
 
 Output:
@@ -54,19 +54,19 @@ Output:
 ### Remove Worktree
 
 ```bash
-tsgit worktree remove <path>
+wit worktree remove <path>
 ```
 
 **Example:**
 
 ```bash
-tsgit worktree remove ../feature-worktree
+wit worktree remove ../feature-worktree
 ```
 
 ### Prune Stale Entries
 
 ```bash
-tsgit worktree prune
+wit worktree prune
 ```
 
 Removes worktree entries where the directory no longer exists.
@@ -79,31 +79,31 @@ You're deep in feature development when a critical bug is reported.
 
 **Without worktrees:**
 ```bash
-tsgit stash
-tsgit switch main
+wit stash
+wit switch main
 # fix bug...
-tsgit commit -m "Hotfix"
-tsgit switch feature
-tsgit stash pop
+wit commit -m "Hotfix"
+wit switch feature
+wit stash pop
 ```
 
 **With worktrees:**
 ```bash
 # Create a worktree for the hotfix
-tsgit worktree add ../hotfix main
+wit worktree add ../hotfix main
 
 # Work on hotfix in separate directory
 cd ../hotfix
 # fix bug...
-tsgit commit -m "Hotfix"
-tsgit push
+wit commit -m "Hotfix"
+wit push
 
 # Back to feature (no context switch!)
 cd ../project
 # Continue exactly where you left off
 
 # Clean up
-tsgit worktree remove ../hotfix
+wit worktree remove ../hotfix
 ```
 
 ## Directory Structure
@@ -111,15 +111,15 @@ tsgit worktree remove ../hotfix
 ```
 ~/code/
 ├── my-project/              # Main worktree (main branch)
-│   ├── .tsgit/              # The actual repository
+│   ├── .wit/              # The actual repository
 │   ├── src/
 │   └── package.json
 ├── my-project-feature/      # Linked worktree (feature branch)
-│   ├── .tsgit -> link       # Links to main .tsgit
+│   ├── .wit -> link       # Links to main .wit
 │   ├── src/
 │   └── package.json
 └── my-project-hotfix/       # Linked worktree (hotfix branch)
-    ├── .tsgit -> link
+    ├── .wit -> link
     ├── src/
     └── package.json
 ```
@@ -130,8 +130,8 @@ tsgit worktree remove ../hotfix
 
 ```bash
 # Work on two features simultaneously
-tsgit worktree add ../feature-a feature-a
-tsgit worktree add ../feature-b feature-b
+wit worktree add ../feature-a feature-a
+wit worktree add ../feature-b feature-b
 
 # Now you have three directories:
 # - Main repo (can stay on main)
@@ -143,7 +143,7 @@ tsgit worktree add ../feature-b feature-b
 
 ```bash
 # Create worktree to test a PR
-tsgit worktree add ../pr-123 origin/pr-123
+wit worktree add ../pr-123 origin/pr-123
 
 # Test in that directory
 cd ../pr-123
@@ -152,14 +152,14 @@ npm test
 
 # Clean up
 cd ../project
-tsgit worktree remove ../pr-123
+wit worktree remove ../pr-123
 ```
 
 ### Long-running Operations
 
 ```bash
 # Run a long build in a worktree
-tsgit worktree add ../build-wt main
+wit worktree add ../build-wt main
 cd ../build-wt
 npm run build:production &
 
@@ -172,10 +172,10 @@ cd ../project
 
 ```bash
 # Review someone's branch
-tsgit worktree add ../review origin/teammate-feature
+wit worktree add ../review origin/teammate-feature
 
 # Open in IDE, review, then clean up
-tsgit worktree remove ../review
+wit worktree remove ../review
 ```
 
 ## Best Practices
@@ -185,8 +185,8 @@ tsgit worktree remove ../review
 
 Name worktrees clearly:
 ```bash
-tsgit worktree add ../project-feature feature-x
-tsgit worktree add ../project-hotfix hotfix-123
+wit worktree add ../project-feature feature-x
+wit worktree add ../project-hotfix hotfix-123
 ```
 </Tip>
 
@@ -195,8 +195,8 @@ tsgit worktree add ../project-hotfix hotfix-123
 
 Don't leave worktrees lying around:
 ```bash
-tsgit worktree list
-tsgit worktree remove ../old-worktree
+wit worktree list
+wit worktree remove ../old-worktree
 ```
 </Tip>
 
@@ -214,7 +214,7 @@ ln -s ../main-project/node_modules node_modules
 
 - Each branch can only be checked out in one worktree
 - The main worktree cannot be removed
-- All worktrees share the same `.tsgit` directory
+- All worktrees share the same `.wit` directory
 
 ## Worktrees vs Other Approaches
 
@@ -240,14 +240,14 @@ ln -s ../main-project/node_modules node_modules
     Remove or choose a different path:
     ```bash
     rm -rf ../old-worktree
-    tsgit worktree add ../old-worktree branch
+    wit worktree add ../old-worktree branch
     ```
   </Accordion>
   
   <Accordion title="Stale worktree entries">
     If you deleted a worktree directory manually:
     ```bash
-    tsgit worktree prune
+    wit worktree prune
     ```
   </Accordion>
 </AccordionGroup>
