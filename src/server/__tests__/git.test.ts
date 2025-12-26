@@ -28,9 +28,14 @@ describe('Git Server', () => {
       expect(res.status).toBe(200);
       
       const data = await res.json();
-      expect(data.status).toBe('ok');
+      // Status is 'ok' when database is connected, 'degraded' otherwise
+      expect(['ok', 'degraded']).toContain(data.status);
       expect(data.version).toBe('2.0.0');
       expect(data.timestamp).toBeDefined();
+      // Should include database status
+      expect(data.database).toBeDefined();
+      expect(typeof data.database.connected).toBe('boolean');
+      expect(typeof data.database.latency).toBe('number');
     });
   });
 
