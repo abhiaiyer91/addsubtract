@@ -16,6 +16,26 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - wit-network
+
+  # Redis for rate limiting and caching
+  redis:
+    image: redis:7-alpine
+    container_name: wit-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - wit-network
 
   server:
     build: .
@@ -23,6 +43,7 @@ services:
       - "3000:3000"
     environment:
       DATABASE_URL: postgresql://wit:wit@db:5432/wit
+      REDIS_URL: redis://redis:6379
       PORT: 3000
       HOST: 0.0.0.0
       REPOS_PATH: /repos
@@ -32,7 +53,32 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - wit-network
+
+  # Redis Commander for debugging (optional, development only)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: wit-redis-commander
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8081:8081"
+    depends_on:
+      redis:
+        condition: service_healthy
+    profiles:
+      - dev
+    networks:
+      - wit-network
 
 volumes:
   postgres_data:
+  redis_data:
   repos_data:
+
+networks:
+  wit-network:
+    driver: bridge
