@@ -85,3 +85,6 @@ export { handlePlatformStatus, STATUS_HELP } from './platform-status';
 
 // Smart status - the killer wit command
 export { handleSmartStatus } from './smart-status';
+
+// Semantic search - the "holy shit" feature
+export { handleSearch } from './search';

@@ -75,6 +75,8 @@ import {
   handlePlatformStatus,
   // Smart status
   handleSmartStatus,
+  // Semantic search
+  handleSearch,
 } from './commands';
 import { handleHooks } from './core/hooks';
 import { handleSubmodule } from './core/submodule';
@@ -234,6 +236,11 @@ Monorepo Support:
   scope clear           Clear scope restrictions
 
 AI-Powered Features:
+  search <query>        Semantic code search (the killer feature!)
+  search index          Index repo for semantic search
+  search status         Show index health
+  search -i             Interactive search mode
+  
   ai <query>            Natural language git commands
   ai commit [-a] [-x]   Generate commit message from changes
   ai review             AI code review of local changes (uses LLM)
@@ -304,7 +311,7 @@ const COMMANDS = [
   'amend', 'wip', 'fixup', 'cleanup', 'blame', 'stats', 'snapshot',
   'scope', 'graph',
   'ui', 'web',
-  'ai',
+  'ai', 'search',
   'cat-file', 'hash-object', 'ls-files', 'ls-tree',
   // Plumbing commands
   'rev-parse', 'update-ref', 'symbolic-ref', 'for-each-ref', 'show-ref', 'fsck',
@@ -640,6 +647,15 @@ function main(): void {
           process.exit(1);
         });
         return; // Exit main() to let async handle complete
+
+      case 'search':
+        // Semantic search - the "holy shit" feature
+        handleSearch(rawArgs).catch((error: Error) => {
+          console.error(`error: ${error.message}`);
+          process.exit(1);
+        });
+        return; // Exit main() to let async handle complete
+
       // Quality of Life commands
       case 'amend':
         handleAmend(cmdArgs.concat(
