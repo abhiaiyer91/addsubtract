@@ -61,6 +61,8 @@ import {
   // Advanced features
   handleReflog,
   handleGC,
+  // Server command
+  handleServe,
   // Command help
   printCommandHelp,
   hasHelpFlag,
@@ -173,6 +175,11 @@ Advanced Features:
   reflog                Show reference log
   gc                    Run garbage collection
 
+Server:
+  serve                 Start Git HTTP server for hosting repos
+  serve --port <n>      Start server on specified port
+  serve --repos <path>  Set repository storage directory
+
 Quality of Life:
   amend                 Quickly fix the last commit
   wip                   Quick WIP commit with auto-generated message
@@ -246,6 +253,7 @@ Examples:
   wit push -u origin main    # Push and set upstream
   wit github login           # Login to GitHub
   wit github status          # Check GitHub auth status
+  wit serve --port 3000      # Start Git server
 `;
 
 const COMMANDS = [
@@ -269,6 +277,8 @@ const COMMANDS = [
   'github',
   // Advanced features
   'hooks', 'submodule', 'worktree', 'reflog', 'gc',
+  // Server
+  'serve',
   'help',
 ];
 
@@ -736,6 +746,10 @@ function main(): void {
 
       case 'gc':
         handleGC(cmdArgs);
+        break;
+
+      case 'serve':
+        handleServe(args.slice(args.indexOf('serve') + 1));
         break;
 
       default: {
