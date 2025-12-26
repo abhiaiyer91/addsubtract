@@ -209,7 +209,9 @@ export class Repository {
 
     while (true) {
       const gitDir = path.join(currentPath, '.wit');
-      if (exists(gitDir)) {
+      // Check for a proper repository by looking for required markers
+      // This distinguishes from ~/.wit which is the platform config directory
+      if (exists(gitDir) && (exists(path.join(gitDir, 'HEAD')) || exists(path.join(gitDir, 'objects')))) {
         return new Repository(currentPath);
       }
 

@@ -329,6 +329,7 @@ export class Filesystem {
           isBinary: false,
           isNew: true,
           isDeleted: false,
+          isRename: false,
         };
         diffs.push(formatUnifiedDiff(fileDiff));
       }
@@ -559,6 +560,7 @@ export class Filesystem {
         isBinary: false,
         isNew: !oldContent,
         isDeleted: isDeleted,
+        isRename: false,
       };
     } catch {
       return null;

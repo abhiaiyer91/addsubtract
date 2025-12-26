@@ -577,16 +577,6 @@ export function renderRenameHeader(fileDiff: FileDiff): string {
 }
 
 /**
- * Escape HTML special characters (exported for external use)
- */
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-}
-
-/**
  * Get CSS styles for rename headers
  */
 export function getRenameStyles(): string {

@@ -73,6 +73,8 @@ import {
   handleUp,
   handleDown,
   handlePlatformStatus,
+  // Smart status
+  handleSmartStatus,
 } from './commands';
 import { handleHooks } from './core/hooks';
 import { handleSubmodule } from './core/submodule';
@@ -396,7 +398,10 @@ function main(): void {
   const args = process.argv.slice(2);
 
   if (args.length === 0) {
-    console.log(HELP);
+    handleSmartStatus([]).catch((error: Error) => {
+      console.error(`error: ${error.message}`);
+      process.exit(1);
+    });
     return;
   }
 
