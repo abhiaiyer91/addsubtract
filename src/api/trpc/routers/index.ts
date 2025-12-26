@@ -1,29 +1,41 @@
-/**
- * Main tRPC Router
- * Combines all sub-routers into a single application router
- */
-
+import { router } from '../trpc';
+import { authRouter } from './auth';
+import { usersRouter } from './users';
+import { reposRouter } from './repos';
+import { pullsRouter } from './pulls';
+import { issuesRouter } from './issues';
+import { commentsRouter } from './comments';
+import { activityRouter } from './activity';
 import { webhooksRouter } from './webhooks';
-import { Context } from '../context';
 
 /**
- * Application router combining all sub-routers
+ * Main application router
+ * This combines all sub-routers into a single router
  */
-export const appRouter = {
+export const appRouter = router({
+  auth: authRouter,
+  users: usersRouter,
+  repos: reposRouter,
+  pulls: pullsRouter,
+  issues: issuesRouter,
+  comments: commentsRouter,
+  activity: activityRouter,
   webhooks: webhooksRouter,
-};
+});
 
 /**
- * Type export for the complete router
+ * Export type definition for end-to-end type safety
  */
 export type AppRouter = typeof appRouter;
 
-/**
- * Re-export context types
- */
-export type { Context } from '../context';
-
-/**
- * Re-export sub-routers for direct access if needed
- */
-export { webhooksRouter } from './webhooks';
+// Re-export individual routers for testing
+export {
+  authRouter,
+  usersRouter,
+  reposRouter,
+  pullsRouter,
+  issuesRouter,
+  commentsRouter,
+  activityRouter,
+  webhooksRouter,
+};

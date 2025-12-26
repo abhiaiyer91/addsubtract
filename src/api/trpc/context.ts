@@ -1,95 +1,87 @@
+import type { Context as HonoContext } from 'hono';
+import { getDb, type Database } from '../../db';
+import { sessionModel } from '../../db/models';
+import type { User } from '../../db/schema';
+
 /**
- * tRPC Context
- * Provides request context including user authentication and permissions
+ * Context available in every tRPC procedure
  */
-
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-}
-
-export interface Context {
+export interface Context extends Record<string, unknown> {
+  /** Database instance */
+  db: Database;
+  /** Authenticated user or null */
   user: User | null;
+  /** Raw request object */
+  req: Request;
 }
 
 /**
- * Repository collaborator permissions
+ * Extract session ID from request headers or cookies
  */
-export type Permission = 'read' | 'write' | 'admin';
-
-/**
- * In-memory store for repository collaborators (in production, this would be a database)
- */
-const collaboratorsStore = new Map<string, Map<string, Permission>>();
-
-/**
- * Get a user's permission level for a repository
- */
-export async function getRepoPermission(
-  userId: string,
-  repoId: string
-): Promise<Permission | null> {
-  const repoCollaborators = collaboratorsStore.get(repoId);
-  if (!repoCollaborators) {
-    return null;
+function getSessionId(req: Request): string | undefined {
+  // Try Authorization header first (Bearer token)
+  const authHeader = req.headers.get('Authorization');
+  if (authHeader?.startsWith('Bearer ')) {
+    return authHeader.slice(7);
   }
-  return repoCollaborators.get(userId) ?? null;
+
+  // Try Cookie header
+  const cookieHeader = req.headers.get('Cookie');
+  if (cookieHeader) {
+    const cookies = cookieHeader.split(';').reduce(
+      (acc, cookie) => {
+        const [key, value] = cookie.trim().split('=');
+        if (key && value) {
+          acc[key] = value;
+        }
+        return acc;
+      },
+      {} as Record<string, string>
+    );
+    return cookies['session'];
+  }
+
+  return undefined;
 }
 
 /**
- * Set a user's permission level for a repository
+ * Create context from Hono request context
+ * This is called for each incoming tRPC request
  */
-export async function setRepoPermission(
-  userId: string,
-  repoId: string,
-  permission: Permission
-): Promise<void> {
-  let repoCollaborators = collaboratorsStore.get(repoId);
-  if (!repoCollaborators) {
-    repoCollaborators = new Map();
-    collaboratorsStore.set(repoId, repoCollaborators);
+export async function createContext(c: HonoContext): Promise<Context> {
+  const db = getDb();
+  const req = c.req.raw;
+
+  // Get session from request
+  const sessionId = getSessionId(req);
+
+  let user: User | null = null;
+
+  if (sessionId) {
+    try {
+      const session = await sessionModel.findWithUser(sessionId);
+      if (session && session.session.expiresAt > new Date()) {
+        user = session.user;
+      }
+    } catch {
+      // Session lookup failed, user remains null
+    }
   }
-  repoCollaborators.set(userId, permission);
+
+  return { db, user, req };
 }
 
 /**
- * Check if a user has at least the required permission level
+ * Create context for testing or CLI usage (without Hono)
  */
-export function hasPermission(
-  userPermission: Permission | null,
-  required: Permission
-): boolean {
-  if (!userPermission) {
-    return false;
-  }
-
-  const levels: Record<Permission, number> = {
-    read: 1,
-    write: 2,
-    admin: 3,
+export function createTestContext(options: {
+  user?: User | null;
+  req?: Request;
+} = {}): Context {
+  const db = getDb();
+  return {
+    db,
+    user: options.user ?? null,
+    req: options.req ?? new Request('http://localhost'),
   };
-
-  return levels[userPermission] >= levels[required];
-}
-
-/**
- * Remove a user's permission from a repository
- */
-export async function removeRepoPermission(
-  userId: string,
-  repoId: string
-): Promise<boolean> {
-  const repoCollaborators = collaboratorsStore.get(repoId);
-  if (!repoCollaborators) {
-    return false;
-  }
-  return repoCollaborators.delete(userId);
-}
-
-/**
- * Clear all collaborators (useful for testing)
- */
-export async function clearCollaborators(): Promise<void> {
-  collaboratorsStore.clear();
 }

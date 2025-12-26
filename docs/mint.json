@@ -1,6 +1,6 @@
 {
   "$schema": "https://mintlify.com/schema.json",
-  "name": "tsgit",
+  "name": "wit",
   "logo": {
     "dark": "/logo/dark.svg",
     "light": "/logo/light.svg"
@@ -18,7 +18,7 @@
   "topbarLinks": [
     {
       "name": "GitHub",
-      "url": "https://github.com/your-username/tsgit"
+      "url": "https://github.com/abhiaiyer91/wit"
     }
   ],
   "topbarCtaButton": {
@@ -33,18 +33,27 @@
     {
       "name": "API Reference",
       "url": "/api-reference"
+    },
+    {
+      "name": "Architecture",
+      "url": "/architecture"
     }
   ],
   "anchors": [
     {
       "name": "GitHub",
       "icon": "github",
-      "url": "https://github.com/your-username/tsgit"
+      "url": "https://github.com/abhiaiyer91/wit"
     },
     {
       "name": "Community",
       "icon": "discord",
-      "url": "https://discord.gg/tsgit"
+      "url": "https://discord.gg/wit"
+    },
+    {
+      "name": "Roadmap",
+      "icon": "map",
+      "url": "https://github.com/abhiaiyer91/wit/blob/main/ROADMAP.md"
     }
   ],
   "navigation": [
@@ -53,15 +62,18 @@
       "pages": [
         "introduction",
         "quickstart",
-        "installation"
+        "installation",
+        "contributing"
       ]
     },
     {
       "group": "Commands",
       "pages": [
         "commands/overview",
+        "commands/reference",
         "commands/basic-workflow",
         "commands/branches",
+        "commands/remotes",
         "commands/undo-history",
         "commands/quality-of-life",
         "commands/merge",
@@ -80,6 +92,7 @@
     {
       "group": "Features",
       "pages": [
+        "features/github",
         "features/ai-powered",
         "features/monorepo-scopes",
         "features/large-files",
@@ -93,7 +106,25 @@
       "pages": [
         "configuration/overview",
         "configuration/repository",
-        "configuration/directory-structure"
+        "configuration/directory-structure",
+        "configuration/shell-integration"
+      ]
+    },
+    {
+      "group": "Platform",
+      "pages": [
+        "platform/overview",
+        "platform/server",
+        "platform/pull-requests",
+        "platform/issues"
+      ]
+    },
+    {
+      "group": "Primitives",
+      "pages": [
+        "primitives/overview",
+        "primitives/filesystem",
+        "primitives/knowledge"
       ]
     },
     {
@@ -101,11 +132,19 @@
       "pages": [
         "api-reference/overview",
         "api-reference/repository",
+        "api-reference/objects",
         "api-reference/search"
+      ]
+    },
+    {
+      "group": "Architecture",
+      "pages": [
+        "architecture/overview"
       ]
     }
   ],
   "footerSocials": {
-    "github": "https://github.com/your-username/tsgit"
+    "github": "https://github.com/abhiaiyer91/wit",
+    "discord": "https://discord.gg/wit"
   }
 }
