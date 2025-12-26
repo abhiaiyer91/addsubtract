@@ -5,50 +5,44 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { Loading } from '@/components/ui/loading';
 import { formatDate } from '@/lib/utils';
-
-// Mock user data
-const mockUser = {
-  id: '1',
-  username: 'johndoe',
-  name: 'John Doe',
-  bio: 'Full-stack developer passionate about TypeScript and open source',
-  avatarUrl: null,
-  location: 'San Francisco, CA',
-  website: 'https://johndoe.dev',
-  createdAt: new Date('2023-01-15'),
-};
-
-// Mock repositories
-const mockRepos = [
-  {
-    id: '1',
-    name: 'awesome-project',
-    description: 'A really awesome project that does amazing things',
-    isPrivate: false,
-    starsCount: 42,
-    forksCount: 7,
-    language: 'TypeScript',
-    updatedAt: new Date(),
-  },
-  {
-    id: '2',
-    name: 'another-repo',
-    description: 'Another great repository',
-    isPrivate: false,
-    starsCount: 15,
-    forksCount: 3,
-    language: 'JavaScript',
-    updatedAt: new Date(Date.now() - 86400000 * 3),
-  },
-];
+import { trpc } from '@/lib/trpc';
 
 export function OwnerPage() {
   const { owner } = useParams<{ owner: string }>();
 
-  // TODO: Fetch real data with tRPC
-  const user = { ...mockUser, username: owner || mockUser.username };
-  const repos = mockRepos;
+  // Fetch user data
+  const { data: userData, isLoading: userLoading, error: userError } = trpc.users.get.useQuery(
+    { username: owner! },
+    { enabled: !!owner }
+  );
+
+  // Fetch user's repositories
+  const { data: reposData, isLoading: reposLoading } = trpc.users.repos.useQuery(
+    { username: owner! },
+    { enabled: !!owner }
+  );
+
+  const isLoading = userLoading || reposLoading;
+
+  if (isLoading) {
+    return <Loading text="Loading profile..." />;
+  }
+
+  if (userError || !userData) {
+    return (
+      <div className="text-center py-12">
+        <h2 className="text-2xl font-bold mb-2">User not found</h2>
+        <p className="text-muted-foreground">
+          The user @{owner} could not be found.
+        </p>
+      </div>
+    );
+  }
+
+  const user = userData;
+  const repos = reposData || [];
 
   return (
     <div className="grid md:grid-cols-4 gap-8">
@@ -95,18 +89,18 @@ export function OwnerPage() {
             )}
             <div className="flex items-center gap-2 text-muted-foreground">
               <Calendar className="h-4 w-4" />
-              Joined {formatDate(user.createdAt)}
+              Joined {formatDate(new Date(user.createdAt))}
             </div>
           </div>
 
           <div className="flex gap-4 text-sm">
             <button className="flex items-center gap-1 hover:text-primary">
               <Users className="h-4 w-4" />
-              <strong>12</strong>
+              <strong>0</strong>
               <span className="text-muted-foreground">followers</span>
             </button>
             <button className="flex items-center gap-1 hover:text-primary">
-              <strong>8</strong>
+              <strong>0</strong>
               <span className="text-muted-foreground">following</span>
             </button>
           </div>
@@ -131,48 +125,51 @@ export function OwnerPage() {
           </TabsList>
 
           <TabsContent value="repositories" className="mt-6">
-            <div className="space-y-4">
-              {repos.map((repo) => (
-                <Card key={repo.id}>
-                  <CardContent className="p-4">
-                    <div className="flex justify-between items-start">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <Link
-                            to={`/${user.username}/${repo.name}`}
-                            className="text-lg font-semibold text-primary hover:underline"
-                          >
-                            {repo.name}
-                          </Link>
-                          {repo.isPrivate && (
-                            <Badge variant="secondary">Private</Badge>
+            {repos.length === 0 ? (
+              <Card>
+                <CardContent className="p-8 text-center text-muted-foreground">
+                  <Code2 className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>No repositories yet</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-4">
+                {repos.map((repo) => (
+                  <Card key={repo.id}>
+                    <CardContent className="p-4">
+                      <div className="flex justify-between items-start">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <Link
+                              to={`/${user.username}/${repo.name}`}
+                              className="text-lg font-semibold text-primary hover:underline"
+                            >
+                              {repo.name}
+                            </Link>
+                            {repo.isPrivate && (
+                              <Badge variant="secondary">Private</Badge>
+                            )}
+                          </div>
+                          {repo.description && (
+                            <p className="text-muted-foreground">
+                              {repo.description}
+                            </p>
                           )}
+                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                            <span>⭐ {repo.starsCount}</span>
+                            <span>🍴 {repo.forksCount}</span>
+                            <span>Updated {formatDate(new Date(repo.updatedAt))}</span>
+                          </div>
                         </div>
-                        {repo.description && (
-                          <p className="text-muted-foreground">
-                            {repo.description}
-                          </p>
-                        )}
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                          {repo.language && (
-                            <span className="flex items-center gap-1">
-                              <span className="h-3 w-3 rounded-full bg-blue-500" />
-                              {repo.language}
-                            </span>
-                          )}
-                          <span>⭐ {repo.starsCount}</span>
-                          <span>🍴 {repo.forksCount}</span>
-                          <span>Updated {formatDate(repo.updatedAt)}</span>
-                        </div>
+                        <Button variant="outline" size="sm">
+                          ⭐ Star
+                        </Button>
                       </div>
-                      <Button variant="outline" size="sm">
-                        ⭐ Star
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="pulls" className="mt-6">

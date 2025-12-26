@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
+import * as path from 'path';
 import { router, publicProcedure, protectedProcedure } from '../trpc';
 import {
   repoModel,
@@ -10,6 +11,24 @@ import {
   labelModel,
   activityHelpers,
 } from '../../../db/models';
+import { BareRepository } from '../../../server/storage/repos';
+import { exists } from '../../../utils/fs';
+
+/**
+ * Helper to get a BareRepository from disk path
+ */
+function getRepoFromDisk(diskPath: string): BareRepository | null {
+  // diskPath is like /repos/owner/name.git
+  // We need to resolve it relative to REPOS_DIR or use absolute path
+  const reposDir = process.env.REPOS_DIR || './repos';
+  const absolutePath = path.isAbsolute(diskPath) ? diskPath : path.join(process.cwd(), reposDir, diskPath.replace(/^\/repos\//, ''));
+  
+  if (!exists(absolutePath) || !exists(path.join(absolutePath, 'objects'))) {
+    return null;
+  }
+  
+  return new BareRepository(absolutePath);
+}
 
 export const reposRouter = router({
   /**
@@ -489,5 +508,403 @@ export const reposRouter = router({
     )
     .query(async ({ input }) => {
       return collaboratorModel.listByRepo(input.repoId);
+    }),
+
+  /**
+   * Get directory tree for a repository
+   */
+  getTree: publicProcedure
+    .input(
+      z.object({
+        owner: z.string(),
+        repo: z.string(),
+        ref: z.string().default('HEAD'),
+        path: z.string().default(''),
+      })
+    )
+    .query(async ({ input, ctx }) => {
+      const result = await repoModel.findByPath(input.owner, input.repo);
+
+      if (!result) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Repository not found',
+        });
+      }
+
+      // Check access for private repos
+      if (result.repo.isPrivate) {
+        if (!ctx.user) {
+          throw new TRPCError({
+            code: 'UNAUTHORIZED',
+            message: 'Authentication required',
+          });
+        }
+
+        const isOwner = result.repo.ownerId === ctx.user.id;
+        const hasAccess = isOwner || (await collaboratorModel.hasPermission(result.repo.id, ctx.user.id, 'read'));
+
+        if (!hasAccess) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'You do not have access to this repository',
+          });
+        }
+      }
+
+      // Get the bare repository
+      const bareRepo = getRepoFromDisk(result.repo.diskPath);
+      if (!bareRepo) {
+        // Return empty tree if repo doesn't exist on disk yet
+        return { entries: [] };
+      }
+
+      try {
+        // Resolve the ref to a commit
+        const commitHash = bareRepo.refs.resolve(input.ref);
+        if (!commitHash) {
+          return { entries: [] };
+        }
+
+        // Read the commit to get the tree
+        const commit = bareRepo.objects.readCommit(commitHash);
+        
+        // Navigate to the path if specified
+        let treeHash = commit.treeHash;
+        if (input.path) {
+          const pathParts = input.path.split('/').filter(Boolean);
+          for (const part of pathParts) {
+            const tree = bareRepo.objects.readTree(treeHash);
+            const entry = tree.entries.find(e => e.name === part);
+            if (!entry || entry.mode !== '40000') {
+              throw new TRPCError({
+                code: 'NOT_FOUND',
+                message: `Path not found: ${input.path}`,
+              });
+            }
+            treeHash = entry.hash;
+          }
+        }
+
+        // Read the tree
+        const tree = bareRepo.objects.readTree(treeHash);
+
+        // Convert to response format
+        const entries = tree.entries.map(entry => ({
+          name: entry.name,
+          path: input.path ? `${input.path}/${entry.name}` : entry.name,
+          type: entry.mode === '40000' ? 'directory' as const : 'file' as const,
+          sha: entry.hash,
+          // Size is only available by reading the blob
+          size: entry.mode !== '40000' ? (() => {
+            try {
+              const blob = bareRepo.objects.readBlob(entry.hash);
+              return blob.content.length;
+            } catch {
+              return undefined;
+            }
+          })() : undefined,
+        }));
+
+        // Sort: directories first, then alphabetically
+        entries.sort((a, b) => {
+          if (a.type !== b.type) {
+            return a.type === 'directory' ? -1 : 1;
+          }
+          return a.name.localeCompare(b.name);
+        });
+
+        return { entries };
+      } catch (error) {
+        if (error instanceof TRPCError) throw error;
+        console.error('[repos.getTree] Error:', error);
+        return { entries: [] };
+      }
+    }),
+
+  /**
+   * Get file content from a repository
+   */
+  getFile: publicProcedure
+    .input(
+      z.object({
+        owner: z.string(),
+        repo: z.string(),
+        ref: z.string().default('HEAD'),
+        path: z.string(),
+      })
+    )
+    .query(async ({ input, ctx }) => {
+      const result = await repoModel.findByPath(input.owner, input.repo);
+
+      if (!result) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Repository not found',
+        });
+      }
+
+      // Check access for private repos
+      if (result.repo.isPrivate) {
+        if (!ctx.user) {
+          throw new TRPCError({
+            code: 'UNAUTHORIZED',
+            message: 'Authentication required',
+          });
+        }
+
+        const isOwner = result.repo.ownerId === ctx.user.id;
+        const hasAccess = isOwner || (await collaboratorModel.hasPermission(result.repo.id, ctx.user.id, 'read'));
+
+        if (!hasAccess) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'You do not have access to this repository',
+          });
+        }
+      }
+
+      // Get the bare repository
+      const bareRepo = getRepoFromDisk(result.repo.diskPath);
+      if (!bareRepo) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Repository not found on disk',
+        });
+      }
+
+      try {
+        // Resolve the ref to a commit
+        const commitHash = bareRepo.refs.resolve(input.ref);
+        if (!commitHash) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Ref not found',
+          });
+        }
+
+        // Read the commit to get the tree
+        const commit = bareRepo.objects.readCommit(commitHash);
+        
+        // Navigate to the file
+        const pathParts = input.path.split('/').filter(Boolean);
+        let currentHash = commit.treeHash;
+        
+        for (let i = 0; i < pathParts.length; i++) {
+          const part = pathParts[i];
+          const tree = bareRepo.objects.readTree(currentHash);
+          const entry = tree.entries.find(e => e.name === part);
+          
+          if (!entry) {
+            throw new TRPCError({
+              code: 'NOT_FOUND',
+              message: `File not found: ${input.path}`,
+            });
+          }
+
+          if (i === pathParts.length - 1) {
+            // This is the file
+            if (entry.mode === '40000') {
+              throw new TRPCError({
+                code: 'BAD_REQUEST',
+                message: 'Path is a directory, not a file',
+              });
+            }
+            currentHash = entry.hash;
+          } else {
+            // This should be a directory
+            if (entry.mode !== '40000') {
+              throw new TRPCError({
+                code: 'NOT_FOUND',
+                message: `Path not found: ${input.path}`,
+              });
+            }
+            currentHash = entry.hash;
+          }
+        }
+
+        // Read the blob
+        const blob = bareRepo.objects.readBlob(currentHash);
+        
+        // Try to decode as UTF-8, fall back to base64
+        let content: string;
+        let encoding: 'utf-8' | 'base64';
+        
+        try {
+          content = blob.content.toString('utf-8');
+          // Check if it's valid UTF-8 by checking for replacement character
+          if (content.includes('\uFFFD')) {
+            throw new Error('Invalid UTF-8');
+          }
+          encoding = 'utf-8';
+        } catch {
+          content = blob.content.toString('base64');
+          encoding = 'base64';
+        }
+
+        return {
+          content,
+          sha: currentHash,
+          size: blob.content.length,
+          encoding,
+        };
+      } catch (error) {
+        if (error instanceof TRPCError) throw error;
+        console.error('[repos.getFile] Error:', error);
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to read file',
+        });
+      }
+    }),
+
+  /**
+   * Get branches for a repository
+   */
+  getBranches: publicProcedure
+    .input(
+      z.object({
+        owner: z.string(),
+        repo: z.string(),
+      })
+    )
+    .query(async ({ input, ctx }) => {
+      const result = await repoModel.findByPath(input.owner, input.repo);
+
+      if (!result) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Repository not found',
+        });
+      }
+
+      // Check access for private repos
+      if (result.repo.isPrivate) {
+        if (!ctx.user) {
+          throw new TRPCError({
+            code: 'UNAUTHORIZED',
+            message: 'Authentication required',
+          });
+        }
+
+        const isOwner = result.repo.ownerId === ctx.user.id;
+        const hasAccess = isOwner || (await collaboratorModel.hasPermission(result.repo.id, ctx.user.id, 'read'));
+
+        if (!hasAccess) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'You do not have access to this repository',
+          });
+        }
+      }
+
+      // Get the bare repository
+      const bareRepo = getRepoFromDisk(result.repo.diskPath);
+      if (!bareRepo) {
+        return [];
+      }
+
+      try {
+        const branches = bareRepo.refs.listBranches();
+        const defaultBranch = result.repo.defaultBranch;
+
+        return branches.map(name => ({
+          name,
+          sha: bareRepo.refs.resolve(`refs/heads/${name}`) || '',
+          isDefault: name === defaultBranch,
+        }));
+      } catch (error) {
+        console.error('[repos.getBranches] Error:', error);
+        return [];
+      }
+    }),
+
+  /**
+   * Get commit history for a repository
+   */
+  getCommits: publicProcedure
+    .input(
+      z.object({
+        owner: z.string(),
+        repo: z.string(),
+        ref: z.string().default('HEAD'),
+        limit: z.number().min(1).max(100).default(30),
+      })
+    )
+    .query(async ({ input, ctx }) => {
+      const result = await repoModel.findByPath(input.owner, input.repo);
+
+      if (!result) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Repository not found',
+        });
+      }
+
+      // Check access for private repos
+      if (result.repo.isPrivate) {
+        if (!ctx.user) {
+          throw new TRPCError({
+            code: 'UNAUTHORIZED',
+            message: 'Authentication required',
+          });
+        }
+
+        const isOwner = result.repo.ownerId === ctx.user.id;
+        const hasAccess = isOwner || (await collaboratorModel.hasPermission(result.repo.id, ctx.user.id, 'read'));
+
+        if (!hasAccess) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'You do not have access to this repository',
+          });
+        }
+      }
+
+      // Get the bare repository
+      const bareRepo = getRepoFromDisk(result.repo.diskPath);
+      if (!bareRepo) {
+        return [];
+      }
+
+      try {
+        // Resolve the ref to a commit
+        let commitHash = bareRepo.refs.resolve(input.ref);
+        if (!commitHash) {
+          return [];
+        }
+
+        const commits: Array<{
+          sha: string;
+          message: string;
+          author: string;
+          authorEmail: string;
+          date: Date;
+        }> = [];
+
+        // Walk the commit history
+        while (commitHash && commits.length < input.limit) {
+          try {
+            const commit = bareRepo.objects.readCommit(commitHash);
+            commits.push({
+              sha: commitHash,
+              message: commit.message,
+              author: commit.author.name,
+              authorEmail: commit.author.email,
+              date: new Date(commit.author.timestamp * 1000),
+            });
+
+            // Move to the first parent
+            commitHash = commit.parentHashes[0] || null;
+          } catch {
+            break;
+          }
+        }
+
+        return commits;
+      } catch (error) {
+        console.error('[repos.getCommits] Error:', error);
+        return [];
+      }
     }),
 });

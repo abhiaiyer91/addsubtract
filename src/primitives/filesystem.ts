@@ -11,10 +11,10 @@ import { Repository } from '../core/repository';
 import { reset, parseRevision } from '../commands/reset';
 import { diff as computeDiff, createHunks, formatUnifiedDiff, FileDiff } from '../core/diff';
 import { exists, mkdirp, walkDir, loadIgnorePatterns } from '../utils/fs';
-import type { FileEntry, FileStatus, FileStat, CommitInfo, MergeResult } from './types';
+import type { FileEntry, FileStatus, FileStat, CommitInfo, FsMergeResult } from './types';
 
 // Re-export types
-export type { FileEntry, FileStatus, FileStat, CommitInfo, MergeResult } from './types';
+export type { FileEntry, FileStatus, FileStat, CommitInfo, FsMergeResult } from './types';
 
 /**
  * Git-backed virtual filesystem
@@ -408,7 +408,7 @@ export class Filesystem {
    * @param branchName - Branch to merge
    * @returns Merge result with success status and any conflicts
    */
-  async merge(branchName: string): Promise<MergeResult> {
+  async merge(branchName: string): Promise<FsMergeResult> {
     try {
       const result = this.repo.mergeManager.merge(branchName);
       return {

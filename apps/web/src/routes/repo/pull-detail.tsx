@@ -19,141 +19,13 @@ import { PrTimeline } from '@/components/pr/pr-timeline';
 import { MergeButton } from '@/components/pr/merge-button';
 import { Markdown } from '@/components/markdown/renderer';
 import { RepoHeader } from './components/repo-header';
+import { Loading } from '@/components/ui/loading';
 import { formatRelativeTime } from '@/lib/utils';
 import { isAuthenticated } from '@/lib/auth';
+import { trpc } from '@/lib/trpc';
 
-// Mock pull request data
-const mockPullRequest = {
-  id: '1',
-  number: 42,
-  title: 'Add new authentication system with OAuth2 support',
-  body: `## Summary
-
-This PR adds a complete OAuth2 authentication system with support for:
-
-- GitHub OAuth
-- Google OAuth  
-- Session management
-- JWT tokens
-
-## Changes
-
-- Added \`/auth/login\` and \`/auth/callback\` routes
-- Created OAuth provider abstraction
-- Added session middleware
-- Updated user model with OAuth fields
-
-## Testing
-
-- [x] Unit tests for OAuth providers
-- [x] Integration tests for auth flow
-- [x] Manual testing with GitHub OAuth
-
-## Screenshots
-
-N/A - Backend changes only
-`,
-  state: 'open' as const,
-  author: { id: '1', username: 'johndoe', avatarUrl: null },
-  sourceBranch: 'feature/oauth2',
-  targetBranch: 'main',
-  headSha: 'abc123def456',
-  baseSha: '789ghi012jkl',
-  isMergeable: true,
-  isDraft: false,
-  createdAt: new Date(Date.now() - 3600000),
-  updatedAt: new Date(),
-  labels: [
-    { id: '1', name: 'enhancement', color: 'a2eeef', description: null, repoId: '1', createdAt: new Date() },
-  ],
-};
-
-// Mock diff data
-const mockDiff: DiffFile[] = [
-  {
-    path: 'src/auth/oauth.ts',
-    status: 'added',
-    additions: 45,
-    deletions: 0,
-    hunks: [
-      {
-        oldStart: 0,
-        newStart: 1,
-        oldLines: 0,
-        newLines: 20,
-        lines: [
-          { type: 'add', content: "import { OAuth2Client } from 'google-auth-library';", newLineNumber: 1 },
-          { type: 'add', content: '', newLineNumber: 2 },
-          { type: 'add', content: 'export interface OAuthProvider {', newLineNumber: 3 },
-          { type: 'add', content: '  getAuthUrl(): string;', newLineNumber: 4 },
-          { type: 'add', content: '  getToken(code: string): Promise<string>;', newLineNumber: 5 },
-          { type: 'add', content: '  getUser(token: string): Promise<User>;', newLineNumber: 6 },
-          { type: 'add', content: '}', newLineNumber: 7 },
-          { type: 'add', content: '', newLineNumber: 8 },
-          { type: 'add', content: 'export class GitHubOAuth implements OAuthProvider {', newLineNumber: 9 },
-          { type: 'add', content: '  // Implementation...', newLineNumber: 10 },
-          { type: 'add', content: '}', newLineNumber: 11 },
-        ],
-      },
-    ],
-  },
-  {
-    path: 'src/routes/auth.ts',
-    status: 'modified',
-    additions: 25,
-    deletions: 5,
-    hunks: [
-      {
-        oldStart: 10,
-        newStart: 10,
-        oldLines: 10,
-        newLines: 30,
-        lines: [
-          { type: 'context', content: "import { Router } from 'express';", oldLineNumber: 10, newLineNumber: 10 },
-          { type: 'context', content: '', oldLineNumber: 11, newLineNumber: 11 },
-          { type: 'remove', content: 'const router = Router();', oldLineNumber: 12 },
-          { type: 'add', content: "import { GitHubOAuth } from '../auth/oauth';", newLineNumber: 12 },
-          { type: 'add', content: '', newLineNumber: 13 },
-          { type: 'add', content: 'const router = Router();', newLineNumber: 14 },
-          { type: 'add', content: 'const github = new GitHubOAuth();', newLineNumber: 15 },
-          { type: 'context', content: '', oldLineNumber: 13, newLineNumber: 16 },
-          { type: 'remove', content: "router.get('/login', (req, res) => {", oldLineNumber: 14 },
-          { type: 'remove', content: "  res.send('Login page');", oldLineNumber: 15 },
-          { type: 'remove', content: '});', oldLineNumber: 16 },
-          { type: 'add', content: "router.get('/login/github', (req, res) => {", newLineNumber: 17 },
-          { type: 'add', content: '  res.redirect(github.getAuthUrl());', newLineNumber: 18 },
-          { type: 'add', content: '});', newLineNumber: 19 },
-        ],
-      },
-    ],
-  },
-];
-
-// Mock timeline events
-const mockTimeline = [
-  {
-    id: '1',
-    type: 'comment' as const,
-    author: { username: 'janesmith', avatarUrl: null },
-    body: 'Looks good overall! Just a few minor comments on the OAuth implementation.',
-    createdAt: new Date(Date.now() - 3600000 * 2),
-  },
-  {
-    id: '2',
-    type: 'commit' as const,
-    author: { username: 'johndoe', avatarUrl: null },
-    sha: 'abc123def456789',
-    message: 'Address code review feedback',
-    createdAt: new Date(Date.now() - 3600000),
-  },
-  {
-    id: '3',
-    type: 'review' as const,
-    author: { username: 'janesmith', avatarUrl: null },
-    reviewState: 'approved' as const,
-    createdAt: new Date(Date.now() - 1800000),
-  },
-];
+// Mock diff data - TODO: Implement getDiff endpoint
+const mockDiff: DiffFile[] = [];
 
 export function PullDetailPage() {
   const { owner, repo, number } = useParams<{
@@ -163,13 +35,114 @@ export function PullDetailPage() {
   }>();
   const [comment, setComment] = useState('');
   const authenticated = isAuthenticated();
+  const utils = trpc.useUtils();
 
   const prNumber = parseInt(number!, 10);
 
-  // TODO: Fetch real data with tRPC
-  const pr = { ...mockPullRequest, number: prNumber };
+  // Fetch repository data
+  const { data: repoData, isLoading: repoLoading } = trpc.repos.get.useQuery(
+    { owner: owner!, repo: repo! },
+    { enabled: !!owner && !!repo }
+  );
+
+  // Fetch pull request
+  const { data: prData, isLoading: prLoading } = trpc.pulls.get.useQuery(
+    {
+      repoId: repoData?.repo.id!,
+      number: prNumber,
+    },
+    { enabled: !!repoData?.repo.id }
+  );
+
+  // Fetch reviews
+  const { data: reviewsData } = trpc.pulls.reviews.useQuery(
+    { prId: prData?.id! },
+    { enabled: !!prData?.id }
+  );
+
+  // Fetch comments
+  const { data: commentsData } = trpc.pulls.comments.useQuery(
+    { prId: prData?.id! },
+    { enabled: !!prData?.id }
+  );
+
+  // Mutations
+  const addCommentMutation = trpc.pulls.addComment.useMutation({
+    onSuccess: () => {
+      setComment('');
+      utils.pulls.comments.invalidate({ prId: prData?.id! });
+    },
+  });
+
+  const mergeMutation = trpc.pulls.merge.useMutation({
+    onSuccess: () => {
+      utils.pulls.get.invalidate({ repoId: repoData?.repo.id!, number: prNumber });
+    },
+  });
+
+  const isLoading = repoLoading || prLoading;
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <RepoHeader owner={owner!} repo={repo!} />
+        <Loading text="Loading pull request..." />
+      </div>
+    );
+  }
+
+  if (!prData) {
+    return (
+      <div className="space-y-6">
+        <RepoHeader owner={owner!} repo={repo!} />
+        <div className="text-center py-12">
+          <h2 className="text-2xl font-bold mb-2">Pull request not found</h2>
+          <p className="text-muted-foreground">
+            Pull request #{prNumber} could not be found in this repository.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const pr = prData;
+  const reviews = reviewsData || [];
+  const comments = commentsData || [];
   const diff = mockDiff;
-  const timeline = mockTimeline;
+
+  // Build timeline from reviews and comments
+  const timeline: Array<{
+    id: string;
+    type: 'comment' | 'commit' | 'review' | 'status';
+    author: { username: string; avatarUrl?: string | null };
+    createdAt: Date;
+    body?: string;
+    reviewState?: 'approved' | 'changes_requested' | 'commented';
+  }> = [
+    ...reviews
+      .filter(review => review.state !== 'pending')
+      .map(review => ({
+        id: review.id,
+        type: 'review' as const,
+        author: {
+          username: review.user?.username || 'Unknown',
+          avatarUrl: review.user?.avatarUrl || null,
+        },
+        reviewState: review.state as 'approved' | 'changes_requested' | 'commented',
+        body: review.body || undefined,
+        createdAt: new Date(review.createdAt),
+      })),
+    ...comments.map(comment => ({
+      id: comment.id,
+      type: 'comment' as const,
+      author: {
+        username: comment.user?.username || 'Unknown',
+        avatarUrl: comment.user?.avatarUrl || null,
+      },
+      body: comment.body,
+      createdAt: new Date(comment.createdAt),
+    })),
+  ].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 
   const stateIcon = {
     open: <GitPullRequest className="h-5 w-5 text-green-500" />,
@@ -183,17 +156,23 @@ export function PullDetailPage() {
     closed: 'Closed',
   };
 
-  const handleMerge = async (method: 'merge' | 'squash' | 'rebase') => {
-    // TODO: Call tRPC mutation
-    console.log('Merging with method:', method);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+  const handleMerge = async (_method: 'merge' | 'squash' | 'rebase') => {
+    if (!prData?.id) return;
+    // For now, we'll use the head SHA as the merge SHA
+    // In a real implementation, the server would compute this
+    // TODO: Pass method to server when implementing different merge strategies
+    mergeMutation.mutate({
+      prId: prData.id,
+      mergeSha: prData.headSha,
+    });
   };
 
   const handleComment = async () => {
-    if (!comment.trim()) return;
-    // TODO: Call tRPC mutation
-    console.log('Adding comment:', comment);
-    setComment('');
+    if (!comment.trim() || !prData?.id) return;
+    addCommentMutation.mutate({
+      prId: prData.id,
+      body: comment,
+    });
   };
 
   return (
@@ -217,8 +196,8 @@ export function PullDetailPage() {
           </Badge>
 
           <span className="text-muted-foreground">
-            <Link to={`/${pr.author.username}`} className="font-medium hover:text-foreground">
-              {pr.author.username}
+            <Link to={`/${pr.author?.username}`} className="font-medium hover:text-foreground">
+              {pr.author?.username || 'Unknown'}
             </Link>{' '}
             wants to merge{' '}
             <code className="px-1.5 py-0.5 bg-muted rounded font-mono text-sm">
@@ -232,7 +211,7 @@ export function PullDetailPage() {
         </div>
 
         <div className="flex items-center gap-2 mt-3">
-          {pr.labels.map((label) => (
+          {pr.labels?.map((label) => (
             <Badge
               key={label.id}
               variant="outline"
@@ -271,24 +250,28 @@ export function PullDetailPage() {
           <Card>
             <div className="flex items-center gap-3 px-4 py-2 bg-muted/30 border-b">
               <Avatar className="h-6 w-6">
-                <AvatarImage src={pr.author.avatarUrl || undefined} />
+                <AvatarImage src={pr.author?.avatarUrl || undefined} />
                 <AvatarFallback className="text-xs">
-                  {pr.author.username.slice(0, 2).toUpperCase()}
+                  {pr.author?.username?.slice(0, 2).toUpperCase() || 'UN'}
                 </AvatarFallback>
               </Avatar>
-              <span className="font-medium">{pr.author.username}</span>
+              <span className="font-medium">{pr.author?.username || 'Unknown'}</span>
               <span className="text-muted-foreground">opened this pull request</span>
               <span className="text-muted-foreground">
-                {formatRelativeTime(pr.createdAt)}
+                {formatRelativeTime(new Date(pr.createdAt))}
               </span>
             </div>
             <CardContent className="p-4">
-              <Markdown content={pr.body} />
+              {pr.body ? (
+                <Markdown content={pr.body} />
+              ) : (
+                <p className="text-muted-foreground italic">No description provided.</p>
+              )}
             </CardContent>
           </Card>
 
           {/* Timeline */}
-          <PrTimeline events={timeline} />
+          {timeline.length > 0 && <PrTimeline events={timeline} />}
 
           {/* Merge section */}
           {pr.state === 'open' && authenticated && (
@@ -296,7 +279,7 @@ export function PullDetailPage() {
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    {pr.isMergeable ? (
+                    {pr.isMergeable !== false ? (
                       <p className="text-green-500 font-medium">
                         ✓ This branch has no conflicts with the base branch
                       </p>
@@ -307,7 +290,7 @@ export function PullDetailPage() {
                     )}
                   </div>
                   <MergeButton
-                    isMergeable={pr.isMergeable}
+                    isMergeable={pr.isMergeable !== false}
                     onMerge={handleMerge}
                   />
                 </div>
@@ -326,8 +309,11 @@ export function PullDetailPage() {
                   rows={4}
                 />
                 <div className="flex justify-end">
-                  <Button onClick={handleComment} disabled={!comment.trim()}>
-                    Comment
+                  <Button
+                    onClick={handleComment}
+                    disabled={!comment.trim() || addCommentMutation.isPending}
+                  >
+                    {addCommentMutation.isPending ? 'Commenting...' : 'Comment'}
                   </Button>
                 </div>
               </CardContent>
@@ -345,7 +331,16 @@ export function PullDetailPage() {
         </TabsContent>
 
         <TabsContent value="files" className="mt-6">
-          <DiffViewer files={diff} />
+          {diff.length > 0 ? (
+            <DiffViewer files={diff} />
+          ) : (
+            <Card>
+              <CardContent className="p-6 text-center text-muted-foreground">
+                <FileCode className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>File diff coming soon</p>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
       </Tabs>
     </div>

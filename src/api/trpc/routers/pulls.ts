@@ -13,7 +13,7 @@ import {
 
 export const pullsRouter = router({
   /**
-   * List pull requests for a repository
+   * List pull requests for a repository (with author and labels)
    */
   list: publicProcedure
     .input(
@@ -26,16 +26,31 @@ export const pullsRouter = router({
       })
     )
     .query(async ({ input }) => {
-      return prModel.listByRepo(input.repoId, {
+      const prs = await prModel.listByRepo(input.repoId, {
         state: input.state,
         authorId: input.authorId,
         limit: input.limit,
         offset: input.offset,
       });
+
+      // Fetch authors and labels for each PR
+      const prsWithDetails = await Promise.all(
+        prs.map(async (pr) => {
+          const result = await prModel.findWithAuthor(pr.id);
+          const labels = await prLabelModel.listByPr(pr.id);
+          return {
+            ...pr,
+            author: result?.author ?? null,
+            labels,
+          };
+        })
+      );
+
+      return prsWithDetails;
     }),
 
   /**
-   * Get a single pull request by number
+   * Get a single pull request by number (with author and labels)
    */
   get: publicProcedure
     .input(
@@ -54,7 +69,18 @@ export const pullsRouter = router({
         });
       }
 
-      return pr;
+      // Get author
+      const authorResult = await prModel.findWithAuthor(pr.id);
+      const author = authorResult?.author ?? null;
+
+      // Get labels
+      const labels = await prLabelModel.listByPr(pr.id);
+
+      return {
+        ...pr,
+        author,
+        labels,
+      };
     }),
 
   /**

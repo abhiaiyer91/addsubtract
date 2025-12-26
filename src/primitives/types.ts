@@ -53,9 +53,9 @@ export interface CommitInfo {
 }
 
 /**
- * Result of a merge operation
+ * Result of a filesystem merge operation
  */
-export interface MergeResult {
+export interface FsMergeResult {
   /** Whether the merge was successful */
   success: boolean;
   /** List of conflicting files if merge failed */

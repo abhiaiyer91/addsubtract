@@ -6,70 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { IssueCard } from '@/components/issue/issue-card';
 import { RepoHeader } from './components/repo-header';
+import { Loading } from '@/components/ui/loading';
 import { isAuthenticated } from '@/lib/auth';
-
-// Mock issues
-const mockIssues = [
-  {
-    id: '1',
-    number: 15,
-    title: 'File upload fails for files larger than 10MB',
-    state: 'open' as const,
-    author: { username: 'johndoe' },
-    createdAt: new Date(Date.now() - 3600000),
-    labels: [
-      { id: '1', name: 'bug', color: 'd73a4a', description: null, repoId: '1', createdAt: new Date() },
-      { id: '2', name: 'help wanted', color: '008672', description: null, repoId: '1', createdAt: new Date() },
-    ],
-    commentsCount: 3,
-  },
-  {
-    id: '2',
-    number: 14,
-    title: 'Add dark mode support',
-    state: 'open' as const,
-    author: { username: 'janesmith' },
-    createdAt: new Date(Date.now() - 86400000),
-    labels: [
-      { id: '3', name: 'enhancement', color: 'a2eeef', description: null, repoId: '1', createdAt: new Date() },
-    ],
-    commentsCount: 7,
-  },
-  {
-    id: '3',
-    number: 13,
-    title: 'Documentation needs updating for v2.0',
-    state: 'open' as const,
-    author: { username: 'bobwilson' },
-    createdAt: new Date(Date.now() - 86400000 * 2),
-    labels: [
-      { id: '4', name: 'documentation', color: '0075ca', description: null, repoId: '1', createdAt: new Date() },
-    ],
-    commentsCount: 1,
-  },
-  {
-    id: '4',
-    number: 12,
-    title: 'Memory leak when processing large datasets',
-    state: 'closed' as const,
-    author: { username: 'johndoe' },
-    createdAt: new Date(Date.now() - 86400000 * 5),
-    labels: [
-      { id: '1', name: 'bug', color: 'd73a4a', description: null, repoId: '1', createdAt: new Date() },
-    ],
-    commentsCount: 12,
-  },
-  {
-    id: '5',
-    number: 11,
-    title: 'Add support for TypeScript 5.0',
-    state: 'closed' as const,
-    author: { username: 'janesmith' },
-    createdAt: new Date(Date.now() - 86400000 * 10),
-    labels: [],
-    commentsCount: 4,
-  },
-];
+import { trpc } from '@/lib/trpc';
 
 export function IssuesPage() {
   const { owner, repo } = useParams<{ owner: string; repo: string }>();
@@ -79,21 +18,49 @@ export function IssuesPage() {
 
   const currentState = searchParams.get('state') || 'open';
 
-  // TODO: Fetch real data with tRPC
-  const issues = mockIssues.filter((issue) => {
-    if (currentState === 'all') return true;
-    return issue.state === currentState;
+  // Fetch repository data to get the repo ID
+  const { data: repoData, isLoading: repoLoading } = trpc.repos.get.useQuery(
+    { owner: owner!, repo: repo! },
+    { enabled: !!owner && !!repo }
+  );
+
+  // Fetch issues
+  const { data: issuesData, isLoading: issuesLoading } = trpc.issues.list.useQuery(
+    {
+      repoId: repoData?.repo.id!,
+      state: currentState === 'open' ? 'open' : currentState === 'closed' ? 'closed' : undefined,
+      limit: 50,
+    },
+    { enabled: !!repoData?.repo.id }
+  );
+
+  const isLoading = repoLoading || issuesLoading;
+
+  // Get issues with labels
+  const issues = issuesData || [];
+
+  // Filter by search query
+  const filteredIssues = issues.filter((issue) => {
+    if (!searchQuery) return true;
+    return issue.title.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
-  const counts = {
-    open: mockIssues.filter((i) => i.state === 'open').length,
-    closed: mockIssues.filter((i) => i.state === 'closed').length,
-    all: mockIssues.length,
-  };
+  // Count issues by state (we need to fetch both states for counts)
+  const openCount = issues.filter(i => i.state === 'open').length;
+  const closedCount = issues.filter(i => i.state === 'closed').length;
 
   const handleStateChange = (state: string) => {
     setSearchParams({ state });
   };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <RepoHeader owner={owner!} repo={repo!} />
+        <Loading text="Loading issues..." />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -122,14 +89,14 @@ export function IssuesPage() {
               <CircleDot className="h-4 w-4" />
               Open
               <span className="ml-1 px-1.5 py-0.5 text-xs bg-muted rounded">
-                {counts.open}
+                {currentState === 'open' ? filteredIssues.length : openCount}
               </span>
             </TabsTrigger>
             <TabsTrigger value="closed" className="gap-2">
               <CheckCircle2 className="h-4 w-4" />
               Closed
               <span className="ml-1 px-1.5 py-0.5 text-xs bg-muted rounded">
-                {counts.closed}
+                {currentState === 'closed' ? filteredIssues.length : closedCount}
               </span>
             </TabsTrigger>
           </TabsList>
@@ -149,7 +116,7 @@ export function IssuesPage() {
       </div>
 
       {/* Issue list */}
-      {issues.length === 0 ? (
+      {filteredIssues.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           <CircleDot className="h-12 w-12 mx-auto mb-4 opacity-50" />
           <p className="text-lg font-medium">No issues found</p>
@@ -166,8 +133,22 @@ export function IssuesPage() {
         </div>
       ) : (
         <div className="space-y-3">
-          {issues.map((issue) => (
-            <IssueCard key={issue.id} issue={issue} owner={owner!} repo={repo!} />
+          {filteredIssues.map((issue) => (
+            <IssueCard
+              key={issue.id}
+              issue={{
+                id: issue.id,
+                number: issue.number,
+                title: issue.title,
+                state: issue.state,
+                author: { username: issue.author?.username || 'Unknown' },
+                createdAt: new Date(issue.createdAt),
+                labels: issue.labels || [],
+                commentsCount: 0, // TODO: Add comments count to API
+              }}
+              owner={owner!}
+              repo={repo!}
+            />
           ))}
         </div>
       )}

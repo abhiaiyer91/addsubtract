@@ -14,87 +14,72 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { FileTree, type TreeEntry } from '@/components/repo/file-tree';
+import { FileTree } from '@/components/repo/file-tree';
 import { SimpleBranchSelector } from '@/components/repo/branch-selector';
 import { Markdown } from '@/components/markdown/renderer';
+import { Loading } from '@/components/ui/loading';
 import { isAuthenticated } from '@/lib/auth';
-
-// Mock data
-const mockRepo = {
-  id: '1',
-  name: 'awesome-project',
-  description: 'A modern TypeScript project with amazing features',
-  isPrivate: false,
-  defaultBranch: 'main',
-  starsCount: 128,
-  forksCount: 23,
-  watchersCount: 45,
-  openIssuesCount: 12,
-  openPrsCount: 3,
-};
-
-const mockOwner = {
-  username: 'johndoe',
-  name: 'John Doe',
-  avatarUrl: null,
-};
-
-const mockTree: TreeEntry[] = [
-  { name: 'src', path: 'src', type: 'directory' },
-  { name: 'tests', path: 'tests', type: 'directory' },
-  { name: '.gitignore', path: '.gitignore', type: 'file', size: 245 },
-  { name: 'package.json', path: 'package.json', type: 'file', size: 1024 },
-  { name: 'README.md', path: 'README.md', type: 'file', size: 2048 },
-  { name: 'tsconfig.json', path: 'tsconfig.json', type: 'file', size: 512 },
-];
-
-const mockReadme = `# Awesome Project
-
-A modern TypeScript project with amazing features.
-
-## Features
-
-- 🚀 Fast and lightweight
-- 📦 Easy to install
-- 🔧 Highly configurable
-- 🎨 Beautiful UI
-
-## Installation
-
-\`\`\`bash
-npm install awesome-project
-\`\`\`
-
-## Usage
-
-\`\`\`typescript
-import { awesome } from 'awesome-project';
-
-const result = awesome.doSomething();
-console.log(result);
-\`\`\`
-
-## Contributing
-
-Pull requests are welcome!
-
-## License
-
-MIT
-`;
+import { trpc } from '@/lib/trpc';
 
 export function RepoPage() {
   const { owner, repo } = useParams<{ owner: string; repo: string }>();
   const [copied, setCopied] = useState(false);
   const authenticated = isAuthenticated();
 
-  // TODO: Fetch real data with tRPC
-  const repoData = { ...mockRepo, name: repo || mockRepo.name };
-  const ownerData = { ...mockOwner, username: owner || mockOwner.username };
-  const tree = mockTree;
-  const readme = mockReadme;
+  // Fetch repository data
+  const {
+    data: repoData,
+    isLoading: repoLoading,
+    error: repoError,
+  } = trpc.repos.get.useQuery(
+    { owner: owner!, repo: repo! },
+    { enabled: !!owner && !!repo }
+  );
 
-  const cloneUrl = `https://wit.dev/${ownerData.username}/${repoData.name}.git`;
+  // Fetch tree
+  const { data: treeData } = trpc.repos.getTree.useQuery(
+    {
+      owner: owner!,
+      repo: repo!,
+      ref: repoData?.repo.defaultBranch || 'main',
+      path: '',
+    },
+    { enabled: !!repoData }
+  );
+
+  // Fetch README
+  const { data: readmeData } = trpc.repos.getFile.useQuery(
+    {
+      owner: owner!,
+      repo: repo!,
+      ref: repoData?.repo.defaultBranch || 'main',
+      path: 'README.md',
+    },
+    { enabled: !!repoData }
+  );
+
+  if (repoLoading) {
+    return <Loading text="Loading repository..." />;
+  }
+
+  if (repoError || !repoData) {
+    return (
+      <div className="text-center py-12">
+        <h2 className="text-2xl font-bold mb-2">Repository not found</h2>
+        <p className="text-muted-foreground">
+          The repository {owner}/{repo} could not be found.
+        </p>
+      </div>
+    );
+  }
+
+  const { repo: repoInfo, owner: ownerInfo } = repoData;
+  const ownerUsername = 'username' in ownerInfo ? ownerInfo.username : owner!;
+  const ownerData = { username: ownerUsername, name: 'name' in ownerInfo ? ownerInfo.name : null, avatarUrl: 'avatarUrl' in ownerInfo ? ownerInfo.avatarUrl : null };
+  const tree = treeData?.entries || [];
+  const readme = readmeData?.encoding === 'utf-8' ? readmeData.content : null;
+
+  const cloneUrl = `https://wit.dev/${ownerUsername}/${repoInfo.name}.git`;
 
   const handleCopyCloneUrl = async () => {
     await navigator.clipboard.writeText(cloneUrl);
@@ -116,19 +101,19 @@ export function RepoPage() {
             </Link>
             <span className="text-xl text-muted-foreground">/</span>
             <Link
-              to={`/${ownerData.username}/${repoData.name}`}
+              to={`/${ownerData.username}/${repoInfo.name}`}
               className="text-xl font-bold hover:underline"
             >
-              {repoData.name}
+              {repoInfo.name}
             </Link>
-            {repoData.isPrivate ? (
+            {repoInfo.isPrivate ? (
               <Badge variant="secondary">Private</Badge>
             ) : (
               <Badge variant="outline">Public</Badge>
             )}
           </div>
-          {repoData.description && (
-            <p className="text-muted-foreground">{repoData.description}</p>
+          {repoInfo.description && (
+            <p className="text-muted-foreground">{repoInfo.description}</p>
           )}
         </div>
 
@@ -139,21 +124,21 @@ export function RepoPage() {
                 <Eye className="h-4 w-4" />
                 Watch
                 <Badge variant="secondary" className="ml-1">
-                  {repoData.watchersCount}
+                  {repoInfo.watchersCount}
                 </Badge>
               </Button>
               <Button variant="outline" size="sm" className="gap-2">
                 <GitFork className="h-4 w-4" />
                 Fork
                 <Badge variant="secondary" className="ml-1">
-                  {repoData.forksCount}
+                  {repoInfo.forksCount}
                 </Badge>
               </Button>
               <Button variant="outline" size="sm" className="gap-2">
                 <Star className="h-4 w-4" />
                 Star
                 <Badge variant="secondary" className="ml-1">
-                  {repoData.starsCount}
+                  {repoInfo.starsCount}
                 </Badge>
               </Button>
             </>
@@ -179,7 +164,7 @@ export function RepoPage() {
             <Link to={`/${owner}/${repo}/issues`}>
               <CircleDot className="h-4 w-4" />
               Issues
-              <Badge variant="secondary">{repoData.openIssuesCount}</Badge>
+              <Badge variant="secondary">{repoInfo.openIssuesCount}</Badge>
             </Link>
           </TabsTrigger>
           <TabsTrigger
@@ -190,7 +175,7 @@ export function RepoPage() {
             <Link to={`/${owner}/${repo}/pulls`}>
               <GitPullRequest className="h-4 w-4" />
               Pull requests
-              <Badge variant="secondary">{repoData.openPrsCount}</Badge>
+              <Badge variant="secondary">{repoInfo.openPrsCount}</Badge>
             </Link>
           </TabsTrigger>
           {authenticated && (
@@ -212,9 +197,9 @@ export function RepoPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <SimpleBranchSelector
-                defaultBranch={repoData.defaultBranch}
+                defaultBranch={repoInfo.defaultBranch}
                 owner={ownerData.username}
-                repo={repoData.name}
+                repo={repoInfo.name}
               />
               <Link
                 to={`/${owner}/${repo}/branches`}
@@ -250,8 +235,8 @@ export function RepoPage() {
           <FileTree
             entries={tree}
             owner={ownerData.username}
-            repo={repoData.name}
-            currentRef={repoData.defaultBranch}
+            repo={repoInfo.name}
+            currentRef={repoInfo.defaultBranch}
           />
 
           {/* README */}

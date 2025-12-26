@@ -10,92 +10,11 @@ import { Separator } from '@/components/ui/separator';
 import { Markdown } from '@/components/markdown/renderer';
 import { LabelPicker } from '@/components/issue/label-picker';
 import { RepoHeader } from './components/repo-header';
+import { Loading } from '@/components/ui/loading';
 import { formatRelativeTime, formatDate } from '@/lib/utils';
 import { isAuthenticated, getUser } from '@/lib/auth';
+import { trpc } from '@/lib/trpc';
 import type { Label } from '@/lib/api-types';
-
-// Mock issue data
-const mockIssue = {
-  id: '1',
-  number: 15,
-  title: 'File upload fails for files larger than 10MB',
-  body: `## Description
-
-When trying to upload files larger than 10MB, the upload fails silently without any error message.
-
-## Steps to Reproduce
-
-1. Navigate to the upload page
-2. Select a file larger than 10MB
-3. Click "Upload"
-4. Nothing happens
-
-## Expected Behavior
-
-The file should upload successfully, or if there's a size limit, it should be clearly communicated to the user.
-
-## Environment
-
-- Browser: Chrome 120
-- OS: macOS 14.2
-- App version: 2.0.1
-
-## Additional Context
-
-This started happening after the v2.0 release. Previous versions had a 100MB limit.
-`,
-  state: 'open' as const,
-  author: {
-    id: '1',
-    username: 'johndoe',
-    avatarUrl: null,
-  },
-  assignee: null,
-  createdAt: new Date(Date.now() - 86400000),
-  updatedAt: new Date(Date.now() - 3600000),
-  closedAt: null,
-  labels: [
-    { id: '1', name: 'bug', color: 'd73a4a', description: null, repoId: '1', createdAt: new Date() },
-    { id: '2', name: 'help wanted', color: '008672', description: null, repoId: '1', createdAt: new Date() },
-  ],
-};
-
-// Mock comments
-const mockComments = [
-  {
-    id: '1',
-    body: 'I can confirm this issue. Also happening on Firefox.',
-    userId: '2',
-    user: {
-      id: '2',
-      username: 'janesmith',
-      avatarUrl: null,
-    },
-    createdAt: new Date(Date.now() - 43200000),
-    updatedAt: new Date(Date.now() - 43200000),
-  },
-  {
-    id: '2',
-    body: "I've identified the root cause. The file size validation was changed incorrectly in the v2.0 migration. Working on a fix now.",
-    userId: '3',
-    user: {
-      id: '3',
-      username: 'bobwilson',
-      avatarUrl: null,
-    },
-    createdAt: new Date(Date.now() - 21600000),
-    updatedAt: new Date(Date.now() - 21600000),
-  },
-];
-
-// Mock available labels
-const mockLabels: Label[] = [
-  { id: '1', name: 'bug', color: 'd73a4a', description: "Something isn't working", repoId: '1', createdAt: new Date() },
-  { id: '2', name: 'help wanted', color: '008672', description: 'Extra attention is needed', repoId: '1', createdAt: new Date() },
-  { id: '3', name: 'enhancement', color: 'a2eeef', description: 'New feature or request', repoId: '1', createdAt: new Date() },
-  { id: '4', name: 'documentation', color: '0075ca', description: 'Improvements or additions to documentation', repoId: '1', createdAt: new Date() },
-  { id: '5', name: 'good first issue', color: '7057ff', description: 'Good for newcomers', repoId: '1', createdAt: new Date() },
-];
 
 export function IssueDetailPage() {
   const { owner, repo, number } = useParams<{
@@ -104,31 +23,104 @@ export function IssueDetailPage() {
     number: string;
   }>();
   const [comment, setComment] = useState('');
-  const [selectedLabels, setSelectedLabels] = useState<Label[]>(mockIssue.labels);
+  const [selectedLabels, setSelectedLabels] = useState<Label[]>([]);
   const authenticated = isAuthenticated();
   const currentUser = getUser();
+  const utils = trpc.useUtils();
 
   const issueNumber = parseInt(number!, 10);
 
-  // TODO: Fetch real data with tRPC
-  const issue = { ...mockIssue, number: issueNumber };
-  const comments = mockComments;
+  // Fetch repository data
+  const { data: repoData, isLoading: repoLoading } = trpc.repos.get.useQuery(
+    { owner: owner!, repo: repo! },
+    { enabled: !!owner && !!repo }
+  );
+
+  // Fetch issue
+  const { data: issueData, isLoading: issueLoading } = trpc.issues.get.useQuery(
+    {
+      repoId: repoData?.repo.id!,
+      number: issueNumber,
+    },
+    { enabled: !!repoData?.repo.id }
+  );
+
+  // Fetch comments
+  const { data: commentsData } = trpc.issues.comments.useQuery(
+    { issueId: issueData?.id! },
+    { enabled: !!issueData?.id }
+  );
+
+  // Fetch available labels
+  const { data: availableLabels } = trpc.issues.listLabels.useQuery(
+    { repoId: repoData?.repo.id! },
+    { enabled: !!repoData?.repo.id }
+  );
+
+  // Mutations
+  const addCommentMutation = trpc.issues.addComment.useMutation({
+    onSuccess: () => {
+      setComment('');
+      utils.issues.comments.invalidate({ issueId: issueData?.id! });
+    },
+  });
+
+  const closeIssueMutation = trpc.issues.close.useMutation({
+    onSuccess: () => {
+      utils.issues.get.invalidate({ repoId: repoData?.repo.id!, number: issueNumber });
+    },
+  });
+
+  const reopenIssueMutation = trpc.issues.reopen.useMutation({
+    onSuccess: () => {
+      utils.issues.get.invalidate({ repoId: repoData?.repo.id!, number: issueNumber });
+    },
+  });
+
+  const isLoading = repoLoading || issueLoading;
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <RepoHeader owner={owner!} repo={repo!} />
+        <Loading text="Loading issue..." />
+      </div>
+    );
+  }
+
+  if (!issueData) {
+    return (
+      <div className="space-y-6">
+        <RepoHeader owner={owner!} repo={repo!} />
+        <div className="text-center py-12">
+          <h2 className="text-2xl font-bold mb-2">Issue not found</h2>
+          <p className="text-muted-foreground">
+            Issue #{issueNumber} could not be found in this repository.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const issue = issueData;
+  const comments = commentsData || [];
 
   const handleComment = async () => {
-    if (!comment.trim()) return;
-    // TODO: Call tRPC mutation
-    console.log('Adding comment:', comment);
-    setComment('');
+    if (!comment.trim() || !issueData?.id) return;
+    addCommentMutation.mutate({
+      issueId: issueData.id,
+      body: comment,
+    });
   };
 
   const handleCloseIssue = async () => {
-    // TODO: Call tRPC mutation
-    console.log('Closing issue');
+    if (!issueData?.id) return;
+    closeIssueMutation.mutate({ issueId: issueData.id });
   };
 
   const handleReopenIssue = async () => {
-    // TODO: Call tRPC mutation
-    console.log('Reopening issue');
+    if (!issueData?.id) return;
+    reopenIssueMutation.mutate({ issueId: issueData.id });
   };
 
   return (
@@ -159,12 +151,12 @@ export function IssueDetailPage() {
 
           <span className="text-muted-foreground">
             <Link
-              to={`/${issue.author.username}`}
+              to={`/${issue.author?.username}`}
               className="font-medium hover:text-foreground"
             >
-              {issue.author.username}
+              {issue.author?.username || 'Unknown'}
             </Link>{' '}
-            opened this issue {formatRelativeTime(issue.createdAt)} ·{' '}
+            opened this issue {formatRelativeTime(new Date(issue.createdAt))} ·{' '}
             {comments.length} comments
           </span>
         </div>
@@ -177,18 +169,22 @@ export function IssueDetailPage() {
           <Card>
             <div className="flex items-center gap-3 px-4 py-2 bg-muted/30 border-b">
               <Avatar className="h-6 w-6">
-                <AvatarImage src={issue.author.avatarUrl || undefined} />
+                <AvatarImage src={issue.author?.avatarUrl || undefined} />
                 <AvatarFallback className="text-xs">
-                  {issue.author.username.slice(0, 2).toUpperCase()}
+                  {issue.author?.username?.slice(0, 2).toUpperCase() || 'UN'}
                 </AvatarFallback>
               </Avatar>
-              <span className="font-medium">{issue.author.username}</span>
+              <span className="font-medium">{issue.author?.username || 'Unknown'}</span>
               <span className="text-muted-foreground">
-                commented {formatRelativeTime(issue.createdAt)}
+                commented {formatRelativeTime(new Date(issue.createdAt))}
               </span>
             </div>
             <CardContent className="p-4">
-              <Markdown content={issue.body} />
+              {issue.body ? (
+                <Markdown content={issue.body} />
+              ) : (
+                <p className="text-muted-foreground italic">No description provided.</p>
+              )}
             </CardContent>
           </Card>
 
@@ -197,14 +193,14 @@ export function IssueDetailPage() {
             <Card key={c.id}>
               <div className="flex items-center gap-3 px-4 py-2 bg-muted/30 border-b">
                 <Avatar className="h-6 w-6">
-                  <AvatarImage src={c.user.avatarUrl || undefined} />
+                  <AvatarImage src={c.user?.avatarUrl || undefined} />
                   <AvatarFallback className="text-xs">
-                    {c.user.username.slice(0, 2).toUpperCase()}
+                    {c.user?.username?.slice(0, 2).toUpperCase() || 'UN'}
                   </AvatarFallback>
                 </Avatar>
-                <span className="font-medium">{c.user.username}</span>
+                <span className="font-medium">{c.user?.username || 'Unknown'}</span>
                 <span className="text-muted-foreground">
-                  commented {formatRelativeTime(c.createdAt)}
+                  commented {formatRelativeTime(new Date(c.createdAt))}
                 </span>
               </div>
               <CardContent className="p-4">
@@ -234,16 +230,27 @@ export function IssueDetailPage() {
                 </div>
                 <div className="flex justify-end gap-2">
                   {issue.state === 'open' ? (
-                    <Button variant="outline" onClick={handleCloseIssue}>
-                      Close issue
+                    <Button
+                      variant="outline"
+                      onClick={handleCloseIssue}
+                      disabled={closeIssueMutation.isPending}
+                    >
+                      {closeIssueMutation.isPending ? 'Closing...' : 'Close issue'}
                     </Button>
                   ) : (
-                    <Button variant="outline" onClick={handleReopenIssue}>
-                      Reopen issue
+                    <Button
+                      variant="outline"
+                      onClick={handleReopenIssue}
+                      disabled={reopenIssueMutation.isPending}
+                    >
+                      {reopenIssueMutation.isPending ? 'Reopening...' : 'Reopen issue'}
                     </Button>
                   )}
-                  <Button onClick={handleComment} disabled={!comment.trim()}>
-                    Comment
+                  <Button
+                    onClick={handleComment}
+                    disabled={!comment.trim() || addCommentMutation.isPending}
+                  >
+                    {addCommentMutation.isPending ? 'Commenting...' : 'Comment'}
                   </Button>
                 </div>
               </CardContent>
@@ -256,7 +263,7 @@ export function IssueDetailPage() {
           {/* Labels */}
           <div>
             <LabelPicker
-              availableLabels={mockLabels}
+              availableLabels={availableLabels || []}
               selectedLabels={selectedLabels}
               onLabelsChange={setSelectedLabels}
             />
@@ -271,11 +278,9 @@ export function IssueDetailPage() {
               <div className="flex items-center gap-2">
                 <Avatar className="h-6 w-6">
                   <AvatarFallback className="text-xs">
-                    {/* @ts-ignore */}
                     {issue.assignee.username?.slice(0, 2).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
-                {/* @ts-ignore */}
                 <span>{issue.assignee.username}</span>
               </div>
             ) : (
@@ -289,11 +294,11 @@ export function IssueDetailPage() {
           <div className="space-y-2 text-sm text-muted-foreground">
             <div>
               <span className="font-medium text-foreground">Created:</span>{' '}
-              {formatDate(issue.createdAt)}
+              {formatDate(new Date(issue.createdAt))}
             </div>
             <div>
               <span className="font-medium text-foreground">Updated:</span>{' '}
-              {formatRelativeTime(issue.updatedAt)}
+              {formatRelativeTime(new Date(issue.updatedAt))}
             </div>
           </div>
         </div>

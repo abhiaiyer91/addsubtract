@@ -6,10 +6,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { login as authLogin } from '@/lib/auth';
+import { trpc } from '@/lib/trpc';
 
 export function RegisterPage() {
   const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     username: '',
@@ -18,51 +18,50 @@ export function RegisterPage() {
     confirmPassword: '',
   });
 
+  const registerMutation = trpc.auth.register.useMutation({
+    onSuccess: (data) => {
+      // Store token and user info
+      authLogin(
+        {
+          id: data.user.id,
+          username: data.user.username,
+          email: data.user.email,
+          name: data.user.name || null,
+          avatarUrl: data.user.avatarUrl || null,
+        },
+        data.sessionId
+      );
+      navigate('/');
+    },
+    onError: (err) => {
+      setError(err.message || 'An error occurred. Please try again.');
+    },
+  });
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
     setError(null);
 
     // Validate passwords match
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match');
-      setIsLoading(false);
       return;
     }
 
     // Validate password strength
     if (formData.password.length < 8) {
       setError('Password must be at least 8 characters');
-      setIsLoading(false);
       return;
     }
 
-    try {
-      // TODO: Replace with actual tRPC mutation
-      // const result = await trpc.auth.register.mutate(formData);
-      
-      // Mock registration for now
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Mock successful registration
-      authLogin(
-        {
-          id: '1',
-          username: formData.username,
-          email: formData.email,
-          name: null,
-          avatarUrl: null,
-        },
-        'mock-token-12345'
-      );
-
-      navigate('/');
-    } catch (err) {
-      setError('An error occurred. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
+    registerMutation.mutate({
+      username: formData.username,
+      email: formData.email,
+      password: formData.password,
+    });
   };
+
+  const isLoading = registerMutation.isPending;
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[80vh]">

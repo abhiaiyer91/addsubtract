@@ -7,11 +7,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface IssueFormProps {
-  onSubmit: (data: { title: string; body: string }) => Promise<void>;
+  onSubmit: (data: { title: string; body: string }) => Promise<void> | void;
   isLoading?: boolean;
+  error?: string | null;
 }
 
-export function IssueForm({ onSubmit, isLoading }: IssueFormProps) {
+export function IssueForm({ onSubmit, isLoading, error }: IssueFormProps) {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
 
@@ -27,6 +28,11 @@ export function IssueForm({ onSubmit, isLoading }: IssueFormProps) {
           <CardTitle>New Issue</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {error && (
+            <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-md">
+              {error}
+            </div>
+          )}
           <div className="space-y-2">
             <Label htmlFor="title">Title</Label>
             <Input
