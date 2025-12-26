@@ -18,11 +18,7 @@
   "topbarLinks": [
     {
       "name": "GitHub",
-<<<<<<< HEAD
       "url": "https://github.com/abhiaiyer91/wit"
-=======
-      "url": "https://github.com/your-org/wit"
->>>>>>> 382fb97 (push)
     }
   ],
   "topbarCtaButton": {
