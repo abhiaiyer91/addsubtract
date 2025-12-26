@@ -17,6 +17,7 @@ export {
   issuesRouter,
   commentsRouter,
   activityRouter,
+  releasesRouter,
 } from './routers';
 
 // Export context

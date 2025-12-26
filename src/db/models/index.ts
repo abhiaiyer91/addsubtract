@@ -40,3 +40,6 @@ export {
 
 // Milestone model
 export { milestoneModel, type MilestoneWithProgress } from './milestones';
+
+// Release models
+export { releaseModel, releaseAssetModel } from './releases';

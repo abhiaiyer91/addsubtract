@@ -411,6 +411,45 @@ export const prLabels = pgTable(
   })
 );
 
+// ============ RELEASES ============
+
+/**
+ * Releases table - tag-based releases with metadata
+ * Similar to GitHub releases
+ */
+export const releases = pgTable('releases', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  repoId: uuid('repo_id')
+    .notNull()
+    .references(() => repositories.id, { onDelete: 'cascade' }),
+  tagName: text('tag_name').notNull(),
+  name: text('name').notNull(),
+  body: text('body'), // Markdown release notes
+  isDraft: boolean('is_draft').notNull().default(false),
+  isPrerelease: boolean('is_prerelease').notNull().default(false),
+  authorId: uuid('author_id')
+    .notNull()
+    .references(() => users.id),
+  publishedAt: timestamp('published_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+/**
+ * Release assets table - files attached to releases
+ */
+export const releaseAssets = pgTable('release_assets', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  releaseId: uuid('release_id')
+    .notNull()
+    .references(() => releases.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  contentType: text('content_type').notNull(),
+  size: integer('size').notNull(),
+  downloadUrl: text('download_url').notNull(),
+  downloadCount: integer('download_count').notNull().default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
 // ============ ACTIVITY ============
 
 export const activities = pgTable('activities', {
@@ -629,6 +668,12 @@ export type NewIssueLabel = typeof issueLabels.$inferInsert;
 
 export type PrLabel = typeof prLabels.$inferSelect;
 export type NewPrLabel = typeof prLabels.$inferInsert;
+
+export type Release = typeof releases.$inferSelect;
+export type NewRelease = typeof releases.$inferInsert;
+
+export type ReleaseAsset = typeof releaseAssets.$inferSelect;
+export type NewReleaseAsset = typeof releaseAssets.$inferInsert;
 
 export type Activity = typeof activities.$inferSelect;
 export type NewActivity = typeof activities.$inferInsert;
