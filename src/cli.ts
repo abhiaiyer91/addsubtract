@@ -189,6 +189,8 @@ Platform Commands:
   pr view <number>      View pull request details
   pr merge <number>     Merge a pull request
   pr close <number>     Close a pull request
+  pr review [<number>]  AI code review using CodeRabbit
+  pr review-status      Check CodeRabbit configuration
   
   issue create <title>  Create new issue
   issue list            List issues
@@ -214,10 +216,13 @@ Monorepo Support:
 AI-Powered Features:
   ai <query>            Natural language git commands
   ai commit [-a] [-x]   Generate commit message from changes
-  ai review             AI code review of changes
+  ai review             AI code review of local changes (uses LLM)
   ai explain [ref]      Explain a commit
   ai resolve [file]     AI-assisted conflict resolution
   ai status             Show AI configuration
+  
+  pr review [<number>]  AI PR review using CodeRabbit
+  pr review --configure Set up CodeRabbit API key
 
 Plumbing Commands:
   cat-file <hash>       Provide content or type info for objects

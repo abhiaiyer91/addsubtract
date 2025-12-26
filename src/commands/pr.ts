@@ -10,12 +10,22 @@
  *   wit pr checkout <num>   Checkout a pull request locally
  *   wit pr merge <number>   Merge a pull request
  *   wit pr close <number>   Close a pull request
+ *   wit pr review <number>  Review a pull request with CodeRabbit AI
  */
 
 import { getApiClient, ApiError, getServerUrl } from '../api/client';
 import { Repository } from '../core/repository';
 import { parseRemoteUrl } from '../core/protocol';
 import { TsgitError, ErrorCode } from '../core/errors';
+import {
+  getCodeRabbitStatus,
+  getCodeRabbitApiKey,
+  saveCodeRabbitApiKey,
+  reviewPullRequest,
+  reviewDiff,
+  formatReviewResult,
+  CodeRabbitConfig,
+} from '../utils/coderabbit';
 
 const colors = {
   green: (s: string) => `\x1b[32m${s}\x1b[0m`,
@@ -40,9 +50,14 @@ Commands:
   merge <number>  Merge a pull request
   close <number>  Close a pull request
   reopen <number> Reopen a closed pull request
+  review <number> Review a pull request with CodeRabbit AI
+  review-status   Show CodeRabbit configuration status
 
 Options:
   -h, --help      Show this help message
+  --json          Output review results in JSON format
+  --verbose       Show detailed review output
+  --configure     Configure CodeRabbit API key
 
 Examples:
   wit pr create                     Create PR from current branch to main
@@ -56,6 +71,10 @@ Examples:
   wit pr merge 123                  Merge PR #123
   wit pr close 123                  Close PR #123
   wit pr reopen 123                 Reopen PR #123
+  wit pr review 123                 AI review of PR #123 using CodeRabbit
+  wit pr review 123 --json          Output review as JSON
+  wit pr review --configure         Configure CodeRabbit API key
+  wit pr review-status              Check CodeRabbit installation status
 `;
 
 /**
@@ -140,6 +159,12 @@ export async function handlePr(args: string[]): Promise<void> {
         break;
       case 'reopen':
         await handlePrReopen(args.slice(1));
+        break;
+      case 'review':
+        await handlePrReview(args.slice(1));
+        break;
+      case 'review-status':
+        await handleReviewStatus();
         break;
       default:
         console.error(colors.red('error: ') + `Unknown subcommand: '${subcommand}'`);
@@ -526,4 +551,231 @@ async function handlePrReopen(args: string[]): Promise<void> {
 
   await api.pulls.reopen(owner, repoName, prNumber);
   console.log(colors.green('✓') + ` Reopened PR #${prNumber}`);
+}
+
+/**
+ * Review a pull request using CodeRabbit AI
+ */
+async function handlePrReview(args: string[]): Promise<void> {
+  const { flags, positional } = parseArgs(args);
+
+  // Handle --configure flag
+  if (flags.configure) {
+    await handleReviewConfigure();
+    return;
+  }
+
+  const prNumber = parseInt(positional[0], 10);
+
+  if (isNaN(prNumber)) {
+    // If no PR number, review local changes
+    await handleLocalReview(flags);
+    return;
+  }
+
+  const repo = Repository.find();
+  const remoteUrl = getRemoteUrl(repo);
+  const { owner, repo: repoName } = parseOwnerRepo(remoteUrl);
+
+  console.log(`\n🐰 Reviewing PR #${prNumber} with CodeRabbit...\n`);
+
+  const config: CodeRabbitConfig = {
+    verbose: !!flags.verbose,
+    format: flags.json ? 'json' : 'text',
+  };
+
+  const result = await reviewPullRequest(owner, repoName, prNumber, config);
+
+  if (flags.json) {
+    console.log(JSON.stringify(result, null, 2));
+  } else {
+    console.log(formatReviewResult(result));
+  }
+
+  if (!result.success) {
+    process.exit(1);
+  }
+}
+
+/**
+ * Review local changes (staged or working directory)
+ */
+async function handleLocalReview(flags: Record<string, string | boolean>): Promise<void> {
+  const repo = Repository.find();
+  const status = repo.status();
+
+  const filesToReview = [...status.staged, ...status.modified];
+
+  if (filesToReview.length === 0) {
+    console.log('No changes to review.');
+    console.log('Stage some changes with: wit add <files>');
+    return;
+  }
+
+  console.log(`\n🐰 Reviewing ${filesToReview.length} changed file(s) with CodeRabbit...\n`);
+
+  // Generate diff content
+  let diffContent = '';
+  const fs = await import('fs');
+  const path = await import('path');
+  const { diff: computeDiff, createHunks } = await import('../core/diff.js');
+
+  for (const file of filesToReview) {
+    try {
+      let oldContent = '';
+      const entry = repo.index.get(file);
+      if (entry) {
+        try {
+          const blob = repo.objects.readBlob(entry.hash);
+          oldContent = blob.content.toString('utf8');
+        } catch {
+          // No previous version
+        }
+      }
+
+      const fullPath = path.join(repo.workDir, file);
+      let newContent = '';
+      try {
+        newContent = fs.readFileSync(fullPath, 'utf8');
+      } catch {
+        // File might be deleted
+      }
+
+      const diffResult = computeDiff(oldContent, newContent);
+      const hunks = createHunks(diffResult, 3);
+
+      if (hunks.length > 0) {
+        diffContent += `diff --git a/${file} b/${file}\n`;
+        diffContent += `--- a/${file}\n`;
+        diffContent += `+++ b/${file}\n`;
+
+        for (const hunk of hunks) {
+          diffContent += `@@ -${hunk.oldStart},${hunk.oldCount} +${hunk.newStart},${hunk.newCount} @@\n`;
+
+          for (const line of hunk.lines) {
+            switch (line.type) {
+              case 'add':
+                diffContent += `+${line.content}\n`;
+                break;
+              case 'remove':
+                diffContent += `-${line.content}\n`;
+                break;
+              case 'context':
+                diffContent += ` ${line.content}\n`;
+                break;
+            }
+          }
+        }
+      }
+    } catch {
+      // Skip files we can't diff
+    }
+  }
+
+  if (!diffContent) {
+    console.log('No meaningful changes to review.');
+    return;
+  }
+
+  const config: CodeRabbitConfig = {
+    verbose: !!flags.verbose,
+    format: flags.json ? 'json' : 'text',
+  };
+
+  const result = await reviewDiff(diffContent, config);
+
+  if (flags.json) {
+    console.log(JSON.stringify(result, null, 2));
+  } else {
+    console.log(formatReviewResult(result));
+  }
+
+  if (!result.success) {
+    process.exit(1);
+  }
+}
+
+/**
+ * Configure CodeRabbit API key
+ */
+async function handleReviewConfigure(): Promise<void> {
+  const readline = await import('readline');
+
+  console.log('\n🐰 CodeRabbit Configuration\n');
+  console.log('To get an API key, sign up at: https://coderabbit.ai');
+  console.log('');
+
+  const currentKey = getCodeRabbitApiKey();
+  if (currentKey) {
+    console.log(colors.green('✓') + ' API key is already configured');
+    console.log(colors.dim(`  Current key: ${currentKey.slice(0, 8)}...${currentKey.slice(-4)}`));
+    console.log('');
+  }
+
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  const question = (prompt: string): Promise<string> => {
+    return new Promise((resolve) => {
+      rl.question(prompt, (answer) => {
+        resolve(answer);
+      });
+    });
+  };
+
+  try {
+    const apiKey = await question('Enter your CodeRabbit API key (or press Enter to skip): ');
+
+    if (apiKey.trim()) {
+      saveCodeRabbitApiKey(apiKey.trim());
+      console.log(colors.green('\n✓') + ' API key saved successfully');
+      console.log(colors.dim('  Stored in: ~/.config/wit/coderabbit.json'));
+    } else {
+      console.log('\nSkipped. You can also set the CODERABBIT_API_KEY environment variable.');
+    }
+  } finally {
+    rl.close();
+  }
+}
+
+/**
+ * Show CodeRabbit status and configuration
+ */
+async function handleReviewStatus(): Promise<void> {
+  console.log('\n🐰 CodeRabbit Status\n');
+
+  const status = await getCodeRabbitStatus();
+
+  console.log(`Installed: ${status.installed ? colors.green('✓ Yes') : colors.red('✗ No')}`);
+
+  if (status.installed) {
+    if (status.version) {
+      console.log(`Version:   ${status.version}`);
+    }
+    if (status.cliPath) {
+      console.log(`CLI Path:  ${colors.dim(status.cliPath)}`);
+    }
+  } else {
+    console.log('');
+    console.log('To install CodeRabbit CLI:');
+    console.log(colors.cyan('  npm install -g @coderabbitai/coderabbit'));
+    console.log('');
+  }
+
+  console.log(
+    `API Key:   ${status.apiKeyConfigured ? colors.green('✓ Configured') : colors.yellow('✗ Not configured')}`
+  );
+
+  if (!status.apiKeyConfigured) {
+    console.log('');
+    console.log('To configure:');
+    console.log(colors.cyan('  wit pr review --configure'));
+    console.log('');
+    console.log('Or set the environment variable:');
+    console.log(colors.cyan('  export CODERABBIT_API_KEY=your-api-key'));
+  }
+
+  console.log('');
 }
