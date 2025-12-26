@@ -77,6 +77,7 @@ import {
 import { handleHooks } from './core/hooks';
 import { handleSubmodule } from './core/submodule';
 import { handleWorktree } from './core/worktree';
+import { handleProtect } from './core/branch-protection';
 import { TsgitError, findSimilar } from './core/errors';
 import { Repository } from './core/repository';
 import { launchTUI } from './ui/tui';
@@ -179,8 +180,16 @@ Advanced Features:
   hooks                 Manage repository hooks
   submodule             Manage submodules
   worktree              Manage multiple working trees
+  protect               Manage branch protection rules
   reflog                Show reference log
   gc                    Run garbage collection
+
+Branch Protection:
+  protect               List all protection rules
+  protect add <pattern> Add protection rule (main, release/*, etc.)
+  protect remove <pat>  Remove a protection rule
+  protect check <br>    Check if operation is allowed on branch
+  protect status <br>   Show protection status for a branch
 
 Server:
   serve                 Start Git HTTP server for hosting repos
@@ -306,7 +315,7 @@ const COMMANDS = [
   // GitHub integration
   'github',
   // Advanced features
-  'hooks', 'submodule', 'worktree', 'reflog', 'gc',
+  'hooks', 'submodule', 'worktree', 'protect', 'reflog', 'gc',
   // Server
   'serve',
   // Platform commands
@@ -781,6 +790,10 @@ function main(): void {
 
       case 'worktree':
         handleWorktree(cmdArgs);
+        break;
+
+      case 'protect':
+        handleProtect(rawArgs);
         break;
 
       case 'reflog':

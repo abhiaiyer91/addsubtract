@@ -220,6 +220,18 @@ export {
   detectRenames,
   processRenames,
 } from './diff';
+export {
+  BranchProtectionRule,
+  ProtectionResult,
+  ProtectionViolation,
+  ViolationType,
+  BranchProtectionManager,
+  BranchProtectionEngine,
+  PROTECTION_PRESETS,
+  formatRule,
+  formatViolations,
+  handleProtect,
+} from './branch-protection';
 
 // Remote infrastructure
 export { Remote, RemoteManager } from './remote';
