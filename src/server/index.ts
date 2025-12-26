@@ -2,9 +2,11 @@ import { Hono } from 'hono';
 import { serve, ServerType } from '@hono/node-server';
 import { logger } from 'hono/logger';
 import { cors } from 'hono/cors';
+import { trpcServer } from '@hono/trpc-server';
 import { createGitRoutes } from './routes/git';
 import { RepoManager } from './storage/repos';
 import { syncReposToDatabase } from './storage/sync';
+import { appRouter, createContext } from '../api/trpc';
 import * as path from 'path';
 import { initDatabase, healthCheck as dbHealthCheck, isConnected as isDbConnected } from '../db';
 
@@ -96,6 +98,12 @@ export function createApp(repoManager: RepoManager, options: { verbose?: boolean
     });
   });
 
+  // tRPC API routes
+  app.use('/trpc/*', trpcServer({
+    router: appRouter,
+    createContext: (_opts, c) => createContext(c),
+  }));
+
   // Git Smart HTTP routes
   const gitRoutes = createGitRoutes(repoManager);
   app.route('/', gitRoutes);
@@ -156,6 +164,7 @@ export function startServer(options: ServerOptions): WitServer {
 ║   🚀 wit server is running!                                  ║
 ║                                                              ║
 ║   HTTP URL: http://${host === '0.0.0.0' ? 'localhost' : host}:${port}                              ${port.toString().length === 4 ? ' ' : ''}║
+║   tRPC API: http://${host === '0.0.0.0' ? 'localhost' : host}:${port}/trpc                         ${port.toString().length === 4 ? ' ' : ''}║
 ║   Repositories: ${absoluteReposDir.slice(0, 40).padEnd(41)}║
 ║                                                              ║
 ║   Clone: wit clone http://localhost:${port}/owner/repo.git     ${port.toString().length === 4 ? ' ' : ''}║

@@ -1,10 +1,15 @@
 /**
- * API Client exports
+ * API module - exports all API-related functionality
  *
- * Provides the API client for communicating with the wit server
- * for platform features like pull requests and issues.
+ * This module provides:
+ * - tRPC API for type-safe server-client communication
+ * - HTTP API client for platform features
  */
 
+// Re-export everything from tRPC module
+export * from './trpc';
+
+// Re-export HTTP API client
 export {
   // Client
   ApiClient,
