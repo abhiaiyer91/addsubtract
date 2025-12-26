@@ -31,9 +31,21 @@ Build an open-source, AI-native code collaboration platform that replaces GitHub
 
 ## Workstreams (Parallel Development)
 
-### 🔴 Stream 1: Git Server (Foundation)
+### ⚡ Stream 0: Server + Database Integration 🔓 READY
 
 **Owner:** TBD  
+**Priority:** P0 - Quick Win  
+**Dependencies:** Streams 1 & 2 ✅
+
+Wire the Git Server to the Database so pushes create repository records.
+
+**Prompt:** `prompts/stream-0-integration.md`
+
+---
+
+### 🔴 Stream 1: Git Server (Foundation) ✅ COMPLETE
+
+**Owner:** AI Agent  
 **Priority:** P0 - Critical Path  
 **Dependencies:** None
 
@@ -41,19 +53,19 @@ Build a standalone Git server that accepts push/pull over HTTP.
 
 #### Milestones
 
-- [ ] **1.1 Basic HTTP Server** (Week 1)
+- [x] **1.1 Basic HTTP Server** ✅
 
-  - Hono/Express server with git-receive-pack endpoint
+  - Hono server with git-receive-pack endpoint
   - Accept pushes to local filesystem
   - Serve clones via git-upload-pack
 
-- [ ] **1.2 Multi-repo Support** (Week 2)
+- [x] **1.2 Multi-repo Support** ✅
 
   - Route: `/:owner/:repo.git`
   - Create repos on first push
   - List available repos
 
-- [ ] **1.3 Authentication** (Week 3)
+- [ ] **1.3 Authentication** (Pending)
   - Token-based auth for push
   - Public/private repo distinction
   - Rate limiting
@@ -77,9 +89,9 @@ src/server/
 
 ---
 
-### 🟠 Stream 2: Database & Models
+### 🟠 Stream 2: Database & Models ✅ COMPLETE
 
-**Owner:** TBD  
+**Owner:** AI Agent  
 **Priority:** P0 - Critical Path  
 **Dependencies:** None
 
@@ -87,23 +99,24 @@ Design and implement the data layer.
 
 #### Milestones
 
-- [ ] **2.1 Schema Design** (Week 1)
+- [x] **2.1 Schema Design** ✅
 
   - Users, Organizations, Teams
-  - Repositories, Branches, Commits (metadata)
+  - Repositories, Collaborators, Stars, Watches
   - Pull Requests, Reviews, Comments
-  - Issues, Labels, Milestones
+  - Issues, Labels, Comments
+  - Activity tracking, Webhooks
 
-- [ ] **2.2 Database Setup** (Week 1)
+- [x] **2.2 Database Setup** ✅
 
   - Drizzle ORM with Postgres
-  - Migrations system
-  - Seed data
+  - Full schema with types
+  - Seed data script
 
-- [ ] **2.3 Models & Queries** (Week 2-3)
-  - Repository CRUD
-  - User management
-  - PR/Issue operations
+- [x] **2.3 Models & Queries** ✅
+  - Repository CRUD with stars/watches
+  - User management with OAuth
+  - PR/Issue operations with comments
 
 #### Schema (Initial)
 
@@ -150,62 +163,65 @@ src/db/
 
 ---
 
-### 🟡 Stream 3: REST & GraphQL API
+### 🟡 Stream 3: tRPC API 🔓 READY
 
 **Owner:** TBD  
-**Priority:** P1  
-**Dependencies:** Stream 2 (Database)
+**Priority:** P0 - Critical Path  
+**Dependencies:** Stream 2 (Database) ✅
 
-Build the API layer for web/mobile clients.
+Build the tRPC API layer for type-safe client-server communication.
 
 #### Milestones
 
-- [ ] **3.1 REST API v1** (Week 2-3)
+- [ ] **3.1 tRPC Setup**
 
-  - `/api/v1/repos` - Repository CRUD
-  - `/api/v1/repos/:owner/:repo/pulls` - Pull Requests
-  - `/api/v1/repos/:owner/:repo/issues` - Issues
-  - `/api/v1/users` - User management
+  - tRPC router with Hono adapter
+  - Auth context and middleware
+  - Client export for web/CLI
 
-- [ ] **3.2 GraphQL API** (Week 3-4)
+- [ ] **3.2 Core Routers**
 
-  - Schema design (mirror GitHub's for familiarity)
-  - Queries for repos, PRs, issues
-  - Mutations for CRUD operations
-  - Subscriptions for realtime
+  - `auth` - login, logout, register, me
+  - `repos` - list, get, create, star, search
+  - `pulls` - list, get, create, merge, review
+  - `issues` - list, get, create, close, comment
+  - `activity` - feed, forRepo
 
-- [ ] **3.3 Webhooks** (Week 4)
+- [ ] **3.3 Webhooks** (Later)
   - Event system (push, PR created, etc.)
   - Webhook delivery with retries
-  - Webhook management API
 
 #### Files to Create
 
 ```
-src/api/
-├── rest/
+src/api/trpc/
+├── index.ts          # Export router and types
+├── trpc.ts           # tRPC instance, procedures
+├── context.ts        # Request context (user, db)
+├── routers/
+│   ├── index.ts      # Merged router
+│   ├── auth.ts
 │   ├── repos.ts
 │   ├── pulls.ts
 │   ├── issues.ts
-│   └── users.ts
-├── graphql/
-│   ├── schema.graphql
-│   ├── resolvers/
-│   └── subscriptions.ts
-└── webhooks/
-    ├── events.ts
-    └── delivery.ts
+│   └── activity.ts
+└── middleware/
+    └── auth.ts       # isAuthed, isRepoAdmin
 ```
+
+**Prompt:** `prompts/stream-3-trpc-api.md`
 
 ---
 
-### 🟢 Stream 4: Web Application
+### 🟢 Stream 4: Web Application 🔓 READY
 
 **Owner:** TBD  
 **Priority:** P1  
-**Dependencies:** Stream 3 (API)
+**Dependencies:** Stream 3 (API) - can start with mocks
 
 Build the web frontend.
+
+**Prompt:** `prompts/stream-4-web-app.md`
 
 #### Milestones
 
@@ -272,13 +288,15 @@ apps/web/
 
 ---
 
-### 🔵 Stream 5: CLI Extensions
+### 🔵 Stream 5: CLI Extensions 🔓 READY
 
 **Owner:** TBD  
 **Priority:** P2  
 **Dependencies:** Stream 3 (API)
 
 Extend the CLI for platform features.
+
+**Prompt:** `prompts/stream-5-cli-extensions.md`
 
 #### Milestones
 
