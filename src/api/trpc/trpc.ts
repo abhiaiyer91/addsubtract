@@ -1,29 +1,10 @@
-import { initTRPC, TRPCError } from "@trpc/server";
-import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
-import superjson from "superjson";
+import { initTRPC, TRPCError } from '@trpc/server';
+import superjson from 'superjson';
+import type { Context } from './context';
 
-// =============================================================================
-// Context Types
-// =============================================================================
-
-export type PermissionLevel = "read" | "write" | "admin";
-
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-}
-
-export interface Context {
-  db: PostgresJsDatabase;
-  user: User | null;
-  checkPermission: (repoId: string, level: PermissionLevel) => Promise<boolean>;
-}
-
-// =============================================================================
-// tRPC Initialization
-// =============================================================================
-
+/**
+ * Initialize tRPC with context and superjson transformer for date serialization
+ */
 const t = initTRPC.context<Context>().create({
   transformer: superjson,
   errorFormatter({ shape }) {
@@ -31,30 +12,31 @@ const t = initTRPC.context<Context>().create({
   },
 });
 
-// =============================================================================
-// Middleware
-// =============================================================================
+/**
+ * Export router and procedure helpers
+ */
+export const router = t.router;
+export const publicProcedure = t.procedure;
+export const middleware = t.middleware;
+export const mergeRouters = t.mergeRouters;
 
-const isAuthenticated = t.middleware(({ ctx, next }) => {
+/**
+ * Auth middleware - ensures user is authenticated
+ */
+const isAuthed = middleware(({ ctx, next }) => {
   if (!ctx.user) {
-    throw new TRPCError({
-      code: "UNAUTHORIZED",
-      message: "You must be logged in to perform this action",
-    });
+    throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Not authenticated' });
   }
   return next({
     ctx: {
       ...ctx,
+      // Narrow the user type to be non-null
       user: ctx.user,
     },
   });
 });
 
-// =============================================================================
-// Exports
-// =============================================================================
-
-export const router = t.router;
-export const publicProcedure = t.procedure;
-export const protectedProcedure = t.procedure.use(isAuthenticated);
-export const createCallerFactory = t.createCallerFactory;
+/**
+ * Protected procedure - requires authentication
+ */
+export const protectedProcedure = t.procedure.use(isAuthed);

@@ -1,5 +1,5 @@
-import { eq, and, sql, count } from "drizzle-orm";
-import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
+import { eq, and, desc, sql } from 'drizzle-orm';
+import { getDb } from '../index';
 import {
   milestones,
   issues,
@@ -7,7 +7,9 @@ import {
   type Milestone,
   type NewMilestone,
   type MilestoneState,
-} from "../schema";
+  type Issue,
+  type PullRequest,
+} from '../schema';
 
 // =============================================================================
 // Types
@@ -21,79 +23,46 @@ export interface MilestoneWithProgress extends Milestone {
   progress: number; // Percentage 0-100
 }
 
-export interface CreateMilestoneInput {
-  repoId: string;
-  title: string;
-  description?: string | null;
-  dueDate?: Date | null;
-}
-
-export interface UpdateMilestoneInput {
-  title?: string;
-  description?: string | null;
-  dueDate?: Date | null;
-  state?: MilestoneState;
-}
-
-export interface ListMilestonesOptions {
-  repoId: string;
-  state?: MilestoneState;
-  limit?: number;
-  offset?: number;
-}
-
 // =============================================================================
 // Milestone Model
 // =============================================================================
 
-export class MilestoneModel {
-  constructor(private db: PostgresJsDatabase) {}
-
+export const milestoneModel = {
   /**
-   * Create a new milestone
+   * Find a milestone by ID
    */
-  async create(input: CreateMilestoneInput): Promise<Milestone> {
-    const [milestone] = await this.db
-      .insert(milestones)
-      .values({
-        repoId: input.repoId,
-        title: input.title,
-        description: input.description ?? null,
-        dueDate: input.dueDate ?? null,
-      })
-      .returning();
-
-    return milestone;
-  }
-
-  /**
-   * Get a milestone by ID
-   */
-  async getById(id: string): Promise<Milestone | null> {
-    const [milestone] = await this.db
+  async findById(id: string): Promise<Milestone | undefined> {
+    const db = getDb();
+    const [milestone] = await db
       .select()
       .from(milestones)
-      .where(eq(milestones.id, id))
-      .limit(1);
-
-    return milestone ?? null;
-  }
+      .where(eq(milestones.id, id));
+    return milestone;
+  },
 
   /**
-   * Get a milestone by ID with progress statistics
+   * Find a milestone by ID with progress statistics
    */
-  async getByIdWithProgress(id: string): Promise<MilestoneWithProgress | null> {
-    const milestone = await this.getById(id);
-    if (!milestone) return null;
+  async findByIdWithProgress(id: string): Promise<MilestoneWithProgress | undefined> {
+    const milestone = await this.findById(id);
+    if (!milestone) return undefined;
 
     return this.addProgress(milestone);
-  }
+  },
 
   /**
    * List milestones for a repository
    */
-  async list(options: ListMilestonesOptions): Promise<Milestone[]> {
-    const { repoId, state, limit = 50, offset = 0 } = options;
+  async listByRepo(
+    repoId: string,
+    options: {
+      state?: MilestoneState;
+      limit?: number;
+      offset?: number;
+    } = {}
+  ): Promise<Milestone[]> {
+    const db = getDb();
+    const { state, limit = 50, offset = 0 } = options;
 
     const conditions = [eq(milestones.repoId, repoId)];
 
@@ -101,93 +70,114 @@ export class MilestoneModel {
       conditions.push(eq(milestones.state, state));
     }
 
-    return this.db
+    let query = db
       .select()
       .from(milestones)
       .where(and(...conditions))
-      .limit(limit)
-      .offset(offset)
       .orderBy(milestones.dueDate, milestones.createdAt);
-  }
+
+    if (limit) {
+      query = query.limit(limit) as typeof query;
+    }
+
+    if (offset) {
+      query = query.offset(offset) as typeof query;
+    }
+
+    return query;
+  },
 
   /**
    * List milestones for a repository with progress statistics
    */
-  async listWithProgress(
-    options: ListMilestonesOptions
+  async listByRepoWithProgress(
+    repoId: string,
+    options: {
+      state?: MilestoneState;
+      limit?: number;
+      offset?: number;
+    } = {}
   ): Promise<MilestoneWithProgress[]> {
-    const milestonesList = await this.list(options);
+    const milestonesList = await this.listByRepo(repoId, options);
     return Promise.all(milestonesList.map((m) => this.addProgress(m)));
-  }
+  },
+
+  /**
+   * Create a new milestone
+   */
+  async create(
+    data: Omit<NewMilestone, 'id' | 'createdAt' | 'updatedAt'>
+  ): Promise<Milestone> {
+    const db = getDb();
+    const [milestone] = await db.insert(milestones).values(data).returning();
+    return milestone;
+  },
 
   /**
    * Update a milestone
    */
-  async update(id: string, input: UpdateMilestoneInput): Promise<Milestone | null> {
-    const updateData: Partial<NewMilestone> & { updatedAt: Date; closedAt?: Date | null } = {
+  async update(
+    id: string,
+    data: Partial<Omit<NewMilestone, 'id' | 'repoId' | 'createdAt'>>
+  ): Promise<Milestone | undefined> {
+    const db = getDb();
+
+    const updateData: Partial<NewMilestone> & { closedAt?: Date | null } = {
+      ...data,
       updatedAt: new Date(),
     };
 
-    if (input.title !== undefined) {
-      updateData.title = input.title;
-    }
-    if (input.description !== undefined) {
-      updateData.description = input.description;
-    }
-    if (input.dueDate !== undefined) {
-      updateData.dueDate = input.dueDate;
-    }
-    if (input.state !== undefined) {
-      updateData.state = input.state;
-      if (input.state === "closed") {
-        updateData.closedAt = new Date();
-      } else {
-        updateData.closedAt = null;
-      }
+    // Handle state change
+    if (data.state === 'closed') {
+      updateData.closedAt = new Date();
+    } else if (data.state === 'open') {
+      updateData.closedAt = null;
     }
 
-    const [milestone] = await this.db
+    const [milestone] = await db
       .update(milestones)
       .set(updateData)
       .where(eq(milestones.id, id))
       .returning();
 
-    return milestone ?? null;
-  }
+    return milestone;
+  },
 
   /**
    * Close a milestone
    */
-  async close(id: string): Promise<Milestone | null> {
-    return this.update(id, { state: "closed" });
-  }
+  async close(id: string): Promise<Milestone | undefined> {
+    return this.update(id, { state: 'closed' });
+  },
 
   /**
    * Reopen a milestone
    */
-  async reopen(id: string): Promise<Milestone | null> {
-    return this.update(id, { state: "open" });
-  }
+  async reopen(id: string): Promise<Milestone | undefined> {
+    return this.update(id, { state: 'open' });
+  },
 
   /**
    * Delete a milestone
    */
   async delete(id: string): Promise<boolean> {
-    const result = await this.db
+    const db = getDb();
+    const result = await db
       .delete(milestones)
       .where(eq(milestones.id, id))
       .returning({ id: milestones.id });
 
     return result.length > 0;
-  }
+  },
 
   /**
    * Get issues for a milestone
    */
   async getIssues(
     milestoneId: string,
-    options?: { state?: "open" | "closed"; limit?: number; offset?: number }
-  ) {
+    options?: { state?: 'open' | 'closed'; limit?: number; offset?: number }
+  ): Promise<Issue[]> {
+    const db = getDb();
     const { state, limit = 50, offset = 0 } = options ?? {};
 
     const conditions = [eq(issues.milestoneId, milestoneId)];
@@ -196,22 +186,31 @@ export class MilestoneModel {
       conditions.push(eq(issues.state, state));
     }
 
-    return this.db
+    let query = db
       .select()
       .from(issues)
       .where(and(...conditions))
-      .limit(limit)
-      .offset(offset)
-      .orderBy(issues.createdAt);
-  }
+      .orderBy(desc(issues.createdAt));
+
+    if (limit) {
+      query = query.limit(limit) as typeof query;
+    }
+
+    if (offset) {
+      query = query.offset(offset) as typeof query;
+    }
+
+    return query;
+  },
 
   /**
    * Get pull requests for a milestone
    */
   async getPullRequests(
     milestoneId: string,
-    options?: { state?: "open" | "closed" | "merged"; limit?: number; offset?: number }
-  ) {
+    options?: { state?: 'open' | 'closed' | 'merged'; limit?: number; offset?: number }
+  ): Promise<PullRequest[]> {
+    const db = getDb();
     const { state, limit = 50, offset = 0 } = options ?? {};
 
     const conditions = [eq(pullRequests.milestoneId, milestoneId)];
@@ -220,27 +219,36 @@ export class MilestoneModel {
       conditions.push(eq(pullRequests.state, state));
     }
 
-    return this.db
+    let query = db
       .select()
       .from(pullRequests)
       .where(and(...conditions))
-      .limit(limit)
-      .offset(offset)
-      .orderBy(pullRequests.createdAt);
-  }
+      .orderBy(desc(pullRequests.createdAt));
+
+    if (limit) {
+      query = query.limit(limit) as typeof query;
+    }
+
+    if (offset) {
+      query = query.offset(offset) as typeof query;
+    }
+
+    return query;
+  },
 
   /**
    * Assign an issue to a milestone
    */
   async assignIssue(issueId: string, milestoneId: string | null): Promise<boolean> {
-    const result = await this.db
+    const db = getDb();
+    const result = await db
       .update(issues)
       .set({ milestoneId, updatedAt: new Date() })
       .where(eq(issues.id, issueId))
       .returning({ id: issues.id });
 
     return result.length > 0;
-  }
+  },
 
   /**
    * Assign a pull request to a milestone
@@ -249,23 +257,25 @@ export class MilestoneModel {
     pullRequestId: string,
     milestoneId: string | null
   ): Promise<boolean> {
-    const result = await this.db
+    const db = getDb();
+    const result = await db
       .update(pullRequests)
       .set({ milestoneId, updatedAt: new Date() })
       .where(eq(pullRequests.id, pullRequestId))
       .returning({ id: pullRequests.id });
 
     return result.length > 0;
-  }
+  },
 
   /**
    * Get milestone counts for a repository
    */
   async getCounts(repoId: string): Promise<{ open: number; closed: number }> {
-    const results = await this.db
+    const db = getDb();
+    const results = await db
       .select({
         state: milestones.state,
-        count: count(),
+        count: sql<number>`count(*)::int`,
       })
       .from(milestones)
       .where(eq(milestones.repoId, repoId))
@@ -277,41 +287,43 @@ export class MilestoneModel {
     }
 
     return counts;
-  }
+  },
 
   /**
    * Add progress statistics to a milestone
    */
-  private async addProgress(milestone: Milestone): Promise<MilestoneWithProgress> {
+  async addProgress(milestone: Milestone): Promise<MilestoneWithProgress> {
+    const db = getDb();
+
     // Get issue counts
-    const issueCounts = await this.db
+    const issueCounts = await db
       .select({
         state: issues.state,
-        count: count(),
+        count: sql<number>`count(*)::int`,
       })
       .from(issues)
       .where(eq(issues.milestoneId, milestone.id))
       .groupBy(issues.state);
 
     // Get pull request counts
-    const prCounts = await this.db
+    const prCounts = await db
       .select({
         state: pullRequests.state,
-        count: count(),
+        count: sql<number>`count(*)::int`,
       })
       .from(pullRequests)
       .where(eq(pullRequests.milestoneId, milestone.id))
       .groupBy(pullRequests.state);
 
     const openIssuesCount =
-      issueCounts.find((c) => c.state === "open")?.count ?? 0;
+      issueCounts.find((c) => c.state === 'open')?.count ?? 0;
     const closedIssuesCount =
-      issueCounts.find((c) => c.state === "closed")?.count ?? 0;
+      issueCounts.find((c) => c.state === 'closed')?.count ?? 0;
     const openPullRequestsCount =
-      prCounts.find((c) => c.state === "open")?.count ?? 0;
-    const closedPullRequestsCount =
-      prCounts.filter((c) => c.state === "closed" || c.state === "merged")
-        .reduce((sum, c) => sum + c.count, 0);
+      prCounts.find((c) => c.state === 'open')?.count ?? 0;
+    const closedPullRequestsCount = prCounts
+      .filter((c) => c.state === 'closed' || c.state === 'merged')
+      .reduce((sum, c) => sum + c.count, 0);
 
     const totalItems =
       openIssuesCount +
@@ -319,7 +331,8 @@ export class MilestoneModel {
       openPullRequestsCount +
       closedPullRequestsCount;
     const closedItems = closedIssuesCount + closedPullRequestsCount;
-    const progress = totalItems > 0 ? Math.round((closedItems / totalItems) * 100) : 0;
+    const progress =
+      totalItems > 0 ? Math.round((closedItems / totalItems) * 100) : 0;
 
     return {
       ...milestone,
@@ -329,13 +342,5 @@ export class MilestoneModel {
       closedPullRequestsCount,
       progress,
     };
-  }
-}
-
-// =============================================================================
-// Factory function
-// =============================================================================
-
-export function createMilestoneModel(db: PostgresJsDatabase): MilestoneModel {
-  return new MilestoneModel(db);
-}
+  },
+};

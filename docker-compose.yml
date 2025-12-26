@@ -1,0 +1,38 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: wit
+      POSTGRES_PASSWORD: wit
+      POSTGRES_DB: wit
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wit"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  server:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://wit:wit@db:5432/wit
+      PORT: 3000
+      HOST: 0.0.0.0
+      REPOS_PATH: /repos
+      NODE_ENV: production
+    volumes:
+      - repos_data:/repos
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  repos_data:
