@@ -426,18 +426,20 @@ function main(): void {
         break;
 
       case 'commit':
-        // Use new commit handler for full options
-        if (options.all || cmdArgs.length > 0) {
-          handleCommit([...cmdArgs, ...(options.message ? ['-m', options.message as string] : []), ...(options.all ? ['-a'] : [])]);
-        } else {
-          const message = options.message as string;
-          if (!message) {
-            console.error('error: switch `m\' requires a value');
-            process.exit(1);
+        // Use new commit handler for full options (now async for hooks)
+        handleCommit([
+          ...cmdArgs,
+          ...(options.message ? ['-m', options.message as string] : []),
+          ...(options.all ? ['-a'] : []),
+        ]).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
           }
-          commit(message);
-        }
-        break;
+          process.exit(1);
+        });
+        return; // Exit main() to let async handle complete
 
       case 'status':
         status();
@@ -495,8 +497,15 @@ function main(): void {
           options.continue ? ['--continue'] : [],
           options.conflicts ? ['--conflicts'] : [],
           options.message ? ['-m', options.message as string] : []
-        ));
-        break;
+        )).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
+          }
+          process.exit(1);
+        });
+        return; // Exit main() to let async handle complete
 
       case 'undo':
         handleUndo(cmdArgs.concat(
