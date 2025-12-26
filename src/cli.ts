@@ -69,6 +69,10 @@ import {
   // Platform commands
   handlePr,
   handleIssue,
+  // Platform management
+  handleUp,
+  handleDown,
+  handlePlatformStatus,
 } from './commands';
 import { handleHooks } from './core/hooks';
 import { handleSubmodule } from './core/submodule';
@@ -198,6 +202,11 @@ Platform Commands:
   issue close <number>  Close an issue
   issue comment <n>     Add comment to issue
 
+Self-Hosting (run your own GitHub):
+  up                    Start the wit platform (database + server + web UI)
+  down                  Stop all wit services
+  platform-status       Show status of running services
+
 Quality of Life:
   amend                 Quickly fix the last commit
   wip                   Quick WIP commit with auto-generated message
@@ -302,6 +311,8 @@ const COMMANDS = [
   'serve',
   // Platform commands
   'pr', 'issue',
+  // Platform management
+  'up', 'down', 'platform-status',
   'help',
 ];
 
@@ -806,6 +817,40 @@ function main(): void {
           process.exit(1);
         });
         return; // Exit main() to let async handle complete
+
+      // Platform management commands
+      case 'up':
+        handleUp(args.slice(args.indexOf('up') + 1)).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
+          }
+          process.exit(1);
+        });
+        return;
+
+      case 'down':
+        handleDown(args.slice(args.indexOf('down') + 1)).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
+          }
+          process.exit(1);
+        });
+        return;
+
+      case 'platform-status':
+        handlePlatformStatus(args.slice(args.indexOf('platform-status') + 1)).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
+          }
+          process.exit(1);
+        });
+        return;
 
       default: {
         // Provide suggestions for unknown commands

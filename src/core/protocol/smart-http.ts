@@ -96,7 +96,7 @@ export class SmartHttpClient {
    */
   async discoverRefs(service: 'upload-pack' | 'receive-pack'): Promise<RefAdvertisement> {
     const url = `${this.baseUrl}/info/refs?service=git-${service}`;
-
+    
     const response = await this.httpRequest({
       method: 'GET',
       url,
@@ -132,7 +132,7 @@ export class SmartHttpClient {
     const requestBody = this.buildFetchRequest(wants, haves, options);
 
     const url = `${this.baseUrl}/git-upload-pack`;
-
+    
     const response = await this.httpRequest({
       method: 'POST',
       url,
@@ -164,7 +164,7 @@ export class SmartHttpClient {
     const requestBody = this.buildPushRequest(refs, pack, options);
 
     const url = `${this.baseUrl}/git-receive-pack`;
-
+    
     const response = await this.httpRequest({
       method: 'POST',
       url,
@@ -365,7 +365,7 @@ export class SmartHttpClient {
 
     // Pack data (only if non-empty)
     if (pack.length > 0) {
-      parts.push(pack);
+    parts.push(pack);
     }
 
     const result = Buffer.concat(parts);
@@ -527,7 +527,7 @@ export class SmartHttpClient {
         res.on('end', () => {
           const body = Buffer.concat(chunks);
           const headers: Record<string, string> = {};
-
+          
           for (const [key, value] of Object.entries(res.headers)) {
             if (typeof value === 'string') {
               headers[key.toLowerCase()] = value;
@@ -663,7 +663,7 @@ export function parseRemoteUrl(url: string): {
 export function normalizeRepoUrl(url: string): string {
   // Convert SSH to HTTPS for HTTP client
   const parsed = parseRemoteUrl(url);
-
+  
   if (parsed.protocol === 'ssh') {
     // Convert git@github.com:user/repo.git to https://github.com/user/repo.git
     let path = parsed.path;

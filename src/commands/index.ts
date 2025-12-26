@@ -77,3 +77,8 @@ export { COMMAND_HELP, formatCommandHelp, printCommandHelp, hasHelpFlag } from '
 // Platform commands (CLI extensions)
 export { handlePr, PR_HELP } from './pr';
 export { handleIssue, ISSUE_HELP } from './issue';
+
+// Platform management commands
+export { handleUp, UP_HELP } from './up';
+export { handleDown, DOWN_HELP } from './down';
+export { handlePlatformStatus, STATUS_HELP } from './platform-status';
