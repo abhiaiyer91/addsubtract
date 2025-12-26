@@ -1,5 +1,5 @@
-import { eq, desc, and, isNull, sql } from 'drizzle-orm';
-import { db } from '../index';
+import { eq, desc, and, sql } from 'drizzle-orm';
+import { getDb } from '../index';
 import {
   releases,
   releaseAssets,
@@ -17,6 +17,7 @@ export const releaseModel = {
    * Create a new release
    */
   async create(data: NewRelease): Promise<Release> {
+    const db = getDb();
     const [release] = await db.insert(releases).values(data).returning();
     return release;
   },
@@ -25,6 +26,7 @@ export const releaseModel = {
    * Get a release by ID
    */
   async getById(id: string): Promise<Release | null> {
+    const db = getDb();
     const [release] = await db
       .select()
       .from(releases)
@@ -37,6 +39,7 @@ export const releaseModel = {
    * Get a release by ID with assets
    */
   async getByIdWithAssets(id: string): Promise<(Release & { assets: ReleaseAsset[] }) | null> {
+    const db = getDb();
     const release = await db.query.releases.findFirst({
       where: eq(releases.id, id),
       with: {
@@ -50,6 +53,7 @@ export const releaseModel = {
    * Get a release by tag name and repo
    */
   async getByTag(repoId: string, tagName: string): Promise<Release | null> {
+    const db = getDb();
     const [release] = await db
       .select()
       .from(releases)
@@ -62,6 +66,7 @@ export const releaseModel = {
    * Get the latest release for a repository (non-draft, non-prerelease)
    */
   async getLatest(repoId: string): Promise<Release | null> {
+    const db = getDb();
     const [release] = await db
       .select()
       .from(releases)
@@ -81,6 +86,7 @@ export const releaseModel = {
    * Get the latest release for a repository including prereleases
    */
   async getLatestIncludingPrerelease(repoId: string): Promise<Release | null> {
+    const db = getDb();
     const [release] = await db
       .select()
       .from(releases)
@@ -102,6 +108,7 @@ export const releaseModel = {
       offset?: number;
     } = {}
   ): Promise<Release[]> {
+    const db = getDb();
     const { includeDrafts = false, includePrereleases = true, limit = 30, offset = 0 } = options;
 
     const conditions = [eq(releases.repoId, repoId)];
@@ -135,6 +142,7 @@ export const releaseModel = {
       offset?: number;
     } = {}
   ): Promise<(Release & { assets: ReleaseAsset[] })[]> {
+    const db = getDb();
     const { includeDrafts = false, includePrereleases = true, limit = 30, offset = 0 } = options;
 
     const conditions = [eq(releases.repoId, repoId)];
@@ -165,6 +173,7 @@ export const releaseModel = {
     id: string,
     data: Partial<Omit<NewRelease, 'id' | 'createdAt'>>
   ): Promise<Release | null> {
+    const db = getDb();
     const [release] = await db
       .update(releases)
       .set(data)
@@ -177,6 +186,7 @@ export const releaseModel = {
    * Publish a draft release
    */
   async publish(id: string): Promise<Release | null> {
+    const db = getDb();
     const [release] = await db
       .update(releases)
       .set({
@@ -192,6 +202,7 @@ export const releaseModel = {
    * Delete a release
    */
   async delete(id: string): Promise<boolean> {
+    const db = getDb();
     const result = await db.delete(releases).where(eq(releases.id, id)).returning();
     return result.length > 0;
   },
@@ -200,6 +211,7 @@ export const releaseModel = {
    * Count releases for a repository
    */
   async countByRepo(repoId: string, includeDrafts = false): Promise<number> {
+    const db = getDb();
     const conditions = [eq(releases.repoId, repoId)];
     if (!includeDrafts) {
       conditions.push(eq(releases.isDraft, false));
@@ -221,6 +233,7 @@ export const releaseAssetModel = {
    * Create a new asset
    */
   async create(data: NewReleaseAsset): Promise<ReleaseAsset> {
+    const db = getDb();
     const [asset] = await db.insert(releaseAssets).values(data).returning();
     return asset;
   },
@@ -229,6 +242,7 @@ export const releaseAssetModel = {
    * Create multiple assets
    */
   async createMany(data: NewReleaseAsset[]): Promise<ReleaseAsset[]> {
+    const db = getDb();
     if (data.length === 0) return [];
     return db.insert(releaseAssets).values(data).returning();
   },
@@ -237,6 +251,7 @@ export const releaseAssetModel = {
    * Get an asset by ID
    */
   async getById(id: string): Promise<ReleaseAsset | null> {
+    const db = getDb();
     const [asset] = await db
       .select()
       .from(releaseAssets)
@@ -249,6 +264,7 @@ export const releaseAssetModel = {
    * Get an asset by name within a release
    */
   async getByName(releaseId: string, name: string): Promise<ReleaseAsset | null> {
+    const db = getDb();
     const [asset] = await db
       .select()
       .from(releaseAssets)
@@ -261,6 +277,7 @@ export const releaseAssetModel = {
    * List all assets for a release
    */
   async listByRelease(releaseId: string): Promise<ReleaseAsset[]> {
+    const db = getDb();
     return db
       .select()
       .from(releaseAssets)
@@ -275,6 +292,7 @@ export const releaseAssetModel = {
     id: string,
     data: Partial<Omit<NewReleaseAsset, 'id' | 'releaseId' | 'createdAt'>>
   ): Promise<ReleaseAsset | null> {
+    const db = getDb();
     const [asset] = await db
       .update(releaseAssets)
       .set(data)
@@ -287,6 +305,7 @@ export const releaseAssetModel = {
    * Increment download count
    */
   async incrementDownloadCount(id: string): Promise<ReleaseAsset | null> {
+    const db = getDb();
     const [asset] = await db
       .update(releaseAssets)
       .set({
@@ -301,6 +320,7 @@ export const releaseAssetModel = {
    * Delete an asset
    */
   async delete(id: string): Promise<boolean> {
+    const db = getDb();
     const result = await db.delete(releaseAssets).where(eq(releaseAssets.id, id)).returning();
     return result.length > 0;
   },
@@ -309,6 +329,7 @@ export const releaseAssetModel = {
    * Delete all assets for a release
    */
   async deleteByRelease(releaseId: string): Promise<number> {
+    const db = getDb();
     const result = await db
       .delete(releaseAssets)
       .where(eq(releaseAssets.releaseId, releaseId))
@@ -320,6 +341,7 @@ export const releaseAssetModel = {
    * Get total download count for a release
    */
   async getTotalDownloads(releaseId: string): Promise<number> {
+    const db = getDb();
     const [result] = await db
       .select({ total: sql<number>`COALESCE(SUM(${releaseAssets.downloadCount}), 0)` })
       .from(releaseAssets)

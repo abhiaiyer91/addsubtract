@@ -1,0 +1,840 @@
+---
+title: "Command Reference"
+description: "Complete reference for all wit commands"
+---
+
+# Command Reference
+
+Complete reference for all wit commands with options and examples.
+
+---
+
+## Core Commands
+
+### `wit init`
+
+Initialize a new repository.
+
+```bash
+wit init [path] [options]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--sha256` | Use SHA-256 hashing (default: SHA-1) |
+| `--bare` | Create a bare repository |
+
+**Examples:**
+```bash
+wit init                    # Initialize in current directory
+wit init my-project         # Initialize in new directory
+wit init --sha256           # Use SHA-256 hashing
+```
+
+---
+
+### `wit add`
+
+Add files to the staging area.
+
+```bash
+wit add <pathspec>... [options]
+```
+
+| Option | Description |
+|--------|-------------|
+| `-A, --all` | Add all changes (new, modified, deleted) |
+| `-u, --update` | Add modified and deleted, not new |
+| `-n, --dry-run` | Show what would be added |
+| `-v, --verbose` | Show files being added |
+
+**Examples:**
+```bash
+wit add file.txt            # Add specific file
+wit add src/                # Add directory
+wit add .                   # Add all files
+wit add -A                  # Add all including deletions
+wit add "*.js"              # Add by pattern
+```
+
+---
+
+### `wit commit`
+
+Record changes to the repository.
+
+```bash
+wit commit [options]
+```
+
+| Option | Description |
+|--------|-------------|
+| `-m <msg>` | Commit message |
+| `-a, --all` | Stage all tracked files before committing |
+| `--amend` | Amend the previous commit |
+| `--no-edit` | Use previous commit message (with --amend) |
+| `--author <author>` | Override author |
+
+**Examples:**
+```bash
+wit commit -m "Add feature"
+wit commit -a -m "Update all files"
+wit commit --amend -m "Fixed message"
+wit commit --amend --no-edit   # Add staged changes to last commit
+```
+
+---
+
+### `wit status`
+
+Show working tree status.
+
+```bash
+wit status [options]
+```
+
+| Option | Description |
+|--------|-------------|
+| `-s, --short` | Short format output |
+| `--porcelain` | Machine-readable output |
+
+**Examples:**
+```bash
+wit status
+wit status -s
+```
+
+---
+
+### `wit log`
+
+Show commit history.
+
+```bash
+wit log [options] [<ref>]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--oneline` | One line per commit |
+| `-n <num>` | Limit to n commits |
+| `--all` | Show all branches |
+| `--graph` | Show ASCII graph |
+| `--stat` | Show file statistics |
+
+**Examples:**
+```bash
+wit log
+wit log --oneline
+wit log -n 10
+wit log --oneline --graph --all
+wit log main..feature       # Commits in feature but not main
+```
+
+---
+
+### `wit diff`
+
+Show changes between commits, index, and working tree.
+
+```bash
+wit diff [options] [<path>...]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--staged, --cached` | Show staged changes |
+| `--stat` | Show statistics only |
+| `--name-only` | Show only file names |
+| `--color` | Colorize output |
+
+**Examples:**
+```bash
+wit diff                    # Working tree vs index
+wit diff --staged           # Index vs HEAD
+wit diff HEAD~1             # HEAD vs previous commit
+wit diff main feature       # Compare branches
+wit diff --stat             # Summary statistics
+```
+
+---
+
+## Branch Commands
+
+### `wit branch`
+
+List, create, or delete branches.
+
+```bash
+wit branch [options] [<name>] [<start-point>]
+```
+
+| Option | Description |
+|--------|-------------|
+| `-a, --all` | List local and remote branches |
+| `-r, --remote` | List remote branches |
+| `-d <branch>` | Delete branch |
+| `-D <branch>` | Force delete branch |
+| `-m <old> <new>` | Rename branch |
+| `-v, --verbose` | Show commit info |
+
+**Examples:**
+```bash
+wit branch                  # List branches
+wit branch feature          # Create branch
+wit branch -d feature       # Delete merged branch
+wit branch -D feature       # Force delete
+wit branch -m old new       # Rename
+wit branch -a               # Show all including remote
+```
+
+---
+
+### `wit switch`
+
+Switch branches.
+
+```bash
+wit switch [options] <branch>
+```
+
+| Option | Description |
+|--------|-------------|
+| `-c <branch>` | Create and switch |
+| `-C <branch>` | Force create and switch |
+| `--detach` | Detach HEAD |
+| `-` | Switch to previous branch |
+
+**Examples:**
+```bash
+wit switch main
+wit switch -c feature       # Create and switch
+wit switch -                # Previous branch
+```
+
+---
+
+### `wit checkout`
+
+Switch branches or restore files.
+
+```bash
+wit checkout [options] <branch|file>
+```
+
+| Option | Description |
+|--------|-------------|
+| `-b <branch>` | Create and switch |
+| `-B <branch>` | Force create and switch |
+| `--` | Separate branch from files |
+
+**Examples:**
+```bash
+wit checkout main
+wit checkout -b feature
+wit checkout -- file.txt    # Restore file
+```
+
+---
+
+### `wit restore`
+
+Restore working tree files.
+
+```bash
+wit restore [options] <file>...
+```
+
+| Option | Description |
+|--------|-------------|
+| `--staged` | Unstage files |
+| `--source <ref>` | Restore from specific commit |
+
+**Examples:**
+```bash
+wit restore file.txt        # Restore from index
+wit restore --staged file.txt  # Unstage
+wit restore --source HEAD~1 file.txt  # Restore from commit
+```
+
+---
+
+## Merge Commands
+
+### `wit merge`
+
+Merge branches.
+
+```bash
+wit merge [options] <branch>
+```
+
+| Option | Description |
+|--------|-------------|
+| `--no-ff` | Create merge commit even if fast-forward |
+| `--ff-only` | Only fast-forward, fail otherwise |
+| `--squash` | Squash commits |
+| `--abort` | Abort current merge |
+| `--continue` | Continue after conflict resolution |
+| `--conflicts` | Show conflict status |
+
+**Examples:**
+```bash
+wit merge feature
+wit merge --no-ff feature
+wit merge --squash feature
+wit merge --abort
+```
+
+---
+
+## Remote Commands
+
+### `wit remote`
+
+Manage remote repositories.
+
+```bash
+wit remote [options] [command]
+```
+
+| Command | Description |
+|---------|-------------|
+| `add <name> <url>` | Add remote |
+| `remove <name>` | Remove remote |
+| `rename <old> <new>` | Rename remote |
+| `set-url <name> <url>` | Change URL |
+| `show <name>` | Show details |
+
+**Examples:**
+```bash
+wit remote -v
+wit remote add origin https://github.com/user/repo.git
+wit remote remove origin
+```
+
+---
+
+### `wit clone`
+
+Clone a repository.
+
+```bash
+wit clone [options] <url> [<directory>]
+```
+
+| Option | Description |
+|--------|-------------|
+| `-b <branch>` | Clone specific branch |
+| `--depth <n>` | Shallow clone |
+
+**Examples:**
+```bash
+wit clone https://github.com/user/repo.git
+wit clone https://github.com/user/repo.git my-folder
+wit clone -b develop https://github.com/user/repo.git
+```
+
+---
+
+### `wit fetch`
+
+Download objects and refs.
+
+```bash
+wit fetch [options] [<remote>]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--all` | Fetch all remotes |
+| `--prune` | Remove deleted remote branches |
+
+**Examples:**
+```bash
+wit fetch
+wit fetch origin
+wit fetch --all
+wit fetch --prune
+```
+
+---
+
+### `wit pull`
+
+Fetch and integrate changes.
+
+```bash
+wit pull [options] [<remote>] [<branch>]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--rebase` | Rebase instead of merge |
+| `--no-rebase` | Merge (default) |
+
+**Examples:**
+```bash
+wit pull
+wit pull origin main
+wit pull --rebase
+```
+
+---
+
+### `wit push`
+
+Update remote refs.
+
+```bash
+wit push [options] [<remote>] [<branch>]
+```
+
+| Option | Description |
+|--------|-------------|
+| `-u, --set-upstream` | Set tracking branch |
+| `--force, -f` | Force push |
+| `--force-with-lease` | Safe force push |
+| `--all` | Push all branches |
+| `--tags` | Push tags |
+| `--dry-run` | Show what would be pushed |
+
+**Examples:**
+```bash
+wit push
+wit push origin main
+wit push -u origin feature
+wit push --force
+wit push --tags
+```
+
+---
+
+## Undo Commands
+
+### `wit undo`
+
+Undo the last operation.
+
+```bash
+wit undo [options]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--steps <n>` | Undo n operations |
+| `--dry-run` | Show what would be undone |
+
+**Examples:**
+```bash
+wit undo
+wit undo --steps 3
+```
+
+---
+
+### `wit uncommit`
+
+Undo commits, keep changes staged.
+
+```bash
+wit uncommit [<count>]
+```
+
+**Examples:**
+```bash
+wit uncommit           # Undo last commit
+wit uncommit 2         # Undo last 2 commits
+```
+
+---
+
+### `wit reset`
+
+Reset HEAD to a specific state.
+
+```bash
+wit reset [options] [<commit>]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--soft` | Keep changes staged |
+| `--mixed` | Keep changes unstaged (default) |
+| `--hard` | Discard all changes |
+
+**Examples:**
+```bash
+wit reset HEAD~1
+wit reset --soft HEAD~1
+wit reset --hard HEAD~1
+```
+
+---
+
+### `wit stash`
+
+Save working directory changes.
+
+```bash
+wit stash [command] [options]
+```
+
+| Command | Description |
+|---------|-------------|
+| `push` | Save changes (default) |
+| `pop` | Apply and remove |
+| `apply` | Apply without removing |
+| `list` | List stashes |
+| `drop` | Remove stash |
+| `clear` | Remove all stashes |
+
+**Examples:**
+```bash
+wit stash
+wit stash pop
+wit stash list
+wit stash apply stash@{1}
+wit stash drop stash@{0}
+```
+
+---
+
+## Quality of Life Commands
+
+### `wit wip`
+
+Quick WIP commit.
+
+```bash
+wit wip [options] [<message>]
+```
+
+| Option | Description |
+|--------|-------------|
+| `-a, --all` | Stage all tracked files |
+
+**Examples:**
+```bash
+wit wip                 # WIP commit with auto message
+wit wip -a              # Stage all + WIP commit
+wit wip "fixing bug"    # WIP: fixing bug
+```
+
+---
+
+### `wit amend`
+
+Fix the last commit.
+
+```bash
+wit amend [options]
+```
+
+| Option | Description |
+|--------|-------------|
+| `-m <msg>` | New commit message |
+| `-a, --all` | Stage all tracked files |
+| `--no-edit` | Keep original message |
+
+**Examples:**
+```bash
+wit amend -m "New message"
+wit amend                # Add staged changes
+wit amend -a             # Stage all + amend
+```
+
+---
+
+### `wit cleanup`
+
+Find and delete merged/stale branches.
+
+```bash
+wit cleanup [options]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--dry-run` | Show what would be deleted |
+| `--force` | Delete without confirmation |
+| `--days <n>` | Consider stale after n days |
+
+**Examples:**
+```bash
+wit cleanup --dry-run
+wit cleanup
+wit cleanup --days 60
+```
+
+---
+
+### `wit stats`
+
+Show repository statistics.
+
+```bash
+wit stats [options]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--all` | Detailed statistics |
+
+**Examples:**
+```bash
+wit stats
+wit stats --all
+```
+
+---
+
+### `wit blame`
+
+Show who changed each line.
+
+```bash
+wit blame [options] <file>
+```
+
+**Examples:**
+```bash
+wit blame src/index.ts
+```
+
+---
+
+### `wit snapshot`
+
+Create/restore quick checkpoints.
+
+```bash
+wit snapshot <command>
+```
+
+| Command | Description |
+|---------|-------------|
+| `create [name]` | Create snapshot |
+| `list` | List snapshots |
+| `restore <id>` | Restore snapshot |
+| `delete <id>` | Delete snapshot |
+
+**Examples:**
+```bash
+wit snapshot create "before refactor"
+wit snapshot list
+wit snapshot restore abc123
+```
+
+---
+
+## AI Commands
+
+### `wit ai`
+
+AI-powered features.
+
+```bash
+wit ai <command> [options]
+```
+
+| Command | Description |
+|---------|-------------|
+| `<query>` | Natural language command |
+| `commit` | Generate commit message |
+| `review` | Code review |
+| `explain [ref]` | Explain commit |
+| `resolve [file]` | Resolve conflicts |
+| `status` | Show AI config |
+
+| Option | Description |
+|--------|-------------|
+| `-a, --all` | Stage all (with commit) |
+| `-x, --execute` | Execute generated command |
+| `--staged` | Review staged only |
+
+**Examples:**
+```bash
+wit ai "what files changed?"
+wit ai commit -a -x
+wit ai review --staged
+wit ai explain HEAD~2
+wit ai resolve src/file.ts
+```
+
+---
+
+## GitHub Commands
+
+### `wit github`
+
+GitHub integration.
+
+```bash
+wit github <command>
+```
+
+| Command | Description |
+|---------|-------------|
+| `login` | Authenticate with GitHub |
+| `logout` | Remove credentials |
+| `status` | Show auth status |
+| `token` | Print access token |
+
+**Examples:**
+```bash
+wit github login
+wit github status
+wit github logout
+```
+
+---
+
+## Plumbing Commands
+
+Low-level commands for scripting and debugging.
+
+### `wit cat-file`
+
+```bash
+wit cat-file <options> <hash>
+```
+
+| Option | Description |
+|--------|-------------|
+| `-t` | Show type |
+| `-s` | Show size |
+| `-p` | Pretty print |
+
+### `wit hash-object`
+
+```bash
+wit hash-object [options] <file>
+```
+
+| Option | Description |
+|--------|-------------|
+| `-w` | Write object to store |
+
+### `wit ls-files`
+
+```bash
+wit ls-files [options]
+```
+
+| Option | Description |
+|--------|-------------|
+| `-s, --stage` | Show staged info |
+| `-c, --cached` | Show cached files |
+
+### `wit ls-tree`
+
+```bash
+wit ls-tree [options] <tree>
+```
+
+| Option | Description |
+|--------|-------------|
+| `-r` | Recurse into subtrees |
+
+### `wit rev-parse`
+
+```bash
+wit rev-parse <ref>
+```
+
+### `wit fsck`
+
+```bash
+wit fsck [options]
+```
+
+Verify object database integrity.
+
+---
+
+## Platform Commands
+
+### `wit serve`
+
+Start a Git HTTP server for hosting repositories.
+
+```bash
+wit serve [options]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--port <number>` | Port to listen on (default: 3000) |
+| `--repos <path>` | Repository storage directory (default: ./repos) |
+| `--host <hostname>` | Hostname to bind to (default: 0.0.0.0) |
+| `--verbose` | Enable verbose logging |
+
+**Examples:**
+```bash
+wit serve
+wit serve --port 8080
+wit serve --repos /var/git/repos --port 3000
+```
+
+---
+
+### `wit pr`
+
+Manage pull requests.
+
+```bash
+wit pr <command> [options]
+```
+
+| Command | Description |
+|---------|-------------|
+| `create` | Create a PR from current branch |
+| `list` | List pull requests |
+| `view <number>` | View PR details |
+| `checkout <number>` | Checkout PR locally |
+| `merge <number>` | Merge a PR |
+| `close <number>` | Close a PR |
+| `reopen <number>` | Reopen a PR |
+
+**Examples:**
+```bash
+wit pr create -t "Add feature" -b main
+wit pr list
+wit pr list --state closed
+wit pr view 42
+wit pr checkout 42
+wit pr merge 42
+wit pr close 42
+```
+
+---
+
+### `wit issue`
+
+Manage issues.
+
+```bash
+wit issue <command> [options]
+```
+
+| Command | Description |
+|---------|-------------|
+| `create <title>` | Create an issue |
+| `list` | List issues |
+| `view <number>` | View issue details |
+| `close <number>` | Close an issue |
+| `reopen <number>` | Reopen an issue |
+| `comment <number>` | Add a comment |
+
+**Examples:**
+```bash
+wit issue create "Bug: Login fails"
+wit issue create -t "Feature request" -m "Description here"
+wit issue list
+wit issue list --state all
+wit issue view 15
+wit issue close 15
+wit issue comment 15 "Fixed in commit abc123"
+```
+

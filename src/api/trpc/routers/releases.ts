@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
-import { router, publicProcedure, protectedProcedure } from '../index';
+import { router, publicProcedure, protectedProcedure } from '../trpc';
 import { releaseModel, releaseAssetModel } from '../../../db/models/releases';
 
 /**
@@ -52,7 +52,7 @@ export const releasesRouter = router({
     .mutation(async ({ input, ctx }) => {
       const release = await releaseModel.create({
         ...input,
-        authorId: ctx.userId,
+        authorId: ctx.user.id,
         publishedAt: input.isDraft ? null : new Date(),
       });
       return release;

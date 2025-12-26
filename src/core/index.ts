@@ -204,7 +204,22 @@ export { BranchStateManager } from './branch-state';
 export { MergeManager } from './merge';
 export { ScopeManager } from './scope';
 export { PartialCloneManager, SparseCheckoutManager } from './partial-clone';
-export { FileDiff, DiffLine, DiffHunk, diff, createHunks, formatUnifiedDiff, formatColoredDiff, isBinary } from './diff';
+export { 
+  FileDiff, 
+  DiffLine, 
+  DiffHunk, 
+  RenameCandidate,
+  RenameDetectionOptions,
+  diff, 
+  createHunks, 
+  formatUnifiedDiff, 
+  formatColoredDiff, 
+  isBinary,
+  calculateContentSimilarity,
+  calculateFilenameSimilarity,
+  detectRenames,
+  processRenames,
+} from './diff';
 
 // Remote infrastructure
 export { Remote, RemoteManager } from './remote';

@@ -56,11 +56,29 @@ export { handleShow, show, showCommit, showFileAtCommit, showTag } from './show'
 
 // Remote commands
 export { handleRemote, listRemotes, addRemote, removeRemote, renameRemote, getRemoteUrl, setRemoteUrl } from './remote';
-export { handleClone, clone, parseRepoUrl } from './clone';
-export { handleFetch, fetch } from './fetch';
-export { handlePull, pull } from './pull';
-export { handlePush, push } from './push';
+export { handleClone, handleCloneAsync, clone, cloneAsync, parseRepoUrl } from './clone';
+export { handleFetch, fetch, fetchAsync } from './fetch';
+export { handlePull, pull, pullAsync } from './pull';
+export { handlePush, push, pushAsync } from './push';
+
+// GitHub integration
+export { handleGitHub, GitHubManager, getGitHubManager } from './github';
 
 // Advanced features
 export { handleReflog, ReflogManager, updateReflog } from './reflog';
 export { handleGC, GarbageCollector } from './gc';
+
+// Server command
+export { handleServe } from './serve';
+
+// Command help system
+export { COMMAND_HELP, formatCommandHelp, printCommandHelp, hasHelpFlag } from './command-help';
+
+// Platform commands (CLI extensions)
+export { handlePr, PR_HELP } from './pr';
+export { handleIssue, ISSUE_HELP } from './issue';
+
+// Platform management commands
+export { handleUp, UP_HELP } from './up';
+export { handleDown, DOWN_HELP } from './down';
+export { handlePlatformStatus, STATUS_HELP } from './platform-status';

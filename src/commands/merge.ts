@@ -5,20 +5,41 @@
 
 import { Repository } from '../core/repository';
 import { MergeManager, MergeOptions, formatMergeResult, formatConflict } from '../core/merge';
-import { TsgitError } from '../core/errors';
+import { TsgitError, ErrorCode } from '../core/errors';
+import { HookManager } from '../core/hooks';
+
+/**
+ * Extended merge options with hook support
+ */
+export interface ExtendedMergeOptions extends MergeOptions {
+  noVerify?: boolean;
+}
 
 /**
  * Merge a branch into the current branch
  */
-export function merge(
+export async function merge(
   branchName: string,
-  options: MergeOptions = {}
-): void {
+  options: ExtendedMergeOptions = {}
+): Promise<void> {
   const repo = Repository.find();
   const mergeManager = new MergeManager(repo, repo.gitDir);
+  const hookManager = new HookManager(repo.gitDir, repo.workDir);
+  const currentBranch = repo.refs.getCurrentBranch();
 
   try {
     const result = mergeManager.merge(branchName, options);
+    
+    // Run post-merge hook after successful merge (if not in conflict state)
+    if (result.success && !options.noVerify) {
+      hookManager.runHook('post-merge', {
+        branch: currentBranch || undefined,
+        targetBranch: branchName,
+      }).catch((err) => {
+        console.error(`post-merge hook error: ${err.message}`);
+      });
+    }
+    
     console.log(formatMergeResult(result));
   } catch (error) {
     if (error instanceof TsgitError) {
@@ -134,8 +155,8 @@ export function resolveFile(filePath: string): void {
 /**
  * CLI handler for merge command
  */
-export function handleMerge(args: string[]): void {
-  const options: MergeOptions = {};
+export async function handleMerge(args: string[]): Promise<void> {
+  const options: ExtendedMergeOptions = {};
   let branchName: string | undefined;
   let action: 'merge' | 'abort' | 'continue' | 'conflicts' | 'resolve' = 'merge';
   let resolveFilePath: string | undefined;
@@ -159,6 +180,8 @@ export function handleMerge(args: string[]): void {
       options.noFastForward = true;
     } else if (arg === '--squash') {
       options.squash = true;
+    } else if (arg === '--no-verify') {
+      options.noVerify = true;
     } else if (arg === '-m' || arg === '--message') {
       options.message = args[++i];
     } else if (!arg.startsWith('-')) {
@@ -196,10 +219,11 @@ export function handleMerge(args: string[]): void {
         console.error('  --no-commit       Perform merge but don\'t commit');
         console.error('  --no-ff           Create merge commit even for fast-forward');
         console.error('  --squash          Squash commits');
+        console.error('  --no-verify       Skip post-merge hooks');
         console.error('  -m <message>      Merge commit message');
         process.exit(1);
       }
-      merge(branchName, options);
+      await merge(branchName, options);
       break;
   }
 }

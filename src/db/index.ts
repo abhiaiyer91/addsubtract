@@ -1,27 +1,98 @@
-import { drizzle } from 'drizzle-orm/node-postgres';
-import { Pool } from 'pg';
+import { drizzle, NodePgDatabase } from 'drizzle-orm/node-postgres';
+import { Pool, PoolConfig } from 'pg';
 import * as schema from './schema';
 
-// Database connection configuration
-const connectionString = process.env.DATABASE_URL;
+export type Database = NodePgDatabase<typeof schema>;
 
-if (!connectionString) {
-  console.warn('DATABASE_URL not set. Database operations will not work.');
+let db: Database | null = null;
+let pool: Pool | null = null;
+
+/**
+ * Initialize the database connection
+ * @param connectionString PostgreSQL connection string or pool config
+ * @returns Drizzle database instance
+ */
+export function initDatabase(connectionString: string | PoolConfig): Database {
+  const config =
+    typeof connectionString === 'string'
+      ? { connectionString }
+      : connectionString;
+
+  pool = new Pool(config);
+  db = drizzle(pool, { schema });
+  return db;
 }
 
-// Create PostgreSQL connection pool
-const pool = new Pool({
-  connectionString,
-  max: 10, // Maximum number of connections in the pool
-  idleTimeoutMillis: 30000, // Close idle connections after 30 seconds
-  connectionTimeoutMillis: 2000, // Timeout for new connections
-});
+/**
+ * Get the database instance
+ * @throws Error if database is not initialized
+ * @returns Drizzle database instance
+ */
+export function getDb(): Database {
+  if (!db) {
+    throw new Error('Database not initialized. Call initDatabase() first.');
+  }
+  return db;
+}
 
-// Create Drizzle ORM instance with schema
-export const db = drizzle(pool, { schema });
+/**
+ * Get the raw PostgreSQL pool
+ * @throws Error if pool is not initialized
+ * @returns PostgreSQL pool instance
+ */
+export function getPool(): Pool {
+  if (!pool) {
+    throw new Error('Database pool not initialized. Call initDatabase() first.');
+  }
+  return pool;
+}
 
-// Export pool for direct access if needed
-export { pool };
+/**
+ * Close the database connection
+ */
+export async function closeDatabase(): Promise<void> {
+  if (pool) {
+    await pool.end();
+    pool = null;
+    db = null;
+  }
+}
 
-// Export schema for use in other modules
+/**
+ * Check if the database is connected
+ */
+export async function isConnected(): Promise<boolean> {
+  if (!pool) {
+    return false;
+  }
+  try {
+    const client = await pool.connect();
+    client.release();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Execute a health check query
+ */
+export async function healthCheck(): Promise<{ ok: boolean; latency: number }> {
+  if (!pool) {
+    return { ok: false, latency: -1 };
+  }
+
+  const start = Date.now();
+  try {
+    const client = await pool.connect();
+    await client.query('SELECT 1');
+    client.release();
+    return { ok: true, latency: Date.now() - start };
+  } catch {
+    return { ok: false, latency: Date.now() - start };
+  }
+}
+
+// Re-export schema for convenience
+export { schema };
 export * from './schema';

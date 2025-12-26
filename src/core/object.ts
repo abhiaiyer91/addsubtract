@@ -50,12 +50,14 @@ export class Tree extends GitObject {
   }
 
   serialize(): Buffer {
-    // Sort entries by name (Git does this)
+    // Sort entries by name using Git's exact sorting rules
+    // Git sorts byte-by-byte, with directories having a virtual trailing '/'
     const sorted = [...this.entries].sort((a, b) => {
       // Directories (trees) should have a trailing slash for sorting
       const aName = a.mode === '40000' ? a.name + '/' : a.name;
       const bName = b.mode === '40000' ? b.name + '/' : b.name;
-      return aName.localeCompare(bName);
+      // Byte-by-byte comparison (NOT locale-aware)
+      return aName < bName ? -1 : aName > bName ? 1 : 0;
     });
 
     const parts: Buffer[] = [];
@@ -139,9 +141,20 @@ export class Commit extends GitObject {
     let author: Author | null = null;
     let committer: Author | null = null;
     let messageStart = 0;
+    let inMultiLineField = false;
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
+
+      // Handle multi-line fields (like gpgsig) - continuation lines start with space
+      if (inMultiLineField) {
+        if (line.startsWith(' ') || line.startsWith('\t')) {
+          // Still in the multi-line field, skip
+          continue;
+        }
+        // End of multi-line field
+        inMultiLineField = false;
+      }
 
       if (line === '') {
         messageStart = i + 1;
@@ -156,7 +169,11 @@ export class Commit extends GitObject {
         author = parseAuthor(line.slice(7));
       } else if (line.startsWith('committer ')) {
         committer = parseAuthor(line.slice(10));
+      } else if (line.startsWith('gpgsig ') || line.startsWith('mergetag ')) {
+        // Start of a multi-line field (GPG signature or merge tag)
+        inMultiLineField = true;
       }
+      // Ignore other headers like 'encoding', 'HG:extra', etc.
     }
 
     const message = lines.slice(messageStart).join('\n');

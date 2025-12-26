@@ -1,66 +1,52 @@
-import { initTRPC, TRPCError } from '@trpc/server';
-import { z } from 'zod';
-
 /**
- * Context for tRPC procedures
+ * tRPC API module
+ *
+ * This module exports everything needed for the tRPC API:
+ * - Server-side: router, context, procedures
+ * - Client-side: createClient
+ * - Types: AppRouter for end-to-end type safety
  */
-export interface Context {
-  userId?: string;
-  isAuthenticated: boolean;
-}
 
-/**
- * Create context for each request
- */
-export const createContext = (opts?: { userId?: string }): Context => {
-  return {
-    userId: opts?.userId,
-    isAuthenticated: !!opts?.userId,
-  };
-};
+// Export router and types
+export { appRouter, type AppRouter } from './routers';
+export {
+  authRouter,
+  usersRouter,
+  reposRouter,
+  pullsRouter,
+  issuesRouter,
+  commentsRouter,
+  activityRouter,
+  releasesRouter,
+} from './routers';
 
-/**
- * Initialize tRPC instance
- */
-const t = initTRPC.context<Context>().create({
-  errorFormatter({ shape, error }) {
-    return {
-      ...shape,
-      data: {
-        ...shape.data,
-        zodError:
-          error.cause instanceof z.ZodError ? error.cause.flatten() : null,
-      },
-    };
-  },
-});
+// Export context
+export { createContext, createTestContext, type Context } from './context';
 
-/**
- * Export reusable router and procedure helpers
- */
-export const router = t.router;
-export const publicProcedure = t.procedure;
-export const middleware = t.middleware;
+// Export tRPC primitives for extending
+export {
+  router,
+  publicProcedure,
+  protectedProcedure,
+  middleware,
+  mergeRouters,
+} from './trpc';
 
-/**
- * Middleware to check if user is authenticated
- */
-const isAuthed = middleware(({ ctx, next }) => {
-  if (!ctx.isAuthenticated || !ctx.userId) {
-    throw new TRPCError({
-      code: 'UNAUTHORIZED',
-      message: 'You must be logged in to perform this action',
-    });
-  }
-  return next({
-    ctx: {
-      ...ctx,
-      userId: ctx.userId,
-    },
-  });
-});
+// Export middleware
+export {
+  isAuthed,
+  withRepoPermission,
+  isRepoAdmin,
+  isRepoMember,
+  withOrgRole,
+  isOrgAdmin,
+  isOrgOwner,
+} from './middleware/auth';
 
-/**
- * Protected procedure - requires authentication
- */
-export const protectedProcedure = publicProcedure.use(isAuthed);
+// Export client creator
+export {
+  createClient,
+  createClientWithTokenGetter,
+  isTRPCClientError,
+  TRPCClientError,
+} from './client';
