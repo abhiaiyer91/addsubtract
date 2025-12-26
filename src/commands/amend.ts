@@ -204,8 +204,13 @@ function buildTree(repo: Repository): string {
       }
     }
     
-    // Sort entries (Git sorts directories and files together by name)
-    finalEntries.sort((a, b) => a.name.localeCompare(b.name));
+    // Sort entries using Git's exact byte-by-byte sorting rules
+    // Note: Tree.serialize() also sorts, but we sort here for consistency
+    finalEntries.sort((a, b) => {
+      const aName = a.mode === '40000' ? a.name + '/' : a.name;
+      const bName = b.mode === '40000' ? b.name + '/' : b.name;
+      return aName < bName ? -1 : aName > bName ? 1 : 0;
+    });
     
     const tree = new Tree(finalEntries);
     const hash = repo.objects.writeObject(tree);

@@ -50,6 +50,9 @@ export enum ErrorCode {
   OPERATION_FAILED = 'OPERATION_FAILED',
   INVALID_ARGUMENT = 'INVALID_ARGUMENT',
   NO_COMMITS_YET = 'NO_COMMITS_YET',
+
+  // Hook errors
+  HOOK_FAILED = 'HOOK_FAILED',
 }
 
 /**
