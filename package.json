@@ -15,7 +15,12 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
+    "db:seed": "npx tsx src/db/seed.ts"
   },
   "keywords": [
     "git",
@@ -36,6 +41,8 @@
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^20.10.0",
+    "@types/pg": "^8.16.0",
+    "drizzle-kit": "^0.31.8",
     "typescript": "^5.3.0",
     "vitest": "^4.0.16"
   },
@@ -43,6 +50,8 @@
     "@mastra/core": "^1.0.0-beta.17",
     "@types/blessed": "^0.1.27",
     "blessed": "^0.1.81",
+    "drizzle-orm": "^0.45.1",
+    "pg": "^8.16.3",
     "zod": "^4.2.1"
   },
   "engines": {
