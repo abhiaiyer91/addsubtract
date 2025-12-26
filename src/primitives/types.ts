@@ -63,10 +63,6 @@ export interface FsMergeResult {
 }
 
 /**
- * Shared types for Knowledge primitive
- */
-
-/**
  * Options for configuring a Knowledge instance
  */
 export interface KnowledgeOptions {

@@ -15,8 +15,8 @@ export {
   type FsMergeResult,
 } from './filesystem';
 
-// Knowledge primitive - Key-value store with history
-export { Knowledge, type KnowledgeOptions, type HistoryEntry } from './knowledge';
+// Export filesystem MergeResult with alternate name for backwards compatibility
+export { type FsMergeResult as FilesystemMergeResult } from './filesystem';
 
-// Re-export types for convenience
-export * from './types';
+// Knowledge primitive - Git-backed key-value store
+export { Knowledge, type KnowledgeOptions, type HistoryEntry } from './knowledge';
