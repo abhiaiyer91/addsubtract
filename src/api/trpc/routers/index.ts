@@ -6,6 +6,7 @@ import { pullsRouter } from './pulls';
 import { issuesRouter } from './issues';
 import { commentsRouter } from './comments';
 import { activityRouter } from './activity';
+import { webhooksRouter } from './webhooks';
 
 /**
  * Main application router
@@ -19,6 +20,7 @@ export const appRouter = router({
   issues: issuesRouter,
   comments: commentsRouter,
   activity: activityRouter,
+  webhooks: webhooksRouter,
 });
 
 /**
@@ -35,4 +37,5 @@ export {
   issuesRouter,
   commentsRouter,
   activityRouter,
+  webhooksRouter,
 };
