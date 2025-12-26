@@ -96,3 +96,51 @@ export async function healthCheck(): Promise<{ ok: boolean; latency: number }> {
 // Re-export schema for convenience
 export { schema };
 export * from './schema';
+
+// Workflow run model exports
+export {
+  // Types
+  type UpdateWorkflowRun,
+  type UpdateJobRun,
+  type UpdateStepRun,
+  type WorkflowRunWithJobs,
+  type JobRunWithSteps,
+  
+  // Workflow run operations
+  createWorkflowRun,
+  findWorkflowRunById,
+  findWorkflowRunByIdWithJobs,
+  findWorkflowRunsByRepoId,
+  findWorkflowRunsByState,
+  updateWorkflowRun,
+  updateWorkflowRunState,
+  deleteWorkflowRun,
+  
+  // Job run operations
+  createJobRun,
+  createJobRuns,
+  findJobRunById,
+  findJobRunByIdWithSteps,
+  findJobRunsByWorkflowRunId,
+  findJobRunsByWorkflowAndState,
+  updateJobRun,
+  updateJobRunState,
+  appendJobRunLogs,
+  deleteJobRun,
+  
+  // Step run operations
+  createStepRun,
+  createStepRuns,
+  findStepRunById,
+  findStepRunsByJobRunId,
+  updateStepRun,
+  updateStepRunState,
+  appendStepRunLogs,
+  deleteStepRun,
+  
+  // Utility functions
+  areAllJobsComplete,
+  areAllStepsComplete,
+  determineWorkflowConclusion,
+  determineJobConclusion,
+} from './models/workflow-runs';
