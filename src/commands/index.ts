@@ -68,5 +68,8 @@ export { handleGitHub, GitHubManager, getGitHubManager } from './github';
 export { handleReflog, ReflogManager, updateReflog } from './reflog';
 export { handleGC, GarbageCollector } from './gc';
 
+// Server command
+export { handleServe } from './serve';
+
 // Command help system
 export { COMMAND_HELP, formatCommandHelp, printCommandHelp, hasHelpFlag } from './command-help';
