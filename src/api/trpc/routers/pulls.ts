@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
+import * as path from 'path';
 import { router, publicProcedure, protectedProcedure } from '../trpc';
 import {
   prModel,
@@ -9,7 +10,10 @@ import {
   repoModel,
   collaboratorModel,
   activityHelpers,
+  userModel,
 } from '../../../db/models';
+import { mergePullRequest, checkMergeability, getDefaultMergeMessage } from '../../../server/storage/merge';
+import { exists } from '../../../utils/fs';
 
 export const pullsRouter = router({
   /**
@@ -216,13 +220,74 @@ export const pullsRouter = router({
     }),
 
   /**
+   * Check if a pull request can be merged (no conflicts)
+   */
+  checkMergeability: publicProcedure
+    .input(
+      z.object({
+        prId: z.string().uuid(),
+      })
+    )
+    .query(async ({ input }) => {
+      const pr = await prModel.findById(input.prId);
+
+      if (!pr) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Pull request not found',
+        });
+      }
+
+      const repo = await repoModel.findById(pr.repoId);
+      if (!repo) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Repository not found',
+        });
+      }
+
+      // Resolve disk path
+      const reposDir = process.env.REPOS_DIR || './repos';
+      const diskPath = path.isAbsolute(repo.diskPath) 
+        ? repo.diskPath 
+        : path.join(process.cwd(), reposDir, repo.diskPath.replace(/^\/repos\//, ''));
+
+      if (!exists(diskPath)) {
+        return { 
+          canMerge: false, 
+          conflicts: [], 
+          behindBy: 0, 
+          aheadBy: 0,
+          error: 'Repository not found on disk' 
+        };
+      }
+
+      try {
+        const result = checkMergeability(diskPath, pr.sourceBranch, pr.targetBranch);
+        return result;
+      } catch (error) {
+        return { 
+          canMerge: false, 
+          conflicts: [], 
+          behindBy: 0, 
+          aheadBy: 0,
+          error: error instanceof Error ? error.message : 'Failed to check mergeability' 
+        };
+      }
+    }),
+
+  /**
    * Merge a pull request
+   * 
+   * This actually performs the Git merge operation on the bare repository,
+   * then updates the database to reflect the merged state.
    */
   merge: protectedProcedure
     .input(
       z.object({
         prId: z.string().uuid(),
-        mergeSha: z.string().min(1, 'Merge SHA is required'),
+        strategy: z.enum(['merge', 'squash', 'rebase']).default('merge'),
+        message: z.string().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -244,7 +309,14 @@ export const pullsRouter = router({
 
       // Check if user has write permission
       const repo = await repoModel.findById(pr.repoId);
-      const isOwner = repo?.ownerId === ctx.user.id;
+      if (!repo) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Repository not found',
+        });
+      }
+
+      const isOwner = repo.ownerId === ctx.user.id;
       const canWrite = isOwner || (await collaboratorModel.hasPermission(pr.repoId, ctx.user.id, 'write'));
 
       if (!canWrite) {
@@ -254,14 +326,70 @@ export const pullsRouter = router({
         });
       }
 
-      const mergedPr = await prModel.merge(input.prId, ctx.user.id, input.mergeSha);
+      // Get user info for commit author
+      const user = await userModel.findById(ctx.user.id);
+      if (!user) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'User not found',
+        });
+      }
+
+      // Resolve disk path
+      const reposDir = process.env.REPOS_DIR || './repos';
+      const diskPath = path.isAbsolute(repo.diskPath) 
+        ? repo.diskPath 
+        : path.join(process.cwd(), reposDir, repo.diskPath.replace(/^\/repos\//, ''));
+
+      if (!exists(diskPath)) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Repository not found on disk',
+        });
+      }
+
+      // Generate merge message if not provided
+      const mergeMessage = input.message || getDefaultMergeMessage(
+        pr.number,
+        pr.title,
+        pr.sourceBranch,
+        pr.targetBranch,
+        input.strategy
+      );
+
+      // Actually perform the Git merge
+      const mergeResult = await mergePullRequest(
+        diskPath,
+        pr.sourceBranch,
+        pr.targetBranch,
+        {
+          authorName: user.name || user.username,
+          authorEmail: user.email,
+          message: mergeMessage,
+          strategy: input.strategy,
+        }
+      );
+
+      if (!mergeResult.success) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: mergeResult.error || 'Merge failed',
+          cause: mergeResult.conflicts,
+        });
+      }
+
+      // Update database with merge info
+      const mergedPr = await prModel.merge(input.prId, ctx.user.id, mergeResult.mergeSha!);
 
       // Log activity
       if (mergedPr) {
         await activityHelpers.logPrMerged(ctx.user.id, pr.repoId, pr.number, pr.title);
       }
 
-      return mergedPr;
+      return {
+        ...mergedPr,
+        mergeSha: mergeResult.mergeSha,
+      };
     }),
 
   /**
