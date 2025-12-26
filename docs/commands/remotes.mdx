@@ -1,0 +1,412 @@
+---
+title: Remote Operations
+description: Working with remote repositories - clone, fetch, pull, push
+---
+
+# Remote Operations
+
+wit provides a complete set of commands for working with remote repositories, enabling collaboration and distributed workflows.
+
+## Overview
+
+| Command | Description |
+|---------|-------------|
+| `clone` | Clone a repository into a new directory |
+| `remote` | Manage remote repository connections |
+| `fetch` | Download objects and refs from a remote |
+| `pull` | Fetch and integrate changes from a remote |
+| `push` | Upload local changes to a remote |
+
+## Clone
+
+Clone a repository to create a local copy.
+
+```bash
+# Clone a repository
+wit clone <url> [directory]
+
+# Clone to a specific directory
+wit clone /path/to/repo my-project
+
+# Shallow clone (limited history)
+wit clone --depth 1 <url>
+
+# Clone a specific branch
+wit clone --branch develop <url>
+```
+
+### Clone Options
+
+| Option | Description |
+|--------|-------------|
+| `--depth <n>` | Create a shallow clone with only n commits of history |
+| `-b, --branch <name>` | Clone only the specified branch |
+| `--bare` | Create a bare repository (no working directory) |
+| `-n, --no-checkout` | Don't checkout HEAD after cloning |
+| `-o, --origin <name>` | Use `<name>` instead of 'origin' for the remote |
+| `--single-branch` | Clone only one branch |
+
+### Examples
+
+```bash
+# Clone a local repository
+wit clone ../other-project ./my-copy
+
+# Clone with shallow history for faster downloads
+wit clone --depth 10 /path/to/large-repo
+
+# Clone and checkout a specific branch
+wit clone --branch feature-x /path/to/repo
+```
+
+## Remote
+
+Manage connections to remote repositories.
+
+```bash
+# List remotes
+wit remote
+
+# List remotes with URLs
+wit remote -v
+
+# Add a new remote
+wit remote add <name> <url>
+
+# Remove a remote
+wit remote remove <name>
+
+# Rename a remote
+wit remote rename <old-name> <new-name>
+
+# Show remote details
+wit remote show <name>
+
+# Get remote URL
+wit remote get-url <name>
+
+# Change remote URL
+wit remote set-url <name> <new-url>
+```
+
+### Examples
+
+```bash
+# Add origin remote
+wit remote add origin /path/to/central-repo
+
+# Add a second remote for collaboration
+wit remote add upstream /path/to/upstream-repo
+
+# View all remotes with URLs
+wit remote -v
+# origin    /path/to/central-repo (fetch)
+# origin    /path/to/central-repo (push)
+
+# Rename a remote
+wit remote rename origin main-repo
+
+# Update remote URL
+wit remote set-url origin /new/path/to/repo
+```
+
+## Fetch
+
+Download objects and refs from a remote repository without integrating changes.
+
+```bash
+# Fetch from origin (default)
+wit fetch
+
+# Fetch from specific remote
+wit fetch <remote>
+
+# Fetch all remotes
+wit fetch --all
+
+# Fetch and prune deleted branches
+wit fetch --prune
+
+# Fetch with tags
+wit fetch --tags
+```
+
+### Fetch Options
+
+| Option | Description |
+|--------|-------------|
+| `--all` | Fetch from all configured remotes |
+| `-p, --prune` | Remove remote-tracking refs that no longer exist on the remote |
+| `-t, --tags` | Fetch all tags from the remote |
+| `--depth <n>` | Deepen a shallow clone to n commits |
+| `-v, --verbose` | Be more verbose |
+| `-n, --dry-run` | Show what would be done without making changes |
+
+### Examples
+
+```bash
+# Fetch updates from origin
+wit fetch origin
+
+# Fetch and clean up stale branches
+wit fetch --prune
+
+# Fetch from all remotes
+wit fetch --all
+
+# See what would be fetched
+wit fetch --dry-run
+```
+
+### Output
+
+```bash
+wit fetch origin
+# From origin
+#  * [new branch]      feature-x   -> origin/feature-x
+#    abc1234..def5678  main        -> origin/main
+# ✓ Fetch complete: 1 new, 1 updated
+```
+
+## Pull
+
+Fetch from a remote and integrate changes into the current branch.
+
+```bash
+# Pull from upstream (fetch + merge)
+wit pull
+
+# Pull with rebase instead of merge
+wit pull --rebase
+
+# Pull from specific remote and branch
+wit pull <remote> <branch>
+
+# Only fast-forward (fail if not possible)
+wit pull --ff-only
+```
+
+### Pull Options
+
+| Option | Description |
+|--------|-------------|
+| `-r, --rebase` | Rebase local commits on top of fetched commits |
+| `--ff-only` | Only update if fast-forward is possible |
+| `--no-ff` | Create a merge commit even for fast-forward |
+| `--autostash` | Automatically stash/unstash local changes |
+| `-v, --verbose` | Be more verbose |
+
+### Pull Strategies
+
+<Tabs>
+  <Tab title="Merge (default)">
+    ```bash
+    # Creates a merge commit if branches have diverged
+    wit pull
+    ```
+    
+    Best for: Preserving complete history of parallel development
+  </Tab>
+  <Tab title="Rebase">
+    ```bash
+    # Replays your commits on top of remote changes
+    wit pull --rebase
+    ```
+    
+    Best for: Keeping a linear, clean history
+  </Tab>
+  <Tab title="Fast-forward only">
+    ```bash
+    # Only succeeds if no local commits exist
+    wit pull --ff-only
+    ```
+    
+    Best for: Ensuring you don't accidentally create merge commits
+  </Tab>
+</Tabs>
+
+### Handling Uncommitted Changes
+
+```bash
+# Option 1: Stash before pulling
+wit stash
+wit pull
+wit stash pop
+
+# Option 2: Use autostash
+wit pull --autostash
+```
+
+### Examples
+
+```bash
+# Standard pull from origin
+wit pull
+
+# Pull with rebase to keep history linear
+wit pull --rebase
+
+# Pull specific branch
+wit pull origin feature-branch
+
+# Safe pull that won't create merge commits
+wit pull --ff-only
+```
+
+## Push
+
+Upload local commits to a remote repository.
+
+```bash
+# Push current branch to origin
+wit push
+
+# Push to specific remote
+wit push <remote>
+
+# Push specific branch
+wit push <remote> <branch>
+
+# Push and set upstream tracking
+wit push -u origin main
+
+# Force push (use with caution!)
+wit push --force
+
+# Safer force push
+wit push --force-with-lease
+
+# Push all branches
+wit push --all
+
+# Push tags
+wit push --tags
+
+# Delete remote branch
+wit push --delete origin old-branch
+```
+
+### Push Options
+
+| Option | Description |
+|--------|-------------|
+| `-u, --set-upstream` | Set upstream tracking for the branch |
+| `-f, --force` | Force push (overwrites remote history) |
+| `--force-with-lease` | Force push only if remote hasn't changed |
+| `--tags` | Push all local tags |
+| `-d, --delete` | Delete the specified remote branch |
+| `--all` | Push all branches |
+| `-n, --dry-run` | Show what would be pushed without pushing |
+| `-v, --verbose` | Be more verbose |
+
+<Warning>
+**Force Push Warning**: Using `--force` can overwrite remote history and cause problems for collaborators. Prefer `--force-with-lease` which checks that the remote hasn't changed before pushing.
+</Warning>
+
+### Examples
+
+```bash
+# First push of a new branch
+wit push -u origin feature-branch
+
+# Push after making local commits
+wit push
+
+# Push all local tags
+wit push --tags
+
+# Delete a remote branch
+wit push --delete origin old-feature
+
+# Force push after rebase (safer version)
+wit push --force-with-lease
+```
+
+### Push Rejections
+
+If your push is rejected, it usually means the remote has changes you don't have:
+
+```bash
+# Push rejected - remote has new commits
+wit push
+# ! [rejected]        main -> main (non-fast-forward)
+# error: failed to push some refs
+
+# Solution: Pull first, then push
+wit pull
+wit push
+
+# Or if you're sure, force push
+wit push --force-with-lease
+```
+
+## Complete Workflow Example
+
+```bash
+# 1. Clone a repository
+wit clone /path/to/shared-repo my-project
+cd my-project
+
+# 2. Check remotes
+wit remote -v
+# origin    /path/to/shared-repo (fetch)
+# origin    /path/to/shared-repo (push)
+
+# 3. Create a feature branch and make changes
+wit switch -c feature-x
+echo "new feature" > feature.txt
+wit add feature.txt
+wit commit -m "Add new feature"
+
+# 4. Push the new branch
+wit push -u origin feature-x
+
+# 5. Later, get updates from origin
+wit fetch origin
+
+# 6. Merge updates into your branch
+wit pull origin main
+
+# 7. Push your updated branch
+wit push
+
+# 8. After merge, clean up
+wit switch main
+wit pull
+wit branch -d feature-x
+wit push --delete origin feature-x
+```
+
+## Tracking Branches
+
+When you clone or push with `-u`, wit sets up tracking relationships:
+
+```bash
+# See tracking configuration
+wit branch -vv
+# * main      abc1234 [origin/main] Latest commit message
+#   feature   def5678 [origin/feature: ahead 2] Feature work
+
+# Set up tracking manually
+wit branch --set-upstream-to=origin/main main
+```
+
+## Tips
+
+<AccordionGroup>
+  <Accordion title="Keep fetched data fresh">
+    Run `wit fetch` regularly to stay up-to-date with remote changes without affecting your working directory.
+  </Accordion>
+  
+  <Accordion title="Use upstream tracking">
+    Set up tracking with `wit push -u` so future pushes/pulls just work with `wit push` and `wit pull`.
+  </Accordion>
+  
+  <Accordion title="Prefer --force-with-lease">
+    When you need to force push, use `--force-with-lease` to prevent accidentally overwriting someone else's work.
+  </Accordion>
+  
+  <Accordion title="Clean up stale branches">
+    Use `wit fetch --prune` to remove tracking branches for remote branches that have been deleted.
+  </Accordion>
+</AccordionGroup>

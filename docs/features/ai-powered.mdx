@@ -107,17 +107,43 @@ export MASTRA_API_KEY="your-api-key"
 
 ## AI Tools
 
-tsgit's AI system includes specialized tools:
+wit's AI system includes specialized tools that give the AI agent full capabilities:
+
+### Repository Understanding
 
 | Tool | Purpose |
 |------|---------|
-| `get-status` | Understand repository state |
-| `get-diff` | Analyze changes |
-| `get-log` | Review history |
-| `get-branches` | Navigate branches |
-| `stage-files` | Smart staging |
-| `create-commit` | Generate commits |
-| `search` | Intelligent search |
+| `get-status` | Understand repository state (staged, modified, untracked files) |
+| `get-diff` | Analyze changes between commits or working directory |
+| `get-log` | Review commit history |
+| `get-branches` | Navigate and list branches |
+| `search` | Intelligent code and commit search |
+
+### Taking Actions
+
+| Tool | Purpose |
+|------|---------|
+| `stage-files` | Stage files for commit |
+| `create-commit` | Generate and create commits |
+| `switch-branch` | Switch to a different branch |
+| `undo` | Undo recent operations |
+
+### Conflict Resolution
+
+| Tool | Purpose |
+|------|---------|
+| `get-merge-conflicts` | Retrieve structured conflict information |
+| `resolve-conflict` | Apply a resolution to a conflict |
+
+The AI agent can use these tools to perform complex multi-step operations like:
+
+```bash
+# AI can understand this request and use multiple tools
+wit ai "stage all test files and commit with a descriptive message"
+
+# Or help resolve conflicts
+wit ai "show me the conflicts and help me resolve them"
+```
 
 ## Examples
 

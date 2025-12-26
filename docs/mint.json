@@ -1,6 +1,6 @@
 {
   "$schema": "https://mintlify.com/schema.json",
-  "name": "tsgit",
+  "name": "wit",
   "logo": {
     "dark": "/logo/dark.svg",
     "light": "/logo/light.svg"
@@ -62,9 +62,14 @@
         "commands/overview",
         "commands/basic-workflow",
         "commands/branches",
+        "commands/remotes",
+        "commands/stash",
+        "commands/merge",
+        "commands/history-rewriting",
+        "commands/tags",
         "commands/undo-history",
         "commands/quality-of-life",
-        "commands/merge",
+        "commands/debugging",
         "commands/advanced"
       ]
     },
@@ -81,6 +86,7 @@
       "group": "Features",
       "pages": [
         "features/ai-powered",
+        "features/ci-cd",
         "features/monorepo-scopes",
         "features/large-files",
         "features/hooks",

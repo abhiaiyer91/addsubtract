@@ -1,0 +1,373 @@
+---
+title: Debugging
+description: Find bugs with bisect, view file history with show, and clean up with clean
+---
+
+# Debugging Commands
+
+wit provides powerful tools for debugging issues in your codebase, understanding file history, and cleaning up your working directory.
+
+## Bisect
+
+Binary search through commit history to find the commit that introduced a bug. This is incredibly efficient - even with 1000 commits, you'll find the culprit in about 10 steps.
+
+### Basic Workflow
+
+```bash
+# 1. Start bisect session
+wit bisect start
+
+# 2. Mark current commit as bad (has the bug)
+wit bisect bad
+
+# 3. Mark a known good commit (before the bug existed)
+wit bisect good v1.0.0
+
+# 4. wit checks out a commit in the middle - test it
+# ... test the code ...
+
+# 5. Mark as good or bad based on your test
+wit bisect good   # Bug not present
+# or
+wit bisect bad    # Bug is present
+
+# 6. Repeat step 4-5 until wit finds the culprit
+# ✓ Found the first bad commit!
+# abc1234 is the first bad commit
+#   John Doe: Add new feature
+
+# 7. End the session
+wit bisect reset
+```
+
+### Commands
+
+```bash
+wit bisect start           # Start bisect session
+wit bisect good [<rev>]    # Mark commit as good (no bug)
+wit bisect bad [<rev>]     # Mark commit as bad (has bug)
+wit bisect skip            # Skip current commit (can't test)
+wit bisect reset           # End session, return to original state
+wit bisect log             # Show bisect history
+wit bisect status          # Show current bisect state
+```
+
+### Example: Finding a Regression
+
+```bash
+# Start bisect
+wit bisect start
+# ✓ Bisect session started
+# Now mark commits as good or bad
+
+# We know HEAD is broken
+wit bisect bad
+# ✗ Marked as bad
+
+# We know v1.0.0 worked
+wit bisect good v1.0.0
+# ✓ Marked as good
+# Bisecting: 15 commits left to test
+# (roughly 4 steps remaining)
+# Testing: abc1234
+#   Jane Doe: Refactor API
+
+# Test the code at this commit
+npm test
+
+# It passes, so this commit is good
+wit bisect good
+# ✓ Marked as good
+# Bisecting: 7 commits left to test
+# (roughly 3 steps remaining)
+# Testing: def5678
+
+# Keep going until...
+# ✓ Found the first bad commit!
+# ghi9012 is the first bad commit
+#   Bob Smith: Update dependencies
+
+wit bisect reset
+# ✓ Bisect session ended
+# Restored to branch: main
+```
+
+### Viewing Bisect Progress
+
+```bash
+wit bisect status
+# Bisect Status:
+# Current commit: abc1234
+# Good commits: 3
+# Bad commits: 2
+# Skipped: 1
+# Steps taken: 5
+#
+# 8 commits left to test
+# (roughly 3 steps remaining)
+
+wit bisect log
+# Bisect Log:
+# 10:30:00 ● Bisect started from abc1234
+# 10:31:00 ✓ Marked abc1234 as good
+# 10:32:00 ✗ Marked def5678 as bad
+# 10:33:00 ○ Skipped ghi9012
+```
+
+### Skip Untestable Commits
+
+Sometimes a commit can't be tested (e.g., doesn't compile):
+
+```bash
+# Can't test this commit
+wit bisect skip
+# ○ Skipped current commit
+# Testing: next-commit
+```
+
+### Tips for Effective Bisecting
+
+<AccordionGroup>
+  <Accordion title="Automate with a test script">
+    Create a script that returns 0 for good, 1 for bad:
+    ```bash
+    # test-script.sh
+    npm test && exit 0 || exit 1
+    ```
+  </Accordion>
+  
+  <Accordion title="Choose good boundaries">
+    Pick a "good" commit you're confident about (e.g., a release tag) to minimize the search space.
+  </Accordion>
+  
+  <Accordion title="Skip broken commits">
+    Don't waste time on commits that won't compile - just `wit bisect skip`.
+  </Accordion>
+</AccordionGroup>
+
+## Show
+
+Display detailed information about commits, files at specific commits, and tags.
+
+### Show a Commit
+
+```bash
+# Show the last commit
+wit show
+
+# Show specific commit
+wit show abc1234
+
+# Show with stats only
+wit show --stat abc1234
+
+# Show file names only
+wit show --name-only abc1234
+```
+
+### Output
+
+```bash
+wit show abc1234
+
+# commit abc1234def5678...
+# Author: Jane Doe <jane@example.com>
+# Date:   Fri Mar 15 14:30:00 2024 -0500
+#
+#     Add user authentication
+#
+#     - Implement JWT tokens
+#     - Add login/logout endpoints
+#
+# diff --git a/src/auth.ts b/src/auth.ts
+# new file mode 100644
+# --- /dev/null
+# +++ b/src/auth.ts
+# @@ -0,0 +1,50 @@
+# +export class Auth {
+# ...
+```
+
+### Show File at Specific Commit
+
+```bash
+# Show file contents at a specific commit
+wit show abc1234:src/config.ts
+
+# Show file at HEAD
+wit show HEAD:package.json
+
+# Show file from 3 commits ago
+wit show HEAD~3:README.md
+```
+
+### Show a Tag
+
+```bash
+wit show v1.0.0
+
+# tag v1.0.0
+# Tagger: Jane Doe <jane@example.com>
+# Date:   Fri Mar 15 14:30:00 2024
+#
+#     Release version 1.0.0
+#
+# commit abc1234...
+# Author: Jane Doe <jane@example.com>
+# ...
+```
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `--stat` | Show diffstat summary instead of full diff |
+| `--name-only` | Show only changed file names |
+| `--name-status` | Show file names with status (A/M/D) |
+| `-q, --quiet` | Suppress diff output |
+
+### Examples
+
+```bash
+# See what changed in a commit (summary)
+wit show --stat HEAD
+# src/auth.ts    | 50 +++++++++++++++
+# src/routes.ts  | 12 ++--
+# 2 files changed, 55 insertions(+), 5 deletions(-)
+
+# List files changed in a commit
+wit show --name-only abc1234
+# src/auth.ts
+# src/routes.ts
+
+# See file status
+wit show --name-status abc1234
+# A    src/auth.ts
+# M    src/routes.ts
+```
+
+## Clean
+
+Remove untracked files from the working directory. This helps clean up build artifacts, temporary files, and other clutter.
+
+### Safety First
+
+Clean requires explicit flags to prevent accidental data loss:
+
+```bash
+# Preview what would be deleted (always do this first!)
+wit clean -n
+
+# Actually delete files
+wit clean -f
+
+# Delete files and directories
+wit clean -fd
+
+# Also delete ignored files (like node_modules, build/)
+wit clean -fx
+```
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `-n, --dry-run` | Preview what would be deleted |
+| `-f, --force` | Actually delete files |
+| `-d, --directories` | Also remove untracked directories |
+| `-x, --ignored` | Also remove ignored files |
+| `-e, --exclude <pattern>` | Exclude files matching pattern |
+
+### Examples
+
+```bash
+# See what would be cleaned
+wit clean -n
+# Would remove:
+#   × temp.txt
+#   × debug.log
+#   × src/test.tmp
+#
+# 3 file(s)
+# Use -f to actually delete these files
+
+# Remove untracked files
+wit clean -f
+# ✓ Removed temp.txt
+# ✓ Removed debug.log
+# ✓ Removed src/test.tmp
+# ✓ Removed 3 file(s)
+
+# Remove files and directories
+wit clean -fd
+# ✓ Removed temp.txt
+# ✓ Removed build/
+# ✓ Removed 1 file(s), 1 directory(ies)
+
+# Nuclear option: remove everything including ignored files
+wit clean -fdx
+# This will remove node_modules, build artifacts, etc.
+# Use with caution!
+
+# Clean, but exclude certain files
+wit clean -f -e "*.log" -e "config.local.json"
+```
+
+### What Gets Cleaned
+
+| Flag | Untracked Files | Untracked Dirs | Ignored Files |
+|------|-----------------|----------------|---------------|
+| `-f` | Removed | Kept | Kept |
+| `-fd` | Removed | Removed | Kept |
+| `-fx` | Removed | Kept | Removed |
+| `-fdx` | Removed | Removed | Removed |
+
+<Warning>
+`wit clean -fdx` will remove **everything** not tracked by wit, including `node_modules`, build outputs, and local config files. Always run with `-n` first!
+</Warning>
+
+### Common Use Cases
+
+```bash
+# Clean up after a failed build
+wit clean -fd
+
+# Start completely fresh (like a new clone)
+wit clean -fdx
+npm install
+
+# Clean up temp files but keep build artifacts
+wit clean -f -e "build/*" -e "dist/*"
+```
+
+## Combining for Effective Debugging
+
+### Debug Workflow Example
+
+```bash
+# 1. Clean up the workspace
+wit clean -n          # Preview
+wit clean -f          # Clean
+
+# 2. Find when bug was introduced
+wit bisect start
+wit bisect bad HEAD
+wit bisect good v1.0.0
+
+# ... test and mark commits ...
+
+wit bisect reset
+
+# 3. Examine the bad commit
+wit show <bad-commit>
+wit show <bad-commit>:path/to/file.ts
+
+# 4. Check what the file looked like before
+wit show <bad-commit>~1:path/to/file.ts
+```
+
+## Related Commands
+
+- [`wit blame`](/commands/quality-of-life#blame) - See who changed each line
+- [`wit log`](/commands/basic-workflow#log) - View commit history
+- [`wit diff`](/commands/basic-workflow#diff) - Compare changes
