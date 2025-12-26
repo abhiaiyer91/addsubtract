@@ -1,882 +1,40 @@
 # wit Platform - Agent Prompts
 
-Self-contained prompts for coding agents to implement features from the roadmap. Each prompt includes all necessary context, file locations, and acceptance criteria.
+## Context
+
+This project is led by Claude (an AI) as technical founder. These prompts reflect the focused vision: **Git that understands your code.**
+
+We're NOT building:
+- CI/CD runner (use external CI)
+- Full GitHub parity features
+- Enterprise features (yet)
+
+We ARE building:
+- AI that's woven into the workflow
+- A CLI developers actually prefer
+- The missing pieces to make it shippable
 
 ---
 
-## Table of Contents
+## Phase 1: Make It Real (Current Priority)
 
-- [Quick Wins (< 4 hours)](#quick-wins)
-- [Stream 9: Platform Critical Features (P0)](#stream-9-platform-critical-features)
-- [Stream 10: Platform Parity Features (P1)](#stream-10-platform-parity-features)
-- [Stream 11: Diff Enhancements (P2)](#stream-11-diff-enhancements)
-- [Stream 12: Enterprise & Scale (P2)](#stream-12-enterprise--scale)
+### P1-1: PR Merge Execution
 
----
-
-## What's Already Implemented
-
-Before working on new features, note that these are **already complete**:
-
-### AI Tools (15 tools in `src/ai/tools/`)
-- `create-commit.ts` - AI commit messages
-- `generate-pr-description.ts` - AI PR descriptions
-- `review-pr.ts` - AI code review
-- `semantic-search.ts` - Natural language code search
-- `resolve-conflict.ts` - Conflict resolution
-- `get-branches.ts`, `get-diff.ts`, `get-log.ts`, `get-status.ts`
-- `get-merge-conflicts.ts`, `stage-files.ts`, `switch-branch.ts`
-- `search.ts`, `undo.ts`
-
-### Test Coverage (29 test files in `src/__tests__/`)
-- `repository.test.ts` - Core Repository class
-- `merge.test.ts` - Merge functionality
-- `semantic-search.test.ts` - Embeddings, chunking, vector store
-- `hooks.test.ts`, `packed-refs.test.ts`, `rebase.test.ts`
-- And 23 more test files
-
-### Core Features
-- Branch state manager (`src/core/branch-state.ts`)
-- Git hooks system (`src/core/hooks.ts`)
-- Large file support (`src/core/large-file.ts`)
-- Git primitives: filesystem & knowledge (`src/primitives/`)
-- Semantic search with embeddings (`src/search/`)
-
-### CI/CD Pipeline (`.github/workflows/ci.yml`)
-- Lint (`npm run lint`)
-- Type check (`npm run typecheck`)
-- Build
-- Tests with coverage
-- PostgreSQL service for integration tests
-
----
-
-## Quick Wins
-
-### QW-1: Implement Fork Creation Logic
-
-**Effort:** 4 hours
-**Priority:** P1
-
-**Prompt:**
-
-```
-Implement fork creation logic for repositories.
-
-CONTEXT:
-
-- Database schema for repositories exists in `src/db/schema.ts`
-- Repositories have a `forkedFromId` field already
-- Repository model at `src/db/models/repos.ts`
-- Need to copy repository and set fork relationship
-
-TASK:
-
-1. Add fork method to `src/db/models/repos.ts`:
-
-```typescript
-export async function forkRepository(
-  sourceRepoId: string,
-  targetUserId: string,
-  options?: { name?: string; description?: string }
-): Promise<Repository> {
-  // Get source repo
-  const source = await findById(sourceRepoId);
-  if (!source) throw new Error('Repository not found');
-
-  // Create fork in database
-  const fork = await db.insert(repositories).values({
-    name: options?.name ?? source.name,
-    description: options?.description ?? source.description,
-    ownerId: targetUserId,
-    forkedFromId: sourceRepoId,
-    visibility: source.visibility,
-    defaultBranch: source.defaultBranch,
-  }).returning();
-
-  // Copy git objects
-  await copyGitObjects(source.diskPath, fork[0].diskPath);
-
-  return fork[0];
-}
-
-async function copyGitObjects(sourcePath: string, targetPath: string): Promise<void> {
-  // Initialize empty repo at target
-  // Copy objects from source
-  // Copy refs from source
-  // Set up remote pointing to source
-}
-```
-
-2. Add tRPC endpoint in `src/api/trpc/routers/repos.ts`:
-
-```typescript
-fork: protectedProcedure
-  .input(z.object({
-    repoId: z.string().uuid(),
-    name: z.string().optional(),
-    description: z.string().optional(),
-  }))
-  .mutation(async ({ input, ctx }) => {
-    // Check if user can fork (repo is public or user has access)
-    // Check if user doesn't already have a fork
-    // Create fork
-    return repoModel.forkRepository(input.repoId, ctx.user.id, {
-      name: input.name,
-      description: input.description,
-    });
-  }),
-```
-
-3. Add CLI command option in `src/commands/clone.ts`:
-
-```typescript
-// Add --fork flag to clone command
-// wit clone --fork owner/repo
-```
-
-ACCEPTANCE CRITERIA:
-
-- [ ] Fork creates new repository linked to source
-- [ ] Git objects are copied correctly
-- [ ] All branches and tags are copied
-- [ ] Fork shows in user's repository list
-- [ ] Source shows fork count
-- [ ] Cannot fork same repo twice
-- [ ] Works for public repos and repos user has access to
-```
-
----
-
-### QW-2: Add Release Schema and CRUD
-
-**Effort:** 4 hours
-**Priority:** P2
-
-**Prompt:**
-
-```
-Implement releases feature (tag-based releases with assets).
-
-CONTEXT:
-
-- Tags already implemented in git operations
-- Need database schema to track releases with metadata
-- Similar to GitHub releases
-
-TASK:
-
-1. Add schema to `src/db/schema.ts`:
-
-```typescript
-export const releases = pgTable('releases', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  repoId: uuid('repo_id').notNull().references(() => repositories.id, { onDelete: 'cascade' }),
-  tagName: text('tag_name').notNull(),
-  name: text('name').notNull(),
-  body: text('body'), // Markdown release notes
-  isDraft: boolean('is_draft').notNull().default(false),
-  isPrerelease: boolean('is_prerelease').notNull().default(false),
-  authorId: uuid('author_id').notNull().references(() => users.id),
-  publishedAt: timestamp('published_at'),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-});
-
-export const releaseAssets = pgTable('release_assets', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  releaseId: uuid('release_id').notNull().references(() => releases.id, { onDelete: 'cascade' }),
-  name: text('name').notNull(),
-  contentType: text('content_type').notNull(),
-  size: integer('size').notNull(),
-  downloadUrl: text('download_url').notNull(),
-  downloadCount: integer('download_count').notNull().default(0),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-});
-```
-
-2. Create model `src/db/models/releases.ts`:
-
-```typescript
-export async function create(data: CreateRelease): Promise<Release>;
-export async function findById(id: string): Promise<Release | null>;
-export async function findByRepoId(repoId: string): Promise<Release[]>;
-export async function findByTag(repoId: string, tagName: string): Promise<Release | null>;
-export async function update(id: string, data: UpdateRelease): Promise<Release>;
-export async function deleteRelease(id: string): Promise<void>;
-export async function publish(id: string): Promise<Release>;
-export async function addAsset(releaseId: string, asset: CreateAsset): Promise<ReleaseAsset>;
-export async function deleteAsset(assetId: string): Promise<void>;
-```
-
-3. Create tRPC router `src/api/trpc/routers/releases.ts`:
-
-```typescript
-export const releasesRouter = router({
-  list: publicProcedure
-    .input(z.object({ repoId: z.string().uuid() }))
-    .query(async ({ input }) => {
-      return releaseModel.findByRepoId(input.repoId);
-    }),
-
-  create: protectedProcedure
-    .input(z.object({
-      repoId: z.string().uuid(),
-      tagName: z.string(),
-      name: z.string(),
-      body: z.string().optional(),
-      isDraft: z.boolean().default(false),
-      isPrerelease: z.boolean().default(false),
-    }))
-    .mutation(async ({ input, ctx }) => {
-      // Verify tag exists
-      // Create release
-    }),
-
-  publish: protectedProcedure
-    .input(z.object({ id: z.string().uuid() }))
-    .mutation(async ({ input, ctx }) => {
-      return releaseModel.publish(input.id);
-    }),
-
-  delete: protectedProcedure
-    .input(z.object({ id: z.string().uuid() }))
-    .mutation(async ({ input, ctx }) => {
-      return releaseModel.deleteRelease(input.id);
-    }),
-});
-```
-
-4. Add router to main router in `src/api/trpc/routers/index.ts`
-
-ACCEPTANCE CRITERIA:
-
-- [ ] Releases linked to git tags
-- [ ] Support draft and pre-release states
-- [ ] Markdown release notes
-- [ ] Asset upload support
-- [ ] Download counting
-- [ ] List releases by repo
-- [ ] Get latest release
-```
-
----
-
-## Stream 9: Platform Critical Features
-
-### S9-1: CI/CD Engine - Workflow Parser
-
-**Effort:** 8-10 hours
-**Priority:** P0
-
-**Prompt:**
-
-```
-Implement workflow YAML parser for CI/CD engine.
-
-CONTEXT:
-
-- Building GitHub Actions alternative
-- Workflows will be in `.wit/workflows/*.yml`
-- Need to support jobs, steps, env vars, secrets, conditions
-
-TASK:
-
-1. Create `src/ci/index.ts` - CI engine entry point
-2. Create `src/ci/types.ts` with workflow types:
-
-```typescript
-interface Workflow {
-  name: string;
-  on: WorkflowTrigger;
-  env?: Record<string, string>;
-  jobs: Record<string, Job>;
-}
-
-interface WorkflowTrigger {
-  push?: { branches?: string[]; tags?: string[]; paths?: string[] };
-  pull_request?: { branches?: string[]; types?: string[] };
-  workflow_dispatch?: { inputs?: Record<string, InputDef> };
-  schedule?: { cron: string }[];
-}
-
-interface Job {
-  name?: string;
-  'runs-on': string;
-  needs?: string[];
-  if?: string;
-  env?: Record<string, string>;
-  steps: Step[];
-  services?: Record<string, Service>;
-  container?: Container;
-  outputs?: Record<string, string>;
-}
-
-interface Step {
-  name?: string;
-  id?: string;
-  uses?: string;  // Action reference
-  run?: string;   // Shell command
-  with?: Record<string, string>;
-  env?: Record<string, string>;
-  if?: string;
-  'working-directory'?: string;
-  shell?: string;
-  'continue-on-error'?: boolean;
-  'timeout-minutes'?: number;
-}
-```
-
-3. Create `src/ci/parser.ts`:
-
-```typescript
-import YAML from 'yaml';
-
-export function parseWorkflow(content: string): Workflow {
-  const raw = YAML.parse(content);
-  return validateWorkflow(raw);
-}
-
-export function validateWorkflow(raw: unknown): Workflow {
-  // Validate required fields
-  // Validate job dependencies (no cycles)
-  // Validate step references
-  // Return typed Workflow or throw errors
-}
-
-export function loadWorkflows(repoPath: string): Workflow[] {
-  const workflowDir = path.join(repoPath, '.wit', 'workflows');
-  // Read all .yml/.yaml files
-  // Parse and validate each
-  // Return array of workflows
-}
-```
-
-4. Create validation for:
-   - Required fields (name, on, jobs)
-   - Job dependency cycles
-   - Valid trigger events
-   - Expression syntax (${{ ... }})
-
-5. Add tests in `src/ci/__tests__/parser.test.ts`
-
-ACCEPTANCE CRITERIA:
-
-- [ ] Parses valid YAML workflows
-- [ ] Returns typed Workflow object
-- [ ] Validates required fields
-- [ ] Detects circular job dependencies
-- [ ] Handles all trigger types
-- [ ] Clear error messages for invalid workflows
-- [ ] Tests cover valid and invalid cases
-```
-
----
-
-### S9-2: CI/CD Engine - Job Scheduler
-
-**Effort:** 10-12 hours
-**Priority:** P0
-**Dependencies:** S9-1
-
-**Prompt:**
-
-```
-Implement job scheduler and queue for CI/CD engine.
-
-CONTEXT:
-
-- Workflows parsed by parser.ts (from S9-1)
-- Need to schedule jobs respecting dependencies
-- Need to track job status and output
-
-TASK:
-
-1. Add DB schema for workflow runs in `src/db/schema.ts`:
-
-```typescript
-export const workflowRunStateEnum = pgEnum('workflow_run_state', [
-  'queued', 'in_progress', 'completed', 'failed', 'cancelled'
-]);
-
-export const workflowRuns = pgTable('workflow_runs', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  repoId: uuid('repo_id').notNull().references(() => repositories.id),
-  workflowPath: text('workflow_path').notNull(),
-  commitSha: text('commit_sha').notNull(),
-  event: text('event').notNull(),  // 'push', 'pull_request', etc.
-  eventPayload: text('event_payload'),  // JSON
-  state: workflowRunStateEnum('state').notNull().default('queued'),
-  conclusion: text('conclusion'),  // 'success', 'failure', 'cancelled'
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  startedAt: timestamp('started_at'),
-  completedAt: timestamp('completed_at'),
-});
-
-export const jobRuns = pgTable('job_runs', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  workflowRunId: uuid('workflow_run_id').notNull().references(() => workflowRuns.id),
-  jobName: text('job_name').notNull(),
-  state: workflowRunStateEnum('state').notNull().default('queued'),
-  conclusion: text('conclusion'),
-  startedAt: timestamp('started_at'),
-  completedAt: timestamp('completed_at'),
-  logs: text('logs'),
-  outputs: text('outputs'),  // JSON
-});
-```
-
-2. Create `src/ci/scheduler.ts`:
-
-```typescript
-export class JobScheduler {
-  private queue: JobRun[] = [];
-  private running: Map<string, JobRun> = new Map();
-  private maxConcurrent: number = 4;
-
-  async enqueue(workflowRun: WorkflowRun): Promise<void> {
-    // Create JobRun entries for each job in workflow
-    // Respect 'needs' dependencies
-    // Add to queue
-  }
-
-  async processQueue(): Promise<void> {
-    // Find jobs ready to run (dependencies met)
-    // Respect maxConcurrent limit
-    // Execute jobs
-  }
-
-  async executeJob(jobRun: JobRun): Promise<void> {
-    // Will call runner.ts (next prompt)
-    // Update state as it progresses
-    // Store logs and outputs
-  }
-
-  canJobRun(job: Job, completedJobs: Set<string>): boolean {
-    // Check if all 'needs' are in completedJobs
-  }
-
-  async cancelRun(workflowRunId: string): Promise<void> {
-    // Cancel queued jobs
-    // Signal running jobs to stop
-  }
-}
-```
-
-3. Create `src/ci/events.ts` for triggering workflows:
-
-```typescript
-export async function handlePush(repoId: string, payload: PushPayload): Promise<void> {
-  // Find matching workflows (on.push triggers)
-  // Queue workflow runs
-}
-
-export async function handlePullRequest(repoId: string, payload: PRPayload): Promise<void> {
-  // Find matching workflows
-  // Queue workflow runs
-}
-
-export function matchesTrigger(workflow: Workflow, event: string, payload: any): boolean {
-  // Check if workflow should run for this event
-  // Match branches, paths, types
-}
-```
-
-ACCEPTANCE CRITERIA:
-
-- [ ] Jobs queue in correct order
-- [ ] Dependencies respected
-- [ ] Concurrent execution with limit
-- [ ] Job status tracked in DB
-- [ ] Logs stored per job
-- [ ] Cancel support
-- [ ] Push/PR events trigger workflows
-```
-
----
-
-### S9-3: CI/CD Engine - Job Runner
-
-**Effort:** 12-16 hours
-**Priority:** P0
-**Dependencies:** S9-2
-
-**Prompt:**
-
-```
-Implement job runner with Docker container execution.
-
-CONTEXT:
-
-- Jobs scheduled by scheduler.ts
-- Need to run steps in isolated containers
-- Support for 'uses' actions and 'run' commands
-
-TASK:
-
-1. Create `src/ci/runner.ts`:
-
-```typescript
-export class JobRunner {
-  async run(job: Job, context: RunContext): Promise<JobResult> {
-    // Prepare container
-    // Run each step
-    // Collect outputs
-    // Cleanup
-  }
-
-  private async runStep(step: Step, container: Container): Promise<StepResult> {
-    if (step.run) {
-      return this.runCommand(step.run, container, step);
-    } else if (step.uses) {
-      return this.runAction(step.uses, container, step);
-    }
-  }
-
-  private async runCommand(cmd: string, container: Container, step: Step): Promise<StepResult> {
-    // Execute shell command in container
-    // Capture stdout/stderr
-    // Return exit code
-  }
-
-  private async runAction(uses: string, container: Container, step: Step): Promise<StepResult> {
-    // Parse action reference (owner/repo@version or ./local)
-    // Download/cache action
-    // Execute action
-  }
-}
-```
-
-2. Create `src/ci/docker.ts`:
-
-```typescript
-import Docker from 'dockerode';
-
-export class ContainerManager {
-  private docker: Docker;
-
-  async createContainer(image: string, options: ContainerOptions): Promise<Container> {
-    // Pull image if needed
-    // Create container with mounts, env, network
-  }
-
-  async exec(container: Container, command: string[]): Promise<ExecResult> {
-    // Execute command in container
-    // Stream logs
-    // Return exit code
-  }
-
-  async cleanup(container: Container): Promise<void> {
-    // Stop container
-    // Remove container
-    // Cleanup volumes
-  }
-}
-```
-
-3. Create `src/ci/artifacts.ts`:
-
-```typescript
-export class ArtifactStore {
-  async upload(runId: string, name: string, paths: string[]): Promise<void> {
-    // Compress files
-    // Store in S3 or local storage
-    // Record in database
-  }
-
-  async download(runId: string, name: string, dest: string): Promise<void> {
-    // Download artifact
-    // Extract to destination
-  }
-
-  async list(runId: string): Promise<Artifact[]> {
-    // List all artifacts for run
-  }
-}
-```
-
-4. Implement context and expression evaluation:
-
-```typescript
-interface RunContext {
-  github: {  // (we'll call it 'wit' but keep compatible structure)
-    event: string;
-    sha: string;
-    ref: string;
-    repository: string;
-    actor: string;
-  };
-  env: Record<string, string>;
-  secrets: Record<string, string>;
-  needs: Record<string, JobOutput>;
-  steps: Record<string, StepOutput>;
-}
-
-function evaluateExpression(expr: string, context: RunContext): string {
-  // Parse ${{ ... }} expressions
-  // Support: env.*, secrets.*, needs.*.outputs.*, steps.*.outputs.*
-  // Support: contains(), startsWith(), format(), etc.
-}
-```
-
-ACCEPTANCE CRITERIA:
-
-- [ ] Steps run in Docker containers
-- [ ] Commands execute with correct shell
-- [ ] Actions downloaded and executed
-- [ ] Environment variables set correctly
-- [ ] Secrets masked in logs
-- [ ] Artifacts uploaded/downloadable
-- [ ] Expression evaluation works
-- [ ] Cleanup on success/failure
-```
-
----
-
-### S9-4: Branch Protection Rules
-
-**Effort:** 8-10 hours
-**Priority:** P0
-
-**Prompt:**
-
-```
-Implement branch protection rules system.
-
-CONTEXT:
-
-- Need to protect important branches (main, release/*)
-- Block direct pushes, require reviews, require CI
-- Server-side enforcement on push
-
-TASK:
-
-1. Add schema in `src/db/schema.ts`:
-
-```typescript
-export const branchProtectionRules = pgTable('branch_protection_rules', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  repoId: uuid('repo_id').notNull().references(() => repositories.id, { onDelete: 'cascade' }),
-  pattern: text('pattern').notNull(),  // 'main', 'release/*', etc.
-
-  // Checks
-  requirePullRequest: boolean('require_pull_request').notNull().default(false),
-  requiredApprovals: integer('required_approvals').notNull().default(0),
-  dismissStaleReviews: boolean('dismiss_stale_reviews').notNull().default(false),
-  requireCodeOwnerReview: boolean('require_code_owner_review').notNull().default(false),
-
-  // Status checks
-  requireStatusChecks: boolean('require_status_checks').notNull().default(false),
-  requiredStatusChecks: text('required_status_checks'),  // JSON array
-  requireBranchUpToDate: boolean('require_branch_up_to_date').notNull().default(false),
-
-  // Push restrictions
-  allowForcePush: boolean('allow_force_push').notNull().default(false),
-  allowDeletions: boolean('allow_deletions').notNull().default(false),
-  restrictPushAccess: boolean('restrict_push_access').notNull().default(false),
-  allowedPushers: text('allowed_pushers'),  // JSON array of user/team IDs
-
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
-```
-
-2. Create `src/core/branch-protection.ts`:
-
-```typescript
-export class BranchProtectionEngine {
-  async getRulesForBranch(repoId: string, branchName: string): Promise<BranchProtectionRule[]> {
-    // Find all rules matching branch
-    // Support glob patterns
-  }
-
-  async canPush(repoId: string, branchName: string, userId: string): Promise<ProtectionResult> {
-    const rules = await this.getRulesForBranch(repoId, branchName);
-    // Check if push is allowed
-    // Return { allowed, violations[] }
-  }
-
-  async canMerge(prId: string): Promise<ProtectionResult> {
-    // Get PR and target branch rules
-    // Check required approvals
-    // Check required status checks
-    // Check branch up-to-date
-    // Return { allowed, violations[] }
-  }
-
-  async canForcePush(repoId: string, branchName: string, userId: string): Promise<boolean> {
-    // Check if force push allowed
-  }
-
-  async canDeleteBranch(repoId: string, branchName: string, userId: string): Promise<boolean> {
-    // Check if deletion allowed
-  }
-}
-```
-
-3. Create model and API endpoints:
-   - `src/db/models/branch-rules.ts`
-   - `src/api/trpc/routers/branches.ts`
-
-4. Integrate with git-receive-pack in `src/server/`:
-   - Check protection rules before accepting push
-   - Return detailed error on violation
-
-5. Integrate with PR merge:
-   - Check canMerge() before allowing merge
-   - Show required checks in UI
-
-ACCEPTANCE CRITERIA:
-
-- [ ] Protection rules stored in DB
-- [ ] Pattern matching works (main, release/*, **/protected)
-- [ ] Push blocked on protected branches
-- [ ] Required reviews enforced
-- [ ] Required status checks enforced
-- [ ] Force push blocked by default
-- [ ] Branch deletion blocked
-- [ ] Clear error messages on violations
-```
-
----
-
-### S9-5: Notifications System
-
-**Effort:** 10-12 hours
-**Priority:** P0
-
-**Prompt:**
-
-```
-Implement notifications system for platform events.
-
-CONTEXT:
-
-- Users need to be notified of relevant events
-- Support in-app and email notifications
-- Real-time via WebSocket
-
-TASK:
-
-1. Add schema in `src/db/schema.ts`:
-
-```typescript
-export const notificationTypeEnum = pgEnum('notification_type', [
-  'pr_opened', 'pr_merged', 'pr_closed', 'pr_review_requested', 'pr_reviewed', 'pr_comment',
-  'issue_opened', 'issue_closed', 'issue_assigned', 'issue_comment',
-  'mention', 'ci_failed', 'ci_passed'
-]);
-
-export const notifications = pgTable('notifications', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
-  type: notificationTypeEnum('type').notNull(),
-  title: text('title').notNull(),
-  body: text('body'),
-  url: text('url'),  // Link to relevant page
-  repoId: uuid('repo_id').references(() => repositories.id),
-  actorId: uuid('actor_id').references(() => users.id),  // Who triggered
-  isRead: boolean('is_read').notNull().default(false),
-  emailSent: boolean('email_sent').notNull().default(false),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-});
-
-export const notificationPreferences = pgTable('notification_preferences', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
-  type: notificationTypeEnum('type').notNull(),
-  inApp: boolean('in_app').notNull().default(true),
-  email: boolean('email').notNull().default(true),
-});
-```
-
-2. Create `src/notifications/index.ts`:
-
-```typescript
-export class NotificationService {
-  async notify(userId: string, notification: CreateNotification): Promise<void> {
-    // Check user preferences
-    // Create in-app notification
-    // Send email if enabled
-    // Push via WebSocket
-  }
-
-  async notifyMany(userIds: string[], notification: CreateNotification): Promise<void> {
-    // Batch notify multiple users
-  }
-
-  async markRead(userId: string, notificationId: string): Promise<void> {
-    // Mark single notification as read
-  }
-
-  async markAllRead(userId: string): Promise<void> {
-    // Mark all as read
-  }
-}
-```
-
-3. Create `src/notifications/events.ts`:
-
-```typescript
-// Event handlers that create notifications
-export async function onPROpened(pr: PullRequest): Promise<void> {
-  // Notify repo watchers
-  // Notify requested reviewers
-}
-
-export async function onPRComment(comment: PRComment): Promise<void> {
-  // Notify PR author
-  // Notify mentioned users
-  // Notify thread participants
-}
-
-export async function onMention(userId: string, context: MentionContext): Promise<void> {
-  // Notify mentioned user
-}
-
-export function extractMentions(text: string): string[] {
-  // Parse @username mentions from text
-}
-```
-
-4. Create `src/notifications/email.ts` and `src/notifications/websocket.ts`
-
-5. Create tRPC router `src/api/trpc/routers/notifications.ts`:
-   - list: Get user notifications (paginated)
-   - markRead: Mark notification as read
-   - markAllRead: Mark all as read
-   - preferences: Get/set notification preferences
-   - unreadCount: Get count of unread
-
-ACCEPTANCE CRITERIA:
-
-- [ ] Notifications created for all event types
-- [ ] In-app notifications visible to users
-- [ ] Email notifications sent (when enabled)
-- [ ] WebSocket push for real-time
-- [ ] User preferences respected
-- [ ] @mentions detected and notified
-- [ ] Unread count accurate
-- [ ] Mark read works
-```
-
----
-
-### S9-6: PR Merge Execution
-
+**Priority:** SHIP BLOCKER  
 **Effort:** 6-8 hours
-**Priority:** P0
+
+**The Problem:** PRs don't actually merge. The database updates but the Git refs don't. This is embarrassing.
 
 **Prompt:**
 
 ```
-Implement actual git merge execution when merging PRs.
+Fix PR merge to actually perform the Git merge.
 
 CONTEXT:
-
-- Current PR merge only updates database state
-- Need to perform actual git merge on server
-- Support merge, squash, and rebase strategies
-- Located in `src/api/trpc/routers/pulls.ts` and `src/server/storage/repos.ts`
+- PR router at `src/api/trpc/routers/pulls.ts`
+- Repository class at `src/core/repository.ts`
+- Merge logic exists at `src/core/merge.ts`
+- Current merge just updates DB, doesn't touch Git
 
 TASK:
 
@@ -885,14 +43,14 @@ TASK:
 ```typescript
 import { Repository } from '../../core/repository';
 
+export type MergeStrategy = 'merge' | 'squash' | 'rebase';
+
 export interface MergeResult {
   success: boolean;
   mergeSha?: string;
   error?: string;
   conflicts?: string[];
 }
-
-export type MergeStrategy = 'merge' | 'squash' | 'rebase';
 
 export async function mergePullRequest(
   repoPath: string,
@@ -906,587 +64,488 @@ export async function mergePullRequest(
   }
 ): Promise<MergeResult> {
   const repo = new Repository(repoPath);
-
-  // Checkout target branch
-  repo.checkout(targetBranch);
-
-  switch (strategy) {
-    case 'merge':
-      return performMerge(repo, sourceBranch, options);
-    case 'squash':
-      return performSquash(repo, sourceBranch, options);
-    case 'rebase':
-      return performRebase(repo, sourceBranch, options);
-  }
+  
+  // 1. Checkout target branch
+  // 2. Perform merge based on strategy
+  // 3. Return result with merge SHA or conflicts
 }
 ```
 
-2. Update `src/api/trpc/routers/pulls.ts`:
+2. Update the `merge` mutation in `src/api/trpc/routers/pulls.ts`:
+   - Call `mergePullRequest` with the repo disk path
+   - Handle conflicts gracefully
+   - Update PR record with merge SHA
 
-```typescript
-merge: protectedProcedure
-  .input(z.object({
-    prId: z.string().uuid(),
-    strategy: z.enum(['merge', 'squash', 'rebase']).default('merge'),
-    message: z.string().optional(),
-  }))
-  .mutation(async ({ input, ctx }) => {
-    const pr = await prModel.findById(input.prId);
-    // ... permission checks ...
-
-    // Check protection rules
-    const protection = new BranchProtectionEngine();
-    const canMerge = await protection.canMerge(input.prId);
-    if (!canMerge.allowed) {
-      throw new TRPCError({
-        code: 'FORBIDDEN',
-        message: `Cannot merge: ${canMerge.violations.join(', ')}`,
-      });
-    }
-
-    // Perform actual merge
-    const repo = await repoModel.findById(pr.repoId);
-    const result = await mergePullRequest(
-      repo.diskPath,
-      pr.sourceBranch,
-      pr.targetBranch,
-      input.strategy,
-      {
-        authorName: ctx.user.name,
-        authorEmail: ctx.user.email,
-        message: input.message,
-      }
-    );
-
-    if (!result.success) {
-      throw new TRPCError({
-        code: 'CONFLICT',
-        message: result.error || 'Merge failed',
-      });
-    }
-
-    // Update PR in database
-    return prModel.merge(input.prId, ctx.user.id, result.mergeSha!);
-  }),
-```
-
-3. Add conflict detection:
-
-```typescript
-checkMergeability: protectedProcedure
-  .input(z.object({ prId: z.string().uuid() }))
-  .query(async ({ input }) => {
-    // Check if PR can be merged without conflicts
-    // Return { mergeable: boolean, conflicts?: string[] }
-  }),
-```
+3. Add `checkMergeability` query:
+   - Dry-run merge to detect conflicts
+   - Return mergeable status
 
 ACCEPTANCE CRITERIA:
-
-- [ ] Merge commit created in repo
-- [ ] Squash merge works (single commit)
-- [ ] Rebase merge works
-- [ ] Conflicts detected before merge
-- [ ] Protection rules enforced
-- [ ] Branch updated after merge
+- [ ] `git log` shows merge commit after PR merge
+- [ ] Squash merge creates single commit
+- [ ] Conflicts detected and reported
 - [ ] Source branch optionally deleted after merge
+- [ ] Works via API and (if exists) web UI
+
+TEST:
+Create two branches with changes, open PR, merge, verify Git history.
 ```
 
 ---
 
-## Stream 10: Platform Parity Features
+### P1-2: Basic Branch Protection
 
-### S10-1: Full-Text Code Search (Meilisearch)
+**Priority:** P0  
+**Effort:** 4 hours
 
-**Effort:** 12-16 hours
-**Priority:** P1
+**The Problem:** Anyone can push to main. We need minimal protection.
 
 **Prompt:**
 
 ```
-Implement full-text code search using Meilisearch.
+Implement minimal branch protection: require PR to push to protected branches.
 
 CONTEXT:
-
-- Semantic search already exists in `src/search/` (embedding-based)
-- Need traditional full-text search for exact matches, regex
-- Use Meilisearch for performance
-
-NOTE: This is DIFFERENT from the existing semantic search. Semantic search
-uses embeddings for natural language queries. This is for traditional
-text search with regex, exact match, etc.
+- Keep it simple. We don't need GitHub's 20 options.
+- Just: "these branches require a PR to receive changes"
 
 TASK:
 
-1. Add Meilisearch to docker-compose.yml:
-
-```yaml
-services:
-  meilisearch:
-    image: getmeili/meilisearch:latest
-    ports:
-      - "7700:7700"
-    environment:
-      - MEILI_MASTER_KEY=${MEILI_MASTER_KEY}
-    volumes:
-      - meili_data:/meili_data
-```
-
-2. Create `src/search/fulltext/index.ts`:
+1. Add to `src/db/schema.ts`:
 
 ```typescript
-import { MeiliSearch } from 'meilisearch';
-
-export interface FullTextSearchResult {
-  repoId: string;
-  repoName: string;
-  path: string;
-  line: number;
-  content: string;
-  highlights: { start: number; end: number }[];
-}
-
-export interface SearchOptions {
-  query: string;
-  repos?: string[];  // Limit to specific repos
-  path?: string;     // Filter by path pattern
-  language?: string; // Filter by language
-  limit?: number;
-  offset?: number;
-}
-```
-
-3. Create `src/search/fulltext/indexer.ts`:
-
-```typescript
-export class FullTextIndexer {
-  async indexRepository(repoId: string): Promise<void> {
-    // Get all files from repo
-    // Extract content from text files
-    // Index with repo, path, content, language
-  }
-
-  async indexCommit(repoId: string, commitSha: string): Promise<void> {
-    // Index only changed files
-    // Remove deleted files from index
-  }
-
-  async removeRepository(repoId: string): Promise<void> {
-    // Remove all indexed content for repo
-  }
-}
-```
-
-4. Create `src/search/fulltext/service.ts`:
-
-```typescript
-export class FullTextSearchService {
-  async search(userId: string, options: SearchOptions): Promise<FullTextSearchResult[]> {
-    // Check repo access permissions
-    // Search indexed content
-    // Highlight matches
-    // Return results
-  }
-}
-```
-
-5. Add tRPC endpoint in `src/api/trpc/routers/search.ts`:
-
-```typescript
-export const searchRouter = router({
-  fulltext: protectedProcedure
-    .input(z.object({
-      query: z.string().min(1),
-      repos: z.array(z.string().uuid()).optional(),
-      path: z.string().optional(),
-      language: z.string().optional(),
-      limit: z.number().min(1).max(100).default(20),
-      offset: z.number().min(0).default(0),
-    }))
-    .query(async ({ input, ctx }) => {
-      // Filter to repos user can access
-      // Perform search
-      // Return results with context
-    }),
+export const branchProtection = pgTable('branch_protection', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  repoId: uuid('repo_id').notNull().references(() => repositories.id, { onDelete: 'cascade' }),
+  pattern: text('pattern').notNull(),  // 'main', 'release/*'
+  requirePR: boolean('require_pr').notNull().default(true),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 ```
 
-6. Hook into git-receive-pack to index on push
+2. Create `src/core/branch-protection.ts`:
+
+```typescript
+export async function canPushToBranch(
+  repoId: string,
+  branchName: string,
+  isPRMerge: boolean
+): Promise<{ allowed: boolean; reason?: string }> {
+  // Get protection rules for this branch
+  // If protected and not a PR merge, reject
+  // Simple glob matching for patterns
+}
+```
+
+3. Hook into git-receive-pack:
+   - Before accepting push, check `canPushToBranch`
+   - Reject with clear error message if protected
+
+4. Add simple tRPC endpoints:
+   - `protectBranch(repoId, pattern)`
+   - `unprotectBranch(repoId, pattern)`
+   - `listProtectedBranches(repoId)`
 
 ACCEPTANCE CRITERIA:
+- [ ] `git push origin main` rejected if main is protected
+- [ ] PR merge still works on protected branches
+- [ ] Clear error message: "Branch 'main' is protected. Please open a pull request."
+- [ ] Glob patterns work: `release/*` protects `release/1.0`
 
-- [ ] Full-text code search works
-- [ ] Results include file path and line number
-- [ ] Search respects repository permissions
-- [ ] Regex search supported
-- [ ] Filter by language/path
-- [ ] Reasonable performance (< 2s for typical queries)
-- [ ] Index updated on push
+DO NOT BUILD:
+- Required reviewers
+- Required status checks
+- Dismiss stale reviews
+- Any other GitHub features
+
+Just: protected branches require PRs. That's it.
 ```
 
 ---
 
-### S10-2: OAuth Providers (GitHub/GitLab)
+### P1-3: Getting Started Documentation
 
-**Effort:** 8-10 hours
-**Priority:** P1
+**Priority:** P0  
+**Effort:** 3 hours
+
+**The Problem:** Nobody knows how to use this. The README is sparse.
 
 **Prompt:**
 
 ```
-Implement OAuth login with GitHub and GitLab.
-
-CONTEXT:
-
-- OAuth accounts schema exists in `src/db/schema.ts`
-- Auth router at `src/api/trpc/routers/auth.ts`
-- Need to link OAuth to user accounts
-- Support login and account linking
+Write documentation that gets someone from zero to using wit.
 
 TASK:
 
-1. Create `src/core/oauth/index.ts`:
+1. Rewrite `README.md`:
 
-```typescript
-export interface OAuthProvider {
-  name: string;
-  authorizationUrl: string;
-  tokenUrl: string;
-  userInfoUrl: string;
-  scopes: string[];
-}
+Structure:
+- What is wit? (2 sentences)
+- Why wit? (3 bullet points, not 20)
+- Quick start (5 commands to something working)
+- Link to full docs
 
-export const providers: Record<string, OAuthProvider> = {
-  github: {
-    name: 'GitHub',
-    authorizationUrl: 'https://github.com/login/oauth/authorize',
-    tokenUrl: 'https://github.com/login/oauth/access_token',
-    userInfoUrl: 'https://api.github.com/user',
-    scopes: ['read:user', 'user:email'],
-  },
-  gitlab: {
-    name: 'GitLab',
-    authorizationUrl: 'https://gitlab.com/oauth/authorize',
-    tokenUrl: 'https://gitlab.com/oauth/token',
-    userInfoUrl: 'https://gitlab.com/api/v4/user',
-    scopes: ['read_user'],
-  },
-};
-```
+Tone: Confident, concise, opinionated. Not corporate.
 
-2. Create `src/core/oauth/github.ts` and `src/core/oauth/gitlab.ts`
+2. Create `docs/getting-started.mdx`:
 
-3. Update `src/api/trpc/routers/auth.ts`:
+Cover:
+- Installation (npm, from source)
+- Initialize a repo
+- Basic workflow (add, commit, push)
+- The AI features (wit commit, wit search)
+- Setting up the server (optional)
 
-```typescript
-// Get OAuth authorization URL
-oauthUrl: publicProcedure
-  .input(z.object({
-    provider: z.enum(['github', 'gitlab']),
-    redirectUri: z.string().url(),
-  }))
-  .query(async ({ input }) => {
-    const state = generateSecureState();
-    return getAuthorizationUrl(input.provider, state, input.redirectUri);
-  }),
+3. Create `docs/why-wit.mdx`:
 
-// Handle OAuth callback
-oauthCallback: publicProcedure
-  .input(z.object({
-    provider: z.enum(['github', 'gitlab']),
-    code: z.string(),
-    state: z.string(),
-  }))
-  .mutation(async ({ input }) => {
-    // Validate state
-    // Exchange code for tokens
-    // Get user info
-    // Find or create user
-    // Link OAuth account
-    // Create session
-    return { user, session };
-  }),
-
-// Link OAuth to existing account
-linkOAuth: protectedProcedure
-  .input(z.object({
-    provider: z.enum(['github', 'gitlab']),
-    code: z.string(),
-  }))
-  .mutation(async ({ input, ctx }) => {
-    // Exchange code
-    // Link to current user
-  }),
-```
+The pitch:
+- Git's UX problems (be specific)
+- How wit solves them
+- The AI angle (semantic search, commit messages)
+- What we're NOT (not replacing GitHub entirely, focused tool)
 
 ACCEPTANCE CRITERIA:
+- [ ] New user can go from install to first commit in <5 minutes
+- [ ] AI features are discoverable
+- [ ] Honest about what's ready and what's not
+- [ ] No buzzword soup
 
-- [ ] GitHub OAuth login works
-- [ ] GitLab OAuth login works
-- [ ] New users created from OAuth
-- [ ] Existing users can link OAuth
-- [ ] Account merging when same email
-- [ ] OAuth unlinking (if password exists)
-- [ ] Tokens stored securely
+TONE EXAMPLE:
+"Git is powerful. It's also hostile. 'Detached HEAD state' tells you nothing. Reflog is archaeology. We fixed this."
+
+NOT:
+"wit is a next-generation AI-powered collaborative development platform leveraging cutting-edge..."
 ```
 
 ---
 
-## Stream 11: Diff Enhancements
+## Phase 2: AI That Delivers
 
-### S11-1: Implement Rename Detection in Diff
+### P2-1: Automatic AI PR Review
 
-**Effort:** 6-8 hours
-**Priority:** P2
+**Priority:** P0  
+**Effort:** 8 hours
 
-**Prompt:**
-
-```
-Implement rename detection in the diff algorithm.
-
-CONTEXT:
-
-- Current diff shows deleted file + new file instead of rename
-- Diff module at `src/core/diff.ts`
-- FileDiff interface has oldPath/newPath fields (already supports renames)
-- Git uses content similarity for rename detection
-
-TASK:
-
-1. Add rename detection to `src/core/diff.ts`:
-
-```typescript
-interface RenameCandidate {
-  oldPath: string;
-  newPath: string;
-  similarity: number;  // 0-100%
-}
-
-function detectRenames(
-  deletedFiles: FileDiff[],
-  addedFiles: FileDiff[],
-  threshold: number = 50  // 50% similarity threshold
-): RenameCandidate[] {
-  // Compare each deleted file with each added file
-  // Calculate similarity based on:
-  // - Content similarity (most important)
-  // - Filename similarity (secondary)
-  // Return pairs above threshold
-}
-
-function calculateSimilarity(oldContent: string, newContent: string): number {
-  // Use LCS length / max(oldLen, newLen) * 100
-  // Or compare line-by-line matches
-}
-```
-
-2. Integrate into diff pipeline:
-   - When computing diff for commit/status
-   - Check deleted + added files for renames
-   - Convert matched pairs to rename FileDiff
-
-3. Update FileDiff to support renames:
-
-```typescript
-interface FileDiff {
-  oldPath: string;
-  newPath: string;
-  isRename: boolean;      // Add this
-  similarity?: number;    // Add this (for renames)
-  // ... existing fields
-}
-```
-
-4. Update formatters:
-   - Show "renamed: old -> new (X% similar)"
-   - Only show actual content changes in hunks
-
-5. Update commands that use diff:
-   - `wit diff` - show renames
-   - `wit status` - show "renamed: old -> new"
-
-ACCEPTANCE CRITERIA:
-
-- [ ] Renames detected at 50%+ similarity
-- [ ] Renamed files show as rename, not delete+add
-- [ ] Similarity percentage displayed
-- [ ] Works in `wit status` and `wit diff`
-- [ ] Configurable threshold
-- [ ] Performance acceptable (no N*M full comparisons for large repos)
-```
-
----
-
-## Stream 12: Enterprise & Scale
-
-### S12-1: SSH Protocol Support
-
-**Effort:** 16-20 hours
-**Priority:** P2
+**The Vision:** Every PR gets an AI code review. Not a gimmick—actually useful feedback.
 
 **Prompt:**
 
 ```
-Add SSH protocol support for git operations.
+Make AI code review automatic and useful.
 
 CONTEXT:
-
-- Currently only HTTPS supported
-- Many users prefer SSH for key-based auth
-- Need SSH server that speaks git protocol
+- `src/ai/tools/review-pr.ts` exists but isn't integrated
+- We want this to run automatically when a PR is opened
+- The review should be posted as a PR comment
 
 TASK:
 
-1. Create `src/server/ssh/index.ts`:
+1. Create `src/ai/bot.ts`:
 
 ```typescript
-import ssh2 from 'ssh2';
-
-export class SSHServer {
-  private server: ssh2.Server;
-
-  constructor(options: { hostKeys: Buffer[], port: number }) {
-    this.server = new ssh2.Server({
-      hostKeys: options.hostKeys,
-    }, this.onConnection.bind(this));
-  }
-
-  private onConnection(client: ssh2.Connection): void {
-    client.on('authentication', this.handleAuth.bind(this, client));
-    client.on('ready', () => {
-      client.on('session', this.handleSession.bind(this, client));
-    });
+export class AIReviewBot {
+  async reviewPR(prId: string): Promise<void> {
+    // 1. Get PR diff
+    // 2. Run AI review
+    // 3. Post results as PR comment
+    // 4. Optionally approve/request changes
   }
 }
 ```
 
-2. Create `src/server/ssh/git-commands.ts` for handling git operations
+2. Integrate into PR creation flow:
+   - When PR is created, queue AI review
+   - Review runs async (don't block PR creation)
+   - Results posted as comment from "wit-bot" user
 
-3. Add SSH key management:
-   - Schema for `ssh_keys` table
-   - tRPC router for key CRUD
+3. Create the bot user:
+   - System user for AI actions
+   - Clear visual distinction in UI
 
-4. Update server entrypoint to start SSH server
+4. Make the review useful:
+   - Focus on: bugs, security, logic errors
+   - Ignore: style nitpicks (that's what linters are for)
+   - Be specific: line numbers, suggested fixes
+   - Be concise: no fluff
+
+5. Add repo setting to disable:
+   - Not everyone wants this
+   - Default: enabled
 
 ACCEPTANCE CRITERIA:
+- [ ] Open PR → AI review appears within 30 seconds
+- [ ] Review has inline comments on specific lines
+- [ ] Review catches at least one real issue in test PRs
+- [ ] Can be disabled per-repo
+- [ ] Doesn't review its own bot commits
 
-- [ ] SSH server listens on port 22 (or configurable)
-- [ ] Public key authentication works
-- [ ] git clone via SSH works
-- [ ] git push via SSH works
-- [ ] SSH keys manageable via API
-- [ ] Key fingerprints displayed
-- [ ] Last used tracking
+QUALITY BAR:
+If the review just says "looks good!" on everything, we failed.
+If it's so noisy people disable it, we failed.
+Find the middle ground.
 ```
 
 ---
 
-### S12-2: Rate Limiting
+### P2-2: Codebase Q&A
 
-**Effort:** 4-6 hours
-**Priority:** P2
+**Priority:** P0  
+**Effort:** 10 hours
+
+**The Vision:** Ask questions about your codebase in natural language.
 
 **Prompt:**
 
 ```
-Implement rate limiting for API protection.
+Build a codebase Q&A interface using our semantic search.
 
 CONTEXT:
-
-- Server uses Hono HTTP framework
-- Need to protect against abuse
-- Different limits for different endpoints
+- Semantic search exists in `src/search/`
+- Embeddings and vector store working
+- This is about UX: making it accessible and useful
 
 TASK:
 
-1. Create `src/server/middleware/rate-limit.ts`:
+1. Create `wit ask` CLI command:
 
-```typescript
-import { Context, MiddlewareHandler } from 'hono';
-import Redis from 'ioredis';
+```bash
+$ wit ask "how does authentication work?"
 
-interface RateLimitConfig {
-  windowMs: number;    // Time window
-  max: number;         // Max requests in window
-  keyGenerator?: (c: Context) => string;
-  handler?: (c: Context) => Response;
-}
+Based on the codebase, authentication works as follows:
 
-export function rateLimit(config: RateLimitConfig): MiddlewareHandler {
-  return async (c, next) => {
-    const key = config.keyGenerator?.(c) ?? c.req.header('x-forwarded-for') ?? 'unknown';
-    const rateKey = `ratelimit:${key}`;
+1. Users authenticate via `src/core/auth.ts` using session tokens
+2. Sessions are stored in PostgreSQL (`src/db/schema.ts:sessions`)
+3. The auth middleware (`src/server/middleware/auth.ts`) validates tokens
 
-    const current = await redis.incr(rateKey);
-    if (current === 1) {
-      await redis.pexpire(rateKey, config.windowMs);
-    }
-
-    c.header('X-RateLimit-Limit', String(config.max));
-    c.header('X-RateLimit-Remaining', String(Math.max(0, config.max - current)));
-
-    if (current > config.max) {
-      const retryAfter = await redis.pttl(rateKey);
-      c.header('Retry-After', String(Math.ceil(retryAfter / 1000)));
-
-      return config.handler?.(c) ?? c.json({ error: 'Too many requests' }, 429);
-    }
-
-    await next();
-  };
-}
+Relevant files:
+- src/core/auth.ts:45 - Token generation
+- src/server/middleware/auth.ts:12 - Request validation
+- src/api/trpc/routers/auth.ts - Auth API endpoints
 ```
 
-2. Create rate limit presets for different endpoint types
+2. The flow:
+   - Take natural language question
+   - Use semantic search to find relevant code
+   - Pass code + question to LLM
+   - Format response with file references
 
-3. Add Redis to docker-compose.yml
+3. Create `src/commands/ask.ts`:
+
+```typescript
+export const askCommand = new Command('ask')
+  .description('Ask a question about the codebase')
+  .argument('<question>', 'Your question')
+  .option('--files <n>', 'Number of files to search', '10')
+  .action(async (question, options) => {
+    // 1. Semantic search for relevant code
+    // 2. Build prompt with code context
+    // 3. Call LLM
+    // 4. Format and display response
+  });
+```
+
+4. Handle edge cases:
+   - No relevant code found → say so
+   - Codebase not indexed → prompt to index
+   - Very large results → summarize
 
 ACCEPTANCE CRITERIA:
+- [ ] `wit ask "where is X"` returns relevant files
+- [ ] Answers include line numbers
+- [ ] Works on medium codebase (10k+ lines)
+- [ ] Response time <10 seconds
+- [ ] Graceful when it doesn't know
 
-- [ ] Rate limits enforced per endpoint type
-- [ ] Proper HTTP headers returned
-- [ ] 429 response when exceeded
-- [ ] Retry-After header set
-- [ ] Different limits for different users
-- [ ] Bypass for trusted sources
+EXAMPLE TEST:
+Run `wit ask "how does the diff algorithm work"` on this repo.
+Should reference `src/core/diff.ts` and explain LCS.
 ```
 
 ---
 
-## Usage Guidelines
+### P2-3: `wit review` - Pre-Push Self Review
 
-### For Coding Agents
+**Priority:** P1  
+**Effort:** 4 hours
 
-1. **Read the entire prompt** before starting
-2. **Check dependencies** - some prompts depend on others
-3. **Follow existing patterns** - look at referenced files
-4. **Write tests** - all features need test coverage
-5. **Update related files** - exports, routers, etc.
+**The Vision:** Review your own changes before pushing, with AI help.
 
-### Priority Order
-
-1. Complete **Stream 9** (Platform Critical) first
-2. **Stream 10** features can be parallelized after S9
-3. **Streams 11-12** are polish/enterprise features
-
-### Dependencies
+**Prompt:**
 
 ```
-S9-1 (Workflow Parser) -> none
-S9-2 (Job Scheduler) -> S9-1
-S9-3 (Job Runner) -> S9-2
-S9-4 (Branch Protection) -> none
-S9-5 (Notifications) -> none
-S9-6 (PR Merge) -> S9-4
+Add a pre-push review command that shows you what you're about to share.
 
-S10-1 (Full-text Search) -> none
-S10-2 (OAuth) -> none
+CONTEXT:
+- Developers push code without reviewing their own diff
+- AI can catch obvious issues before they become PR comments
 
-S11-1 (Rename Detection) -> none
+TASK:
 
-S12-1 (SSH) -> none
-S12-2 (Rate Limiting) -> none
+1. Create `src/commands/review.ts`:
 
-QW-1 (Forks) -> none
-QW-2 (Releases) -> none
+```bash
+$ wit review
+
+Reviewing changes on branch 'feature/add-auth' (3 commits, 5 files)
+
+src/auth.ts:
+  + Added login function
+  ⚠️  Line 45: Password stored in plain text (security)
+  ⚠️  Line 52: Missing error handling for DB failure
+
+src/routes.ts:
+  + Added /login endpoint
+  ✓ Looks good
+
+Summary:
+  2 potential issues found
+  Would you like to push anyway? [y/N]
 ```
+
+2. Implementation:
+   - Get diff of current branch vs origin
+   - Run AI review on the diff
+   - Display inline in terminal
+   - Prompt before push
+
+3. Options:
+   - `--fix` - Attempt to fix issues automatically
+   - `--push` - Push after review regardless
+   - `--quiet` - Only show issues, not full diff
+
+ACCEPTANCE CRITERIA:
+- [ ] Shows diff with AI annotations
+- [ ] Catches at least obvious issues (console.log, TODO, security)
+- [ ] Fast enough to use regularly (<15 seconds)
+- [ ] Non-blocking (can push anyway)
+
+NOT:
+- A replacement for CI
+- A linter
+- Exhaustive (focus on high-signal issues)
+```
+
+---
+
+## Phase 3: CLI Polish
+
+### P3-1: CLI Experience Audit
+
+**Priority:** P0  
+**Effort:** 6 hours
+
+**The Vision:** Every command should feel right.
+
+**Prompt:**
+
+```
+Audit and polish the CLI experience.
+
+TASK:
+
+1. Run every command in `src/commands/` and note:
+   - Confusing output
+   - Missing help text
+   - Errors that don't help
+   - Inconsistent formatting
+
+2. Fix the worst offenders:
+   - Error messages should suggest fixes
+   - Help text should have examples
+   - Output should be scannable
+
+3. Add color and formatting:
+   - Status: green for success, red for error, yellow for warning
+   - Diffs: standard diff coloring
+   - Progress: spinners for long operations
+
+4. Add `wit --help` landing page:
+   - Group commands logically
+   - Highlight the good stuff (AI commands)
+   - Link to docs
+
+EXAMPLE - Before:
+```
+$ wit checkout foo
+Error: Reference not found
+```
+
+EXAMPLE - After:
+```
+$ wit checkout foo
+Error: Branch 'foo' not found
+
+Did you mean:
+  - feature/foo
+  - fix/foobar
+
+Create it with: wit checkout -b foo
+```
+
+ACCEPTANCE CRITERIA:
+- [ ] No command exits with unhelpful error
+- [ ] `--help` on every command is useful
+- [ ] Consistent style across all commands
+- [ ] Looks good in terminal
+```
+
+---
+
+## What's Already Done (Reference)
+
+### Complete - Don't Touch Unless Broken
+
+**Git Implementation**
+- 57 commands in `src/commands/`
+- Full compatibility with Git
+- Tests in `src/__tests__/`
+
+**AI Tools**
+- 15 tools in `src/ai/tools/`
+- Semantic search in `src/search/`
+- Agent in `src/ai/agent.ts`
+
+**Server**
+- HTTP + SSH protocols
+- Rate limiting
+- tRPC API
+
+**Features**
+- Branch state manager
+- Journal-based undo
+- Rename detection
+- Packed refs
+- CI workflow parser (no runner)
+
+---
+
+## Dependencies
+
+```
+P1-1 (PR Merge) → blocks shipping
+P1-2 (Branch Protection) → blocks shipping
+P1-3 (Docs) → blocks shipping
+
+P2-1 (AI Review) → needs PR infrastructure
+P2-2 (Codebase Q&A) → independent
+P2-3 (wit review) → independent
+
+P3-1 (CLI Polish) → independent
+```
+
+---
+
+## For Agents
+
+When implementing these prompts:
+
+1. **Read existing code first** - patterns are established
+2. **Keep it simple** - we explicitly defer complexity
+3. **Test your changes** - `npm test`
+4. **Update docs if needed** - especially for user-facing changes
+
+The goal is shipping, not perfection.
+
+---
+
+*Prompts maintained by Claude, December 2024*
