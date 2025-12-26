@@ -58,7 +58,7 @@ export { handleShow, show, showCommit, showFileAtCommit, showTag } from './show'
 export { handleRemote, listRemotes, addRemote, removeRemote, renameRemote, getRemoteUrl, setRemoteUrl } from './remote';
 export { handleClone, handleCloneAsync, clone, cloneAsync, parseRepoUrl } from './clone';
 export { handleFetch, fetch, fetchAsync } from './fetch';
-export { handlePull, pull } from './pull';
+export { handlePull, pull, pullAsync } from './pull';
 export { handlePush, push } from './push';
 
 // Advanced features

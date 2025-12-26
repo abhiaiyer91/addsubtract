@@ -1,4 +1,5 @@
 import * as zlib from 'zlib';
+import * as crypto from 'crypto';
 import { ObjectType } from '../types';
 import {
   PackObject,
@@ -14,7 +15,16 @@ import {
   verifyPackChecksum,
   applyDelta,
 } from './pack';
-import { hashObject } from '../../utils/hash';
+
+/**
+ * Hash a Git object using SHA-1 (Git's native format)
+ * Pack files from Git servers always use SHA-1
+ */
+function hashObjectSha1(type: string, content: Buffer): string {
+  const header = Buffer.from(`${type} ${content.length}\0`);
+  const store = Buffer.concat([header, content]);
+  return crypto.createHash('sha1').update(store).digest('hex');
+}
 
 /**
  * Result of parsing a pack file
@@ -226,7 +236,7 @@ export class PackfileParser {
           throw new Error(`Unknown pack object type: ${obj.type}`);
         }
 
-        const hash = hashObject(objectType, obj.data);
+        const hash = hashObjectSha1(objectType, obj.data);
         const parsed: ParsedObject = {
           type: objectType,
           data: obj.data,
@@ -260,7 +270,7 @@ export class PackfileParser {
 
         // Apply delta
         const resolvedData = applyDelta(base.data, obj.data);
-        const hash = hashObject(base.type, resolvedData);
+        const hash = hashObjectSha1(base.type, resolvedData);
 
         const parsed: ParsedObject = {
           type: base.type,

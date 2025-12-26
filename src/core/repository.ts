@@ -63,7 +63,10 @@ export class Repository {
   constructor(workDir: string, config: Partial<RepositoryConfig> = {}) {
     this.workDir = path.resolve(workDir);
     this.gitDir = path.join(this.workDir, '.wit');
-    this.config = { ...DEFAULT_CONFIG, ...config };
+    
+    // Load config from existing repo if it exists
+    const loadedConfig = this.loadStoredConfig();
+    this.config = { ...DEFAULT_CONFIG, ...loadedConfig, ...config };
     
     // Set hash algorithm
     setHashAlgorithm(this.config.hashAlgorithm);
@@ -83,6 +86,41 @@ export class Repository {
     this.sparseCheckout = new SparseCheckoutManager(this.gitDir);
     this.hooks = new HookManager(this.gitDir, this.workDir);
     this.remotes = new RemoteManager(this.gitDir);
+  }
+
+  /**
+   * Load configuration from .wit/config file if it exists
+   */
+  private loadStoredConfig(): Partial<RepositoryConfig> {
+    const configPath = path.join(this.gitDir, 'config');
+    if (!exists(configPath)) {
+      return {};
+    }
+
+    try {
+      const configContent = readFileText(configPath);
+      const config: Partial<RepositoryConfig> = {};
+
+      // Parse simple INI-style config
+      const hashMatch = configContent.match(/hashAlgorithm\s*=\s*(sha1|sha256)/);
+      if (hashMatch) {
+        config.hashAlgorithm = hashMatch[1] as HashAlgorithm;
+      }
+
+      const thresholdMatch = configContent.match(/largeFileThreshold\s*=\s*(\d+)/);
+      if (thresholdMatch) {
+        config.largeFileThreshold = parseInt(thresholdMatch[1], 10);
+      }
+
+      const autoStashMatch = configContent.match(/autoStashOnSwitch\s*=\s*(true|false)/);
+      if (autoStashMatch) {
+        config.autoStashOnSwitch = autoStashMatch[1] === 'true';
+      }
+
+      return config;
+    } catch {
+      return {};
+    }
   }
 
   /**

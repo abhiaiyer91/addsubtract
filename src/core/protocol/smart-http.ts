@@ -235,14 +235,17 @@ export class SmartHttpClient {
           // Error message (sideband channel 3)
           const errorMsg = line.slice(1).toString('utf8');
           throw new Error(`Server error: ${errorMsg}`);
-        } else if (!inPack) {
+        } else if (inPack) {
+          // Already receiving pack data in non-sideband mode, continue collecting
+          packParts.push(line);
+        } else {
           // Not in sideband mode - check if this is actual pack data
           // Pack data starts with 'PACK' signature
           if (line.length >= 4 && line.slice(0, 4).toString('ascii') === 'PACK') {
             packParts.push(line);
             inPack = true;
           }
-          // Otherwise skip unknown lines
+          // Otherwise skip unknown lines (protocol negotiation)
         }
       }
     }

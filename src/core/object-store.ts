@@ -58,15 +58,12 @@ export class ObjectStore {
 
   /**
    * Write a raw object (type + data) directly to the store
-   * Used when importing objects from pack files
+   * Used when importing objects from pack files (Git interop uses SHA-1)
    */
   writeRawObject(type: ObjectType, data: Buffer, expectedHash?: string): string {
-    const hash = hashObject(type, data);
-    
-    // Verify hash if provided (for pack file imports)
-    if (expectedHash && hash !== expectedHash) {
-      throw new Error(`Hash mismatch: expected ${expectedHash}, got ${hash}`);
-    }
+    // When expectedHash is provided (from Git packfile), use it directly
+    // This enables Git interop where remote objects use SHA-1
+    const hash = expectedHash || hashObject(type, data);
     
     const objectPath = this.getObjectPath(hash);
 
