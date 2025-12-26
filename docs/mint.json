@@ -53,7 +53,7 @@
     {
       "name": "Roadmap",
       "icon": "map",
-      "url": "https://github.com/your-org/wit/blob/main/ROADMAP.md"
+      "url": "https://github.com/abhiaiyer91/wit/blob/main/ROADMAP.md"
     }
   ],
   "navigation": [
@@ -111,6 +111,23 @@
       ]
     },
     {
+      "group": "Platform",
+      "pages": [
+        "platform/overview",
+        "platform/server",
+        "platform/pull-requests",
+        "platform/issues"
+      ]
+    },
+    {
+      "group": "Primitives",
+      "pages": [
+        "primitives/overview",
+        "primitives/filesystem",
+        "primitives/knowledge"
+      ]
+    },
+    {
       "group": "API Reference",
       "pages": [
         "api-reference/overview",
@@ -127,11 +144,7 @@
     }
   ],
   "footerSocials": {
-<<<<<<< HEAD
-    "github": "https://github.com/abhiaiyer91/wit"
-=======
-    "github": "https://github.com/your-org/wit",
+    "github": "https://github.com/abhiaiyer91/wit",
     "discord": "https://discord.gg/wit"
->>>>>>> 382fb97 (push)
   }
 }
