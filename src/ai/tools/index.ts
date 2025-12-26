@@ -15,6 +15,7 @@ export { getMergeConflictsTool } from './get-merge-conflicts.js';
 export { resolveConflictTool } from './resolve-conflict.js';
 export { undoTool } from './undo.js';
 export { searchTool } from './search.js';
+export { semanticSearchTool, indexRepositoryTool, getIndexStatusTool } from './semantic-search.js';
 
 import { getStatusTool } from './get-status.js';
 import { getDiffTool } from './get-diff.js';
@@ -27,6 +28,7 @@ import { getMergeConflictsTool } from './get-merge-conflicts.js';
 import { resolveConflictTool } from './resolve-conflict.js';
 import { undoTool } from './undo.js';
 import { searchTool } from './search.js';
+import { semanticSearchTool, indexRepositoryTool, getIndexStatusTool } from './semantic-search.js';
 
 /**
  * All wit tools bundled together for easy registration with an agent
@@ -43,4 +45,7 @@ export const witTools = {
   resolveConflict: resolveConflictTool,
   undo: undoTool,
   search: searchTool,
+  semanticSearch: semanticSearchTool,
+  indexRepository: indexRepositoryTool,
+  getIndexStatus: getIndexStatusTool,
 };
