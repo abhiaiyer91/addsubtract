@@ -2,7 +2,27 @@
 
 ## Vision
 
-Build an open-source, AI-native code collaboration platform that replaces GitHub.
+Build an open-source, AI-native code collaboration platform that surpasses Git, GitHub, and all competitors.
+
+## Current Status (December 2024)
+
+| Domain | Completion | Quality | Status |
+|--------|------------|---------|--------|
+| **Core VCS** | 90% | Excellent | 57 commands, Git-compatible |
+| **AI Integration** | 85% | Excellent | 11 tools, Mastra agent |
+| **Platform/Server** | 50% | Good | Basic PRs/Issues working |
+| **UI (TUI + Web)** | 80% | Excellent | Dual interfaces |
+| **Test Coverage** | 65% | Good | 440+ tests |
+
+### What Makes Wit Better Than Git
+
+- **Undo operations** - Journal-based undo (not just reflog)
+- **Branch state manager** - Auto-save/restore working directory per branch
+- **Monorepo scopes** - Filter operations to specific paths
+- **AI-native** - Built-in agent for commits, reviews, conflict resolution
+- **Modern TypeScript** - Maintainable, extensible codebase
+
+---
 
 ## Architecture Overview
 
@@ -11,496 +31,401 @@ Build an open-source, AI-native code collaboration platform that replaces GitHub
 │                         wit Platform                             │
 ├─────────────────────────────────────────────────────────────────┤
 │  Web App (React)          │  API Server (Node/Hono)             │
-│  - Repository browser     │  - REST API                         │
-│  - Pull requests UI       │  - GraphQL API                      │
+│  - Repository browser     │  - tRPC API (type-safe)             │
+│  - Pull requests UI       │  - Git Smart HTTP                   │
 │  - Issues UI              │  - WebSocket (realtime)             │
-│  - User dashboard         │  - Git Smart HTTP                   │
+│  - User dashboard         │  - CI/CD Runner                     │
 ├───────────────────────────┼─────────────────────────────────────┤
 │  CLI (wit)                │  Core Libraries                     │
-│  - Local git ops          │  - @wit/core (git impl)             │
-│  - Remote sync            │  - @wit/ai (mastra)                 │
+│  - 57 git commands        │  - @wit/core (git impl)             │
+│  - AI agent               │  - @wit/ai (mastra)                 │
 │  - PR/Issue commands      │  - @wit/protocol (smart http)       │
+│  - TUI interface          │  - @wit/ui (tui + web)              │
 ├───────────────────────────┴─────────────────────────────────────┤
 │                         Storage Layer                            │
 │  - Object Store (S3/local)  - Database (Postgres)               │
-│  - Search Index (Meilisearch/Typesense)                         │
+│  - Search Index (planned)   - Activity/Audit Logs               │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Workstreams (Parallel Development)
+## Completed Workstreams
 
-### ⚡ Stream 0: Server + Database Integration 🔓 READY
+### Stream 1: Git Server (Foundation) - COMPLETE
 
-**Owner:** TBD  
-**Priority:** P0 - Quick Win  
-**Dependencies:** Streams 1 & 2 ✅
+- [x] Hono HTTP server with Smart HTTP protocol
+- [x] git-upload-pack and git-receive-pack
+- [x] Multi-repo support (`/:owner/:repo.git`)
+- [x] Auto-create repos on first push
+- [x] Token-based authentication
 
-Wire the Git Server to the Database so pushes create repository records.
+### Stream 2: Database & Models - COMPLETE
 
-**Prompt:** `prompts/stream-0-integration.md`
+- [x] Full schema (users, repos, PRs, issues, orgs, teams)
+- [x] Drizzle ORM with PostgreSQL
+- [x] All CRUD operations implemented
+- [x] Activity tracking and webhooks (model)
 
----
+### Stream 3: tRPC API - COMPLETE
 
-### 🔴 Stream 1: Git Server (Foundation) ✅ COMPLETE
+- [x] Type-safe tRPC routers
+- [x] Auth router (login, register, sessions)
+- [x] Repos router (CRUD, stars, collaborators)
+- [x] PRs router (create, review, merge)
+- [x] Issues router (create, labels, comments)
+- [x] Activity router (feeds)
 
-**Owner:** AI Agent  
-**Priority:** P0 - Critical Path  
-**Dependencies:** None
+### Stream 4: Core VCS Commands - COMPLETE
 
-Build a standalone Git server that accepts push/pull over HTTP.
+- [x] All local commands (add, commit, status, log, diff, branch, etc.)
+- [x] All remote commands (clone, fetch, pull, push)
+- [x] History rewriting (rebase, cherry-pick, revert)
+- [x] Advanced features (hooks, submodules, worktrees, reflog, gc)
+- [x] Plumbing commands (rev-parse, update-ref, etc.)
 
-#### Milestones
+### Stream 5: AI Integration - COMPLETE
 
-- [x] **1.1 Basic HTTP Server** ✅
-
-  - Hono server with git-receive-pack endpoint
-  - Accept pushes to local filesystem
-  - Serve clones via git-upload-pack
-
-- [x] **1.2 Multi-repo Support** ✅
-
-  - Route: `/:owner/:repo.git`
-  - Create repos on first push
-  - List available repos
-
-- [ ] **1.3 Authentication** (Pending)
-  - Token-based auth for push
-  - Public/private repo distinction
-  - Rate limiting
-
-#### Files to Create
-
-```
-src/server/
-├── index.ts              # Server entry point
-├── routes/
-│   ├── git.ts            # Smart HTTP endpoints
-│   ├── api.ts            # REST API
-│   └── graphql.ts        # GraphQL API
-├── middleware/
-│   ├── auth.ts           # Authentication
-│   └── ratelimit.ts      # Rate limiting
-└── storage/
-    ├── repos.ts          # Repository management
-    └── objects.ts        # Object storage abstraction
-```
+- [x] Mastra agent with 11 tools
+- [x] AI commit message generation
+- [x] AI code review
+- [x] AI conflict resolution suggestions
+- [x] Natural language git operations
 
 ---
 
-### 🟠 Stream 2: Database & Models ✅ COMPLETE
+## Active Workstreams
 
-**Owner:** AI Agent  
-**Priority:** P0 - Critical Path  
-**Dependencies:** None
+### Stream 6: Foundation Hardening - P0 (CURRENT)
 
-Design and implement the data layer.
+**Priority:** Critical - Must complete before new features  
+**Timeline:** 2-4 weeks  
+**Status:** In Progress
 
-#### Milestones
+| Task | Priority | Status | Notes |
+|------|----------|--------|-------|
+| Fix TUI diff view | P0 | TODO | Currently shows placeholder |
+| Add tests for `src/core/repository.ts` | P0 | TODO | Main orchestration class |
+| Add tests for `src/core/merge.ts` | P0 | TODO | Critical path |
+| Add lint step to CI | P1 | TODO | No ESLint currently |
+| Add type-check step to CI | P1 | TODO | No `tsc` check |
+| Set up coverage thresholds | P1 | TODO | No enforcement |
+| Implement rename detection in diff | P2 | TODO | Shows delete+add |
+| Add packed refs support | P2 | TODO | All refs are loose |
 
-- [x] **2.1 Schema Design** ✅
-
-  - Users, Organizations, Teams
-  - Repositories, Collaborators, Stars, Watches
-  - Pull Requests, Reviews, Comments
-  - Issues, Labels, Comments
-  - Activity tracking, Webhooks
-
-- [x] **2.2 Database Setup** ✅
-
-  - Drizzle ORM with Postgres
-  - Full schema with types
-  - Seed data script
-
-- [x] **2.3 Models & Queries** ✅
-  - Repository CRUD with stars/watches
-  - User management with OAuth
-  - PR/Issue operations with comments
-
-#### Schema (Initial)
-
-```sql
--- Core entities
-users (id, username, email, name, avatar_url, created_at)
-organizations (id, name, slug, avatar_url, created_at)
-org_members (org_id, user_id, role)
-
--- Repositories
-repositories (id, owner_id, owner_type, name, description,
-              is_private, default_branch, created_at)
-collaborators (repo_id, user_id, permission)
-branches (id, repo_id, name, head_sha, protected)
-
--- Pull Requests
-pull_requests (id, repo_id, number, title, body, state,
-               source_branch, target_branch, author_id,
-               created_at, merged_at, closed_at)
-pr_reviews (id, pr_id, user_id, state, body, created_at)
-pr_comments (id, pr_id, user_id, path, line, body, created_at)
-
--- Issues
-issues (id, repo_id, number, title, body, state,
-        author_id, assignee_id, created_at, closed_at)
-issue_comments (id, issue_id, user_id, body, created_at)
-labels (id, repo_id, name, color, description)
-issue_labels (issue_id, label_id)
-```
-
-#### Files to Create
+#### Files to Modify
 
 ```
-src/db/
-├── schema.ts             # Drizzle schema
-├── migrations/           # Database migrations
-├── models/
-│   ├── user.ts
-│   ├── repository.ts
-│   ├── pull-request.ts
-│   └── issue.ts
-└── seed.ts               # Development data
+.github/workflows/ci.yml    # Add lint, type-check, coverage
+src/ui/tui.ts               # Fix diff view (line ~800)
+src/core/diff.ts            # Add rename detection
+src/__tests__/              # Add missing tests
 ```
 
 ---
 
-### 🟡 Stream 3: tRPC API 🔓 READY
+### Stream 7: Platform Critical Features - P0
 
-**Owner:** TBD  
-**Priority:** P0 - Critical Path  
-**Dependencies:** Stream 2 (Database) ✅
+**Priority:** Critical - Blocking GitHub replacement  
+**Timeline:** 4-8 weeks  
+**Dependencies:** Stream 6
 
-Build the tRPC API layer for type-safe client-server communication.
+#### 7.1 CI/CD Engine (GitHub Actions Alternative)
 
-#### Milestones
+| Milestone | Status | Description |
+|-----------|--------|-------------|
+| 7.1.1 Workflow Syntax | TODO | `.wit/workflows/*.yml` parsing |
+| 7.1.2 Job Scheduler | TODO | Queue and execute jobs |
+| 7.1.3 Docker Runner | TODO | Execute steps in containers |
+| 7.1.4 Artifact Storage | TODO | Store build outputs |
+| 7.1.5 Status Checks API | TODO | Report to PRs |
+| 7.1.6 UI Integration | TODO | Logs, history, badges |
 
-- [ ] **3.1 tRPC Setup**
-
-  - tRPC router with Hono adapter
-  - Auth context and middleware
-  - Client export for web/CLI
-
-- [ ] **3.2 Core Routers**
-
-  - `auth` - login, logout, register, me
-  - `repos` - list, get, create, star, search
-  - `pulls` - list, get, create, merge, review
-  - `issues` - list, get, create, close, comment
-  - `activity` - feed, forRepo
-
-- [ ] **3.3 Webhooks** (Later)
-  - Event system (push, PR created, etc.)
-  - Webhook delivery with retries
-
-#### Files to Create
+**Files to Create:**
 
 ```
-src/api/trpc/
-├── index.ts          # Export router and types
-├── trpc.ts           # tRPC instance, procedures
-├── context.ts        # Request context (user, db)
-├── routers/
-│   ├── index.ts      # Merged router
-│   ├── auth.ts
-│   ├── repos.ts
-│   ├── pulls.ts
-│   ├── issues.ts
-│   └── activity.ts
-└── middleware/
-    └── auth.ts       # isAuthed, isRepoAdmin
+src/ci/
+├── index.ts              # CI engine entry
+├── parser.ts             # Workflow YAML parser
+├── scheduler.ts          # Job queue and scheduling
+├── runner.ts             # Job execution
+├── docker.ts             # Container management
+└── artifacts.ts          # Artifact storage
+
+src/api/trpc/routers/
+├── workflows.ts          # Workflow CRUD
+├── runs.ts               # Run history
+└── checks.ts             # Status checks
 ```
 
-**Prompt:** `prompts/stream-3-trpc-api.md`
+#### 7.2 Branch Protection Rules
 
----
+| Milestone | Status | Description |
+|-----------|--------|-------------|
+| 7.2.1 Protection Schema | TODO | Database schema for rules |
+| 7.2.2 Rule Engine | TODO | Evaluate rules on push/merge |
+| 7.2.3 Required Reviews | TODO | Enforce N approvals |
+| 7.2.4 Required Checks | TODO | Require CI to pass |
+| 7.2.5 API Endpoints | TODO | CRUD for protection rules |
+| 7.2.6 UI Settings | TODO | Branch settings page |
 
-### 🟢 Stream 4: Web Application 🔓 READY
-
-**Owner:** TBD  
-**Priority:** P1  
-**Dependencies:** Stream 3 (API) - can start with mocks
-
-Build the web frontend.
-
-**Prompt:** `prompts/stream-4-web-app.md`
-
-#### Milestones
-
-- [ ] **4.1 Repository Browser** (Week 2-3)
-
-  - Code viewer with syntax highlighting
-  - Branch/tag selector
-  - Commit history
-  - File tree navigation
-  - Blame view
-
-- [ ] **4.2 Pull Requests** (Week 3-5)
-
-  - PR list view
-  - PR detail with diff viewer
-  - Inline comments
-  - Review workflow (approve/request changes)
-  - Merge button
-
-- [ ] **4.3 Issues** (Week 4-5)
-
-  - Issue list with filters
-  - Issue detail
-  - Labels, milestones, assignees
-  - Markdown editor
-
-- [ ] **4.4 User & Org Pages** (Week 5-6)
-  - User profiles
-  - Organization pages
-  - Settings
-
-#### Tech Stack
-
-- React 19 / Next.js 15
-- TailwindCSS + shadcn/ui
-- TanStack Query for data fetching
-- Monaco Editor for code viewing
-
-#### Files to Create
+**Files to Create:**
 
 ```
-apps/web/
-├── app/
-│   ├── [owner]/
-│   │   └── [repo]/
-│   │       ├── page.tsx           # Repo home
-│   │       ├── tree/[...path]/    # File browser
-│   │       ├── blob/[...path]/    # File viewer
-│   │       ├── commits/           # Commit history
-│   │       ├── pulls/             # PR list
-│   │       ├── pull/[number]/     # PR detail
-│   │       └── issues/            # Issues
-│   ├── settings/
-│   └── login/
-├── components/
-│   ├── diff-viewer/
-│   ├── code-viewer/
-│   ├── file-tree/
-│   └── markdown/
-└── lib/
-    ├── api.ts
-    └── hooks/
+src/core/branch-protection.ts    # Rule engine
+src/db/models/branch-rules.ts    # Schema
+src/api/trpc/routers/branches.ts # Protection API
+```
+
+#### 7.3 Notifications System
+
+| Milestone | Status | Description |
+|-----------|--------|-------------|
+| 7.3.1 Event System | TODO | Emit events on actions |
+| 7.3.2 Notification Model | TODO | Store notifications |
+| 7.3.3 In-App Notifications | TODO | Bell icon, dropdown |
+| 7.3.4 Email Notifications | TODO | Send emails |
+| 7.3.5 Notification Preferences | TODO | User settings |
+| 7.3.6 WebSocket Updates | TODO | Real-time delivery |
+
+**Files to Create:**
+
+```
+src/notifications/
+├── index.ts              # Notification service
+├── events.ts             # Event definitions
+├── email.ts              # Email sender
+└── websocket.ts          # Real-time delivery
+
+src/db/models/notifications.ts
+src/api/trpc/routers/notifications.ts
+```
+
+#### 7.4 PR Merge Execution
+
+| Milestone | Status | Description |
+|-----------|--------|-------------|
+| 7.4.1 Server-side Merge | TODO | Execute git merge on server |
+| 7.4.2 Merge Strategies | TODO | Merge, squash, rebase |
+| 7.4.3 Conflict Detection | TODO | Pre-merge conflict check |
+| 7.4.4 Post-merge Hooks | TODO | Trigger CI, notifications |
+
+**Files to Modify:**
+
+```
+src/api/trpc/routers/pulls.ts    # Merge procedure
+src/server/storage/repos.ts      # Merge execution
 ```
 
 ---
 
-### 🔵 Stream 5: CLI Extensions 🔓 READY
+### Stream 8: Platform Parity Features - P1
 
-**Owner:** TBD  
-**Priority:** P2  
-**Dependencies:** Stream 3 (API)
+**Priority:** High - Competitive parity  
+**Timeline:** 4-6 weeks  
+**Dependencies:** Stream 7
 
-Extend the CLI for platform features.
+| Feature | Status | Effort | Notes |
+|---------|--------|--------|-------|
+| Code Search | TODO | Medium | Search across repos |
+| Fork Creation | TODO | Medium | Schema exists, no logic |
+| Webhook API | TODO | Low | Model exists, add endpoints |
+| OAuth Providers | TODO | Medium | GitHub/GitLab login |
+| Milestones | TODO | Low | Project tracking |
+| Releases | TODO | Low | Tag-based releases |
+| Wiki | TODO | Medium | Markdown documentation |
 
-**Prompt:** `prompts/stream-5-cli-extensions.md`
+---
 
-#### Milestones
+### Stream 9: AI Differentiation - P1
 
-- [ ] **5.1 PR Commands** (Week 3-4)
+**Priority:** High - Our competitive advantage  
+**Timeline:** 4-8 weeks  
+**Dependencies:** Stream 7.1 (CI/CD)
 
-  ```bash
-  wit pr create              # Create PR from current branch
-  wit pr list                # List open PRs
-  wit pr checkout 123        # Checkout PR locally
-  wit pr merge 123           # Merge PR
-  wit pr review 123          # Start review
-  ```
+| Feature | Status | Notes |
+|---------|--------|-------|
+| AI PR Descriptions | TODO | Type defined, implement generation |
+| AI Code Review Bot | TODO | Auto-review on PR creation |
+| AI Issue Triage | TODO | Auto-label, suggest assignees |
+| AI Semantic Search | TODO | Natural language code search |
+| AI Conflict Resolution | TODO | Auto-apply resolutions |
+| AI Test Generation | TODO | Generate tests for changes |
 
-- [ ] **5.2 Issue Commands** (Week 4)
-
-  ```bash
-  wit issue create           # Create issue
-  wit issue list             # List issues
-  wit issue close 123        # Close issue
-  wit issue assign 123 @user # Assign issue
-  ```
-
-- [ ] **5.3 Repo Commands** (Week 4)
-  ```bash
-  wit repo create            # Create new repo on server
-  wit repo fork              # Fork a repo
-  wit repo delete            # Delete repo
-  wit repo settings          # Manage settings
-  ```
-
-#### Files to Create
+**Files to Modify:**
 
 ```
-src/commands/
-├── pr.ts                 # Pull request commands
-├── issue.ts              # Issue commands
-└── repo.ts               # Repository management
+src/ai/tools/generate-pr.ts      # PR description generation
+src/ai/tools/review-code.ts      # Enhanced review
+src/ai/agent.ts                  # New capabilities
 ```
 
 ---
 
-### 🟣 Stream 6: AI Features
+### Stream 10: Polish & Scale - P2
 
-**Owner:** TBD  
-**Priority:** P2  
-**Dependencies:** Stream 4 (Web App)
+**Priority:** Medium - Production readiness  
+**Timeline:** Ongoing
 
-Extend AI capabilities for the platform.
-
-#### Milestones
-
-- [ ] **6.1 AI PR Review** (Week 4-5)
-
-  - Automated review on PR creation
-  - Suggest improvements
-  - Security vulnerability detection
-
-- [ ] **6.2 AI Issue Triage** (Week 5)
-
-  - Auto-label issues
-  - Suggest assignees
-  - Duplicate detection
-
-- [ ] **6.3 AI Code Search** (Week 5-6)
-
-  - Natural language code search
-  - "Find where we handle authentication"
-  - Semantic code understanding
-
-- [ ] **6.4 AI Copilot** (Week 6+)
-  - In-browser code suggestions
-  - PR description generation
-  - Commit message suggestions
-
----
-
-### ⚪ Stream 7: CI/CD (Actions Alternative)
-
-**Owner:** TBD  
-**Priority:** P3  
-**Dependencies:** Streams 1, 2, 3
-
-Build a GitHub Actions alternative.
-
-#### Milestones
-
-- [ ] **7.1 Workflow Definition** (Week 6+)
-
-  - YAML workflow files
-  - Trigger on push/PR/schedule
-  - Job and step definitions
-
-- [ ] **7.2 Runner** (Week 7+)
-
-  - Docker-based job execution
-  - Self-hosted runner support
-  - Artifact storage
-
-- [ ] **7.3 UI Integration** (Week 8+)
-  - Workflow run history
-  - Log viewer
-  - Status badges
+| Feature | Status | Notes |
+|---------|--------|-------|
+| SSH Protocol | TODO | Some users prefer SSH |
+| Rate Limiting | TODO | API protection |
+| Audit Logs | TODO | Enterprise compliance |
+| Backup/Restore | TODO | Data protection |
+| Performance Optimization | TODO | Large repos |
+| Mobile Experience | TODO | Responsive web |
 
 ---
 
 ## Development Phases
 
-### Phase 1: MVP (Weeks 1-4)
+### Phase 1: MVP - COMPLETE
 
-**Goal:** Self-hosted GitHub alternative for small teams
+- [x] Git server with push/pull
+- [x] Basic web UI for browsing repos
+- [x] User authentication
+- [x] Pull Request workflow
+- [x] Basic issues
 
-- ✅ Git server with push/pull
-- ✅ Basic web UI for browsing repos
-- ✅ User authentication
-- ✅ Pull Request workflow (create, review, merge)
-- ✅ Basic issues
+### Phase 2: Foundation Hardening (Current - Weeks 1-4)
 
-### Phase 2: Feature Parity (Weeks 5-8)
+**Goal:** Production-ready core
 
-**Goal:** Match core GitHub features
+- [ ] Fix TUI diff view
+- [ ] Add missing tests for core modules
+- [ ] CI improvements (lint, type-check, coverage)
+- [ ] Rename detection in diff
 
-- Organizations and teams
-- Protected branches
-- Code owners
-- Webhooks
-- API compatibility
+### Phase 3: Platform Critical (Weeks 5-12)
 
-### Phase 3: Differentiation (Weeks 9-12)
+**Goal:** Match GitHub's critical features
+
+- [ ] CI/CD engine with workflow execution
+- [ ] Branch protection rules
+- [ ] Notifications system
+- [ ] Actual git merge on PR merge
+- [ ] Complete OAuth flows
+
+### Phase 4: Differentiation (Weeks 13-20)
 
 **Goal:** Be better than GitHub
 
-- AI-native features
-- Federation (connect instances)
-- Advanced code intelligence
-- Built-in CI/CD
-- P2P sync option
+- [ ] AI-powered code review bot
+- [ ] AI semantic search
+- [ ] AI PR descriptions
+- [ ] Smart conflict resolution
+- [ ] Predictive features
+
+### Phase 5: Enterprise (Weeks 21+)
+
+**Goal:** Enterprise-ready
+
+- [ ] SSO/SAML
+- [ ] Audit logs
+- [ ] Compliance features
+- [ ] On-premise deployment
+- [ ] Support SLAs
 
 ---
 
 ## Tech Stack
 
-| Component      | Technology                        |
-| -------------- | --------------------------------- |
-| CLI            | TypeScript, Commander             |
-| Server         | Node.js, Hono                     |
-| Database       | PostgreSQL, Drizzle ORM           |
-| Web            | React 19, Next.js 15, TailwindCSS |
-| Search         | Meilisearch or Typesense          |
-| Object Storage | S3-compatible or local            |
-| AI             | Mastra (OpenAI/Anthropic)         |
-| Auth           | Lucia, OAuth providers            |
-| Realtime       | WebSockets                        |
+| Component | Technology | Status |
+|-----------|------------|--------|
+| CLI | TypeScript, Commander | Complete |
+| Server | Node.js, Hono | Complete |
+| Database | PostgreSQL, Drizzle ORM | Complete |
+| API | tRPC | Complete |
+| Web | React, Vite, TailwindCSS | In Progress |
+| TUI | Blessed | Complete |
+| AI | Mastra (OpenAI/Anthropic) | Complete |
+| Auth | Sessions, OAuth (partial) | In Progress |
+| CI/CD | Docker (planned) | Not Started |
+| Search | TBD (Meilisearch?) | Not Started |
 
 ---
 
-## Team Allocation
+## Priority Matrix
 
-| Stream        | Skills Needed          | Est. Effort |
-| ------------- | ---------------------- | ----------- |
-| 1. Git Server | Backend, Git internals | 3 weeks     |
-| 2. Database   | Backend, SQL           | 2 weeks     |
-| 3. API        | Backend, GraphQL       | 3 weeks     |
-| 4. Web App    | Frontend, React        | 6 weeks     |
-| 5. CLI        | TypeScript             | 2 weeks     |
-| 6. AI         | ML/AI, Mastra          | 4 weeks     |
-| 7. CI/CD      | DevOps, Docker         | 4 weeks     |
+### P0 - Must Have (Blocking)
 
-**Recommended Team:**
+1. Fix TUI diff view
+2. CI/CD engine
+3. Branch protection
+4. Notifications
+5. PR merge execution
 
-- 2 Backend engineers (Streams 1, 2, 3)
-- 2 Frontend engineers (Stream 4)
-- 1 Full-stack (Streams 5, 6)
-- 1 DevOps (Stream 7)
+### P1 - Should Have (Competitive)
+
+1. Code search
+2. AI PR descriptions
+3. AI code review bot
+4. Fork creation
+5. OAuth providers
+
+### P2 - Nice to Have (Polish)
+
+1. SSH protocol
+2. Milestones
+3. Releases
+4. Wiki
+5. Mobile experience
+
+### P3 - Future (Differentiation)
+
+1. AI semantic search
+2. AI test generation
+3. Federation
+4. P2P sync
+5. Plugin system
 
 ---
 
-## Getting Started
+## Quick Wins (Good First Issues)
 
-### For Contributors
-
-1. Pick a stream that interests you
-2. Check the dependencies
-3. Create a branch: `git checkout -b stream-X-description`
-4. Implement the milestone
-5. Open a PR
-
-### Quick Wins (Good First Issues)
-
-- [ ] Add `wit serve` command skeleton
-- [ ] Design database schema in Drizzle
-- [ ] Create API route structure
-- [ ] Set up Next.js app with shadcn
-- [ ] Add `wit pr create` command
+- [ ] Add ESLint to CI workflow (30 min)
+- [ ] Add `tsc --noEmit` to CI (15 min)
+- [ ] Create coverage report in CI (1 hour)
+- [ ] Add webhook management API endpoints (2 hours)
+- [ ] Implement fork creation logic (4 hours)
+- [ ] Add milestone schema and CRUD (4 hours)
 
 ---
 
 ## Success Metrics
 
-- **Week 4:** Can push to self-hosted server and browse code in web UI
-- **Week 8:** Full PR workflow working, comparable to basic GitHub
-- **Week 12:** AI features and CI/CD make it better than GitHub
+| Milestone | Target | Status |
+|-----------|--------|--------|
+| Core VCS parity with Git | 95% | 90% |
+| All tests passing | 100% | 100% |
+| Test coverage | >80% | ~65% |
+| CI/CD MVP working | Week 8 | Not started |
+| Branch protection working | Week 10 | Not started |
+| AI features differentiate | Week 16 | Partial |
+
+---
+
+## Contributing
+
+### For Contributors
+
+1. Check the priority matrix above
+2. Pick a task from P0 or P1
+3. Create a branch: `wit checkout -b feature/description`
+4. Implement with tests
+5. Open a PR
+
+### Code Style
+
+- Follow existing patterns in `src/commands/`
+- Use `WitError` for user-facing errors
+- Include helpful suggestions in error messages
+- Add tests for new functionality
+- Document public functions with JSDoc
 
 ---
 
 ## License
 
-MIT - Let's build this in the open.
+MIT - Built in the open.
