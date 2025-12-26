@@ -4,7 +4,9 @@ import { logger } from 'hono/logger';
 import { cors } from 'hono/cors';
 import { createGitRoutes } from './routes/git';
 import { RepoManager } from './storage/repos';
+import { syncReposToDatabase } from './storage/sync';
 import * as path from 'path';
+import { initDatabase, healthCheck as dbHealthCheck, isConnected as isDbConnected } from '../db';
 
 /**
  * Server configuration options
@@ -53,11 +55,17 @@ export function createApp(repoManager: RepoManager, options: { verbose?: boolean
   }));
 
   // Health check endpoint
-  app.get('/health', (c) => {
+  app.get('/health', async (c) => {
+    const dbStatus = await dbHealthCheck();
+    
     return c.json({
-      status: 'ok',
+      status: dbStatus.ok ? 'ok' : 'degraded',
       version: '2.0.0',
       timestamp: new Date().toISOString(),
+      database: {
+        connected: dbStatus.ok,
+        latency: dbStatus.latency,
+      },
     });
   });
 
@@ -71,6 +79,20 @@ export function createApp(repoManager: RepoManager, options: { verbose?: boolean
         name: r.name,
         url: `/${r.owner}/${r.name}.git`,
       })),
+    });
+  });
+
+  // Sync repositories to database
+  app.post('/sync', async (c) => {
+    const results = await syncReposToDatabase(repoManager);
+    return c.json({
+      message: 'Sync complete',
+      results,
+      summary: {
+        created: results.filter(r => r.action === 'created').length,
+        skipped: results.filter(r => r.action === 'skipped').length,
+        errors: results.filter(r => r.action === 'error').length,
+      },
     });
   });
 
@@ -97,6 +119,20 @@ export function createApp(repoManager: RepoManager, options: { verbose?: boolean
  */
 export function startServer(options: ServerOptions): WitServer {
   const { port, reposDir, verbose = false, host = '0.0.0.0' } = options;
+
+  // Initialize database if DATABASE_URL is set
+  const databaseUrl = process.env.DATABASE_URL;
+  if (databaseUrl) {
+    try {
+      initDatabase(databaseUrl);
+      console.log('✓ Database connected');
+    } catch (error) {
+      console.error('✗ Database connection failed:', error instanceof Error ? error.message : error);
+      console.warn('⚠ Running without database');
+    }
+  } else {
+    console.warn('⚠ DATABASE_URL not set - running without database');
+  }
 
   // Resolve repos directory
   const absoluteReposDir = path.resolve(reposDir);
@@ -160,3 +196,5 @@ export function startServer(options: ServerOptions): WitServer {
  */
 export { RepoManager } from './storage/repos';
 export { createGitRoutes } from './routes/git';
+export { syncReposToDatabase, syncRepoToDatabase } from './storage/sync';
+export { authMiddleware, gitAuthMiddleware, requireAuth } from './middleware/auth';
