@@ -15,6 +15,7 @@ import {
 export const ownerTypeEnum = pgEnum('owner_type', ['user', 'organization']);
 export const prStateEnum = pgEnum('pr_state', ['open', 'closed', 'merged']);
 export const issueStateEnum = pgEnum('issue_state', ['open', 'closed']);
+export const milestoneStateEnum = pgEnum('milestone_state', ['open', 'closed']);
 export const reviewStateEnum = pgEnum('review_state', [
   'pending',
   'approved',
@@ -205,6 +206,22 @@ export const watches = pgTable(
   })
 );
 
+// ============ MILESTONES ============
+
+export const milestones = pgTable('milestones', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  repoId: uuid('repo_id')
+    .notNull()
+    .references(() => repositories.id, { onDelete: 'cascade' }),
+  title: text('title').notNull(),
+  description: text('description'),
+  dueDate: timestamp('due_date', { withTimezone: true }),
+  state: milestoneStateEnum('state').notNull().default('open'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  closedAt: timestamp('closed_at', { withTimezone: true }),
+});
+
 // ============ PULL REQUESTS ============
 
 export const pullRequests = pgTable('pull_requests', {
@@ -235,6 +252,11 @@ export const pullRequests = pgTable('pull_requests', {
   authorId: uuid('author_id')
     .notNull()
     .references(() => users.id),
+
+  // Milestone reference
+  milestoneId: uuid('milestone_id').references(() => milestones.id, {
+    onDelete: 'set null',
+  }),
 
   isDraft: boolean('is_draft').notNull().default(false),
   isMergeable: boolean('is_mergeable'),
@@ -307,6 +329,11 @@ export const issues = pgTable('issues', {
     .notNull()
     .references(() => users.id),
   assigneeId: uuid('assignee_id').references(() => users.id),
+
+  // Milestone reference
+  milestoneId: uuid('milestone_id').references(() => milestones.id, {
+    onDelete: 'set null',
+  }),
 
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
@@ -441,6 +468,9 @@ export type NewStar = typeof stars.$inferInsert;
 export type Watch = typeof watches.$inferSelect;
 export type NewWatch = typeof watches.$inferInsert;
 
+export type Milestone = typeof milestones.$inferSelect;
+export type NewMilestone = typeof milestones.$inferInsert;
+
 export type PullRequest = typeof pullRequests.$inferSelect;
 export type NewPullRequest = typeof pullRequests.$inferInsert;
 
@@ -470,3 +500,7 @@ export type NewActivity = typeof activities.$inferInsert;
 
 export type Webhook = typeof webhooks.$inferSelect;
 export type NewWebhook = typeof webhooks.$inferInsert;
+
+export type MilestoneState = (typeof milestoneStateEnum.enumValues)[number];
+export type IssueState = (typeof issueStateEnum.enumValues)[number];
+export type PrState = (typeof prStateEnum.enumValues)[number];

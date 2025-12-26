@@ -37,3 +37,6 @@ export {
   webhookDelivery,
   type WebhookEvent,
 } from './webhook';
+
+// Milestone model
+export { milestoneModel, type MilestoneWithProgress } from './milestones';
