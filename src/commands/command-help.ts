@@ -1042,7 +1042,7 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
     name: 'pr',
     summary: 'Manage pull requests',
     usage: 'wit pr <subcommand> [options]',
-    description: 'Create, list, view, merge, and close pull requests from the command line.',
+    description: 'Create, list, view, merge, close, and review pull requests from the command line. Includes AI-powered code review via CodeRabbit.',
     options: [
       { flag: 'create', description: 'Create a pull request from current branch' },
       { flag: 'list', description: 'List pull requests' },
@@ -1051,9 +1051,14 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
       { flag: 'merge <number>', description: 'Merge a pull request' },
       { flag: 'close <number>', description: 'Close a pull request' },
       { flag: 'reopen <number>', description: 'Reopen a closed pull request' },
+      { flag: 'review [<number>]', description: 'AI code review using CodeRabbit (PR or local changes)' },
+      { flag: 'review-status', description: 'Show CodeRabbit installation and configuration status' },
       { flag: '-b, --base <branch>', description: 'Target branch for PR (default: main)' },
       { flag: '-t, --title <title>', description: 'Pull request title' },
       { flag: '--state <state>', description: 'Filter by state (open, closed, merged, all)' },
+      { flag: '--json', description: 'Output review results in JSON format' },
+      { flag: '--verbose', description: 'Show detailed review output' },
+      { flag: '--configure', description: 'Configure CodeRabbit API key' },
     ],
     examples: [
       { command: 'wit pr create', description: 'Create PR from current branch' },
@@ -1062,8 +1067,12 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
       { command: 'wit pr list --state all', description: 'List all PRs' },
       { command: 'wit pr view 123', description: 'View PR #123' },
       { command: 'wit pr merge 123', description: 'Merge PR #123' },
+      { command: 'wit pr review 123', description: 'AI review PR #123 with CodeRabbit' },
+      { command: 'wit pr review', description: 'AI review local changes with CodeRabbit' },
+      { command: 'wit pr review --configure', description: 'Configure CodeRabbit API key' },
+      { command: 'wit pr review-status', description: 'Check CodeRabbit setup' },
     ],
-    seeAlso: ['issue', 'push', 'branch'],
+    seeAlso: ['issue', 'push', 'branch', 'ai'],
   },
 
   issue: {
