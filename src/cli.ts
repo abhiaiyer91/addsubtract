@@ -49,6 +49,8 @@ import {
   handleFetch,
   handlePull,
   handlePush,
+  // GitHub integration
+  handleGitHub,
   // Plumbing commands
   handleRevParse,
   handleUpdateRef,
@@ -158,6 +160,11 @@ Remote Operations:
   pull [<remote>]       Fetch and integrate with local branch
   push [<remote>]       Update remote refs and objects
 
+GitHub Integration:
+  github login          Authenticate with GitHub
+  github logout         Remove stored GitHub credentials
+  github status         Show authentication status
+
 Advanced Features:
   hooks                 Manage repository hooks
   submodule             Manage submodules
@@ -229,6 +236,8 @@ Examples:
   wit fetch origin           # Fetch from origin
   wit pull                   # Pull current branch
   wit push -u origin main    # Push and set upstream
+  wit github login           # Login to GitHub
+  wit github status          # Check GitHub auth status
 `;
 
 const COMMANDS = [
@@ -248,6 +257,8 @@ const COMMANDS = [
   'cherry-pick', 'rebase', 'revert',
   // Remote commands
   'remote', 'clone', 'fetch', 'pull', 'push',
+  // GitHub integration
+  'github',
   // Advanced features
   'hooks', 'submodule', 'worktree', 'reflog', 'gc',
   'help',
@@ -682,6 +693,18 @@ function main(): void {
         // Pass through all remaining args
         handlePush(args.slice(args.indexOf('push') + 1));
         break;
+
+      // GitHub integration
+      case 'github':
+        handleGitHub(args.slice(args.indexOf('github') + 1)).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
+          }
+          process.exit(1);
+        });
+        return; // Exit main() to let async handle complete
 
       // Advanced features
       case 'hooks':

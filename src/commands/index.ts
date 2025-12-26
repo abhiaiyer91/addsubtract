@@ -61,6 +61,9 @@ export { handleFetch, fetch, fetchAsync } from './fetch';
 export { handlePull, pull, pullAsync } from './pull';
 export { handlePush, push, pushAsync } from './push';
 
+// GitHub integration
+export { handleGitHub, GitHubManager, getGitHubManager } from './github';
+
 // Advanced features
 export { handleReflog, ReflogManager, updateReflog } from './reflog';
 export { handleGC, GarbageCollector } from './gc';

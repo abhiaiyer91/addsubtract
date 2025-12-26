@@ -557,7 +557,28 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
       { command: 'wit push --force', description: 'Force push' },
       { command: 'wit push --tags', description: 'Push all tags' },
     ],
-    seeAlso: ['fetch', 'pull', 'remote'],
+    seeAlso: ['fetch', 'pull', 'remote', 'github'],
+  },
+
+  // ============ GitHub Integration ============
+  github: {
+    name: 'github',
+    summary: 'Manage GitHub authentication',
+    usage: 'wit github <subcommand>',
+    description: 'Authenticate with GitHub to enable push/pull operations for private repositories and increase API rate limits.',
+    options: [
+      { flag: 'login', description: 'Authenticate with GitHub using device flow' },
+      { flag: 'logout', description: 'Remove stored GitHub credentials' },
+      { flag: 'status', description: 'Show current authentication status' },
+      { flag: 'token', description: 'Print the current access token (for scripting)' },
+    ],
+    examples: [
+      { command: 'wit github login', description: 'Start interactive GitHub login' },
+      { command: 'wit github status', description: 'Check if you are logged in' },
+      { command: 'wit github logout', description: 'Log out from GitHub' },
+      { command: 'wit github token', description: 'Get token for scripting' },
+    ],
+    seeAlso: ['push', 'pull', 'clone', 'remote'],
   },
 
   // ============ Advanced Features ============
