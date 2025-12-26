@@ -12,7 +12,7 @@ These commands are designed to make common tasks faster and more enjoyable.
 Create a quick work-in-progress commit with an auto-generated message.
 
 ```bash
-tsgit wip [options] [suffix]
+wit wip [options] [suffix]
 ```
 
 ### Options
@@ -31,13 +31,13 @@ tsgit wip [options] [suffix]
 
 ```bash
 # WIP commit with staged files
-tsgit wip
+wit wip
 
 # Stage all tracked files and WIP commit
-tsgit wip -a
+wit wip -a
 
 # WIP with custom suffix
-tsgit wip -a "fixing login bug"
+wit wip -a "fixing login bug"
 ```
 
 ### Generated Messages
@@ -48,7 +48,7 @@ WIP: 2024-01-15 10:30 - fixing login bug
 ```
 
 <Tip>
-Use `tsgit uncommit` later to restore your WIP state and create a proper commit.
+Use `wit uncommit` later to restore your WIP state and create a proper commit.
 </Tip>
 
 ---
@@ -58,7 +58,7 @@ Use `tsgit uncommit` later to restore your WIP state and create a proper commit.
 Modify the last commit easily.
 
 ```bash
-tsgit amend [options]
+wit amend [options]
 ```
 
 ### Options
@@ -72,22 +72,22 @@ tsgit amend [options]
 
 ```bash
 # Change the commit message
-tsgit amend -m "Better commit message"
+wit amend -m "Better commit message"
 
 # Add staged changes to last commit (keep message)
-tsgit add forgotten-file.ts
-tsgit amend
+wit add forgotten-file.ts
+wit amend
 
 # Stage all and amend
-tsgit amend -a
+wit amend -a
 ```
 
 ### Comparison with Git
 
-| Git | tsgit |
+| Git | wit |
 |-----|-------|
-| `git commit --amend -m "msg"` | `tsgit amend -m "msg"` |
-| `git add file && git commit --amend --no-edit` | `tsgit add file && tsgit amend` |
+| `git commit --amend -m "msg"` | `wit amend -m "msg"` |
+| `git add file && git commit --amend --no-edit` | `wit add file && wit amend` |
 
 ---
 
@@ -96,7 +96,7 @@ tsgit amend -a
 Create fixup commits for later squashing.
 
 ```bash
-tsgit fixup <commit> [options]
+wit fixup <commit> [options]
 ```
 
 ### Options
@@ -109,10 +109,10 @@ tsgit fixup <commit> [options]
 
 ```bash
 # Create fixup for specific commit
-tsgit fixup HEAD~2
+wit fixup HEAD~2
 
 # List recent commits first
-tsgit fixup -l
+wit fixup -l
 # Then choose one to fix up
 ```
 
@@ -123,7 +123,7 @@ tsgit fixup -l
 Create quick checkpoints without full commits.
 
 ```bash
-tsgit snapshot <command> [options]
+wit snapshot <command> [options]
 ```
 
 ### Commands
@@ -139,16 +139,16 @@ tsgit snapshot <command> [options]
 
 ```bash
 # Create a snapshot before risky changes
-tsgit snapshot create "before refactor"
+wit snapshot create "before refactor"
 
 # List all snapshots
-tsgit snapshot list
+wit snapshot list
 
 # Restore if something goes wrong
-tsgit snapshot restore "before refactor"
+wit snapshot restore "before refactor"
 
 # Clean up old snapshot
-tsgit snapshot delete "before refactor"
+wit snapshot delete "before refactor"
 ```
 
 ### Example Output
@@ -171,7 +171,7 @@ Snapshots are lighter than commits and don't appear in your commit history. They
 Find and remove merged or stale branches.
 
 ```bash
-tsgit cleanup [options]
+wit cleanup [options]
 ```
 
 ### Options
@@ -188,16 +188,16 @@ tsgit cleanup [options]
 
 ```bash
 # See what branches can be cleaned
-tsgit cleanup --dry-run
+wit cleanup --dry-run
 
 # Interactive cleanup with confirmation
-tsgit cleanup
+wit cleanup
 
 # Force cleanup without prompts
-tsgit cleanup --force
+wit cleanup --force
 
 # Find branches older than 60 days
-tsgit cleanup --days 60 --stale
+wit cleanup --days 60 --stale
 ```
 
 ### Example Output
@@ -222,7 +222,7 @@ Delete these branches? [y/N]
 Show repository statistics and insights.
 
 ```bash
-tsgit stats [options]
+wit stats [options]
 ```
 
 ### Options
@@ -235,10 +235,10 @@ tsgit stats [options]
 
 ```bash
 # Basic stats
-tsgit stats
+wit stats
 
 # Detailed stats
-tsgit stats --all
+wit stats --all
 ```
 
 ### Example Output
@@ -278,13 +278,13 @@ Activity:
 Show who changed each line of a file.
 
 ```bash
-tsgit blame <file>
+wit blame <file>
 ```
 
 ### Examples
 
 ```bash
-tsgit blame src/index.ts
+wit blame src/index.ts
 ```
 
 ### Example Output
@@ -304,24 +304,24 @@ i9j0k1l2 (Alice  2024-01-12)   const repo = Repository.open('.');
 
 ```bash
 # Working on something, need to switch contexts fast
-tsgit wip -a  # Quick save
+wit wip -a  # Quick save
 
 # Switch to handle something else
-tsgit switch other-branch
+wit switch other-branch
 
 # Come back later
-tsgit switch -
-tsgit uncommit  # Restore WIP state
+wit switch -
+wit uncommit  # Restore WIP state
 
 # Before doing something risky
-tsgit snapshot create "known good state"
+wit snapshot create "known good state"
 
 # Try something risky...
 
 # Didn't work? Restore!
-tsgit snapshot restore "known good state"
+wit snapshot restore "known good state"
 
 # Done with feature, clean up
-tsgit cleanup --dry-run
-tsgit cleanup
+wit cleanup --dry-run
+wit cleanup
 ```

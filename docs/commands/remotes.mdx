@@ -1,41 +1,52 @@
 ---
-title: Remote Operations
-description: Working with remote repositories - clone, fetch, pull, push
+title: "Remote Operations"
+description: "Clone, fetch, pull, and push to remote repositories"
 ---
 
 # Remote Operations
 
-wit provides a complete set of commands for working with remote repositories, enabling collaboration and distributed workflows.
+wit provides full support for remote Git operations, allowing you to collaborate with others using any Git hosting service including GitHub, GitLab, Bitbucket, or self-hosted servers.
 
-## Overview
+## Quick Reference
 
 | Command | Description |
 |---------|-------------|
-| `clone` | Clone a repository into a new directory |
-| `remote` | Manage remote repository connections |
-| `fetch` | Download objects and refs from a remote |
-| `pull` | Fetch and integrate changes from a remote |
-| `push` | Upload local changes to a remote |
+| `wit clone <url>` | Clone a repository |
+| `wit remote add <name> <url>` | Add a remote |
+| `wit fetch [remote]` | Download objects from remote |
+| `wit pull [remote]` | Fetch and merge |
+| `wit push [remote] [branch]` | Upload changes to remote |
 
 ## Clone
 
-Clone a repository to create a local copy.
+Clone a repository from a remote URL:
 
 ```bash
-# Clone a repository
-wit clone <url> [directory]
+# Clone into a new directory
+wit clone https://github.com/user/repo.git
 
-# Clone to a specific directory
-wit clone /path/to/repo my-project
+# Clone into a specific directory
+wit clone https://github.com/user/repo.git my-project
 
-# Shallow clone (limited history)
-wit clone --depth 1 <url>
-
-# Clone a specific branch
-wit clone --branch develop <url>
+# Clone into current directory
+wit clone https://github.com/user/repo.git .
 ```
 
 ### Clone Options
+
+```bash
+# Clone a specific branch
+wit clone -b develop https://github.com/user/repo.git
+
+# Shallow clone (faster, less history)
+wit clone --depth 1 https://github.com/user/repo.git
+
+# Bare clone (no working directory)
+wit clone --bare https://github.com/user/repo.git
+
+# Clone without checking out
+wit clone -n https://github.com/user/repo.git
+```
 
 | Option | Description |
 |--------|-------------|
@@ -46,85 +57,52 @@ wit clone --branch develop <url>
 | `-o, --origin <name>` | Use `<name>` instead of 'origin' for the remote |
 | `--single-branch` | Clone only one branch |
 
-### Examples
+## Remotes
+
+Manage remote repository connections:
 
 ```bash
-# Clone a local repository
-wit clone ../other-project ./my-copy
-
-# Clone with shallow history for faster downloads
-wit clone --depth 10 /path/to/large-repo
-
-# Clone and checkout a specific branch
-wit clone --branch feature-x /path/to/repo
-```
-
-## Remote
-
-Manage connections to remote repositories.
-
-```bash
-# List remotes
+# List all remotes
 wit remote
 
 # List remotes with URLs
 wit remote -v
 
 # Add a new remote
-wit remote add <name> <url>
+wit remote add origin https://github.com/user/repo.git
+wit remote add upstream https://github.com/original/repo.git
 
 # Remove a remote
-wit remote remove <name>
+wit remote remove upstream
 
 # Rename a remote
-wit remote rename <old-name> <new-name>
+wit remote rename origin github
 
 # Show remote details
-wit remote show <name>
-
-# Get remote URL
-wit remote get-url <name>
-
-# Change remote URL
-wit remote set-url <name> <new-url>
-```
-
-### Examples
-
-```bash
-# Add origin remote
-wit remote add origin /path/to/central-repo
-
-# Add a second remote for collaboration
-wit remote add upstream /path/to/upstream-repo
-
-# View all remotes with URLs
-wit remote -v
-# origin    /path/to/central-repo (fetch)
-# origin    /path/to/central-repo (push)
-
-# Rename a remote
-wit remote rename origin main-repo
+wit remote show origin
 
 # Update remote URL
-wit remote set-url origin /new/path/to/repo
+wit remote set-url origin https://github.com/user/new-repo.git
+
+# Get remote URL
+wit remote get-url origin
 ```
 
 ## Fetch
 
-Download objects and refs from a remote repository without integrating changes.
+Download objects and refs from a remote without merging:
 
 ```bash
-# Fetch from origin (default)
+# Fetch from origin (default remote)
 wit fetch
 
-# Fetch from specific remote
-wit fetch <remote>
+# Fetch from a specific remote
+wit fetch upstream
 
 # Fetch all remotes
 wit fetch --all
 
-# Fetch and prune deleted branches
+# Fetch and prune deleted remote branches
 wit fetch --prune
 
 # Fetch with tags
@@ -142,45 +120,32 @@ wit fetch --tags
 | `-v, --verbose` | Be more verbose |
 | `-n, --dry-run` | Show what would be done without making changes |
 
-### Examples
+After fetching, you can see what changed:
 
 ```bash
-# Fetch updates from origin
-wit fetch origin
+# Compare local and remote
+wit log main..origin/main
 
-# Fetch and clean up stale branches
-wit fetch --prune
-
-# Fetch from all remotes
-wit fetch --all
-
-# See what would be fetched
-wit fetch --dry-run
-```
-
-### Output
-
-```bash
-wit fetch origin
-# From origin
-#  * [new branch]      feature-x   -> origin/feature-x
-#    abc1234..def5678  main        -> origin/main
-# ✓ Fetch complete: 1 new, 1 updated
+# See all remote branches
+wit branch -r
 ```
 
 ## Pull
 
-Fetch from a remote and integrate changes into the current branch.
+Fetch from remote and merge into current branch:
 
 ```bash
-# Pull from upstream (fetch + merge)
+# Pull from tracking branch
 wit pull
+
+# Pull from specific remote/branch
+wit pull origin main
 
 # Pull with rebase instead of merge
 wit pull --rebase
 
-# Pull from specific remote and branch
-wit pull <remote> <branch>
+# Pull and auto-stash local changes
+wit pull --autostash
 
 # Only fast-forward (fail if not possible)
 wit pull --ff-only
@@ -225,56 +190,34 @@ wit pull --ff-only
   </Tab>
 </Tabs>
 
-### Handling Uncommitted Changes
+### Pull Conflicts
+
+If there are conflicts during pull:
 
 ```bash
-# Option 1: Stash before pulling
-wit stash
-wit pull
-wit stash pop
+# See conflicts
+wit merge --conflicts
 
-# Option 2: Use autostash
-wit pull --autostash
-```
+# Resolve and continue
+wit merge --continue
 
-### Examples
-
-```bash
-# Standard pull from origin
-wit pull
-
-# Pull with rebase to keep history linear
-wit pull --rebase
-
-# Pull specific branch
-wit pull origin feature-branch
-
-# Safe pull that won't create merge commits
-wit pull --ff-only
+# Or abort
+wit merge --abort
 ```
 
 ## Push
 
-Upload local commits to a remote repository.
+Upload local commits to a remote repository:
 
 ```bash
-# Push current branch to origin
+# Push current branch to tracking remote
 wit push
 
-# Push to specific remote
-wit push <remote>
-
-# Push specific branch
-wit push <remote> <branch>
+# Push to specific remote/branch
+wit push origin main
 
 # Push and set upstream tracking
 wit push -u origin main
-
-# Force push (use with caution!)
-wit push --force
-
-# Safer force push
-wit push --force-with-lease
 
 # Push all branches
 wit push --all
@@ -284,6 +227,13 @@ wit push --tags
 
 # Delete remote branch
 wit push --delete origin old-branch
+
+# Force push (use with caution!)
+wit push --force
+wit push -f
+
+# Safer force push
+wit push --force-with-lease
 ```
 
 ### Push Options
@@ -303,25 +253,6 @@ wit push --delete origin old-branch
 **Force Push Warning**: Using `--force` can overwrite remote history and cause problems for collaborators. Prefer `--force-with-lease` which checks that the remote hasn't changed before pushing.
 </Warning>
 
-### Examples
-
-```bash
-# First push of a new branch
-wit push -u origin feature-branch
-
-# Push after making local commits
-wit push
-
-# Push all local tags
-wit push --tags
-
-# Delete a remote branch
-wit push --delete origin old-feature
-
-# Force push after rebase (safer version)
-wit push --force-with-lease
-```
-
 ### Push Rejections
 
 If your push is rejected, it usually means the remote has changes you don't have:
@@ -340,17 +271,99 @@ wit push
 wit push --force-with-lease
 ```
 
+## Authentication
+
+### GitHub Authentication
+
+The recommended way to authenticate with GitHub:
+
+```bash
+# Login with OAuth (opens browser)
+wit github login
+
+# Check authentication status
+wit github status
+
+# Logout
+wit github logout
+```
+
+### Environment Variables
+
+You can also use environment variables:
+
+```bash
+# GitHub token
+export GITHUB_TOKEN=ghp_xxxxxxxxxxxx
+
+# Or use GH CLI token
+export GH_TOKEN=ghp_xxxxxxxxxxxx
+```
+
+### Personal Access Tokens
+
+For other Git hosts, use personal access tokens:
+
+```bash
+# Token in URL (not recommended for shared machines)
+wit clone https://token@github.com/user/repo.git
+
+# Or set in environment
+export WIT_TOKEN=your-token
+```
+
+## Working with Forks
+
+Common fork workflow:
+
+```bash
+# Clone your fork
+wit clone https://github.com/you/repo.git
+cd repo
+
+# Add upstream remote
+wit remote add upstream https://github.com/original/repo.git
+
+# Fetch upstream changes
+wit fetch upstream
+
+# Merge upstream into your branch
+wit merge upstream/main
+
+# Push to your fork
+wit push origin main
+```
+
+## Tracking Branches
+
+Set up tracking between local and remote branches:
+
+```bash
+# Push and set upstream
+wit push -u origin feature
+
+# After this, you can just use:
+wit push
+wit pull
+
+# See tracking configuration
+wit branch -vv
+
+# Set up tracking manually
+wit branch --set-upstream-to=origin/main main
+```
+
 ## Complete Workflow Example
 
 ```bash
 # 1. Clone a repository
-wit clone /path/to/shared-repo my-project
+wit clone https://github.com/user/repo.git my-project
 cd my-project
 
 # 2. Check remotes
 wit remote -v
-# origin    /path/to/shared-repo (fetch)
-# origin    /path/to/shared-repo (push)
+# origin    https://github.com/user/repo.git (fetch)
+# origin    https://github.com/user/repo.git (push)
 
 # 3. Create a feature branch and make changes
 wit switch -c feature-x
@@ -377,18 +390,37 @@ wit branch -d feature-x
 wit push --delete origin feature-x
 ```
 
-## Tracking Branches
+## Troubleshooting
 
-When you clone or push with `-u`, wit sets up tracking relationships:
+### "Authentication failed"
 
 ```bash
-# See tracking configuration
-wit branch -vv
-# * main      abc1234 [origin/main] Latest commit message
-#   feature   def5678 [origin/feature: ahead 2] Feature work
+# Check if logged in
+wit github status
 
-# Set up tracking manually
-wit branch --set-upstream-to=origin/main main
+# Re-login
+wit github logout
+wit github login
+```
+
+### "Updates were rejected"
+
+Your local branch is behind the remote:
+
+```bash
+# Option 1: Pull first
+wit pull
+wit push
+
+# Option 2: Force push (if you know what you're doing)
+wit push --force
+```
+
+### "No upstream branch"
+
+```bash
+# Set upstream when pushing
+wit push -u origin branch-name
 ```
 
 ## Tips

@@ -32,16 +32,16 @@ wit provides a comprehensive set of commands organized by functionality. Many co
     Release management: tag, lightweight, annotated
   </Card>
   <Card title="Undo & History" icon="rotate-left" href="/commands/undo-history">
-    Powerful undo capabilities: undo, history, restore, uncommit
+    Powerful undo capabilities: undo, history, restore, uncommit, reset
   </Card>
   <Card title="Quality of Life" icon="wand-magic-sparkles" href="/commands/quality-of-life">
-    Productivity boosters: wip, amend, fixup, snapshot, cleanup, stats
+    Productivity boosters: wip, amend, fixup, snapshot, cleanup, stats, blame
   </Card>
   <Card title="Debugging" icon="bug" href="/commands/debugging">
     Find bugs: bisect, show, clean
   </Card>
   <Card title="Advanced" icon="gear" href="/commands/advanced">
-    Hooks, submodules, worktrees, reflog, garbage collection
+    Hooks, submodules, worktrees, reflog, garbage collection, plumbing
   </Card>
 </CardGroup>
 
@@ -63,6 +63,7 @@ wit provides a comprehensive set of commands organized by functionality. Many co
 | `wit stash` | Temporarily save changes |
 | `wit undo` | Undo the last operation |
 | `wit wip` | Quick WIP commit |
+| `wit ai commit` | AI-generated commit message |
 
 ### wit-Exclusive Commands
 
@@ -79,7 +80,36 @@ These commands are unique to wit and don't exist in Git:
 | `wit snapshot` | Quick checkpoints without full commits |
 | `wit scope` | Limit operations to specific paths (monorepo) |
 | `wit history` | Show operation history (what undo uses) |
-| `wit ai` | AI-powered commit messages and code review |
+| `wit ai <query>` | Natural language git commands |
+| `wit ai commit` | AI-generated commit messages |
+| `wit ai review` | AI code review |
+
+### History Rewriting Commands
+
+| Command | Description |
+|---------|-------------|
+| `wit cherry-pick <commit>` | Apply changes from specific commits |
+| `wit rebase <branch>` | Rebase current branch onto another |
+| `wit revert <commit>` | Create commit that undoes changes |
+
+### Remote Operations
+
+| Command | Description |
+|---------|-------------|
+| `wit remote` | List or manage remotes |
+| `wit clone <url>` | Clone a repository |
+| `wit fetch` | Download objects from remote |
+| `wit pull` | Fetch and merge |
+| `wit push` | Push to remote |
+
+### Debugging & Inspection
+
+| Command | Description |
+|---------|-------------|
+| `wit show <commit>` | Show commit details and diff |
+| `wit bisect` | Binary search for bug introduction |
+| `wit clean` | Remove untracked files |
+| `wit fsck` | Verify repository integrity |
 
 ## Command Syntax
 
@@ -105,6 +135,7 @@ wit --help
 # Help for specific command
 wit commit --help
 wit undo --help
+wit ai --help
 ```
 
 ## Differences from Git
@@ -119,5 +150,51 @@ wit aims to be more intuitive than Git:
 | `git reset HEAD~1` | `wit uncommit` | Clear intent |
 | `git stash` (manual) | Auto-stash on switch | Automatic |
 | `git reflog` (cryptic) | `wit undo` | Simple undo |
+| No AI | `wit ai commit` | AI assistance |
 | Complex merge conflicts | Structured JSON conflicts | Easier resolution |
 | Git LFS required | Built-in large file handling | No setup needed |
+
+## Full Command List
+
+### Core
+- `init`, `add`, `commit`, `status`, `log`, `diff`
+
+### Branches
+- `branch`, `switch`, `checkout`, `restore`
+
+### Merge
+- `merge`
+
+### History
+- `undo`, `history`, `uncommit`, `reset`, `stash`
+
+### Tags
+- `tag`
+
+### History Rewriting
+- `cherry-pick`, `rebase`, `revert`
+
+### Remote
+- `remote`, `clone`, `fetch`, `pull`, `push`
+
+### Quality of Life
+- `wip`, `amend`, `fixup`, `cleanup`, `stats`, `blame`, `snapshot`
+
+### Advanced
+- `hooks`, `submodule`, `worktree`, `reflog`, `gc`
+
+### Debugging
+- `show`, `bisect`, `clean`, `fsck`
+
+### Monorepo
+- `scope`
+
+### AI
+- `ai` (natural language, commit, review, explain, resolve)
+
+### Visual
+- `ui`, `web`, `graph`
+
+### Plumbing
+- `cat-file`, `hash-object`, `ls-files`, `ls-tree`
+- `rev-parse`, `update-ref`, `symbolic-ref`, `for-each-ref`, `show-ref`

@@ -60,6 +60,8 @@ export interface GCStats {
   reflogEntriesExpired: number;
   tempFilesRemoved: number;
   corruptObjectsFound: number;
+  refsPacked: number;
+  looseRefsPruned: number;
   bytesFreed: number;
   duration: number;
 }
@@ -102,6 +104,8 @@ export class GarbageCollector {
       reflogEntriesExpired: 0,
       tempFilesRemoved: 0,
       corruptObjectsFound: 0,
+      refsPacked: 0,
+      looseRefsPruned: 0,
       bytesFreed: 0,
       duration: 0,
     };
@@ -169,12 +173,36 @@ export class GarbageCollector {
     stats.tempFilesRemoved = tempResult.count;
     stats.bytesFreed += tempResult.bytes;
 
-    // Step 7: Pack objects if aggressive
+    // Step 7: Pack refs
+    // Always pack refs during gc (like git does)
+    if (!options.dryRun) {
+      const packResult = this.repo.refs.packRefs({
+        all: options.aggressive, // Pack all refs including remotes in aggressive mode
+        prune: options.aggressive, // Prune loose refs in aggressive mode
+      });
+      stats.refsPacked = packResult.packed;
+      stats.looseRefsPruned = packResult.pruned;
+      
+      if (!options.quiet && packResult.packed > 0) {
+        console.log(`Packed ${packResult.packed} refs`);
+        if (packResult.pruned > 0) {
+          console.log(`Pruned ${packResult.pruned} loose refs`);
+        }
+      }
+      
+      for (const error of packResult.errors) {
+        if (!options.quiet) {
+          console.log(`  Warning: ${error}`);
+        }
+      }
+    }
+
+    // Step 8: Pack objects if aggressive
     if (options.aggressive) {
-      // In a full implementation, we would pack loose objects
+      // In a full implementation, we would pack loose objects into packfiles
       // For now, we just report that we would do it
       if (!options.quiet) {
-        console.log('Aggressive mode: would pack loose objects');
+        console.log('Aggressive mode: would pack loose objects into packfiles');
       }
     }
 
@@ -727,6 +755,14 @@ export function handleGC(args: string[]): void {
 
       if (stats.tempFilesRemoved > 0) {
         console.log(`  ${colors.green('✓')} Removed ${stats.tempFilesRemoved} temp files`);
+      }
+
+      if (stats.refsPacked > 0) {
+        console.log(`  ${colors.green('✓')} Packed ${stats.refsPacked} refs`);
+      }
+
+      if (stats.looseRefsPruned > 0) {
+        console.log(`  ${colors.green('✓')} Pruned ${stats.looseRefsPruned} loose refs`);
       }
 
       if (stats.corruptObjectsFound > 0) {
