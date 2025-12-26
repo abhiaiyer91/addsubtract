@@ -542,7 +542,9 @@ function parseTextReviewOutput(output: string): CodeRabbitReviewResult {
     }
 
     // Parse issue patterns like "⚠️ [HIGH] file.ts:42 - Message"
+    // Match optional emoji prefix followed by severity in brackets
     const issueMatch = line.match(
+      // eslint-disable-next-line no-misleading-character-class
       /[⚠️🔴🟡🟢ℹ️❌✗✕]?\s*\[(CRITICAL|HIGH|MEDIUM|LOW|INFO|WARNING|ERROR)\]\s*([^:]+):?(\d+)?\s*[-:]\s*(.+)/i
     );
     if (issueMatch) {
