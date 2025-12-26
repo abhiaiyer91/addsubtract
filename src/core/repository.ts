@@ -269,7 +269,14 @@ export class Repository {
     const parentHashes: string[] = [];
     const headHash = this.refs.resolve('HEAD');
     if (headHash) {
-      parentHashes.push(headHash);
+      // Verify the parent commit exists before using it
+      try {
+        this.objects.readCommit(headHash);
+        parentHashes.push(headHash);
+      } catch (error) {
+        // Parent commit doesn't exist - this could happen if objects weren't properly stored
+        console.warn(`Warning: HEAD points to ${headHash} but commit object not found. Creating orphan commit.`);
+      }
     }
 
     // Create commit object

@@ -183,10 +183,15 @@ export class SmartHttpClient {
     const caps = [
       'multi_ack_detailed',
       'side-band-64k',
-      'thin-pack',
       'ofs-delta',
       'no-progress',
     ];
+
+    // Only request thin-pack if we have local objects
+    // For fresh clones (no haves), thin-pack could cause unresolvable deltas
+    if (haves.length > 0) {
+      caps.push('thin-pack');
+    }
 
     if (options?.depth) {
       caps.push('shallow');
