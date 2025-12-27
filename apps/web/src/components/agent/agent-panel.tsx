@@ -77,7 +77,7 @@ export function AgentPanel({ isOpen, onClose, repoId, repoName, owner }: AgentPa
 
         {/* Agent Chat Content */}
         <div className="h-[calc(100%-57px)]">
-          <AgentChat />
+          <AgentChat repoId={repoId} />
         </div>
       </div>
     </>
