@@ -10,8 +10,6 @@ import {
   Trash2,
   Copy,
   Star,
-  Clock,
-  GripVertical,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
