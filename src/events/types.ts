@@ -241,6 +241,46 @@ export interface MentionEvent extends BaseEvent {
   };
 }
 
+// ============ MERGE QUEUE EVENTS ============
+
+export interface MergeQueueAddedEvent extends BaseEvent {
+  type: 'merge_queue.added';
+  payload: {
+    prId: string;
+    prNumber: number;
+    repoId: string;
+    position: number;
+  };
+}
+
+export interface MergeQueueProcessEvent extends BaseEvent {
+  type: 'merge_queue.process';
+  payload: {
+    repoId: string;
+    targetBranch: string;
+  };
+}
+
+export interface MergeQueueCompletedEvent extends BaseEvent {
+  type: 'merge_queue.completed';
+  payload: {
+    prId: string;
+    prNumber: number;
+    repoId: string;
+    mergeSha: string;
+  };
+}
+
+export interface MergeQueueFailedEvent extends BaseEvent {
+  type: 'merge_queue.failed';
+  payload: {
+    prId: string;
+    prNumber: number;
+    repoId: string;
+    errorMessage: string;
+  };
+}
+
 // ============ UNION TYPE ============
 
 export type AppEvent =
@@ -260,7 +300,11 @@ export type AppEvent =
   | IssueClosedEvent
   | IssueCommentedEvent
   | CiRunCompletedEvent
-  | MentionEvent;
+  | MentionEvent
+  | MergeQueueAddedEvent
+  | MergeQueueProcessEvent
+  | MergeQueueCompletedEvent
+  | MergeQueueFailedEvent;
 
 export type EventType = AppEvent['type'];
 

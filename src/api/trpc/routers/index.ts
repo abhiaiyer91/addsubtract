@@ -16,10 +16,12 @@ import { branchProtectionRouter } from './branch-protection';
 import { notificationsRouter } from './notifications';
 import { stacksRouter } from './stacks';
 import { workflowsRouter } from './workflows';
+import { agentRouter } from './agent';
 import { aiRouter } from './ai';
 import { searchRouter } from './search';
 import { projectsRouter } from './projects';
 import { cyclesRouter } from './cycles';
+import { mergeQueueRouter } from './merge-queue';
 
 /**
  * Main application router
@@ -43,10 +45,12 @@ export const appRouter = router({
   notifications: notificationsRouter,
   stacks: stacksRouter,
   workflows: workflowsRouter,
+  agent: agentRouter,
   ai: aiRouter,
   search: searchRouter,
   projects: projectsRouter,
   cycles: cyclesRouter,
+  mergeQueue: mergeQueueRouter,
 });
 
 /**
@@ -72,8 +76,10 @@ export {
   branchProtectionRouter,
   notificationsRouter,
   stacksRouter,
+  agentRouter,
   aiRouter,
   searchRouter,
   projectsRouter,
   cyclesRouter,
+  mergeQueueRouter,
 };

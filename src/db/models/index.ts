@@ -38,6 +38,7 @@ export {
   issueCommentModel,
   labelModel,
   issueLabelModel,
+  issueInboxModel,
   ISSUE_STATUSES,
   ISSUE_PRIORITIES,
   PRIORITY_CONFIG,
@@ -96,3 +97,10 @@ export {
   type StackBranchWithPR,
   type StackWithDetails,
 } from './stack';
+
+// Agent models (coding agent sessions and messages)
+export {
+  agentSessionModel,
+  agentMessageModel,
+  agentFileChangeModel,
+} from './agent';

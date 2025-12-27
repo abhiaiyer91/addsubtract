@@ -101,7 +101,7 @@ describe('Coding Agent Tools', () => {
       const result = await readFileTool.execute({ filePath: 'nonexistent.txt' });
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('not found');
+      expect(result.errorMessage).toContain('not found');
     });
 
     it('should return error for directory path', async () => {
@@ -110,14 +110,14 @@ describe('Coding Agent Tools', () => {
       const result = await readFileTool.execute({ filePath: 'subdir' });
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('directory');
+      expect(result.errorMessage).toContain('directory');
     });
 
     it('should prevent path traversal outside repo', async () => {
       const result = await readFileTool.execute({ filePath: '../../../etc/passwd' });
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('outside repository');
+      expect(result.errorMessage).toContain('outside repository');
     });
 
     it('should detect binary files', async () => {
@@ -269,7 +269,7 @@ describe('Coding Agent Tools', () => {
 
       expect(result.success).toBe(false);
       expect(result.editsApplied).toBe(0);
-      expect(result.editResults?.[0].error).toContain('not found');
+      expect(result.editResults?.[0].errorMessage).toContain('not found');
     });
 
     it('should fail when oldText is ambiguous (multiple matches)', async () => {
@@ -281,7 +281,7 @@ describe('Coding Agent Tools', () => {
       });
 
       expect(result.success).toBe(false);
-      expect(result.editResults?.[0].error).toContain('found 2 times');
+      expect(result.editResults?.[0].errorMessage).toContain('found 2 times');
     });
 
     it('should support dry run mode', async () => {
@@ -438,14 +438,14 @@ describe('Coding Agent Tools', () => {
       const result = await listDirectoryTool.execute({ dirPath: 'nonexistent' });
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('not found');
+      expect(result.errorMessage).toContain('not found');
     });
 
     it('should return error when path is a file', async () => {
       const result = await listDirectoryTool.execute({ dirPath: 'README.md' });
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('file, not a directory');
+      expect(result.errorMessage).toContain('file, not a directory');
     });
   });
 
@@ -480,7 +480,7 @@ describe('Coding Agent Tools', () => {
       });
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('blocked');
+      expect(result.errorMessage).toContain('blocked');
     });
 
     it('should block sudo commands', async () => {
@@ -490,7 +490,7 @@ describe('Coding Agent Tools', () => {
       });
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('blocked');
+      expect(result.errorMessage).toContain('blocked');
     });
 
     it('should block curl/wget for security', async () => {
@@ -500,7 +500,7 @@ describe('Coding Agent Tools', () => {
       });
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('blocked');
+      expect(result.errorMessage).toContain('blocked');
     });
 
     it('should reject non-allowed commands', async () => {
@@ -509,7 +509,7 @@ describe('Coding Agent Tools', () => {
       });
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('not in the allowed list');
+      expect(result.errorMessage).toContain('not in the allowed list');
     });
 
     it('should capture stderr', async () => {

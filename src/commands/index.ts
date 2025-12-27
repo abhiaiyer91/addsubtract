@@ -17,6 +17,7 @@ export { handleScope } from './scope';
 
 // AI-powered commands
 export { handleAI, handleAICommit, handleReview, handleExplain, handleResolve } from './ai';
+export { handleAgent, AGENT_HELP } from './agent';
 // Quality of Life commands (new!)
 export { amend, handleAmend } from './amend';
 export { wip, handleWip } from './wip';
@@ -107,6 +108,9 @@ export { handleCodeReview, REVIEW_HELP } from './review';
 
 // CI/CD commands
 export { handleCI, CI_HELP } from './ci';
+
+// Merge Queue commands
+export { handleMergeQueue, MERGE_QUEUE_HELP } from './merge-queue';
 
 // Collaborator management
 export {

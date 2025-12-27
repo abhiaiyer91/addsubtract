@@ -753,6 +753,8 @@ export const pullsRouter = router({
         path: z.string().optional(),
         line: z.number().int().positive().optional(),
         side: z.enum(['LEFT', 'RIGHT']).optional(),
+        startLine: z.number().int().positive().optional(), // For multi-line selection
+        endLine: z.number().int().positive().optional(), // For multi-line selection
         commitSha: z.string().optional(),
         reviewId: z.string().uuid().optional(),
         replyToId: z.string().uuid().optional(),
@@ -775,6 +777,8 @@ export const pullsRouter = router({
         path: input.path,
         line: input.line,
         side: input.side,
+        startLine: input.startLine,
+        endLine: input.endLine,
         commitSha: input.commitSha,
         reviewId: input.reviewId,
         replyToId: input.replyToId,
@@ -877,6 +881,339 @@ export const pullsRouter = router({
       }
 
       return prCommentModel.delete(input.commentId);
+    }),
+
+  /**
+   * Resolve a comment thread
+   * Only the PR author, comment author, or repo collaborators can resolve threads
+   */
+  resolveComment: protectedProcedure
+    .input(
+      z.object({
+        commentId: z.string().uuid(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const comment = await prCommentModel.findById(input.commentId);
+
+      if (!comment) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Comment not found',
+        });
+      }
+
+      const pr = await prModel.findById(comment.prId);
+      if (!pr) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Pull request not found',
+        });
+      }
+
+      // Check permissions: PR author, comment author, or repo collaborator
+      const isPrAuthor = pr.authorId === ctx.user.id;
+      const isCommentAuthor = comment.userId === ctx.user.id;
+      const hasWriteAccess = await collaboratorModel.hasPermission(pr.repoId, ctx.user.id, 'write');
+
+      if (!isPrAuthor && !isCommentAuthor && !hasWriteAccess) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to resolve this comment thread',
+        });
+      }
+
+      return prCommentModel.resolve(input.commentId, ctx.user.id);
+    }),
+
+  /**
+   * Unresolve a comment thread
+   * Only the PR author, comment author, or repo collaborators can unresolve threads
+   */
+  unresolveComment: protectedProcedure
+    .input(
+      z.object({
+        commentId: z.string().uuid(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const comment = await prCommentModel.findById(input.commentId);
+
+      if (!comment) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Comment not found',
+        });
+      }
+
+      const pr = await prModel.findById(comment.prId);
+      if (!pr) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Pull request not found',
+        });
+      }
+
+      // Check permissions: PR author, comment author, or repo collaborator
+      const isPrAuthor = pr.authorId === ctx.user.id;
+      const isCommentAuthor = comment.userId === ctx.user.id;
+      const hasWriteAccess = await collaboratorModel.hasPermission(pr.repoId, ctx.user.id, 'write');
+
+      if (!isPrAuthor && !isCommentAuthor && !hasWriteAccess) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to unresolve this comment thread',
+        });
+      }
+
+      return prCommentModel.unresolve(input.commentId);
+    }),
+
+  /**
+   * Get inline comments for a specific file in a PR
+   * Groups comments by line and includes thread information
+   */
+  getFileComments: publicProcedure
+    .input(
+      z.object({
+        prId: z.string().uuid(),
+        path: z.string(),
+      })
+    )
+    .query(async ({ input }) => {
+      return prCommentModel.listByFile(input.prId, input.path);
+    }),
+
+  /**
+   * Add a comment with a code suggestion
+   * Suggestions allow reviewers to propose specific code changes
+   */
+  addSuggestion: protectedProcedure
+    .input(
+      z.object({
+        prId: z.string().uuid(),
+        body: z.string().min(1, 'Comment body is required'),
+        suggestion: z.string().min(1, 'Suggestion code is required'),
+        path: z.string(),
+        line: z.number().int().positive(),
+        side: z.enum(['LEFT', 'RIGHT']).default('RIGHT'),
+        startLine: z.number().int().positive().optional(),
+        endLine: z.number().int().positive().optional(),
+        commitSha: z.string().optional(),
+        reviewId: z.string().uuid().optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const pr = await prModel.findById(input.prId);
+
+      if (!pr) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Pull request not found',
+        });
+      }
+
+      const comment = await prCommentModel.create({
+        prId: input.prId,
+        userId: ctx.user.id,
+        body: input.body,
+        suggestion: input.suggestion,
+        path: input.path,
+        line: input.line,
+        side: input.side,
+        startLine: input.startLine,
+        endLine: input.endLine,
+        commitSha: input.commitSha,
+        reviewId: input.reviewId,
+      });
+
+      return comment;
+    }),
+
+  /**
+   * Apply a code suggestion
+   * Creates a commit with the suggested code change
+   */
+  applySuggestion: protectedProcedure
+    .input(
+      z.object({
+        commentId: z.string().uuid(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const comment = await prCommentModel.findById(input.commentId);
+
+      if (!comment) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Comment not found',
+        });
+      }
+
+      if (!comment.suggestion) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'This comment does not contain a suggestion',
+        });
+      }
+
+      if (comment.suggestionApplied) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'This suggestion has already been applied',
+        });
+      }
+
+      const pr = await prModel.findById(comment.prId);
+      if (!pr) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Pull request not found',
+        });
+      }
+
+      // Only PR author or repo collaborators can apply suggestions
+      const isAuthor = pr.authorId === ctx.user.id;
+      const hasWriteAccess = await collaboratorModel.hasPermission(pr.repoId, ctx.user.id, 'write');
+
+      if (!isAuthor && !hasWriteAccess) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to apply this suggestion',
+        });
+      }
+
+      const repo = await repoModel.findById(pr.repoId);
+      if (!repo) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Repository not found',
+        });
+      }
+
+      // Get the file path and apply the suggestion
+      if (!comment.path || comment.line === null) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Suggestion is missing file path or line information',
+        });
+      }
+
+      // Resolve disk path
+      const reposDir = process.env.REPOS_DIR || './repos';
+      const diskPath = path.isAbsolute(repo.diskPath)
+        ? repo.diskPath
+        : path.join(process.cwd(), reposDir, repo.diskPath.replace(/^\/repos\//, ''));
+
+      if (!exists(diskPath)) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Repository not found on disk',
+        });
+      }
+
+      try {
+        // Read the current file content from the source branch
+        const fileContent = execSync(
+          `git show ${pr.sourceBranch}:${comment.path}`,
+          { cwd: diskPath, encoding: 'utf-8' }
+        );
+
+        const lines = fileContent.split('\n');
+        const startLine = comment.startLine || comment.line;
+        const endLine = comment.endLine || comment.line;
+
+        // Replace the lines with the suggestion
+        const newLines = [
+          ...lines.slice(0, startLine - 1),
+          comment.suggestion,
+          ...lines.slice(endLine),
+        ];
+
+        const newContent = newLines.join('\n');
+
+        // Create a worktree to make the change
+        const worktreePath = path.join(diskPath, '..', `worktree-suggestion-${Date.now()}`);
+        
+        try {
+          // Create worktree from source branch
+          execSync(`git worktree add "${worktreePath}" ${pr.sourceBranch}`, {
+            cwd: diskPath,
+            encoding: 'utf-8',
+          });
+
+          // Write the modified file
+          const fs = await import('fs');
+          fs.writeFileSync(path.join(worktreePath, comment.path), newContent);
+
+          // Get the suggestion author's username
+          const { userModel } = await import('../../../db/models');
+          const suggestionAuthor = comment.userId ? await userModel.findById(comment.userId) : null;
+          const authorUsername = suggestionAuthor?.username || 'reviewer';
+
+          // Stage and commit
+          execSync(`git add "${comment.path}"`, {
+            cwd: worktreePath,
+            encoding: 'utf-8',
+          });
+
+          const commitMessage = `Apply suggestion from @${authorUsername}\n\nCo-authored-by: ${ctx.user.name || ctx.user.username} <${ctx.user.email}>`;
+          execSync(
+            `git commit -m "${commitMessage.replace(/"/g, '\\"')}"`,
+            {
+              cwd: worktreePath,
+              encoding: 'utf-8',
+              env: {
+                ...process.env,
+                GIT_AUTHOR_NAME: ctx.user.name || ctx.user.username || 'Unknown',
+                GIT_AUTHOR_EMAIL: ctx.user.email,
+                GIT_COMMITTER_NAME: ctx.user.name || ctx.user.username || 'Unknown',
+                GIT_COMMITTER_EMAIL: ctx.user.email,
+              },
+            }
+          );
+
+          // Get the new commit SHA
+          const newSha = execSync('git rev-parse HEAD', {
+            cwd: worktreePath,
+            encoding: 'utf-8',
+          }).trim();
+
+          // Push the change back to the source branch
+          execSync(`git push origin HEAD:${pr.sourceBranch}`, {
+            cwd: worktreePath,
+            encoding: 'utf-8',
+          });
+
+          // Mark the suggestion as applied
+          await prCommentModel.markSuggestionApplied(input.commentId, newSha);
+
+          // Update PR head SHA
+          await prModel.updateHead(pr.id, newSha);
+
+          return {
+            success: true,
+            commitSha: newSha,
+            message: 'Suggestion applied successfully',
+          };
+        } finally {
+          // Clean up worktree
+          try {
+            execSync(`git worktree remove "${worktreePath}" --force`, {
+              cwd: diskPath,
+              encoding: 'utf-8',
+            });
+          } catch {
+            // Ignore cleanup errors
+          }
+        }
+      } catch (error) {
+        console.error('[pulls.applySuggestion] Error:', error);
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: error instanceof Error ? error.message : 'Failed to apply suggestion',
+        });
+      }
     }),
 
   /**
@@ -1207,9 +1544,15 @@ export const pullsRouter = router({
   /**
    * Get inbox summary - counts for each inbox section
    */
-  inboxSummary: protectedProcedure.query(async ({ ctx }) => {
-    return inboxModel.getSummary(ctx.user.id);
-  }),
+  inboxSummary: protectedProcedure
+    .input(
+      z.object({
+        repoId: z.string().uuid().optional(),
+      }).optional()
+    )
+    .query(async ({ input, ctx }) => {
+      return inboxModel.getSummary(ctx.user.id, input?.repoId);
+    }),
 
   /**
    * Get PRs awaiting the user's review
@@ -1220,11 +1563,12 @@ export const pullsRouter = router({
       z.object({
         limit: z.number().min(1).max(100).default(20),
         offset: z.number().min(0).default(0),
+        repoId: z.string().uuid().optional(),
       }).optional()
     )
     .query(async ({ input, ctx }) => {
-      const { limit = 20, offset = 0 } = input ?? {};
-      return inboxModel.getAwaitingReview(ctx.user.id, { limit, offset });
+      const { limit = 20, offset = 0, repoId } = input ?? {};
+      return inboxModel.getAwaitingReview(ctx.user.id, { limit, offset, repoId });
     }),
 
   /**
@@ -1235,11 +1579,12 @@ export const pullsRouter = router({
       z.object({
         limit: z.number().min(1).max(100).default(20),
         offset: z.number().min(0).default(0),
+        repoId: z.string().uuid().optional(),
       }).optional()
     )
     .query(async ({ input, ctx }) => {
-      const { limit = 20, offset = 0 } = input ?? {};
-      return inboxModel.getMyPrsAwaitingReview(ctx.user.id, { limit, offset });
+      const { limit = 20, offset = 0, repoId } = input ?? {};
+      return inboxModel.getMyPrsAwaitingReview(ctx.user.id, { limit, offset, repoId });
     }),
 
   /**
@@ -1251,11 +1596,12 @@ export const pullsRouter = router({
         limit: z.number().min(1).max(100).default(20),
         offset: z.number().min(0).default(0),
         state: z.enum(['open', 'closed', 'all']).default('open'),
+        repoId: z.string().uuid().optional(),
       }).optional()
     )
     .query(async ({ input, ctx }) => {
-      const { limit = 20, offset = 0, state = 'open' } = input ?? {};
-      return inboxModel.getParticipated(ctx.user.id, { limit, offset, state });
+      const { limit = 20, offset = 0, state = 'open', repoId } = input ?? {};
+      return inboxModel.getParticipated(ctx.user.id, { limit, offset, state, repoId });
     }),
 
   // ============ REVIEWER MANAGEMENT ============

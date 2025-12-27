@@ -102,3 +102,6 @@ export function Markdown({ content, className }: MarkdownProps) {
     </div>
   );
 }
+
+// Alias for backwards compatibility
+export { Markdown as MarkdownRenderer };

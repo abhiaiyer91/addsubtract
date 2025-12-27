@@ -7,7 +7,7 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { router, publicProcedure, protectedProcedure } from '../trpc';
-import { repoModel, collaboratorModel } from '../../../db/models';
+import { repoModel, collaboratorModel, userModel } from '../../../db/models';
 
 export const searchRouter = router({
   /**
@@ -46,7 +46,6 @@ export const searchRouter = router({
             metadata: {
               stars: repo.starsCount,
               isPrivate: repo.isPrivate,
-              language: repo.language,
             },
           });
         }
@@ -126,16 +125,16 @@ export const searchRouter = router({
       }> = [];
 
       // Get repository suggestions
-      const repos = await repoModel.search(input.query, {
-        limit: input.limit,
-        userId: ctx.user?.id,
-      });
+      const repos = await repoModel.search(input.query, input.limit);
 
       for (const repo of repos.slice(0, 3)) {
+        // Get owner info for the URL
+        const owner = await userModel.findById(repo.ownerId);
+        const ownerUsername = owner?.username || owner?.name || 'unknown';
         suggestions.push({
           type: 'repository',
-          text: `${repo.owner?.username}/${repo.name}`,
-          url: `/${repo.owner?.username}/${repo.name}`,
+          text: `${ownerUsername}/${repo.name}`,
+          url: `/${ownerUsername}/${repo.name}`,
         });
       }
 

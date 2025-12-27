@@ -36,7 +36,7 @@ Tip: Include enough context in oldText to uniquely identify the location.`,
     editResults: z.array(z.object({
       index: z.number(),
       applied: z.boolean(),
-      error: z.string().optional(),
+      errorMessage: z.string().optional(),
     })).optional(),
     message: z.string(),
     diff: z.string().optional().describe('Preview of changes (in dry-run mode or on success)'),
@@ -74,7 +74,7 @@ Tip: Include enough context in oldText to uniquely identify the location.`,
       // Read current content
       const originalContent = readFileText(fullPath);
       let modifiedContent = originalContent;
-      const editResults: Array<{ index: number; applied: boolean; error?: string }> = [];
+      const editResults: Array<{ index: number; applied: boolean; errorMessage?: string }> = [];
 
       // Apply edits in order
       for (let i = 0; i < edits.length; i++) {
@@ -87,7 +87,7 @@ Tip: Include enough context in oldText to uniquely identify the location.`,
           editResults.push({
             index: i,
             applied: false,
-            error: `oldText not found in file. Make sure it matches exactly including whitespace.`,
+            errorMessage: `oldText not found in file. Make sure it matches exactly including whitespace.`,
           });
           continue;
         }
@@ -96,7 +96,7 @@ Tip: Include enough context in oldText to uniquely identify the location.`,
           editResults.push({
             index: i,
             applied: false,
-            error: `oldText found ${occurrences} times. Add more context to make it unique.`,
+            errorMessage: `oldText found ${occurrences} times. Add more context to make it unique.`,
           });
           continue;
         }

@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { isAuthenticated, getUser } from '@/lib/auth';
 import { trpc } from '@/lib/trpc';
-import { Loading } from '@/components/ui/loading';
+import { RepoListSkeleton } from '@/components/skeleton';
 
 export function HomePage() {
   const authenticated = isAuthenticated();
@@ -173,9 +173,24 @@ function DashboardView({ username }: { username: string }) {
 
   if (isLoading) {
     return (
-      <div className="grid md:grid-cols-3 gap-8">
-        <div className="md:col-span-2">
-          <Loading />
+      <div className="grid md:grid-cols-3 gap-8 py-8">
+        <div className="md:col-span-2 space-y-8">
+          <div>
+            <div className="flex items-center gap-2 mb-5">
+              <div className="h-5 w-5 bg-muted rounded animate-shimmer bg-gradient-to-r from-muted via-muted-foreground/10 to-muted bg-[length:200%_100%]" />
+              <div className="h-6 w-40 bg-muted rounded animate-shimmer bg-gradient-to-r from-muted via-muted-foreground/10 to-muted bg-[length:200%_100%]" />
+            </div>
+            <RepoListSkeleton count={4} />
+          </div>
+        </div>
+        <div className="space-y-6">
+          <div className="rounded-2xl border border-border/40 bg-card/80 p-6 space-y-4">
+            <div className="h-5 w-28 bg-muted rounded animate-shimmer bg-gradient-to-r from-muted via-muted-foreground/10 to-muted bg-[length:200%_100%]" />
+            <div className="space-y-2">
+              <div className="h-10 w-full bg-muted rounded-xl animate-shimmer bg-gradient-to-r from-muted via-muted-foreground/10 to-muted bg-[length:200%_100%]" />
+              <div className="h-10 w-full bg-muted rounded-xl animate-shimmer bg-gradient-to-r from-muted via-muted-foreground/10 to-muted bg-[length:200%_100%]" />
+            </div>
+          </div>
         </div>
       </div>
     );

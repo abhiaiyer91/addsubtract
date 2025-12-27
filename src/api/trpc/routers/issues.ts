@@ -9,6 +9,7 @@ import {
   repoModel,
   collaboratorModel,
   activityHelpers,
+  issueInboxModel,
   ISSUE_STATUSES,
   ISSUE_PRIORITIES,
 } from '../../../db/models';
@@ -2334,5 +2335,71 @@ export const issuesRouter = router({
       }
 
       return updatedIssue;
+    }),
+
+  // ============ INBOX ENDPOINTS ============
+
+  /**
+   * Get inbox summary - counts for each inbox section
+   */
+  inboxSummary: protectedProcedure
+    .input(
+      z.object({
+        repoId: z.string().uuid().optional(),
+      }).optional()
+    )
+    .query(async ({ input, ctx }) => {
+      return issueInboxModel.getSummary(ctx.user.id, input?.repoId);
+    }),
+
+  /**
+   * Get issues assigned to the user
+   */
+  inboxAssignedToMe: protectedProcedure
+    .input(
+      z.object({
+        limit: z.number().min(1).max(100).default(20),
+        offset: z.number().min(0).default(0),
+        repoId: z.string().uuid().optional(),
+        state: z.enum(['open', 'closed', 'all']).default('open'),
+      }).optional()
+    )
+    .query(async ({ input, ctx }) => {
+      const { limit = 20, offset = 0, repoId, state = 'open' } = input ?? {};
+      return issueInboxModel.getAssignedToMe(ctx.user.id, { limit, offset, repoId, state });
+    }),
+
+  /**
+   * Get issues created by the user
+   */
+  inboxCreatedByMe: protectedProcedure
+    .input(
+      z.object({
+        limit: z.number().min(1).max(100).default(20),
+        offset: z.number().min(0).default(0),
+        repoId: z.string().uuid().optional(),
+        state: z.enum(['open', 'closed', 'all']).default('open'),
+      }).optional()
+    )
+    .query(async ({ input, ctx }) => {
+      const { limit = 20, offset = 0, repoId, state = 'open' } = input ?? {};
+      return issueInboxModel.getCreatedByMe(ctx.user.id, { limit, offset, repoId, state });
+    }),
+
+  /**
+   * Get issues where the user has participated (commented)
+   */
+  inboxParticipated: protectedProcedure
+    .input(
+      z.object({
+        limit: z.number().min(1).max(100).default(20),
+        offset: z.number().min(0).default(0),
+        repoId: z.string().uuid().optional(),
+        state: z.enum(['open', 'closed', 'all']).default('open'),
+      }).optional()
+    )
+    .query(async ({ input, ctx }) => {
+      const { limit = 20, offset = 0, repoId, state = 'open' } = input ?? {};
+      return issueInboxModel.getParticipated(ctx.user.id, { limit, offset, repoId, state });
     }),
 });

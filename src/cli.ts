@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 
+// Load environment variables from .env file
+import 'dotenv/config';
+
 import {
   init,
   parseInitArgs,
@@ -24,6 +27,7 @@ import {
   handleScope,
   // AI commands
   handleAI,
+  handleAgent,
   // Quality of Life commands
   handleAmend,
   handleWip,
@@ -93,6 +97,8 @@ import {
   handleCodeReview,
   // CI/CD
   handleCI,
+  // Merge Queue
+  handleMergeQueue,
 } from './commands';
 import { handleHooks } from './core/hooks';
 import { handleSubmodule } from './core/submodule';
@@ -272,6 +278,15 @@ CI/CD:
   ci runs               Show recent workflow runs (requires server)
   ci view <run-id>      View workflow run details (requires server)
 
+Merge Queue:
+  merge-queue add       Add PR to merge queue (auto-queued merging)
+  merge-queue remove    Remove PR from queue
+  merge-queue status    Show queue position
+  merge-queue list      List PRs in queue
+  merge-queue stats     Show queue statistics
+  merge-queue enable    Enable merge queue for branch
+  merge-queue config    Configure queue settings
+
 Quality of Life:
   amend                 Quickly fix the last commit
   wip                   Quick WIP commit with auto-generated message
@@ -311,7 +326,11 @@ Monorepo Support:
   scope clear           Clear scope restrictions
 
 AI-Powered Features:
-  search <query>        Semantic code search (the killer feature!)
+  agent                 Interactive coding assistant (the killer feature!)
+  agent ask <query>     One-shot question to the coding agent
+  agent status          Show agent configuration
+  
+  search <query>        Semantic code search
   search index          Index repo for semantic search
   search status         Show index health
   search -i             Interactive search mode
@@ -355,6 +374,8 @@ Environment Variables:
 Examples:
   wit ui                    # Launch terminal UI
   wit web                   # Launch web UI
+  wit agent                 # Start interactive coding agent
+  wit agent "add tests"     # One-shot agent query
   wit init
   wit add .
   wit commit -m "Initial commit"
@@ -400,7 +421,7 @@ const COMMANDS = [
   'amend', 'wip', 'fixup', 'cleanup', 'blame', 'stats', 'snapshot',
   'scope', 'graph',
   'ui', 'web',
-  'ai', 'search', 'review',
+  'ai', 'agent', 'search', 'review',
   // Issue tracking
   'issue', 'cycle', 'project',
   'cat-file', 'hash-object', 'ls-files', 'ls-tree',
@@ -430,6 +451,8 @@ const COMMANDS = [
   'token',
   // CI/CD
   'ci',
+  // Merge Queue
+  'merge-queue',
   'help',
 ];
 
@@ -745,6 +768,18 @@ function main(): void {
         // AI commands are async, so we need to handle them specially
         handleAI(cmdArgs).catch((error: Error) => {
           console.error(`error: ${error.message}`);
+          process.exit(1);
+        });
+        return; // Exit main() to let async handle complete
+
+      case 'agent':
+        // Interactive coding agent
+        handleAgent(rawArgs).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
+          }
           process.exit(1);
         });
         return; // Exit main() to let async handle complete
@@ -1066,6 +1101,18 @@ function main(): void {
       // CI/CD commands
       case 'ci':
         handleCI(args.slice(args.indexOf('ci') + 1)).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
+          }
+          process.exit(1);
+        });
+        return;
+
+      // Merge Queue commands
+      case 'merge-queue':
+        handleMergeQueue(args.slice(args.indexOf('merge-queue') + 1)).catch((error: Error) => {
           if (error instanceof TsgitError) {
             console.error((error as TsgitError).format());
           } else {

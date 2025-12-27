@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Loader2, Check } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Loader2, Check, Key, Ticket, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -158,6 +159,51 @@ export function SettingsPage() {
               )}
             </div>
           </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Security</CardTitle>
+          <CardDescription>
+            Manage your authentication methods and access tokens.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <Link
+            to="/settings/keys"
+            className="flex items-center justify-between p-3 rounded-lg hover:bg-muted transition-colors group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-muted rounded-md group-hover:bg-background">
+                <Key className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <div>
+                <div className="font-medium">SSH Keys</div>
+                <div className="text-sm text-muted-foreground">
+                  Manage SSH keys for secure Git operations
+                </div>
+              </div>
+            </div>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          </Link>
+          <Link
+            to="/settings/tokens"
+            className="flex items-center justify-between p-3 rounded-lg hover:bg-muted transition-colors group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-muted rounded-md group-hover:bg-background">
+                <Ticket className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <div>
+                <div className="font-medium">Personal Access Tokens</div>
+                <div className="text-sm text-muted-foreground">
+                  Generate tokens for API and Git access
+                </div>
+              </div>
+            </div>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          </Link>
         </CardContent>
       </Card>
 

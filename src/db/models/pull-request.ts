@@ -496,6 +496,154 @@ export const prCommentModel = {
       .returning();
     return result.length > 0;
   },
+
+  /**
+   * Resolve a comment thread
+   */
+  async resolve(id: string, resolvedById: string): Promise<PrComment | undefined> {
+    const db = getDb();
+    const [comment] = await db
+      .update(prComments)
+      .set({
+        isResolved: true,
+        resolvedAt: new Date(),
+        resolvedById,
+        updatedAt: new Date(),
+      })
+      .where(eq(prComments.id, id))
+      .returning();
+    return comment;
+  },
+
+  /**
+   * Unresolve a comment thread
+   */
+  async unresolve(id: string): Promise<PrComment | undefined> {
+    const db = getDb();
+    const [comment] = await db
+      .update(prComments)
+      .set({
+        isResolved: false,
+        resolvedAt: null,
+        resolvedById: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(prComments.id, id))
+      .returning();
+    return comment;
+  },
+
+  /**
+   * Get thread comments (root comment + all replies)
+   */
+  async getThread(rootCommentId: string): Promise<(PrComment & { user: Author })[]> {
+    const db = getDb();
+    
+    // Get the root comment and all replies
+    const result = await db
+      .select()
+      .from(prComments)
+      .innerJoin(user, eq(prComments.userId, user.id))
+      .where(
+        or(
+          eq(prComments.id, rootCommentId),
+          eq(prComments.replyToId, rootCommentId)
+        )
+      )
+      .orderBy(prComments.createdAt);
+
+    return result.map((r) => ({
+      ...r.pr_comments,
+      user: {
+        id: r.user.id,
+        name: r.user.name,
+        email: r.user.email,
+        username: r.user.username,
+        image: r.user.image,
+        avatarUrl: r.user.avatarUrl,
+      },
+    }));
+  },
+
+  /**
+   * List all inline comments for a PR, grouped by file
+   * Returns root comments only (replies are fetched via getThread)
+   */
+  async listInlineByPr(prId: string): Promise<(PrComment & { user: Author })[]> {
+    const db = getDb();
+    const result = await db
+      .select()
+      .from(prComments)
+      .innerJoin(user, eq(prComments.userId, user.id))
+      .where(
+        and(
+          eq(prComments.prId, prId),
+          isNull(prComments.replyToId), // Only root comments
+          sql`${prComments.path} IS NOT NULL` // Only inline comments
+        )
+      )
+      .orderBy(prComments.path, prComments.line, prComments.createdAt);
+
+    return result.map((r) => ({
+      ...r.pr_comments,
+      user: {
+        id: r.user.id,
+        name: r.user.name,
+        email: r.user.email,
+        username: r.user.username,
+        image: r.user.image,
+        avatarUrl: r.user.avatarUrl,
+      },
+    }));
+  },
+
+  /**
+   * Mark a suggestion as applied
+   */
+  async markSuggestionApplied(id: string, commitSha: string): Promise<PrComment | undefined> {
+    const db = getDb();
+    const [comment] = await db
+      .update(prComments)
+      .set({
+        suggestionApplied: true,
+        suggestionCommitSha: commitSha,
+        updatedAt: new Date(),
+      })
+      .where(eq(prComments.id, id))
+      .returning();
+    return comment;
+  },
+
+  /**
+   * Get pending suggestions for a PR (not yet applied)
+   */
+  async getPendingSuggestions(prId: string): Promise<(PrComment & { user: Author })[]> {
+    const db = getDb();
+    const result = await db
+      .select()
+      .from(prComments)
+      .innerJoin(user, eq(prComments.userId, user.id))
+      .where(
+        and(
+          eq(prComments.prId, prId),
+          sql`${prComments.suggestion} IS NOT NULL`,
+          eq(prComments.suggestionApplied, false)
+        )
+      )
+      .orderBy(prComments.path, prComments.line, prComments.createdAt);
+
+    return result.map((r) => ({
+      ...r.pr_comments,
+      user: {
+        id: r.user.id,
+        name: r.user.name,
+        email: r.user.email,
+        username: r.user.username,
+        image: r.user.image,
+        avatarUrl: r.user.avatarUrl,
+      },
+    }));
+  },
 };
 
 export const prLabelModel = {
@@ -702,10 +850,20 @@ export const inboxModel = {
    */
   async getAwaitingReview(
     userId: string,
-    options: { limit?: number; offset?: number } = {}
+    options: { limit?: number; offset?: number; repoId?: string } = {}
   ): Promise<InboxPr[]> {
     const db = getDb();
-    const { limit = 50, offset = 0 } = options;
+    const { limit = 50, offset = 0, repoId } = options;
+
+    // Build where conditions
+    const conditions = [
+      eq(prReviewers.userId, userId),
+      eq(prReviewers.state, 'pending'),
+      eq(pullRequests.state, 'open'),
+    ];
+    if (repoId !== undefined) {
+      conditions.push(eq(pullRequests.repoId, repoId));
+    }
 
     // Get PRs where user has pending review request and PR is open
     const result = await db
@@ -721,13 +879,7 @@ export const inboxModel = {
       .from(prReviewers)
       .innerJoin(pullRequests, eq(prReviewers.prId, pullRequests.id))
       .innerJoin(repositories, eq(pullRequests.repoId, repositories.id))
-      .where(
-        and(
-          eq(prReviewers.userId, userId),
-          eq(prReviewers.state, 'pending'),
-          eq(pullRequests.state, 'open')
-        )
-      )
+      .where(and(...conditions))
       .orderBy(desc(prReviewers.requestedAt))
       .limit(limit)
       .offset(offset);
@@ -756,10 +908,19 @@ export const inboxModel = {
    */
   async getMyPrsAwaitingReview(
     userId: string,
-    options: { limit?: number; offset?: number } = {}
+    options: { limit?: number; offset?: number; repoId?: string } = {}
   ): Promise<InboxPr[]> {
     const db = getDb();
-    const { limit = 50, offset = 0 } = options;
+    const { limit = 50, offset = 0, repoId } = options;
+
+    // Build where conditions
+    const conditions = [
+      eq(pullRequests.authorId, userId),
+      eq(pullRequests.state, 'open'),
+    ];
+    if (repoId !== undefined) {
+      conditions.push(eq(pullRequests.repoId, repoId));
+    }
 
     // Get open PRs by the user
     const result = await db
@@ -773,7 +934,7 @@ export const inboxModel = {
       })
       .from(pullRequests)
       .innerJoin(repositories, eq(pullRequests.repoId, repositories.id))
-      .where(and(eq(pullRequests.authorId, userId), eq(pullRequests.state, 'open')))
+      .where(and(...conditions))
       .orderBy(desc(pullRequests.updatedAt))
       .limit(limit)
       .offset(offset);
@@ -803,10 +964,10 @@ export const inboxModel = {
    */
   async getParticipated(
     userId: string,
-    options: { limit?: number; offset?: number; state?: 'open' | 'closed' | 'all' } = {}
+    options: { limit?: number; offset?: number; state?: 'open' | 'closed' | 'all'; repoId?: string } = {}
   ): Promise<InboxPr[]> {
     const db = getDb();
-    const { limit = 50, offset = 0, state = 'open' } = options;
+    const { limit = 50, offset = 0, state = 'open', repoId } = options;
 
     // Find PRs where user has reviewed or commented (but isn't the author)
     const reviewedPrIds = db
@@ -830,6 +991,10 @@ export const inboxModel = {
 
     if (state !== 'all') {
       conditions.push(eq(pullRequests.state, state));
+    }
+
+    if (repoId !== undefined) {
+      conditions.push(eq(pullRequests.repoId, repoId));
     }
 
     const result = await db
@@ -871,48 +1036,65 @@ export const inboxModel = {
   /**
    * Get inbox summary counts for a user
    */
-  async getSummary(userId: string): Promise<{
+  async getSummary(userId: string, repoId?: string): Promise<{
     awaitingReview: number;
-    myPrsOpen: number;
+    myOpenPrs: number;
     participated: number;
   }> {
     const db = getDb();
+
+    // Build conditions for awaiting review
+    const awaitingConditions = [
+      eq(prReviewers.userId, userId),
+      eq(prReviewers.state, 'pending'),
+      eq(pullRequests.state, 'open'),
+    ];
+    if (repoId !== undefined) {
+      awaitingConditions.push(eq(pullRequests.repoId, repoId));
+    }
 
     // Count PRs awaiting review
     const awaitingReviewResult = await db
       .select({ count: sql<number>`count(*)` })
       .from(prReviewers)
       .innerJoin(pullRequests, eq(prReviewers.prId, pullRequests.id))
-      .where(
-        and(
-          eq(prReviewers.userId, userId),
-          eq(prReviewers.state, 'pending'),
-          eq(pullRequests.state, 'open')
-        )
-      );
+      .where(and(...awaitingConditions));
+
+    // Build conditions for my PRs
+    const myPrsConditions = [
+      eq(pullRequests.authorId, userId),
+      eq(pullRequests.state, 'open'),
+    ];
+    if (repoId !== undefined) {
+      myPrsConditions.push(eq(pullRequests.repoId, repoId));
+    }
 
     // Count user's open PRs
     const myPrsResult = await db
       .select({ count: sql<number>`count(*)` })
       .from(pullRequests)
-      .where(and(eq(pullRequests.authorId, userId), eq(pullRequests.state, 'open')));
+      .where(and(...myPrsConditions));
+
+    // Build conditions for participated
+    const participatedConditions = [
+      eq(prReviews.userId, userId),
+      eq(pullRequests.state, 'open'),
+      ne(pullRequests.authorId, userId),
+    ];
+    if (repoId !== undefined) {
+      participatedConditions.push(eq(pullRequests.repoId, repoId));
+    }
 
     // Count participated PRs (rough count - PRs where user reviewed)
     const participatedResult = await db
       .select({ count: sql<number>`count(distinct ${prReviews.prId})` })
       .from(prReviews)
       .innerJoin(pullRequests, eq(prReviews.prId, pullRequests.id))
-      .where(
-        and(
-          eq(prReviews.userId, userId),
-          eq(pullRequests.state, 'open'),
-          ne(pullRequests.authorId, userId)
-        )
-      );
+      .where(and(...participatedConditions));
 
     return {
       awaitingReview: Number(awaitingReviewResult[0]?.count ?? 0),
-      myPrsOpen: Number(myPrsResult[0]?.count ?? 0),
+      myOpenPrs: Number(myPrsResult[0]?.count ?? 0),
       participated: Number(participatedResult[0]?.count ?? 0),
     };
   },
