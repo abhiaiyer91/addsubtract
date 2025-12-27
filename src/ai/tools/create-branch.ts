@@ -99,7 +99,7 @@ Optionally switch to the new branch immediately.`,
         `Created branch: ${name}`,
         beforeState,
         afterState,
-        { branchName: name, switchedTo: switchTo }
+        { commitHash }
       );
 
       return {

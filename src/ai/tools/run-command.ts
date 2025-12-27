@@ -80,7 +80,7 @@ Do NOT use this for file operations - use readFile, writeFile, editFile instead.
     truncated: z.boolean().optional(),
     duration: z.number().optional().describe('Execution time in milliseconds'),
   }),
-  execute: async ({ command, args = [], timeout = 60000, env = {} }) => {
+  execute: async ({ command, args = [], timeout = 60000, env = {} }): Promise<any> => {
     try {
       const repo = Repository.find();
 

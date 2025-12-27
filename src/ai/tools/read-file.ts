@@ -30,7 +30,7 @@ Can also read binary files and return base64 encoded content.`,
     size: z.number().optional().describe('File size in bytes'),
     error: z.string().optional(),
   }),
-  execute: async ({ filePath, startLine, endLine }) => {
+  execute: async ({ filePath, startLine, endLine }): Promise<any> => {
     try {
       const repo = Repository.find();
       const fullPath = path.join(repo.workDir, filePath);

@@ -37,7 +37,7 @@ Can recursively list subdirectories up to a specified depth.`,
     truncated: z.boolean().optional().describe('Whether results were truncated due to limit'),
     error: z.string().optional(),
   }),
-  execute: async ({ dirPath = '.', recursive = false, maxDepth = 3, includeHidden = false, pattern }) => {
+  execute: async ({ dirPath = '.', recursive = false, maxDepth = 3, includeHidden = false, pattern }): Promise<any> => {
     try {
       const repo = Repository.find();
       const fullPath = path.join(repo.workDir, dirPath);

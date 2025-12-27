@@ -1147,8 +1147,9 @@ export const pullsRouter = router({
           fs.writeFileSync(path.join(worktreePath, comment.path), newContent);
 
           // Get the suggestion author's username
-          const suggestionAuthor = await prCommentModel.findById(input.commentId);
-          const authorUsername = suggestionAuthor?.user?.username || 'reviewer';
+          const { userModel } = await import('../../../db/models');
+          const suggestionAuthor = comment.userId ? await userModel.findById(comment.userId) : null;
+          const authorUsername = suggestionAuthor?.username || 'reviewer';
 
           // Stage and commit
           execSync(`git add "${comment.path}"`, {
