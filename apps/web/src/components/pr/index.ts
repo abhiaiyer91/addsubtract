@@ -13,3 +13,9 @@ export { PrSidebar } from './pr-sidebar';
 export { PrTimeline } from './pr-timeline';
 export { ReviewButton } from './review-button';
 export { StackViewer } from './stack-viewer';
+
+// Review components (from our implementation)
+export { ReviewProvider, useReview, useReviewOptional } from './review-context';
+export type { PendingComment, ReviewState } from './review-context';
+export { ReviewPanel } from './review-panel';
+export { StartReviewButton } from './start-review-button';
