@@ -62,14 +62,14 @@ export function Header() {
               <div className="p-1.5 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
                 <GitBranch className="h-4 w-4 md:h-5 md:w-5 text-primary" />
               </div>
-              <span className="font-bold text-lg md:text-xl tracking-tight">wit</span>
+              <span className="font-bold text-lg md:text-xl tracking-tight">Wit</span>
             </Link>
 
-            {/* Search bar - right next to logo */}
-            <div className="hidden sm:flex flex-1 max-w-md">
+            {/* Search bar - centered */}
+            <div className="hidden sm:flex flex-1 justify-center">
               <button
                 onClick={openCommandPalette}
-                className="flex h-10 w-full items-center gap-2 rounded-full border border-border/40 bg-muted/20 px-4 py-2 text-sm transition-all duration-300 hover:border-muted-foreground/30 hover:bg-muted/30 focus:border-primary/50 focus:bg-card focus:outline-none focus:ring-2 focus:ring-primary/20"
+                className="flex h-10 w-full max-w-md items-center gap-2 rounded-full border border-border/40 bg-muted/20 px-4 py-2 text-sm transition-all duration-300 hover:border-muted-foreground/30 hover:bg-muted/30 focus:border-primary/50 focus:bg-card focus:outline-none focus:ring-2 focus:ring-primary/20"
               >
                 <Search className="h-4 w-4 text-muted-foreground" />
                 <span className="flex-1 text-left text-muted-foreground/50">
@@ -84,7 +84,7 @@ export function Header() {
           </div>
 
           {/* Right section - User actions */}
-          <div className="flex items-center gap-1 md:gap-2">
+          <div className="flex items-center gap-1 md:gap-2 flex-1 justify-end">
             {/* Search button for mobile - opens command palette */}
             <Button 
               variant="ghost" 
