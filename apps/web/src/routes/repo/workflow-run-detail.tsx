@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { 
   CheckCircle2, XCircle, Clock, Play, RotateCcw, Ban,
@@ -15,6 +15,8 @@ import { RepoLayout } from './components/repo-layout';
 import { Loading } from '@/components/ui/loading';
 import { formatRelativeTime, formatDuration } from '@/lib/utils';
 import { toastSuccess, toastError } from '@/components/ui/use-toast';
+import { JobGraph } from '@/components/ci/job-graph';
+import { buildJobGraph } from '@/lib/job-graph';
 
 const stateConfig = {
   queued: { icon: Clock, color: 'text-yellow-500', label: 'Queued', bg: 'bg-yellow-500/10' },
@@ -28,11 +30,17 @@ export function WorkflowRunDetail() {
   const { owner, repo, runId } = useParams();
   const navigate = useNavigate();
   const utils = trpc.useUtils();
+  const [selectedJob, setSelectedJob] = useState<string | null>(null);
 
   const { data: run, isLoading } = trpc.workflows.getRun.useQuery(
     { runId: runId! },
     { enabled: !!runId, refetchInterval: (data) => data?.state === 'in_progress' ? 3000 : false }
   );
+
+  const jobGraph = useMemo(() => {
+    if (!run?.jobs) return null;
+    return buildJobGraph(run.jobs);
+  }, [run?.jobs]);
 
   const cancelMutation = trpc.workflows.cancel.useMutation({
     onSuccess: () => {
@@ -176,6 +184,34 @@ export function WorkflowRunDetail() {
           </Card>
         </div>
 
+        {/* Job Graph */}
+        {jobGraph && jobGraph.nodes.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Execution Flow</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <JobGraph 
+                graph={jobGraph} 
+                onNodeClick={(jobName) => {
+                  setSelectedJob(jobName);
+                  // Scroll to job in list
+                  const element = document.getElementById(`job-${jobName}`);
+                  element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }}
+              />
+              <div className="flex items-center gap-4 mt-4 text-sm text-muted-foreground">
+                <span className="flex items-center gap-1">
+                  <div className="w-3 h-0.5 bg-primary" />
+                  Critical path
+                </span>
+                <span>{jobGraph.nodes.length} jobs</span>
+                <span>{jobGraph.levels} stages</span>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Jobs */}
         <Card>
           <CardHeader>
@@ -200,27 +236,29 @@ function JobCard({ job }: { job: any }) {
   const Icon = config.icon;
 
   return (
-    <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
-      <CollapsibleTrigger className="w-full">
-        <div className="flex items-center justify-between p-4 hover:bg-accent/50 transition-colors">
-          <div className="flex items-center gap-3">
-            {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-            <Icon className={`h-4 w-4 ${config.color} ${job.state === 'in_progress' ? 'animate-spin' : ''}`} />
-            <span className="font-medium">{job.jobName}</span>
+    <div id={`job-${job.jobName}`}>
+      <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
+        <CollapsibleTrigger className="w-full">
+          <div className="flex items-center justify-between p-4 hover:bg-accent/50 transition-colors">
+            <div className="flex items-center gap-3">
+              {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              <Icon className={`h-4 w-4 ${config.color} ${job.state === 'in_progress' ? 'animate-spin' : ''}`} />
+              <span className="font-medium">{job.jobName}</span>
+            </div>
+            <span className="text-sm text-muted-foreground">
+              {formatDuration(job.startedAt, job.completedAt)}
+            </span>
           </div>
-          <span className="text-sm text-muted-foreground">
-            {formatDuration(job.startedAt, job.completedAt)}
-          </span>
-        </div>
-      </CollapsibleTrigger>
-      <CollapsibleContent>
-        <div className="pl-10 pb-4 space-y-1">
-          {job.steps?.map((step: any, i: number) => (
-            <StepRow key={step.id} step={step} number={i + 1} />
-          ))}
-        </div>
-      </CollapsibleContent>
-    </Collapsible>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="pl-10 pb-4 space-y-1">
+            {job.steps?.map((step: any, i: number) => (
+              <StepRow key={step.id} step={step} number={i + 1} />
+            ))}
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+    </div>
   );
 }
 
