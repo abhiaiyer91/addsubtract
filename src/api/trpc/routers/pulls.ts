@@ -11,6 +11,8 @@ import {
   repoModel,
   collaboratorModel,
   activityHelpers,
+  stackModel,
+  stackBranchModel,
 } from '../../../db/models';
 import { mergePullRequest, checkMergeability, getDefaultMergeMessage } from '../../../server/storage/merge';
 import { triggerAsyncReview } from '../../../ai/services/pr-review';
@@ -223,10 +225,35 @@ export const pullsRouter = router({
       // Get labels
       const labels = await prLabelModel.listByPr(pr.id);
 
+      // Get stack info if this PR is part of a stack
+      let stack = null;
+      if (pr.stackId) {
+        const stackData = await stackModel.findWithDetails(pr.stackId);
+        if (stackData) {
+          stack = {
+            id: stackData.id,
+            name: stackData.name,
+            baseBranch: stackData.baseBranch,
+            branches: stackData.branches.map((b, idx) => ({
+              branchName: b.branchName,
+              position: idx,
+              pr: b.pr ? {
+                id: b.pr.id,
+                number: b.pr.number,
+                title: b.pr.title,
+                state: b.pr.state,
+              } : null,
+              isCurrent: b.prId === pr.id,
+            })),
+          };
+        }
+      }
+
       return {
         ...pr,
         author,
         labels,
+        stack,
       };
     }),
 

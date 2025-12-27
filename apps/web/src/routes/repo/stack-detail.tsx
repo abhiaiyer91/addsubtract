@@ -11,6 +11,11 @@ import {
   CheckCircle2,
   AlertCircle,
   ArrowUpRight,
+  GitPullRequest,
+  GitMerge,
+  Circle,
+  Send,
+  Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -29,7 +34,7 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { RepoLayout } from './components/repo-layout';
-import { Loading } from '@/components/ui/loading';
+import { Loading, Skeleton } from '@/components/ui/loading';
 import { useSession } from '@/lib/auth-client';
 import { trpc } from '@/lib/trpc';
 
@@ -74,6 +79,14 @@ export function StackDetailPage() {
   const reorderMutation = trpc.stacks.reorder.useMutation({
     onSuccess: () => {
       utils.stacks.get.invalidate({ owner: owner!, repo: repo!, name: stackName! });
+    },
+  });
+
+  // Submit stack mutation
+  const submitMutation = trpc.stacks.submit.useMutation({
+    onSuccess: () => {
+      utils.stacks.get.invalidate({ owner: owner!, repo: repo!, name: stackName! });
+      utils.stacks.list.invalidate({ owner: owner!, repo: repo! });
     },
   });
 
@@ -122,10 +135,24 @@ export function StackDetailPage() {
     });
   };
 
+  const handleSubmitStack = (draft: boolean = false) => {
+    submitMutation.mutate({
+      owner: owner!,
+      repo: repo!,
+      stackName: stackName!,
+      draft,
+    });
+  };
+
   // Filter out branches already in the stack
   const availableBranches = branches?.filter(
     (b) => b.name !== stack?.baseBranch && !stack?.branches.includes(b.name)
   );
+
+  // Count branches without PRs
+  const branchesWithoutPRs = stack?.nodes?.filter(
+    (n) => n.branch !== stack.baseBranch && !n.pr
+  ).length || 0;
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -145,13 +172,55 @@ export function StackDetailPage() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'synced':
-        return <Badge variant="secondary" className="bg-green-100 text-green-800">Synced</Badge>;
+        return <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">Synced</Badge>;
       case 'behind':
-        return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">Behind</Badge>;
+        return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">Behind</Badge>;
       case 'ahead':
-        return <Badge variant="secondary" className="bg-blue-100 text-blue-800">Ahead</Badge>;
+        return <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">Ahead</Badge>;
       case 'diverged':
-        return <Badge variant="secondary" className="bg-red-100 text-red-800">Diverged</Badge>;
+        return <Badge variant="secondary" className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">Diverged</Badge>;
+      default:
+        return null;
+    }
+  };
+
+  const getPRStatusIcon = (state: string) => {
+    switch (state) {
+      case 'open':
+        return <GitPullRequest className="h-4 w-4 text-green-600" />;
+      case 'merged':
+        return <GitMerge className="h-4 w-4 text-purple-600" />;
+      case 'closed':
+        return <Circle className="h-4 w-4 text-red-600" />;
+      default:
+        return null;
+    }
+  };
+
+  const getPRStatusBadge = (state: string, number: number) => {
+    const baseClasses = "gap-1";
+    switch (state) {
+      case 'open':
+        return (
+          <Badge variant="secondary" className={`${baseClasses} bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200`}>
+            {getPRStatusIcon(state)}
+            #{number} Open
+          </Badge>
+        );
+      case 'merged':
+        return (
+          <Badge variant="secondary" className={`${baseClasses} bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200`}>
+            {getPRStatusIcon(state)}
+            #{number} Merged
+          </Badge>
+        );
+      case 'closed':
+        return (
+          <Badge variant="secondary" className={`${baseClasses} bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200`}>
+            {getPRStatusIcon(state)}
+            #{number} Closed
+          </Badge>
+        );
       default:
         return null;
     }
@@ -160,7 +229,28 @@ export function StackDetailPage() {
   if (stackLoading) {
     return (
       <RepoLayout owner={owner!} repo={repo!}>
-        <Loading text="Loading stack..." />
+        <div className="space-y-6">
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-8 w-48" />
+          </div>
+          <Card>
+            <CardHeader>
+              <Skeleton className="h-5 w-32" />
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <Skeleton className="h-10 w-10 rounded-full" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-3 w-48" />
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
       </RepoLayout>
     );
   }
@@ -201,18 +291,60 @@ export function StackDetailPage() {
               <p className="text-muted-foreground mt-1">{stack.description}</p>
             )}
           </div>
-          {authenticated && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2"
-              onClick={() => setShowAddBranch(!showAddBranch)}
-            >
-              <Plus className="h-4 w-4" />
-              Add Branch
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {authenticated && stack.branches.length > 0 && branchesWithoutPRs > 0 && (
+              <Button
+                size="sm"
+                className="gap-2"
+                onClick={() => handleSubmitStack(false)}
+                disabled={submitMutation.isPending}
+              >
+                {submitMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+                Submit Stack ({branchesWithoutPRs} PR{branchesWithoutPRs !== 1 ? 's' : ''})
+              </Button>
+            )}
+            {authenticated && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={() => setShowAddBranch(!showAddBranch)}
+              >
+                <Plus className="h-4 w-4" />
+                Add Branch
+              </Button>
+            )}
+          </div>
         </div>
+
+        {/* Submit success message */}
+        {submitMutation.isSuccess && submitMutation.data.createdPRs.length > 0 && (
+          <Card className="border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 text-green-800 dark:text-green-200">
+                <CheckCircle2 className="h-5 w-5" />
+                <span className="font-medium">
+                  Created {submitMutation.data.createdPRs.length} pull request{submitMutation.data.createdPRs.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+              <div className="mt-2 space-y-1">
+                {submitMutation.data.createdPRs.map((pr) => (
+                  <Link
+                    key={pr.prNumber}
+                    to={`/${owner}/${repo}/pull/${pr.prNumber}`}
+                    className="block text-sm text-green-700 dark:text-green-300 hover:underline"
+                  >
+                    #{pr.prNumber}: {pr.branch}
+                  </Link>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Add Branch Form */}
         {showAddBranch && (
@@ -264,6 +396,9 @@ export function StackDetailPage() {
               <GitBranch className="h-4 w-4" />
               Stack Structure
             </CardTitle>
+            <CardDescription>
+              PRs should be reviewed and merged from bottom to top
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-0">
@@ -271,41 +406,66 @@ export function StackDetailPage() {
               {[...stack.branches].reverse().map((branch, reversedIndex) => {
                 const index = stack.branches.length - 1 - reversedIndex;
                 const node = stack.nodes?.find((n) => n.branch === branch);
+                const targetBranch = index === 0 ? stack.baseBranch : stack.branches[index - 1];
+                
                 return (
                   <div key={branch} className="relative">
                     {/* Connection line */}
                     {reversedIndex < stack.branches.length - 1 && (
-                      <div className="absolute left-[19px] top-[40px] w-0.5 h-4 bg-border" />
+                      <div className="absolute left-[19px] top-[48px] w-0.5 h-4 bg-border" />
                     )}
                     
                     <div className="flex items-center gap-3 py-2 px-3 rounded-lg hover:bg-muted/50 group">
                       <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 text-primary">
-                        {getStatusIcon(node?.status || 'synced')}
+                        {node?.pr ? getPRStatusIcon(node.pr.state) : getStatusIcon(node?.status || 'synced')}
                       </div>
                       
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <Link
                             to={`/${owner}/${repo}/tree/${branch}`}
                             className="font-medium hover:underline truncate"
                           >
                             {branch}
                           </Link>
-                          {node && getStatusBadge(node.status)}
+                          {node?.pr ? (
+                            <Link to={`/${owner}/${repo}/pull/${node.pr.number}`}>
+                              {getPRStatusBadge(node.pr.state, node.pr.number)}
+                            </Link>
+                          ) : (
+                            <>
+                              {node && getStatusBadge(node.status)}
+                              <Badge variant="outline" className="text-xs text-muted-foreground">
+                                No PR
+                              </Badge>
+                            </>
+                          )}
                           <Badge variant="outline" className="text-xs">
                             #{index + 1}
                           </Badge>
                         </div>
-                        {node && (
-                          <div className="text-sm text-muted-foreground flex items-center gap-2 mt-0.5">
-                            <code className="text-xs bg-muted px-1 rounded">{node.commit}</code>
-                            <span className="truncate">{node.message}</span>
-                          </div>
-                        )}
+                        <div className="text-sm text-muted-foreground flex items-center gap-2 mt-0.5">
+                          {node && (
+                            <>
+                              <code className="text-xs bg-muted px-1 rounded">{node.commit || '???'}</code>
+                              <span className="truncate">{node.message}</span>
+                            </>
+                          )}
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          → targets <code className="bg-muted px-1 rounded">{targetBranch}</code>
+                        </div>
                       </div>
 
                       {authenticated && (
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {!node?.pr && (
+                            <Link to={`/${owner}/${repo}/pulls/new?source=${branch}&target=${targetBranch}`}>
+                              <Button variant="ghost" size="sm" title="Create PR">
+                                <GitPullRequest className="h-4 w-4" />
+                              </Button>
+                            </Link>
+                          )}
                           <Button
                             variant="ghost"
                             size="sm"
@@ -393,24 +553,45 @@ export function StackDetailPage() {
           </Card>
         )}
 
-        {/* Actions */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Quick Actions</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-wrap gap-2">
-            <Link to={`/${owner}/${repo}/pulls/new`}>
-              <Button variant="outline" size="sm" className="gap-2">
-                <ArrowUpRight className="h-4 w-4" />
-                Create PR for top branch
-              </Button>
-            </Link>
-            <Button variant="outline" size="sm" className="gap-2" disabled>
-              <ArrowDown className="h-4 w-4" />
-              Sync Stack (CLI only)
-            </Button>
-          </CardContent>
-        </Card>
+        {/* Quick Actions */}
+        {stack.branches.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Quick Actions</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-wrap gap-2">
+              {branchesWithoutPRs > 0 && authenticated && (
+                <>
+                  <Button
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => handleSubmitStack(false)}
+                    disabled={submitMutation.isPending}
+                  >
+                    <Send className="h-4 w-4" />
+                    Create {branchesWithoutPRs} PR{branchesWithoutPRs !== 1 ? 's' : ''}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => handleSubmitStack(true)}
+                    disabled={submitMutation.isPending}
+                  >
+                    <Send className="h-4 w-4" />
+                    Create as Draft
+                  </Button>
+                </>
+              )}
+              {branchesWithoutPRs === 0 && stack.branches.length > 0 && (
+                <div className="text-sm text-muted-foreground flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-green-500" />
+                  All branches have PRs
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* CLI Info */}
         <Card className="bg-muted/30">
@@ -420,7 +601,7 @@ export function StackDetailPage() {
               <p><code>wit stack show {stack.name}</code> - View stack</p>
               <p><code>wit stack push</code> - Add new branch</p>
               <p><code>wit stack sync</code> - Rebase all branches</p>
-              <p><code>wit stack submit</code> - Push all branches</p>
+              <p><code>wit stack submit</code> - Push all branches and create PRs</p>
             </div>
           </CardContent>
         </Card>

@@ -285,6 +285,59 @@ export const milestones = pgTable('milestones', {
   closedAt: timestamp('closed_at', { withTimezone: true }),
 });
 
+// ============ STACKS (Stacked Diffs) ============
+
+/**
+ * Stacks table - Groups of dependent branches/PRs
+ * A stack represents a series of changes that build on each other
+ */
+export const stacks = pgTable('stacks', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  repoId: uuid('repo_id')
+    .notNull()
+    .references(() => repositories.id, { onDelete: 'cascade' }),
+  
+  name: text('name').notNull(), // e.g., "auth-feature"
+  description: text('description'),
+  
+  // The base branch this stack builds on (e.g., "main")
+  baseBranch: text('base_branch').notNull(),
+  
+  // Author of the stack
+  authorId: text('author_id').notNull(), // References better-auth user.id
+  
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  // Stack names must be unique within a repository
+  uniqueNamePerRepo: unique().on(table.repoId, table.name),
+}));
+
+/**
+ * Stack branches table - Ordered branches within a stack
+ * Each branch can optionally be linked to a PR
+ */
+export const stackBranches = pgTable('stack_branches', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  stackId: uuid('stack_id')
+    .notNull()
+    .references(() => stacks.id, { onDelete: 'cascade' }),
+  
+  // Branch name
+  branchName: text('branch_name').notNull(),
+  
+  // Position in the stack (0 = closest to base, higher = further up)
+  position: integer('position').notNull(),
+  
+  // Optional link to the PR for this branch
+  prId: uuid('pr_id').references(() => pullRequests.id, { onDelete: 'set null' }),
+  
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  // Each branch can only appear once per stack
+  uniqueBranchPerStack: unique().on(table.stackId, table.branchName),
+}));
+
 // ============ PULL REQUESTS ============
 
 export const pullRequests = pgTable('pull_requests', {
@@ -318,6 +371,9 @@ export const pullRequests = pgTable('pull_requests', {
   milestoneId: uuid('milestone_id').references(() => milestones.id, {
     onDelete: 'set null',
   }),
+  
+  // Stack reference - which stack this PR belongs to (if any)
+  stackId: uuid('stack_id').references(() => stacks.id, { onDelete: 'set null' }),
 
   isDraft: boolean('is_draft').notNull().default(false),
   isMergeable: boolean('is_mergeable'),
@@ -767,6 +823,12 @@ export type NewIssueLabel = typeof issueLabels.$inferInsert;
 
 export type PrLabel = typeof prLabels.$inferSelect;
 export type NewPrLabel = typeof prLabels.$inferInsert;
+
+export type Stack = typeof stacks.$inferSelect;
+export type NewStack = typeof stacks.$inferInsert;
+
+export type StackBranch = typeof stackBranches.$inferSelect;
+export type NewStackBranch = typeof stackBranches.$inferInsert;
 
 export type Release = typeof releases.$inferSelect;
 export type NewRelease = typeof releases.$inferInsert;

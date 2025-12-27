@@ -65,3 +65,11 @@ export {
   getWorkflowRunWithDetails,
   type WorkflowRunWithJobs,
 } from './workflow';
+
+// Stack models (stacked diffs)
+export {
+  stackModel,
+  stackBranchModel,
+  type StackBranchWithPR,
+  type StackWithDetails,
+} from './stack';
