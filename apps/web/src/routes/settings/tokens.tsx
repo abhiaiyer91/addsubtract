@@ -67,7 +67,7 @@ export function TokensPage() {
 
   const createToken = trpc.tokens.create.useMutation({
     onSuccess: (data) => {
-      setNewToken(data.rawToken);
+      setNewToken(data.token);
       setName('');
       setSelectedScopes([]);
       setExpiresIn('30');
