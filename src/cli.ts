@@ -2,6 +2,7 @@
 
 import {
   init,
+  parseInitArgs,
   add,
   commit,
   status,
@@ -523,9 +524,11 @@ function main(): void {
 
   try {
     switch (command) {
-      case 'init':
-        init(cmdArgs[0] || '.');
-        break;
+      case 'init': {
+        const { directory, options: initOptions } = parseInitArgs(rawArgs);
+        init(directory, initOptions);
+        return; // init is now async
+      }
 
       case 'add':
         if (cmdArgs.length === 0) {

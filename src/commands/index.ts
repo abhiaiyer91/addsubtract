@@ -1,5 +1,5 @@
 // Porcelain commands (user-facing)
-export { init } from './init';
+export { init, parseInitArgs, InitOptions } from './init';
 export { add } from './add';
 export { commit, commitWithOptions, handleCommit } from './commit';
 export { status } from './status';
