@@ -330,7 +330,7 @@ export class MergeManager {
       this.writeConflictMarkersToWorkDir(result.conflicts, sourceBranch, targetBranch);
     } else {
       // Successful merge - update working directory with merged files
-      this.updateWorkingDirectoryAfterMerge(theirFiles, result);
+      this.updateWorkingDirectoryAfterMerge(sourceTree, result);
       
       if (!options.noCommit) {
         // Create merge commit
