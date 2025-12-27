@@ -100,6 +100,9 @@
       "pages": [
         "features/github",
         "features/ai-powered",
+        "features/search",
+        "features/review",
+        "features/tokens",
         "features/ci-cd",
         "features/monorepo-scopes",
         "features/large-files",
