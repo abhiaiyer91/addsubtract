@@ -20,7 +20,7 @@ Can also read binary files and return base64 encoded content.`,
     startLine: z.number().optional().describe('Optional: Start reading from this line (1-indexed)'),
     endLine: z.number().optional().describe('Optional: Stop reading at this line (inclusive)'),
   }),
-  outputSchema: z.object({
+outputSchema: z.object({
     success: z.boolean(),
     content: z.string().optional().describe('File content (text or base64 for binary)'),
     isBinary: z.boolean().optional().describe('Whether the file is binary'),
@@ -28,7 +28,7 @@ Can also read binary files and return base64 encoded content.`,
     startLine: z.number().optional().describe('Actual start line returned'),
     endLine: z.number().optional().describe('Actual end line returned'),
     size: z.number().optional().describe('File size in bytes'),
-    error: z.string().optional(),
+    errorMessage: z.string().optional().describe('Error message if operation failed'),
   }),
   execute: async ({ filePath, startLine, endLine }) => {
     try {
@@ -40,21 +40,21 @@ Can also read binary files and return base64 encoded content.`,
       if (!resolvedPath.startsWith(repo.workDir)) {
         return {
           success: false,
-          error: 'Access denied: Path is outside repository',
+          errorMessage: 'Access denied: Path is outside repository',
         };
       }
 
       if (!exists(fullPath)) {
         return {
           success: false,
-          error: `File not found: ${filePath}`,
+          errorMessage: `File not found: ${filePath}`,
         };
       }
 
       if (isDirectory(fullPath)) {
         return {
           success: false,
-          error: `Path is a directory, not a file: ${filePath}. Use listDirectory tool instead.`,
+          errorMessage: `Path is a directory, not a file: ${filePath}. Use listDirectory tool instead.`,
         };
       }
 
@@ -90,7 +90,7 @@ Can also read binary files and return base64 encoded content.`,
       if (actualStartLine > totalLines) {
         return {
           success: false,
-          error: `Start line ${startLine} exceeds file length (${totalLines} lines)`,
+          errorMessage: `Start line ${startLine} exceeds file length (${totalLines} lines)`,
         };
       }
 
@@ -107,10 +107,10 @@ Can also read binary files and return base64 encoded content.`,
         endLine: actualEndLine,
         size,
       };
-    } catch (error) {
+    } catch (err) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to read file',
+        errorMessage: err instanceof Error ? err.message : 'Failed to read file',
       };
     }
   },

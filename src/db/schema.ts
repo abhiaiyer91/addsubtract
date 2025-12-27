@@ -781,7 +781,124 @@ export const notifications = pgTable('notifications', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+// ============ AGENT SESSIONS ============
+
+export const agentSessionStatusEnum = pgEnum('agent_session_status', [
+  'active',
+  'completed',
+  'cancelled',
+]);
+
+export const agentMessageRoleEnum = pgEnum('agent_message_role', [
+  'user',
+  'assistant',
+  'tool',
+  'system',
+]);
+
+/**
+ * Agent sessions table
+ * Tracks conversations between users and the wit coding agent
+ */
+export const agentSessions = pgTable('agent_sessions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  
+  // User who created the session
+  userId: text('user_id').notNull(), // References better-auth user.id
+  
+  // Repository context (optional - agent can work without a repo)
+  repoId: uuid('repo_id').references(() => repositories.id, { onDelete: 'set null' }),
+  
+  // Branch the agent is working on
+  branch: text('branch'),
+  
+  // Session title (auto-generated or user-provided)
+  title: text('title'),
+  
+  // Current status
+  status: agentSessionStatusEnum('status').notNull().default('active'),
+  
+  // Timestamps
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+/**
+ * Agent messages table
+ * Stores all messages in agent conversations
+ */
+export const agentMessages = pgTable('agent_messages', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  
+  // Parent session
+  sessionId: uuid('session_id')
+    .notNull()
+    .references(() => agentSessions.id, { onDelete: 'cascade' }),
+  
+  // Message role
+  role: agentMessageRoleEnum('role').notNull(),
+  
+  // Message content
+  content: text('content').notNull(),
+  
+  // Tool calls made by the assistant (JSON array)
+  toolCalls: text('tool_calls'), // JSON: [{ name, args, result }]
+  
+  // Token usage for this message
+  promptTokens: integer('prompt_tokens'),
+  completionTokens: integer('completion_tokens'),
+  
+  // Timestamp
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+/**
+ * Agent file changes table
+ * Tracks proposed file changes before they're applied
+ */
+export const agentFileChanges = pgTable('agent_file_changes', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  
+  // Parent session
+  sessionId: uuid('session_id')
+    .notNull()
+    .references(() => agentSessions.id, { onDelete: 'cascade' }),
+  
+  // Message that proposed this change
+  messageId: uuid('message_id')
+    .references(() => agentMessages.id, { onDelete: 'cascade' }),
+  
+  // File path relative to repo root
+  filePath: text('file_path').notNull(),
+  
+  // Type of change
+  changeType: text('change_type').notNull(), // 'create' | 'edit' | 'delete'
+  
+  // Original content (for undo)
+  originalContent: text('original_content'),
+  
+  // Proposed new content
+  proposedContent: text('proposed_content'),
+  
+  // Approval status
+  approved: boolean('approved'),
+  
+  // When the change was applied
+  appliedAt: timestamp('applied_at', { withTimezone: true }),
+  
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
 // ============ TYPE EXPORTS ============
+
+export type AgentSession = typeof agentSessions.$inferSelect;
+export type NewAgentSession = typeof agentSessions.$inferInsert;
+
+export type AgentMessage = typeof agentMessages.$inferSelect;
+export type NewAgentMessage = typeof agentMessages.$inferInsert;
+
+export type AgentFileChange = typeof agentFileChanges.$inferSelect;
+export type NewAgentFileChange = typeof agentFileChanges.$inferInsert;
 
 export type Notification = typeof notifications.$inferSelect;
 export type NewNotification = typeof notifications.$inferInsert;

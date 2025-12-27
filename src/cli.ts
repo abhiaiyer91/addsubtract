@@ -24,6 +24,7 @@ import {
   handleScope,
   // AI commands
   handleAI,
+  handleAgent,
   // Quality of Life commands
   handleAmend,
   handleWip,
@@ -298,7 +299,11 @@ Monorepo Support:
   scope clear           Clear scope restrictions
 
 AI-Powered Features:
-  search <query>        Semantic code search (the killer feature!)
+  agent                 Interactive coding assistant (the killer feature!)
+  agent ask <query>     One-shot question to the coding agent
+  agent status          Show agent configuration
+  
+  search <query>        Semantic code search
   search index          Index repo for semantic search
   search status         Show index health
   search -i             Interactive search mode
@@ -342,6 +347,8 @@ Environment Variables:
 Examples:
   wit ui                    # Launch terminal UI
   wit web                   # Launch web UI
+  wit agent                 # Start interactive coding agent
+  wit agent "add tests"     # One-shot agent query
   wit init
   wit add .
   wit commit -m "Initial commit"
@@ -387,7 +394,7 @@ const COMMANDS = [
   'amend', 'wip', 'fixup', 'cleanup', 'blame', 'stats', 'snapshot',
   'scope', 'graph',
   'ui', 'web',
-  'ai', 'search', 'review',
+  'ai', 'agent', 'search', 'review',
   // Issue tracking
   'issue', 'cycle',
   'cat-file', 'hash-object', 'ls-files', 'ls-tree',
@@ -732,6 +739,18 @@ function main(): void {
         // AI commands are async, so we need to handle them specially
         handleAI(cmdArgs).catch((error: Error) => {
           console.error(`error: ${error.message}`);
+          process.exit(1);
+        });
+        return; // Exit main() to let async handle complete
+
+      case 'agent':
+        // Interactive coding agent
+        handleAgent(rawArgs).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
+          }
           process.exit(1);
         });
         return; // Exit main() to let async handle complete

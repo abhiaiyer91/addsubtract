@@ -10,11 +10,11 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "wit": "*",
     "@radix-ui/react-avatar": "^1.1.2",
     "@radix-ui/react-dialog": "^1.1.4",
     "@radix-ui/react-dropdown-menu": "^2.1.4",
     "@radix-ui/react-label": "^2.1.1",
+    "@radix-ui/react-scroll-area": "^1.2.10",
     "@radix-ui/react-select": "^2.1.4",
     "@radix-ui/react-separator": "^1.1.1",
     "@radix-ui/react-slot": "^1.1.1",
@@ -36,6 +36,7 @@
     "shiki": "^1.24.2",
     "superjson": "^2.2.6",
     "tailwind-merge": "^2.6.0",
+    "wit": "*",
     "zod": "^3.24.1"
   },
   "devDependencies": {

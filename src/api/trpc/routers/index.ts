@@ -16,6 +16,7 @@ import { branchProtectionRouter } from './branch-protection';
 import { notificationsRouter } from './notifications';
 import { stacksRouter } from './stacks';
 import { workflowsRouter } from './workflows';
+import { agentRouter } from './agent';
 
 /**
  * Main application router
@@ -39,6 +40,7 @@ export const appRouter = router({
   notifications: notificationsRouter,
   stacks: stacksRouter,
   workflows: workflowsRouter,
+  agent: agentRouter,
 });
 
 /**
@@ -64,4 +66,5 @@ export {
   branchProtectionRouter,
   notificationsRouter,
   stacksRouter,
+  agentRouter,
 };

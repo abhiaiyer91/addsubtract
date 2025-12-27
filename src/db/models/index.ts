@@ -76,3 +76,10 @@ export {
   type StackBranchWithPR,
   type StackWithDetails,
 } from './stack';
+
+// Agent models (coding agent sessions and messages)
+export {
+  agentSessionModel,
+  agentMessageModel,
+  agentFileChangeModel,
+} from './agent';

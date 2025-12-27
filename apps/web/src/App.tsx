@@ -24,6 +24,7 @@ import { StackDetailPage } from './routes/repo/stack-detail';
 import { WorkflowsPage } from './routes/repo/workflows';
 import { SettingsPage } from './routes/settings';
 import { NewRepoPage } from './routes/new';
+import { AgentPage } from './routes/agent';
 
 export function App() {
   return (
@@ -37,6 +38,7 @@ export function App() {
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/new" element={<NewRepoPage />} />
+            <Route path="/agent" element={<AgentPage />} />
 
             {/* User/Org profile */}
             <Route path="/:owner" element={<OwnerPage />} />
