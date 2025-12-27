@@ -12,22 +12,58 @@ import {
   RotateCcw,
   Eye,
   ChevronDown,
+  Train,
+  Zap,
+  Calendar,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import { trpc } from '@/lib/trpc';
+import { toastSuccess, toastError } from '@/components/ui/use-toast';
 
-type PRState = 'draft' | 'open' | 'ready' | 'waiting' | 'merged' | 'closed';
+type PRState = 'draft' | 'open' | 'ready' | 'queued' | 'merged' | 'closed';
 type MergeMethod = 'merge' | 'squash' | 'rebase';
+type MergeQueueState = 
+  | 'pending' 
+  | 'preparing' 
+  | 'testing' 
+  | 'ready' 
+  | 'merging' 
+  | 'completed' 
+  | 'failed' 
+  | 'cancelled';
+
+interface MergeQueuePosition {
+  inQueue: boolean;
+  position?: number;
+  state?: MergeQueueState;
+  priority?: number;
+  estimatedWaitMinutes?: number | null;
+  aheadCount?: number;
+}
 
 interface ActionCardProps {
+  prId: string;
   prState: 'open' | 'merged' | 'closed';
+  repoId: string;
+  targetBranch: string;
   isDraft?: boolean;
   isMergeable?: boolean;
   hasConflicts?: boolean;
@@ -35,6 +71,7 @@ interface ActionCardProps {
   mergedAt?: Date | string;
   isAuthor?: boolean;
   isReviewer?: boolean;
+  canWrite?: boolean;
   reviewsApproved?: number;
   reviewsChangesRequested?: number;
   checksStatus?: 'passing' | 'failing' | 'pending' | 'none';
@@ -55,10 +92,11 @@ interface ActionCardProps {
   repo?: string;
 }
 
-function getCardState(props: ActionCardProps): PRState {
+function getCardState(props: ActionCardProps, queuePosition?: MergeQueuePosition): PRState {
   if (props.prState === 'merged') return 'merged';
   if (props.prState === 'closed') return 'closed';
   if (props.isDraft) return 'draft';
+  if (queuePosition?.inQueue) return 'queued';
   if (props.isMergeable && props.checksStatus === 'passing') return 'ready';
   if (props.isMergeable !== false) return 'open';
   return 'open';
@@ -91,11 +129,11 @@ const stateConfig: Record<
     bgClass: 'bg-green-50 dark:bg-green-950/30',
     borderClass: 'border-green-300 dark:border-green-800',
   },
-  waiting: {
-    icon: <Clock className="h-5 w-5 text-yellow-600" />,
-    title: 'Waiting to merge',
-    bgClass: 'bg-yellow-50 dark:bg-yellow-950/30',
-    borderClass: 'border-yellow-200 dark:border-yellow-900',
+  queued: {
+    icon: <Train className="h-5 w-5 text-blue-500" />,
+    title: 'In Merge Queue',
+    bgClass: 'bg-blue-50 dark:bg-blue-950/30',
+    borderClass: 'border-blue-300 dark:border-blue-800',
   },
   merged: {
     icon: <GitMerge className="h-5 w-5 text-purple-500" />,
@@ -111,11 +149,106 @@ const stateConfig: Record<
   },
 };
 
+const queueStateLabels: Record<MergeQueueState, { label: string; color: string }> = {
+  pending: { label: 'Waiting', color: 'text-yellow-600' },
+  preparing: { label: 'Preparing', color: 'text-blue-600' },
+  testing: { label: 'Testing', color: 'text-blue-600' },
+  ready: { label: 'Ready', color: 'text-green-600' },
+  merging: { label: 'Merging', color: 'text-purple-600' },
+  completed: { label: 'Completed', color: 'text-purple-600' },
+  failed: { label: 'Failed', color: 'text-red-600' },
+  cancelled: { label: 'Cancelled', color: 'text-gray-600' },
+};
+
+function formatWaitTime(minutes: number | null | undefined): string {
+  if (minutes === null || minutes === undefined) return '';
+  if (minutes < 1) return '< 1 min';
+  if (minutes < 60) return `~${Math.round(minutes)} min`;
+  const hours = Math.floor(minutes / 60);
+  const mins = Math.round(minutes % 60);
+  return mins > 0 ? `~${hours}h ${mins}m` : `~${hours}h`;
+}
+
 export function ActionCard(props: ActionCardProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [mergeMethod, setMergeMethod] = useState<MergeMethod>('squash');
-  const state = getCardState(props);
+  const utils = trpc.useUtils();
+
+  // Fetch merge queue config
+  const { data: queueConfig } = trpc.mergeQueue.getConfig.useQuery(
+    { repoId: props.repoId, targetBranch: props.targetBranch },
+    { enabled: props.prState === 'open' }
+  );
+
+  // Fetch queue position for this PR
+  const { data: queuePosition } = trpc.mergeQueue.getQueuePosition.useQuery(
+    { prId: props.prId },
+    { enabled: props.prState === 'open' }
+  );
+
+  // Fetch queue stats
+  const { data: queueStats } = trpc.mergeQueue.getStats.useQuery(
+    { repoId: props.repoId, targetBranch: props.targetBranch },
+    { enabled: props.prState === 'open' && queueConfig?.enabled }
+  );
+
+  // Add to queue mutation
+  const addToQueueMutation = trpc.mergeQueue.addToQueue.useMutation({
+    onSuccess: (data) => {
+      utils.mergeQueue.getQueuePosition.invalidate({ prId: props.prId });
+      utils.mergeQueue.getStats.invalidate({ repoId: props.repoId, targetBranch: props.targetBranch });
+      toastSuccess({
+        title: 'Added to merge queue',
+        description: data.message,
+      });
+    },
+    onError: (error) => {
+      toastError({
+        title: 'Failed to add to queue',
+        description: error.message,
+      });
+    },
+  });
+
+  // Remove from queue mutation
+  const removeFromQueueMutation = trpc.mergeQueue.removeFromQueue.useMutation({
+    onSuccess: (data) => {
+      utils.mergeQueue.getQueuePosition.invalidate({ prId: props.prId });
+      utils.mergeQueue.getStats.invalidate({ repoId: props.repoId, targetBranch: props.targetBranch });
+      toastSuccess({
+        title: 'Removed from queue',
+        description: data.message,
+      });
+    },
+    onError: (error) => {
+      toastError({
+        title: 'Failed to remove from queue',
+        description: error.message,
+      });
+    },
+  });
+
+  // Trigger queue processing mutation
+  const triggerProcessingMutation = trpc.mergeQueue.triggerProcessing.useMutation({
+    onSuccess: () => {
+      toastSuccess({
+        title: 'Queue processing started',
+        description: 'The merge queue is now processing.',
+      });
+    },
+    onError: (error) => {
+      toastError({
+        title: 'Failed to trigger processing',
+        description: error.message,
+      });
+    },
+  });
+
+  const state = getCardState(props, queuePosition as MergeQueuePosition | undefined);
   const config = stateConfig[state];
+  const isQueueEnabled = queueConfig?.enabled ?? false;
+  const isInQueue = queuePosition?.inQueue ?? false;
+  const canModify = props.isAuthor || props.canWrite;
 
   const handleMerge = async () => {
     if (!props.onMerge) return;
@@ -125,6 +258,21 @@ export function ActionCard(props: ActionCardProps) {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleAddToQueue = (priority: number = 50) => {
+    addToQueueMutation.mutate({ prId: props.prId, priority });
+  };
+
+  const handleRemoveFromQueue = () => {
+    removeFromQueueMutation.mutate({ prId: props.prId });
+  };
+
+  const handleTriggerProcessing = () => {
+    triggerProcessingMutation.mutate({ 
+      repoId: props.repoId, 
+      targetBranch: props.targetBranch 
+    });
   };
 
   const handleClose = async () => {
@@ -163,13 +311,36 @@ export function ActionCard(props: ActionCardProps) {
     rebase: 'Rebase and merge',
   };
 
+  const isMutating = addToQueueMutation.isPending || removeFromQueueMutation.isPending || isLoading;
+
+  // Calculate progress for queued state
+  const getQueueProgress = () => {
+    if (!queuePosition?.inQueue) return 0;
+    const queueState = (queuePosition as any).state as MergeQueueState;
+    switch (queueState) {
+      case 'pending': return 10;
+      case 'preparing': return 30;
+      case 'testing': return 60;
+      case 'ready': return 80;
+      case 'merging': return 95;
+      default: return 0;
+    }
+  };
+
   return (
     <Card className={cn('border-2', config.borderClass, config.bgClass)}>
       <CardContent className="p-4">
         {/* State Header */}
-        <div className="flex items-center gap-3 mb-3">
-          {config.icon}
-          <span className="font-semibold">{config.title}</span>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-3">
+            {config.icon}
+            <span className="font-semibold">{config.title}</span>
+          </div>
+          {state === 'queued' && queuePosition?.inQueue && (
+            <Badge variant="secondary" className="gap-1">
+              #{((queuePosition as any).position ?? 0) + 1} in queue
+            </Badge>
+          )}
         </div>
 
         {/* State-specific content */}
@@ -261,62 +432,19 @@ export function ActionCard(props: ActionCardProps) {
               </div>
             )}
 
-            {/* Merge Section */}
+            {/* Merge Actions */}
             {props.onMerge && props.isMergeable !== false && !props.hasConflicts && (
-              <div className="flex gap-2">
-                <div className="flex flex-1">
-                  <Button
-                    variant="success"
-                    className="flex-1 rounded-r-none gap-2"
-                    onClick={handleMerge}
-                    disabled={isLoading}
-                  >
-                    {isLoading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <GitMerge className="h-4 w-4" />
-                    )}
-                    {methodLabels[mergeMethod]}
-                  </Button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="success"
-                        className="px-2 rounded-l-none border-l border-green-700"
-                        disabled={isLoading}
-                      >
-                        <ChevronDown className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => setMergeMethod('merge')}>
-                        <div>
-                          <div className="font-medium">Create a merge commit</div>
-                          <div className="text-xs text-muted-foreground">
-                            All commits will be added via a merge commit.
-                          </div>
-                        </div>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setMergeMethod('squash')}>
-                        <div>
-                          <div className="font-medium">Squash and merge</div>
-                          <div className="text-xs text-muted-foreground">
-                            All commits will be combined into one.
-                          </div>
-                        </div>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setMergeMethod('rebase')}>
-                        <div>
-                          <div className="font-medium">Rebase and merge</div>
-                          <div className="text-xs text-muted-foreground">
-                            Commits will be rebased onto base.
-                          </div>
-                        </div>
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </div>
+              <MergeActions
+                mergeMethod={mergeMethod}
+                setMergeMethod={setMergeMethod}
+                methodLabels={methodLabels}
+                isLoading={isMutating}
+                onMerge={handleMerge}
+                onAddToQueue={handleAddToQueue}
+                isQueueEnabled={isQueueEnabled}
+                queueStats={queueStats}
+                canWrite={canModify}
+              />
             )}
 
             {/* Close button */}
@@ -360,61 +488,119 @@ export function ActionCard(props: ActionCardProps) {
               </div>
             )}
 
-            {/* Merge Section */}
+            {/* Merge Actions */}
             {props.onMerge && (
-              <div className="flex gap-2">
-                <div className="flex flex-1">
-                  <Button
-                    variant="success"
-                    className="flex-1 rounded-r-none gap-2"
-                    onClick={handleMerge}
-                    disabled={isLoading}
-                  >
-                    {isLoading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <GitMerge className="h-4 w-4" />
-                    )}
-                    {methodLabels[mergeMethod]}
-                  </Button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="success"
-                        className="px-2 rounded-l-none border-l border-green-700"
-                        disabled={isLoading}
-                      >
-                        <ChevronDown className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => setMergeMethod('merge')}>
-                        <div>
-                          <div className="font-medium">Create a merge commit</div>
-                          <div className="text-xs text-muted-foreground">
-                            All commits will be added via a merge commit.
-                          </div>
-                        </div>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setMergeMethod('squash')}>
-                        <div>
-                          <div className="font-medium">Squash and merge</div>
-                          <div className="text-xs text-muted-foreground">
-                            All commits will be combined into one.
-                          </div>
-                        </div>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setMergeMethod('rebase')}>
-                        <div>
-                          <div className="font-medium">Rebase and merge</div>
-                          <div className="text-xs text-muted-foreground">
-                            Commits will be rebased onto base.
-                          </div>
-                        </div>
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+              <MergeActions
+                mergeMethod={mergeMethod}
+                setMergeMethod={setMergeMethod}
+                methodLabels={methodLabels}
+                isLoading={isMutating}
+                onMerge={handleMerge}
+                onAddToQueue={handleAddToQueue}
+                isQueueEnabled={isQueueEnabled}
+                queueStats={queueStats}
+                canWrite={canModify}
+              />
+            )}
+          </div>
+        )}
+
+        {state === 'queued' && queuePosition?.inQueue && (
+          <div className="space-y-3">
+            {/* Queue status */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Status:</span>
+                <span className={cn(
+                  'font-medium',
+                  queueStateLabels[(queuePosition as any).state as MergeQueueState]?.color
+                )}>
+                  {queueStateLabels[(queuePosition as any).state as MergeQueueState]?.label || 'Processing'}
+                </span>
+              </div>
+              
+              {(queuePosition as any).estimatedWaitMinutes != null && (queuePosition as any).state === 'pending' && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Estimated wait:</span>
+                  <span className="font-medium">
+                    {formatWaitTime((queuePosition as any).estimatedWaitMinutes)}
+                  </span>
                 </div>
+              )}
+            </div>
+
+            {/* Progress bar */}
+            <div className="space-y-1">
+              <Progress value={getQueueProgress()} className="h-2" />
+              <p className="text-xs text-muted-foreground text-center">
+                {(queuePosition as any).state === 'pending' && 'Waiting for earlier PRs...'}
+                {(queuePosition as any).state === 'preparing' && 'Preparing merge commit...'}
+                {(queuePosition as any).state === 'testing' && 'Running CI checks...'}
+                {(queuePosition as any).state === 'ready' && 'Ready to merge!'}
+                {(queuePosition as any).state === 'merging' && 'Merging...'}
+              </p>
+            </div>
+
+            {/* Failed state */}
+            {(queuePosition as any).state === 'failed' && (
+              <div className="flex items-start gap-2 p-2 bg-red-50 dark:bg-red-950/30 rounded text-sm">
+                <AlertTriangle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-red-600 dark:text-red-400 font-medium">Merge failed</p>
+                  <p className="text-red-600/80 dark:text-red-400/80 text-xs mt-0.5">
+                    Check the CI logs for details
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Actions for queued state */}
+            {canModify && (
+              <div className="flex gap-2 pt-2 border-t">
+                {/* Manual trigger button (for admins when queue is in manual mode) */}
+                {queueConfig?.autoMergeMode === 'manual' && (queuePosition as any).state === 'ready' && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="default"
+                          size="sm"
+                          className="flex-1"
+                          onClick={handleTriggerProcessing}
+                          disabled={triggerProcessingMutation.isPending}
+                        >
+                          {triggerProcessingMutation.isPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                          ) : (
+                            <Zap className="h-4 w-4 mr-1" />
+                          )}
+                          Merge Queue Now
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Process the merge queue immediately</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+                
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={cn(
+                    queueConfig?.autoMergeMode === 'manual' ? '' : 'w-full',
+                    'text-red-600 hover:text-red-700 hover:bg-red-50'
+                  )}
+                  onClick={handleRemoveFromQueue}
+                  disabled={removeFromQueueMutation.isPending || ['merging', 'completed'].includes((queuePosition as any).state)}
+                >
+                  {removeFromQueueMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                  ) : (
+                    <XCircle className="h-4 w-4 mr-1" />
+                  )}
+                  Remove from Queue
+                </Button>
               </div>
             )}
           </div>
@@ -460,5 +646,149 @@ export function ActionCard(props: ActionCardProps) {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * MergeActions component - handles the merge button with queue option
+ */
+function MergeActions({
+  mergeMethod,
+  setMergeMethod,
+  methodLabels,
+  isLoading,
+  onMerge,
+  onAddToQueue,
+  isQueueEnabled,
+  queueStats,
+  canWrite,
+}: {
+  mergeMethod: MergeMethod;
+  setMergeMethod: (method: MergeMethod) => void;
+  methodLabels: Record<MergeMethod, string>;
+  isLoading: boolean;
+  onMerge: () => Promise<void>;
+  onAddToQueue: (priority?: number) => void;
+  isQueueEnabled: boolean;
+  queueStats?: { pending: number; avgMergeTimeMinutes: number } | null;
+  canWrite?: boolean;
+}) {
+  if (!canWrite) return null;
+
+  return (
+    <div className="space-y-2">
+      {/* Primary merge button */}
+      <div className="flex gap-2">
+        <div className="flex flex-1">
+          <Button
+            variant="success"
+            className="flex-1 rounded-r-none gap-2"
+            onClick={onMerge}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <GitMerge className="h-4 w-4" />
+            )}
+            {methodLabels[mergeMethod]}
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="success"
+                className="px-2 rounded-l-none border-l border-green-700"
+                disabled={isLoading}
+              >
+                <ChevronDown className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-64">
+              <DropdownMenuLabel>Merge method</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => setMergeMethod('merge')}>
+                <div>
+                  <div className="font-medium">Create a merge commit</div>
+                  <div className="text-xs text-muted-foreground">
+                    All commits will be added via a merge commit.
+                  </div>
+                </div>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setMergeMethod('squash')}>
+                <div>
+                  <div className="font-medium">Squash and merge</div>
+                  <div className="text-xs text-muted-foreground">
+                    All commits will be combined into one.
+                  </div>
+                </div>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setMergeMethod('rebase')}>
+                <div>
+                  <div className="font-medium">Rebase and merge</div>
+                  <div className="text-xs text-muted-foreground">
+                    Commits will be rebased onto base.
+                  </div>
+                </div>
+              </DropdownMenuItem>
+              
+              {/* Queue options */}
+              {isQueueEnabled && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel className="flex items-center gap-2">
+                    <Train className="h-4 w-4" />
+                    Merge Queue
+                    {queueStats && queueStats.pending > 0 && (
+                      <Badge variant="secondary" className="text-xs ml-auto">
+                        {queueStats.pending} waiting
+                      </Badge>
+                    )}
+                  </DropdownMenuLabel>
+                  <DropdownMenuItem onClick={() => onAddToQueue(50)}>
+                    <div className="flex items-center gap-2 w-full">
+                      <Train className="h-4 w-4 text-blue-500" />
+                      <div className="flex-1">
+                        <div className="font-medium">Add to queue</div>
+                        <div className="text-xs text-muted-foreground">
+                          Automatically merged when ready
+                        </div>
+                      </div>
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onAddToQueue(80)}>
+                    <div className="flex items-center gap-2 w-full">
+                      <Zap className="h-4 w-4 text-yellow-500" />
+                      <div className="flex-1">
+                        <div className="font-medium">Add with high priority</div>
+                        <div className="text-xs text-muted-foreground">
+                          Jump ahead in the queue
+                        </div>
+                      </div>
+                    </div>
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+
+      {/* Quick add to queue button when queue is enabled */}
+      {isQueueEnabled && (
+        <Button
+          variant="outline"
+          className="w-full gap-2"
+          onClick={() => onAddToQueue(50)}
+          disabled={isLoading}
+        >
+          <Train className="h-4 w-4" />
+          Add to Merge Queue
+          {queueStats && queueStats.pending > 0 && (
+            <span className="text-muted-foreground">
+              ({queueStats.pending} ahead)
+            </span>
+          )}
+        </Button>
+      )}
+    </div>
   );
 }

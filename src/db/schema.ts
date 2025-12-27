@@ -933,6 +933,23 @@ export const mergeQueueConfig = pgTable('merge_queue_config', {
   /** Whether to delete branches after merging */
   deleteBranchAfterMerge: boolean('delete_branch_after_merge').notNull().default(true),
   
+  /** 
+   * Auto-merge mode: how the queue processes entries
+   * - 'auto': Automatically process queue when PRs are ready (default)
+   * - 'manual': Wait for explicit trigger to process queue
+   * - 'scheduled': Process at scheduled times (uses mergeWindowStart/End)
+   */
+  autoMergeMode: text('auto_merge_mode').notNull().default('auto'),
+  
+  /** Start of merge window (hour in UTC, 0-23) for scheduled mode */
+  mergeWindowStart: integer('merge_window_start'),
+  
+  /** End of merge window (hour in UTC, 0-23) for scheduled mode */
+  mergeWindowEnd: integer('merge_window_end'),
+  
+  /** Days of week to allow merging (0=Sun, 1=Mon, ..., 6=Sat) as JSON array */
+  mergeWindowDays: text('merge_window_days'), // e.g., "[1,2,3,4,5]" for weekdays
+  
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => ({

@@ -27,6 +27,7 @@ import { ReviewButton } from '@/components/pr/review-button';
 import { AiChat } from '@/components/pr/ai-chat';
 import { BranchStatus } from '@/components/pr/branch-status';
 import { KeyboardShortcutsDialog, KeyboardShortcutsButton } from '@/components/pr/keyboard-shortcuts-dialog';
+import { MergeQueueCard } from '@/components/pr/merge-queue-card';
 import { RichEditor } from '@/components/editor/rich-editor';
 import { ConflictResolver } from '@/components/pr/conflict-resolver';
 import { Markdown } from '@/components/markdown/renderer';
@@ -621,10 +622,13 @@ export function PullDetailPage() {
           )}
 
           {/* Action Card */}
-          {authenticated && (
+          {authenticated && repoData?.repo.id && (
             <div className="mb-6">
               <ActionCard
+                prId={pr.id}
                 prState={pr.state}
+                repoId={repoData.repo.id}
+                targetBranch={pr.targetBranch}
                 isDraft={pr.isDraft}
                 isMergeable={mergeabilityData?.canMerge}
                 hasConflicts={conflictCount > 0}
@@ -632,6 +636,7 @@ export function PullDetailPage() {
                 reviewsChangesRequested={changesRequestedCount}
                 behindBy={mergeabilityData?.behindBy}
                 isAuthor={isAuthor}
+                canWrite={authenticated}
                 onMerge={pr.state === 'open' && !pr.isDraft ? handleMerge : undefined}
                 onClose={pr.state === 'open' ? handleClose : undefined}
                 onReopen={pr.state === 'closed' ? handleReopen : undefined}
@@ -904,6 +909,18 @@ export function PullDetailPage() {
             onRemoveLabel={authenticated ? handleRemoveLabel : undefined}
             canManageLabels={authenticated}
           />
+
+          {/* Merge Queue Card */}
+          {repoData?.repo.id && (
+            <MergeQueueCard
+              prId={pr.id}
+              repoId={repoData.repo.id}
+              targetBranch={pr.targetBranch}
+              prState={pr.state}
+              owner={owner!}
+              repo={repo!}
+            />
+          )}
 
           {/* AI Review Card */}
           <Card>
