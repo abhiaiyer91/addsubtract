@@ -14,7 +14,25 @@ import { repoModel, repoAiKeyModel } from '../../../db/models';
 const aiProviderSchema = z.enum(['openai', 'anthropic']);
 
 /**
- * Helper to verify user is repository owner
+ * Helper to get repo by owner/name and verify ownership
+ */
+async function getRepoAndVerifyOwner(owner: string, repoName: string, userId: string) {
+  const result = await repoModel.findByPath(owner, repoName);
+  
+  if (!result) {
+    throw new TRPCError({
+      code: 'NOT_FOUND',
+      message: 'Repository not found',
+    });
+  }
+  
+  const isOwner = result.repo.ownerId === userId;
+  
+  return { repo: result.repo, isOwner };
+}
+
+/**
+ * Helper to verify user is repository owner (by ID)
  */
 async function verifyRepoOwner(repoId: string, userId: string) {
   const repo = await repoModel.findById(repoId);
@@ -37,6 +55,61 @@ async function verifyRepoOwner(repoId: string, userId: string) {
 }
 
 export const repoAiKeysRouter = router({
+  /**
+   * Get all AI settings for a repository in one call
+   * Accepts owner/repo to avoid needing repoId first
+   */
+  getSettings: protectedProcedure
+    .input(
+      z.object({
+        owner: z.string(),
+        repo: z.string(),
+      })
+    )
+    .query(async ({ input, ctx }) => {
+      const { repo, isOwner } = await getRepoAndVerifyOwner(input.owner, input.repo, ctx.user.id);
+      
+      // Check server keys availability (doesn't require owner)
+      const hasServerKeys = !!(
+        process.env.OPENAI_API_KEY || 
+        process.env.ANTHROPIC_API_KEY
+      );
+      
+      // If not owner, return limited info
+      if (!isOwner) {
+        const hasRepoKeys = await repoAiKeyModel.hasKeys(repo.id);
+        return {
+          isOwner: false,
+          repoId: repo.id,
+          keys: [],
+          availability: {
+            available: hasRepoKeys || hasServerKeys,
+            source: hasRepoKeys ? 'repository' as const : hasServerKeys ? 'server' as const : null,
+            hasRepoKeys,
+            hasServerKeys,
+          },
+        };
+      }
+      
+      // Owner gets full info - fetch keys and availability in parallel
+      const [keys, hasRepoKeys] = await Promise.all([
+        repoAiKeyModel.listKeys(repo.id),
+        repoAiKeyModel.hasKeys(repo.id),
+      ]);
+      
+      return {
+        isOwner: true,
+        repoId: repo.id,
+        keys,
+        availability: {
+          available: hasRepoKeys || hasServerKeys,
+          source: hasRepoKeys ? 'repository' as const : hasServerKeys ? 'server' as const : null,
+          hasRepoKeys,
+          hasServerKeys,
+        },
+      };
+    }),
+
   /**
    * List all AI keys for a repository (metadata only, not decrypted)
    * Only accessible by repository owner

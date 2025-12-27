@@ -72,36 +72,25 @@ export function RepoAISettingsPage() {
 
   const utils = trpc.useUtils();
 
-  const { data: repoData, isLoading: repoLoading } = trpc.repos.get.useQuery(
+  // Single query to get all AI settings at once - no cascading queries
+  const { data: settings, isLoading } = trpc.repoAiKeys.getSettings.useQuery(
     { owner: owner!, repo: repo! },
-    { enabled: !!owner && !!repo }
+    { enabled: !!owner && !!repo && authenticated }
   );
 
-  const { data: keys, isLoading: keysLoading } = trpc.repoAiKeys.list.useQuery(
-    { repoId: repoData?.repo.id! },
-    { enabled: !!repoData?.repo.id }
-  );
-
-  const { data: availability } = trpc.repoAiKeys.checkAvailability.useQuery(
-    { repoId: repoData?.repo.id! },
-    { enabled: !!repoData?.repo.id }
-  );
-
-  const setKey = trpc.repoAiKeys.set.useMutation({
+  const setKeyMutation = trpc.repoAiKeys.set.useMutation({
     onSuccess: () => {
       closeDialog();
-      utils.repoAiKeys.list.invalidate({ repoId: repoData?.repo.id! });
-      utils.repoAiKeys.checkAvailability.invalidate({ repoId: repoData?.repo.id! });
+      utils.repoAiKeys.getSettings.invalidate({ owner: owner!, repo: repo! });
     },
-    onError: (err) => {
+    onError: (err: { message: string }) => {
       setError(err.message);
     },
   });
 
-  const deleteKey = trpc.repoAiKeys.delete.useMutation({
+  const deleteKeyMutation = trpc.repoAiKeys.delete.useMutation({
     onSuccess: () => {
-      utils.repoAiKeys.list.invalidate({ repoId: repoData?.repo.id! });
-      utils.repoAiKeys.checkAvailability.invalidate({ repoId: repoData?.repo.id! });
+      utils.repoAiKeys.getSettings.invalidate({ owner: owner!, repo: repo! });
     },
   });
 
@@ -136,26 +125,23 @@ export function RepoAISettingsPage() {
       return;
     }
 
-    if (!repoData?.repo.id) return;
+    if (!settings?.repoId) return;
 
-    setKey.mutate({
-      repoId: repoData.repo.id,
+    setKeyMutation.mutate({
+      repoId: settings.repoId,
       provider: selectedProvider,
       apiKey: apiKey.trim(),
     });
   };
 
   const handleDelete = (provider: Provider) => {
-    if (!repoData?.repo.id) return;
+    if (!settings?.repoId) return;
 
     const providerLabel = AI_PROVIDERS.find(p => p.value === provider)?.label || provider;
     if (confirm(`Remove ${providerLabel} API key? AI features using this key will stop working.`)) {
-      deleteKey.mutate({ repoId: repoData.repo.id, provider });
+      deleteKeyMutation.mutate({ repoId: settings.repoId, provider });
     }
   };
-
-  // Check if current user is the owner
-  const isOwner = session?.user?.id === repoData?.repo.ownerId;
 
   if (!authenticated) {
     return (
@@ -167,8 +153,6 @@ export function RepoAISettingsPage() {
     );
   }
 
-  const isLoading = repoLoading || keysLoading;
-
   if (isLoading) {
     return (
       <RepoLayout owner={owner!} repo={repo!}>
@@ -177,7 +161,7 @@ export function RepoAISettingsPage() {
     );
   }
 
-  if (!repoData?.repo) {
+  if (!settings) {
     return (
       <RepoLayout owner={owner!} repo={repo!}>
         <div className="text-center py-12">
@@ -188,7 +172,7 @@ export function RepoAISettingsPage() {
   }
 
   // Only owners can view/manage AI keys
-  if (!isOwner) {
+  if (!settings.isOwner) {
     return (
       <RepoLayout owner={owner!} repo={repo!}>
         <SettingsLayout>
@@ -212,7 +196,8 @@ export function RepoAISettingsPage() {
     );
   }
 
-  const isMutating = setKey.isPending;
+  const isMutating = setKeyMutation.isPending;
+  const { keys, availability } = settings;
 
   return (
     <RepoLayout owner={owner!} repo={repo!}>
@@ -376,7 +361,7 @@ export function RepoAISettingsPage() {
                 />
               ) : (
                 <div className="divide-y">
-                  {keys.map((key) => {
+                  {keys.map((key: { id: string; provider: string; keyHint: string }) => {
                     const provider = AI_PROVIDERS.find(p => p.value === key.provider);
                     return (
                       <div key={key.id} className="py-4 first:pt-0 last:pb-0">
@@ -408,9 +393,9 @@ export function RepoAISettingsPage() {
                               size="sm"
                               className="text-destructive hover:text-destructive hover:bg-destructive/10"
                               onClick={() => handleDelete(key.provider as Provider)}
-                              disabled={deleteKey.isPending}
+                              disabled={deleteKeyMutation.isPending}
                             >
-                              {deleteKey.isPending ? (
+                              {deleteKeyMutation.isPending ? (
                                 <Loader2 className="h-4 w-4 animate-spin" />
                               ) : (
                                 <Trash2 className="h-4 w-4" />
