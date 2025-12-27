@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, KeyboardEvent } from 'react';
+import { useState, useRef, useEffect, useImperativeHandle, forwardRef, KeyboardEvent } from 'react';
 import { Send, Loader2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -8,25 +8,53 @@ interface ChatInputProps {
   isLoading?: boolean;
   disabled?: boolean;
   placeholder?: string;
+  compact?: boolean;
 }
 
-export function ChatInput({
-  onSend,
-  isLoading = false,
-  disabled = false,
-  placeholder = 'Ask the agent anything...',
-}: ChatInputProps) {
+export interface ChatInputRef {
+  focus: () => void;
+  setValue: (value: string) => void;
+}
+
+export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(function ChatInput(
+  {
+    onSend,
+    isLoading = false,
+    disabled = false,
+    placeholder = 'Ask anything...',
+    compact = false,
+  },
+  ref
+) {
   const [message, setMessage] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Expose methods via ref
+  useImperativeHandle(ref, () => ({
+    focus: () => {
+      textareaRef.current?.focus();
+    },
+    setValue: (value: string) => {
+      setMessage(value);
+      // Trigger resize after setting value
+      setTimeout(() => {
+        const textarea = textareaRef.current;
+        if (textarea) {
+          textarea.style.height = 'auto';
+          textarea.style.height = `${Math.min(textarea.scrollHeight, compact ? 120 : 200)}px`;
+        }
+      }, 0);
+    },
+  }));
 
   // Auto-resize textarea
   useEffect(() => {
     const textarea = textareaRef.current;
     if (textarea) {
       textarea.style.height = 'auto';
-      textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
+      textarea.style.height = `${Math.min(textarea.scrollHeight, compact ? 120 : 200)}px`;
     }
-  }, [message]);
+  }, [message, compact]);
 
   const handleSubmit = () => {
     const trimmed = message.trim();
@@ -48,6 +76,56 @@ export function ChatInput({
   };
 
   const canSend = message.trim().length > 0 && !isLoading && !disabled;
+
+  if (compact) {
+    return (
+      <div className="relative">
+        <div
+          className={cn(
+            'flex items-end gap-2 p-2 rounded-xl border border-border/60',
+            'bg-background/60 backdrop-blur-sm',
+            'focus-within:border-primary/40 focus-within:ring-1 focus-within:ring-primary/20',
+            'transition-all duration-200'
+          )}
+        >
+          <textarea
+            ref={textareaRef}
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={placeholder}
+            disabled={disabled || isLoading}
+            rows={1}
+            className={cn(
+              'flex-1 resize-none bg-transparent border-0 px-2 py-1',
+              'text-foreground placeholder:text-muted-foreground',
+              'focus:outline-none focus:ring-0',
+              'min-h-[28px] max-h-[120px]',
+              'text-sm leading-relaxed'
+            )}
+          />
+
+          <Button
+            onClick={handleSubmit}
+            disabled={!canSend}
+            size="icon-sm"
+            className={cn(
+              'flex-shrink-0 h-7 w-7 transition-all duration-200',
+              canSend
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted text-muted-foreground'
+            )}
+          >
+            {isLoading ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Send className="h-3.5 w-3.5" />
+            )}
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative">
@@ -118,4 +196,4 @@ export function ChatInput({
       </div>
     </div>
   );
-}
+});
