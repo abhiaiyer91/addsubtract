@@ -29,20 +29,20 @@ export function useGlobalShortcuts() {
     toggleShortcuts();
   }, { enableOnFormTags: false });
 
-  // g then h - Go home
-  useHotkeys('g h', (e) => {
+  // Alt+h - Go home
+  useHotkeys('alt+h', (e) => {
     e.preventDefault();
     navigate('/');
   }, { enableOnFormTags: false });
 
-  // g then n - Go to notifications
-  useHotkeys('g n', (e) => {
+  // Alt+n - Go to notifications
+  useHotkeys('alt+n', (e) => {
     e.preventDefault();
     navigate('/notifications');
   }, { enableOnFormTags: false });
 
-  // g then s - Go to settings
-  useHotkeys('g s', (e) => {
+  // Alt+s - Go to settings
+  useHotkeys('alt+s', (e) => {
     e.preventDefault();
     navigate('/settings');
   }, { enableOnFormTags: false });
@@ -62,32 +62,32 @@ export function useRepoShortcuts() {
     return null;
   }, [params.owner, params.repo]);
 
-  // g then c - Go to code
-  useHotkeys('g c', (e) => {
+  // Alt+c - Go to code
+  useHotkeys('alt+c', (e) => {
     e.preventDefault();
     if (repoPath) navigate(repoPath);
   }, { enableOnFormTags: false, enabled: !!repoPath });
 
-  // g then i - Go to issues
-  useHotkeys('g i', (e) => {
+  // Alt+i - Go to issues
+  useHotkeys('alt+i', (e) => {
     e.preventDefault();
     if (repoPath) navigate(`${repoPath}/issues`);
   }, { enableOnFormTags: false, enabled: !!repoPath });
 
-  // g then p - Go to pull requests
-  useHotkeys('g p', (e) => {
+  // Alt+p - Go to pull requests
+  useHotkeys('alt+p', (e) => {
     e.preventDefault();
     if (repoPath) navigate(`${repoPath}/pulls`);
   }, { enableOnFormTags: false, enabled: !!repoPath });
 
-  // g then a - Go to actions
-  useHotkeys('g a', (e) => {
+  // Alt+a - Go to actions
+  useHotkeys('alt+a', (e) => {
     e.preventDefault();
     if (repoPath) navigate(`${repoPath}/actions`);
   }, { enableOnFormTags: false, enabled: !!repoPath });
 
-  // g then b - Go to branches
-  useHotkeys('g b', (e) => {
+  // Alt+b - Go to branches
+  useHotkeys('alt+b', (e) => {
     e.preventDefault();
     if (repoPath) navigate(`${repoPath}/branches`);
   }, { enableOnFormTags: false, enabled: !!repoPath });
