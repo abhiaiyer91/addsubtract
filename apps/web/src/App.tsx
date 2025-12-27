@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { TRPCProvider } from './lib/trpc';
 import { Layout } from './components/layout';
+import { Toaster } from './components/ui/toaster';
 import { CommandPalette, ShortcutsModal } from './components/command';
 import { BranchSwitcher } from './components/branch';
 
@@ -121,6 +122,7 @@ export function App() {
             <Route path="/:owner/:repo/settings/webhooks" element={<WebhooksPage />} />
           </Route>
         </Routes>
+        <Toaster />
       </BrowserRouter>
     </TRPCProvider>
   );

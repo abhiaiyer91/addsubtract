@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loading } from '@/components/ui/loading';
 import { trpc } from '@/lib/trpc';
 import { useSession } from '@/lib/auth-client';
+import { toastSuccess, toastError } from '@/components/ui/use-toast';
 
 export function NewRepoPage() {
   const navigate = useNavigate();
@@ -22,10 +23,18 @@ export function NewRepoPage() {
 
   const createRepo = trpc.repos.create.useMutation({
     onSuccess: (repo) => {
+      toastSuccess({
+        title: 'Repository created',
+        description: `${repo.name} has been created successfully.`,
+      });
       navigate(`/${user?.username}/${repo.name}`);
     },
     onError: (err) => {
       setError(err.message);
+      toastError({
+        title: 'Failed to create repository',
+        description: err.message,
+      });
     },
   });
 

@@ -15,6 +15,7 @@ import { formatRelativeTime, formatDate } from '@/lib/utils';
 import { useSession } from '@/lib/auth-client';
 import { trpc } from '@/lib/trpc';
 import type { Label } from '@/lib/api-types';
+import { toastSuccess, toastError } from '@/components/ui/use-toast';
 
 export function IssueDetailPage() {
   const { owner, repo, number } = useParams<{
@@ -63,17 +64,95 @@ export function IssueDetailPage() {
     onSuccess: () => {
       setComment('');
       utils.issues.comments.invalidate({ issueId: issueData?.id! });
+      toastSuccess({
+        title: 'Comment added',
+        description: 'Your comment has been posted.',
+      });
+    },
+    onError: (error) => {
+      toastError({
+        title: 'Failed to add comment',
+        description: error.message,
+      });
     },
   });
 
   const closeIssueMutation = trpc.issues.close.useMutation({
+    onMutate: async () => {
+      // Cancel outgoing refetches
+      await utils.issues.get.cancel({ repoId: repoData?.repo.id!, number: issueNumber });
+      
+      // Snapshot previous value
+      const previousIssue = utils.issues.get.getData({ repoId: repoData?.repo.id!, number: issueNumber });
+      
+      // Optimistically update
+      utils.issues.get.setData(
+        { repoId: repoData?.repo.id!, number: issueNumber },
+        (old) => old ? { ...old, state: 'closed' } : old
+      );
+      
+      return { previousIssue };
+    },
     onSuccess: () => {
+      toastSuccess({
+        title: 'Issue closed',
+        description: `Issue #${issueNumber} has been closed.`,
+      });
+    },
+    onError: (error, _variables, context) => {
+      // Roll back on error
+      if (context?.previousIssue) {
+        utils.issues.get.setData(
+          { repoId: repoData?.repo.id!, number: issueNumber },
+          context.previousIssue
+        );
+      }
+      toastError({
+        title: 'Failed to close issue',
+        description: error.message,
+      });
+    },
+    onSettled: () => {
       utils.issues.get.invalidate({ repoId: repoData?.repo.id!, number: issueNumber });
     },
   });
 
   const reopenIssueMutation = trpc.issues.reopen.useMutation({
+    onMutate: async () => {
+      // Cancel outgoing refetches
+      await utils.issues.get.cancel({ repoId: repoData?.repo.id!, number: issueNumber });
+      
+      // Snapshot previous value
+      const previousIssue = utils.issues.get.getData({ repoId: repoData?.repo.id!, number: issueNumber });
+      
+      // Optimistically update
+      utils.issues.get.setData(
+        { repoId: repoData?.repo.id!, number: issueNumber },
+        (old) => old ? { ...old, state: 'open' } : old
+      );
+      
+      return { previousIssue };
+    },
     onSuccess: () => {
+      toastSuccess({
+        title: 'Issue reopened',
+        description: `Issue #${issueNumber} has been reopened.`,
+      });
+    },
+    onError: (error, _variables, context) => {
+      // Roll back on error
+      if (context?.previousIssue) {
+        utils.issues.get.setData(
+          { repoId: repoData?.repo.id!, number: issueNumber },
+          context.previousIssue
+        );
+      }
+      toastError({
+        title: 'Failed to reopen issue',
+        description: error.message,
+      });
+    },
+    onSettled: () => {
       utils.issues.get.invalidate({ repoId: repoData?.repo.id!, number: issueNumber });
     },
   });

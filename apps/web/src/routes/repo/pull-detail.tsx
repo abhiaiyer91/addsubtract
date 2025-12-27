@@ -35,6 +35,7 @@ import { Loading } from '@/components/ui/loading';
 import { formatRelativeTime } from '@/lib/utils';
 import { useSession } from '@/lib/auth-client';
 import { trpc } from '@/lib/trpc';
+import { toastSuccess, toastError, toastInfo } from '@/components/ui/use-toast';
 import type { InlineCommentData } from '@/components/diff/inline-comment';
 
 export function PullDetailPage() {
@@ -119,9 +120,20 @@ export function PullDetailPage() {
   // Trigger AI review mutation
   const triggerReviewMutation = trpc.pulls.triggerAIReview.useMutation({
     onSuccess: () => {
+      toastInfo({
+        title: 'AI Review started',
+        description: 'The review will be ready in a few moments.',
+      });
+      // Refetch AI review after a delay to allow processing
       setTimeout(() => {
         refetchAIReview();
       }, 3000);
+    },
+    onError: (error) => {
+      toastError({
+        title: 'Failed to start AI review',
+        description: error.message,
+      });
     },
   });
 
@@ -130,12 +142,32 @@ export function PullDetailPage() {
     onSuccess: () => {
       setComment('');
       utils.pulls.comments.invalidate({ prId: prData?.id! });
+      toastSuccess({
+        title: 'Comment added',
+        description: 'Your comment has been posted.',
+      });
+    },
+    onError: (error) => {
+      toastError({
+        title: 'Failed to add comment',
+        description: error.message,
+      });
     },
   });
 
   const mergeMutation = trpc.pulls.merge.useMutation({
     onSuccess: () => {
       utils.pulls.get.invalidate({ repoId: repoData?.repo.id!, number: prNumber });
+      toastSuccess({
+        title: 'Pull request merged',
+        description: `PR #${prNumber} has been successfully merged.`,
+      });
+    },
+    onError: (error) => {
+      toastError({
+        title: 'Failed to merge pull request',
+        description: error.message,
+      });
     },
   });
 
