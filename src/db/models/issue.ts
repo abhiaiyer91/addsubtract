@@ -1,4 +1,4 @@
-import { eq, and, desc, sql } from 'drizzle-orm';
+import { eq, and, desc, sql, inArray } from 'drizzle-orm';
 import { getDb } from '../index';
 import {
   issues,
@@ -12,9 +12,20 @@ import {
   type NewIssueComment,
   type Label,
   type NewLabel,
+  type IssueStatus,
 } from '../schema';
 import { user } from '../auth-schema';
 import { repoModel } from './repository';
+
+// Issue status values for Kanban board
+export const ISSUE_STATUSES: IssueStatus[] = [
+  'backlog',
+  'todo',
+  'in_progress',
+  'in_review',
+  'done',
+  'canceled',
+];
 
 // Author type from better-auth user table
 type Author = {
@@ -129,6 +140,7 @@ export const issueModel = {
     repoId: string,
     options: {
       state?: 'open' | 'closed';
+      status?: IssueStatus;
       authorId?: string;
       assigneeId?: string;
       limit?: number;
@@ -140,6 +152,10 @@ export const issueModel = {
 
     if (options.state) {
       conditions.push(eq(issues.state, options.state));
+    }
+
+    if (options.status) {
+      conditions.push(eq(issues.status, options.status));
     }
 
     if (options.authorId) {
@@ -165,6 +181,94 @@ export const issueModel = {
     }
 
     return query;
+  },
+
+  /**
+   * List issues with authors for Kanban board (optimized single query)
+   */
+  async listByRepoWithAuthors(
+    repoId: string,
+    options: {
+      state?: 'open' | 'closed';
+      authorId?: string;
+      assigneeId?: string;
+      limit?: number;
+    } = {}
+  ): Promise<Array<Issue & { author: Author | null }>> {
+    const db = getDb();
+    const conditions = [eq(issues.repoId, repoId)];
+
+    if (options.state) {
+      conditions.push(eq(issues.state, options.state));
+    }
+    if (options.authorId) {
+      conditions.push(eq(issues.authorId, options.authorId));
+    }
+    if (options.assigneeId) {
+      conditions.push(eq(issues.assigneeId, options.assigneeId));
+    }
+
+    const result = await db
+      .select()
+      .from(issues)
+      .leftJoin(user, eq(issues.authorId, user.id))
+      .where(and(...conditions))
+      .orderBy(desc(issues.createdAt))
+      .limit(options.limit || 500);
+
+    return result.map((r) => ({
+      ...r.issues,
+      author: r.user ? {
+        id: r.user.id,
+        name: r.user.name,
+        email: r.user.email,
+        username: r.user.username,
+        image: r.user.image,
+        avatarUrl: r.user.avatarUrl,
+      } : null,
+    }));
+  },
+
+  /**
+   * List issues grouped by status (for Kanban board)
+   */
+  async listByRepoGroupedByStatus(
+    repoId: string,
+    options: {
+      state?: 'open' | 'closed';
+      authorId?: string;
+      assigneeId?: string;
+    } = {}
+  ): Promise<Record<IssueStatus, Issue[]>> {
+    const allIssues = await this.listByRepo(repoId, {
+      ...options,
+      limit: 500, // Get all for Kanban view
+    });
+
+    // Group by status (default to 'backlog' for issues without status)
+    const grouped: Record<IssueStatus, Issue[]> = {
+      backlog: [],
+      todo: [],
+      in_progress: [],
+      in_review: [],
+      done: [],
+      canceled: [],
+    };
+
+    for (const issue of allIssues) {
+      // Handle null/undefined status (for existing issues before migration)
+      // Also map closed issues without explicit status to 'done'
+      let status: IssueStatus = (issue.status as IssueStatus) || 'backlog';
+      
+      // If issue is closed but has no status or backlog status, move to 'done'
+      if (issue.state === 'closed' && (!issue.status || issue.status === 'backlog')) {
+        status = 'done';
+      }
+      
+      grouped[status].push(issue);
+    }
+
+    return grouped;
   },
 
   /**
@@ -276,6 +380,40 @@ export const issueModel = {
     }
 
     return updated;
+  },
+
+  /**
+   * Update issue status (for Kanban board)
+   */
+  async updateStatus(id: string, status: IssueStatus): Promise<Issue | undefined> {
+    const db = getDb();
+    
+    // When moving to 'done' or 'canceled', also close the issue
+    const shouldClose = status === 'done' || status === 'canceled';
+    
+    const updates: Partial<Issue> = {
+      status,
+      updatedAt: new Date(),
+    };
+    
+    if (shouldClose) {
+      updates.state = 'closed';
+      updates.closedAt = new Date();
+    } else if (status === 'backlog' || status === 'todo' || status === 'in_progress' || status === 'in_review') {
+      // Reopen if moving back to active status
+      const existing = await this.findById(id);
+      if (existing?.state === 'closed') {
+        updates.state = 'open';
+        updates.closedAt = null;
+      }
+    }
+    
+    const [issue] = await db
+      .update(issues)
+      .set(updates)
+      .where(eq(issues.id, id))
+      .returning();
+    return issue;
   },
 
   /**
@@ -538,6 +676,41 @@ export const issueLabelModel = {
       .where(eq(issueLabels.issueId, issueId));
 
     return result.map((r) => r.labels);
+  },
+
+  /**
+   * List labels for multiple issues (batch query)
+   */
+  async listByIssuesBatch(issueIds: string[]): Promise<Map<string, Label[]>> {
+    if (issueIds.length === 0) {
+      return new Map();
+    }
+    
+    const db = getDb();
+    const result = await db
+      .select({
+        issueId: issueLabels.issueId,
+        label: labels,
+      })
+      .from(issueLabels)
+      .innerJoin(labels, eq(issueLabels.labelId, labels.id))
+      .where(inArray(issueLabels.issueId, issueIds));
+
+    const labelsMap = new Map<string, Label[]>();
+    
+    // Initialize all issue IDs with empty arrays
+    for (const id of issueIds) {
+      labelsMap.set(id, []);
+    }
+    
+    // Populate with actual labels
+    for (const r of result) {
+      const existing = labelsMap.get(r.issueId) || [];
+      existing.push(r.label);
+      labelsMap.set(r.issueId, existing);
+    }
+
+    return labelsMap;
   },
 
   /**

@@ -15,6 +15,14 @@ import {
 export const ownerTypeEnum = pgEnum('owner_type', ['user', 'organization']);
 export const prStateEnum = pgEnum('pr_state', ['open', 'closed', 'merged']);
 export const issueStateEnum = pgEnum('issue_state', ['open', 'closed']);
+export const issueStatusEnum = pgEnum('issue_status', [
+  'backlog',
+  'todo', 
+  'in_progress',
+  'in_review',
+  'done',
+  'canceled',
+]);
 export const milestoneStateEnum = pgEnum('milestone_state', ['open', 'closed']);
 export const reviewStateEnum = pgEnum('review_state', [
   'pending',
@@ -373,6 +381,9 @@ export const issues = pgTable('issues', {
   body: text('body'),
 
   state: issueStateEnum('state').notNull().default('open'),
+  
+  // Workflow status for Kanban board (Linear-style)
+  status: issueStatusEnum('status').notNull().default('backlog'),
 
   authorId: text('author_id').notNull(), // References better-auth user.id
   assigneeId: text('assignee_id'), // References better-auth user.id
@@ -771,6 +782,7 @@ export type NewWebhook = typeof webhooks.$inferInsert;
 
 export type MilestoneState = (typeof milestoneStateEnum.enumValues)[number];
 export type IssueState = (typeof issueStateEnum.enumValues)[number];
+export type IssueStatus = (typeof issueStatusEnum.enumValues)[number];
 export type PrState = (typeof prStateEnum.enumValues)[number];
 
 // Workflow run types

@@ -35,6 +35,7 @@ export {
   issueCommentModel,
   labelModel,
   issueLabelModel,
+  ISSUE_STATUSES,
 } from './issue';
 
 // Activity model

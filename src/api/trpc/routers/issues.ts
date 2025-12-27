@@ -9,8 +9,13 @@ import {
   repoModel,
   collaboratorModel,
   activityHelpers,
+  ISSUE_STATUSES,
 } from '../../../db/models';
 import { eventBus, extractMentions } from '../../../events';
+import type { IssueStatus } from '../../../db/schema';
+
+// Zod schema for issue status
+const issueStatusSchema = z.enum(['backlog', 'todo', 'in_progress', 'in_review', 'done', 'canceled']);
 
 export const issuesRouter = router({
   /**
@@ -21,6 +26,7 @@ export const issuesRouter = router({
       z.object({
         repoId: z.string().uuid(),
         state: z.enum(['open', 'closed']).optional(),
+        status: issueStatusSchema.optional(),
         authorId: z.string().uuid().optional(),
         assigneeId: z.string().uuid().optional(),
         limit: z.number().min(1).max(100).default(20),
@@ -30,6 +36,7 @@ export const issuesRouter = router({
     .query(async ({ input }) => {
       const issues = await issueModel.listByRepo(input.repoId, {
         state: input.state,
+        status: input.status,
         authorId: input.authorId,
         assigneeId: input.assigneeId,
         limit: input.limit,
@@ -80,10 +87,10 @@ export const issuesRouter = router({
       const labels = await issueLabelModel.listByIssue(issue.id);
 
       // Get assignee if assigned
-      let assignee = null;
+      let assignee: Awaited<ReturnType<typeof import('../../../db/models').userModel.findById>> | null = null;
       if (issue.assigneeId) {
         const { userModel } = await import('../../../db/models');
-        assignee = await userModel.findById(issue.assigneeId);
+        assignee = await userModel.findById(issue.assigneeId) ?? null;
       }
 
       return {
@@ -788,4 +795,139 @@ export const issuesRouter = router({
 
       return labelModel.delete(input.labelId);
     }),
+
+  /**
+   * List issues grouped by status (for Kanban board)
+   * Optimized to use only 2 queries: one for issues+authors, one for labels
+   */
+  listGroupedByStatus: publicProcedure
+    .input(
+      z.object({
+        repoId: z.string().uuid(),
+        state: z.enum(['open', 'closed']).optional(),
+        authorId: z.string().uuid().optional(),
+        assigneeId: z.string().uuid().optional(),
+      })
+    )
+    .query(async ({ input }) => {
+      // Single query to get all issues with authors (using JOIN)
+      const issuesWithAuthors = await issueModel.listByRepoWithAuthors(input.repoId, {
+        state: input.state,
+        authorId: input.authorId,
+        assigneeId: input.assigneeId,
+        limit: 500,
+      });
+
+      // Collect issue IDs for batch label fetch
+      const issueIds = issuesWithAuthors.map(i => i.id);
+      
+      // Single query to get all labels for all issues
+      const labelsMap = await issueLabelModel.listByIssuesBatch(issueIds);
+
+      // Build result grouped by status
+      const result: Record<string, Array<{
+        id: string;
+        number: number;
+        title: string;
+        state: string;
+        status: string;
+        createdAt: Date;
+        author: { username?: string | null; avatarUrl?: string | null } | null;
+        labels: Array<{ id: string; name: string; color: string }>;
+        assignee?: { username?: string | null; avatarUrl?: string | null } | null;
+      }>> = {
+        backlog: [],
+        todo: [],
+        in_progress: [],
+        in_review: [],
+        done: [],
+        canceled: [],
+      };
+
+      for (const issue of issuesWithAuthors) {
+        // Determine status (handle null/undefined for existing issues)
+        let status = issue.status || 'backlog';
+        
+        // If issue is closed but has no status or backlog status, move to 'done'
+        if (issue.state === 'closed' && (!issue.status || issue.status === 'backlog')) {
+          status = 'done';
+        }
+
+        const labels = labelsMap.get(issue.id) ?? [];
+
+        result[status].push({
+          id: issue.id,
+          number: issue.number,
+          title: issue.title,
+          state: issue.state,
+          status,
+          createdAt: issue.createdAt,
+          author: issue.author ? { 
+            username: issue.author.username, 
+            avatarUrl: issue.author.avatarUrl 
+          } : null,
+          labels,
+          assignee: null, // Skip assignee for now to keep it fast
+        });
+      }
+
+      return result;
+    }),
+
+  /**
+   * Update issue status (for Kanban board drag-and-drop)
+   */
+  updateStatus: protectedProcedure
+    .input(
+      z.object({
+        issueId: z.string().uuid(),
+        status: issueStatusSchema,
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const issue = await issueModel.findById(input.issueId);
+
+      if (!issue) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Issue not found',
+        });
+      }
+
+      // Check write permission
+      const repo = await repoModel.findById(issue.repoId);
+      const isOwner = repo?.ownerId === ctx.user.id;
+      const canWrite = isOwner || (await collaboratorModel.hasPermission(issue.repoId, ctx.user.id, 'write'));
+      const isAuthor = issue.authorId === ctx.user.id;
+
+      if (!canWrite && !isAuthor) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to update this issue',
+        });
+      }
+
+      const updatedIssue = await issueModel.updateStatus(input.issueId, input.status);
+
+      // If status changed to done/canceled (closed), emit event
+      if (updatedIssue && repo && (input.status === 'done' || input.status === 'canceled')) {
+        await eventBus.emit('issue.closed', ctx.user.id, {
+          issueId: issue.id,
+          issueNumber: issue.number,
+          issueTitle: issue.title,
+          repoId: issue.repoId,
+          repoFullName: `${ctx.user.username || ctx.user.name}/${repo.name}`,
+          authorId: issue.authorId,
+        });
+      }
+
+      return updatedIssue;
+    }),
+
+  /**
+   * Get available issue statuses
+   */
+  statuses: publicProcedure.query(() => {
+    return ISSUE_STATUSES;
+  }),
 });
