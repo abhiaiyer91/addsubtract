@@ -25,6 +25,7 @@ import { eventBus } from '../../../events';
 // ============ SCHEMAS ============
 
 const mergeQueueStrategySchema = z.enum(['sequential', 'optimistic', 'adaptive']);
+const autoMergeModeSchema = z.enum(['auto', 'manual', 'scheduled']);
 
 const configInputSchema = z.object({
   repoId: z.string().uuid(),
@@ -37,6 +38,11 @@ const configInputSchema = z.object({
   requireAllChecks: z.boolean().optional(),
   autoRebase: z.boolean().optional(),
   deleteBranchAfterMerge: z.boolean().optional(),
+  // New auto-merge settings
+  autoMergeMode: autoMergeModeSchema.optional(),
+  mergeWindowStart: z.number().int().min(0).max(23).optional(),
+  mergeWindowEnd: z.number().int().min(0).max(23).optional(),
+  mergeWindowDays: z.array(z.number().int().min(0).max(6)).optional(),
 });
 
 // ============ ROUTER ============
@@ -63,11 +69,16 @@ export const mergeQueueRouter = router({
           requireAllChecks: false,
           autoRebase: true,
           deleteBranchAfterMerge: true,
+          autoMergeMode: 'auto' as const,
+          mergeWindowStart: null,
+          mergeWindowEnd: null,
+          mergeWindowDays: null,
         };
       }
       return {
         ...config,
         requiredChecks: config.requiredChecks ? JSON.parse(config.requiredChecks) : [],
+        mergeWindowDays: (config as any).mergeWindowDays ? JSON.parse((config as any).mergeWindowDays) : null,
       };
     }),
 
@@ -101,7 +112,11 @@ export const mergeQueueRouter = router({
         requireAllChecks: input.requireAllChecks ?? false,
         autoRebase: input.autoRebase ?? true,
         deleteBranchAfterMerge: input.deleteBranchAfterMerge ?? true,
-      });
+        autoMergeMode: input.autoMergeMode ?? 'auto',
+        mergeWindowStart: input.mergeWindowStart ?? null,
+        mergeWindowEnd: input.mergeWindowEnd ?? null,
+        mergeWindowDays: input.mergeWindowDays ? JSON.stringify(input.mergeWindowDays) : null,
+      } as any);
 
       return config;
     }),
@@ -259,13 +274,24 @@ export const mergeQueueRouter = router({
   getQueuePosition: publicProcedure
     .input(z.object({ prId: z.string().uuid() }))
     .query(async ({ input }) => {
-      const position = await mergeQueueEntryModel.getPosition(input.prId);
-      if (!position) {
+      const entry = await mergeQueueEntryModel.findByPrId(input.prId);
+      if (!entry) {
         return { inQueue: false as const };
       }
+      
+      const position = await mergeQueueEntryModel.getPosition(input.prId);
+      
       return {
         inQueue: true as const,
-        ...position,
+        position: entry.position,
+        state: entry.state,
+        priority: entry.priority,
+        estimatedWaitMinutes: position?.estimatedWaitMinutes ?? null,
+        aheadCount: entry.position, // Number of PRs ahead
+        createdAt: entry.createdAt,
+        startedAt: entry.startedAt,
+        errorMessage: entry.errorMessage,
+        retryCount: entry.retryCount,
       };
     }),
 

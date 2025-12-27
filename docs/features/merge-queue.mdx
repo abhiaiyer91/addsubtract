@@ -1,19 +1,100 @@
 ---
 title: 'Merge Queue'
-description: 'Controlled merging with automated testing and batching'
+description: 'Intelligent merge queue with conflict prediction and automated batching'
 ---
 
 
-The merge queue provides controlled, safe merging of pull requests with automated testing, priority handling, and batch optimization.
+The merge queue provides controlled, safe merging of pull requests with intelligent conflict prediction, automated testing, priority handling, and batch optimization.
 
 ## Overview
 
 The merge queue:
-- Tests PRs before merging to prevent broken builds
-- Batches multiple PRs for efficient CI usage
-- Handles priority ordering
-- Auto-rebases PRs to stay up-to-date
-- Provides detailed status and statistics
+- **Prevents merge conflicts** by analyzing PRs and determining optimal merge order
+- **Tests PRs before merging** to prevent broken builds
+- **Batches multiple PRs** for efficient CI usage with automatic bisection on failure
+- **Handles priority ordering** with customizable priorities (0-100)
+- **Auto-rebases PRs** to stay up-to-date with the target branch
+- **Provides detailed status** and statistics
+
+## How It Prevents Conflicts
+
+The merge queue uses an intelligent algorithm to prevent merge conflicts:
+
+### 1. PR Analysis
+
+When a PR is added to the queue, the system analyzes:
+
+```
+Files Changed:      src/api/users.ts, src/db/schema.ts
+Directories:        src/api, src/db, src
+Conflict-Prone:     src/db/schema.ts (schema file)
+Change Size:        +150 / -30 lines
+```
+
+**Conflict-prone areas** are automatically identified:
+- Lock files (`package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`)
+- Generated files (`*.generated.ts`)
+- Schema and migration files
+- High-churn files (100+ lines changed)
+
+### 2. Conflict Prediction
+
+Before processing, the queue predicts conflicts between all PR pairs:
+
+```
+PR #1 vs PR #2:
+  - Direct file overlap: src/api/users.ts → +20 conflict score
+  - Same directory: src/api → +2 conflict score
+  - Both touch schema file → +30 conflict score
+  - Conflict probability: 52%
+```
+
+### 3. Optimal Ordering
+
+The queue uses a greedy algorithm to determine the safest merge order:
+
+```
+Queue: [PR #1, PR #2, PR #3, PR #4]
+
+Conflict Matrix:
+       #1    #2    #3    #4
+  #1   -    0.52  0.10  0.05
+  #2  0.52   -    0.30  0.15
+  #3  0.10  0.30   -    0.80
+  #4  0.05  0.15  0.80   -
+
+Optimal Order: [#4, #1, #2, #3]
+  - #4 first: lowest total conflict risk
+  - #1 next: conflicts mainly with #2 (not yet merged)
+  - #2 next: can now resolve against #4 and #1
+  - #3 last: high conflict with #4, but #4 already merged
+```
+
+### 4. Speculative Merging
+
+The queue performs merges in an isolated worktree:
+
+1. Create temporary branch from target
+2. Cherry-pick commits in optimal order
+3. If conflict occurs, try reordering or fall back to merge commit
+4. Push speculative merge for CI testing
+5. Only update target branch if CI passes
+
+### 5. Batch Processing with Bisection
+
+When batching multiple PRs, if one fails:
+
+```
+Batch: [#1, #2, #3, #4, #5] → FAILED
+
+Bisect:
+  [#1, #2] → SUCCESS
+  [#3, #4, #5]
+    [#3] → FAILED (identified!)
+    [#4, #5] → SUCCESS
+
+Result: #1, #2, #4, #5 merged; #3 needs fixes
+```
 
 ## Quick Start
 
@@ -64,7 +145,9 @@ $ wit merge-queue status
 Merge Queue Status for PR #123
 
   Position: 3 of 5
+  State: pending
   Estimated wait: ~15 minutes
+  Conflict score: 23 (low)
 ```
 
 ### List Queue
@@ -74,10 +157,12 @@ $ wit merge-queue list
 
 Merge Queue for myrepo:main
 
-  #1   #125       ready          Implement caching
-  #2   #123       processing     Add authentication
-  #3   #127       pending        Fix database issue
-  #4   #128       pending        Update dependencies
+  #  PR       State        Priority  Conflict  Title
+  ─────────────────────────────────────────────────────
+  1  #125     ready        80        12        Implement caching
+  2  #123     testing      50        45        Add authentication
+  3  #127     pending      50        23        Fix database issue
+  4  #128     pending      20        67        Update dependencies
 ```
 
 ### Queue Statistics
@@ -106,6 +191,7 @@ Merge Queue Configuration for myrepo:main
 
   Enabled:           yes
   Strategy:          adaptive
+  Auto-merge mode:   auto
   Max batch size:    5
   Min wait (sec):    60
   Auto rebase:       yes
@@ -142,38 +228,75 @@ PRs in the queue go through these states:
 
 | State | Description |
 |-------|-------------|
-| `pending` | Waiting in queue |
-| `preparing` | Being prepared for testing |
-| `testing` | CI tests running |
+| `pending` | Waiting in queue for earlier PRs |
+| `preparing` | Building speculative merge commit |
+| `testing` | CI tests running on speculative merge |
 | `ready` | Tests passed, ready to merge |
-| `merging` | Currently being merged |
+| `merging` | Currently updating target branch |
 | `completed` | Successfully merged |
-| `failed` | Tests failed or merge error |
+| `failed` | Tests failed or merge conflict |
 | `cancelled` | Removed from queue |
 
 ## Strategies
 
 The merge queue supports different strategies:
 
-### Sequential (Default)
-Tests and merges one PR at a time.
+### Sequential
+Tests and merges one PR at a time. Safest but slowest.
 
 ```bash
 wit merge-queue config --strategy sequential
 ```
 
-### Batch
-Groups multiple PRs together for testing.
+Best for: Critical branches, low-volume repos
+
+### Optimistic
+Groups multiple PRs together for testing. Uses bisection on failure.
 
 ```bash
-wit merge-queue config --strategy batch --batch-size 5
+wit merge-queue config --strategy optimistic --batch-size 5
 ```
 
-### Adaptive
-Adjusts batch size based on CI success rate.
+Best for: High-volume repos with good CI
+
+### Adaptive (Recommended)
+Analyzes conflicts and determines optimal merge order, then batches.
 
 ```bash
 wit merge-queue config --strategy adaptive
+```
+
+Best for: Most use cases - balances safety and speed
+
+## Auto-Merge Modes
+
+Control when the queue processes:
+
+### Auto (Default)
+Queue processes automatically when PRs are ready.
+
+```bash
+wit merge-queue config --auto-merge-mode auto
+```
+
+### Manual
+Wait for explicit trigger to process.
+
+```bash
+wit merge-queue config --auto-merge-mode manual
+
+# Then trigger manually
+wit merge-queue process
+```
+
+### Scheduled
+Only process during specific time windows.
+
+```bash
+wit merge-queue config --auto-merge-mode scheduled \
+  --merge-window-start 9 \
+  --merge-window-end 17 \
+  --merge-window-days 1,2,3,4,5  # Monday-Friday
 ```
 
 ## Priority System
@@ -181,27 +304,51 @@ wit merge-queue config --strategy adaptive
 Higher priority PRs are processed first:
 
 ```bash
-# Low priority (default: 0)
+# Low priority (default: 50)
 wit merge-queue add 123
 
-# Medium priority
-wit merge-queue add 123 --priority 50
-
 # High priority (urgent fix)
+wit merge-queue add 123 --priority 80
+
+# Critical (hotfix)
 wit merge-queue add 123 --priority 100
 ```
+
+Within the same priority level, conflict analysis determines order.
 
 ## Configuration Options
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--strategy` | Merge strategy (sequential, batch, adaptive) | sequential |
+| `--strategy` | Merge strategy (sequential, optimistic, adaptive) | adaptive |
 | `--batch-size` | Maximum PRs per batch | 5 |
 | `--min-wait` | Minimum seconds before processing | 60 |
 | `--auto-rebase` | Auto-rebase PRs before testing | true |
-| `--no-auto-rebase` | Disable auto-rebase | - |
 | `--delete-branch` | Delete branch after merge | true |
-| `--no-delete-branch` | Keep branch after merge | - |
+| `--auto-merge-mode` | When to process (auto, manual, scheduled) | auto |
+| `--required-checks` | CI checks that must pass | none |
+
+## Web UI Integration
+
+The merge queue is integrated into the PR page:
+
+### From the Action Card
+- **Merge Now**: Direct merge to branch (bypasses queue)
+- **Add to Queue**: Queue for automated, conflict-free merging
+- **Add with Priority**: Queue with high priority (jumps ahead)
+
+### Queue Status
+When a PR is in the queue, the action card shows:
+- Current position and state
+- Progress bar for active states
+- Estimated wait time
+- Remove from queue option
+
+### Sidebar Card
+A compact status indicator shows:
+- Queue position
+- Processing state
+- Link to queue settings
 
 ## Workflow Example
 
@@ -237,18 +384,21 @@ wit merge-queue stats
 If your PR fails in the queue:
 
 ```bash
-# Check status
+# Check what happened
 $ wit merge-queue status 123
 
-PR #123 is not in the merge queue
-Add it with: wit merge-queue add
+PR #123 failed in merge queue
+  Reason: Merge conflict in src/api/users.ts
+  
+Fix the issue and re-add:
+  wit merge-queue add 123
 
-# The PR was removed due to failure
-# Fix the issue and re-add
+# Fix the conflict
 wit checkout feature/my-branch
-# ... fix the issue ...
-wit commit -m "Fix CI failure"
-wit push
+git fetch origin main
+git rebase origin/main
+# ... resolve conflicts ...
+wit push --force-with-lease
 wit merge-queue add
 ```
 
@@ -311,14 +461,53 @@ wit merge-queue config --required-checks "test,build,lint"
 - Use the sequential strategy for critical branches
 
 ### For Teams
-- Set clear priority guidelines
+- Set clear priority guidelines (80+ for urgent, 50 for normal)
 - Monitor queue statistics regularly
-- Consider batch strategy for many small PRs
+- Use scheduled mode to avoid merges during critical periods
+
+## Technical Details
+
+### Conflict Score Calculation
+
+```
+Score = 0
+
+For each file in PR1:
+  If same file in PR2: Score += 20
+  
+For each directory in PR1:
+  If same directory in PR2: Score += 2
+  
+For each conflict-prone file in PR1:
+  If same file in PR2: Score += 30
+
+Probability = min(1, Score / 100)
+```
+
+### Optimal Order Algorithm
+
+1. Build NxN conflict matrix for N PRs
+2. Greedy selection: pick PR with lowest sum of conflicts
+3. Repeat until all PRs ordered
+4. PRs touching unique files go first
+5. PRs touching shared files go last (built on stable base)
+
+### Speculative Merge Process
+
+1. Create isolated git worktree from target branch
+2. For each PR in optimal order:
+   - Try cherry-picking each commit
+   - If fails, fall back to merge commit
+   - If still fails, report failure
+3. Push speculative merge to temp branch
+4. Run CI on speculative merge
+5. If CI passes, fast-forward target branch
 
 ## Requirements
 
 The merge queue requires:
 - wit server running (`wit serve`)
+- Database connected (PostgreSQL)
 - CI/CD configured (optional but recommended)
 - Branch protection enabled (recommended)
 
