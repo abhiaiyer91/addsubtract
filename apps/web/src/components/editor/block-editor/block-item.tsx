@@ -116,8 +116,9 @@ export function BlockItem({
 
   // Handle content change
   const handleContentChange = (value: string) => {
-    // Check for slash command trigger
-    if (value.startsWith('/') && block.content === '') {
+    // Check for slash command trigger at start of empty block
+    // This triggers when typing '/' at the beginning of a block
+    if (value.startsWith('/')) {
       const query = value.slice(1);
       const rect = inputRef.current?.getBoundingClientRect();
       if (rect) {
@@ -126,7 +127,8 @@ export function BlockItem({
           left: rect.left,
         });
       }
-    } else if (!value.includes('/') || value.indexOf('/') !== 0) {
+    } else {
+      // Close slash menu if content doesn't start with /
       onCloseSlashMenu();
     }
 

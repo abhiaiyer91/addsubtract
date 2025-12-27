@@ -41,6 +41,22 @@ export function truncate(str: string, length: number): string {
   return str.slice(0, length) + '...';
 }
 
+export function formatDuration(start?: Date | string | null, end?: Date | string | null): string {
+  if (!start) return '-';
+  const startDate = new Date(start);
+  const endDate = end ? new Date(end) : new Date();
+  const seconds = Math.floor((endDate.getTime() - startDate.getTime()) / 1000);
+  
+  if (seconds < 0) return '-';
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  if (minutes < 60) return `${minutes}m ${remainingSeconds}s`;
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return `${hours}h ${remainingMinutes}m`;
+}
+
 export function getFileExtension(filename: string): string {
   const parts = filename.split('.');
   return parts.length > 1 ? parts[parts.length - 1] : '';

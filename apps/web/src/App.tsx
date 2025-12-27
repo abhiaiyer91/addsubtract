@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { TRPCProvider } from './lib/trpc';
 import { Layout } from './components/layout';
 import { Toaster } from './components/ui/toaster';
@@ -10,6 +11,9 @@ import { BranchSwitcher } from './components/branch';
 import { HomePage } from './routes/index';
 import { LoginPage } from './routes/login';
 import { RegisterPage } from './routes/register';
+import { ForgotPasswordPage } from './routes/forgot-password';
+import { TermsPage } from './routes/terms';
+import { PrivacyPage } from './routes/privacy';
 import { UserHomePage } from './routes/user-home';
 import { RepoPage } from './routes/repo';
 import { TreePage } from './routes/repo/tree';
@@ -30,6 +34,8 @@ import { CycleDetailPage } from './routes/repo/cycle-detail';
 import { StacksPage } from './routes/repo/stacks';
 import { StackDetailPage } from './routes/repo/stack-detail';
 import { WorkflowsPage } from './routes/repo/workflows';
+import { WorkflowEditor } from './routes/repo/workflow-editor';
+import { WorkflowRunDetail } from './routes/repo/workflow-run-detail';
 import { RepoSettingsPage } from './routes/repo/settings';
 import { CollaboratorsPage } from './routes/repo/settings/collaborators';
 import { BranchProtectionPage } from './routes/repo/settings/branches';
@@ -57,10 +63,22 @@ import { TeamDetailPage } from './routes/org/team-detail';
 import { SearchPage } from './routes/search';
 import { InboxPage } from './routes/inbox';
 
+// Scroll to top on route change
+function ScrollToTop() {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+
+  return null;
+}
+
 export function App() {
   return (
     <TRPCProvider>
       <BrowserRouter>
+        <ScrollToTop />
         {/* Global keyboard-first components */}
         <SearchModal />
         <CommandPalette />
@@ -73,6 +91,9 @@ export function App() {
             <Route path="/" element={<HomePage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/terms" element={<TermsPage />} />
+            <Route path="/privacy" element={<PrivacyPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/settings/keys" element={<SSHKeysPage />} />
             <Route path="/settings/tokens" element={<TokensPage />} />
@@ -124,6 +145,9 @@ export function App() {
 
             {/* Workflows / Actions */}
             <Route path="/:owner/:repo/actions" element={<WorkflowsPage />} />
+            <Route path="/:owner/:repo/actions/new" element={<WorkflowEditor />} />
+            <Route path="/:owner/:repo/actions/edit" element={<WorkflowEditor />} />
+            <Route path="/:owner/:repo/actions/runs/:runId" element={<WorkflowRunDetail />} />
 
             {/* Releases */}
             <Route path="/:owner/:repo/releases" element={<ReleasesPage />} />
