@@ -1,16 +1,21 @@
-import React, { useState, useMemo, useCallback } from 'react';
-import { ChevronDown, ChevronRight, File, MessageSquare, Columns, AlignJustify, Sparkles, Loader2, Lightbulb, X } from 'lucide-react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import { ChevronDown, ChevronRight, File, Plus, MessageSquare, Columns, AlignJustify, Sparkles, Loader2, Lightbulb, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Markdown } from '@/components/markdown/renderer';
 import { trpc } from '@/lib/trpc';
-import {
-  InlineComment,
-  InlineCommentThread,
-  AddCommentForm,
-} from './inline-comment';
+import { CommentThread } from './comment-thread';
+import { CommentForm } from './comment-form';
+import { SplitDiff } from './split-diff';
+import type { InlineCommentData } from './inline-comment';
+
+export type DiffViewMode = 'unified' | 'split';
+
+// Local storage key for diff view preference
+const DIFF_VIEW_PREFERENCE_KEY = 'wit-diff-view-mode';
 
 export interface DiffLine {
   type: 'add' | 'remove' | 'context';
@@ -40,13 +45,34 @@ export interface DiffViewerProps {
   files?: DiffFile[];
   diff?: string; // Raw diff string
   prId?: string; // PR ID for AI explanations
-  comments?: InlineComment[];
-  onAddComment?: (path: string, line: number, side: 'LEFT' | 'RIGHT', body: string) => Promise<void>;
-  onReplyToComment?: (commentId: string, body: string) => Promise<void>;
-  viewMode?: 'unified' | 'split';
-  onViewModeChange?: (mode: 'unified' | 'split') => void;
+  /** Comments for inline display, keyed by file path */
+  comments?: Record<string, InlineCommentData[]>;
+  /** Current user ID for edit/delete permissions */
+  currentUserId?: string;
+  /** Default view mode */
+  defaultViewMode?: DiffViewMode;
+  /** Called when adding a new comment */
+  onAddComment?: (filePath: string, line: number, side: 'LEFT' | 'RIGHT', body: string) => void;
+  /** Called when replying to a comment */
+  onReplyComment?: (commentId: string, body: string) => void;
+  /** Called when editing a comment */
+  onEditComment?: (commentId: string, body: string) => void;
+  /** Called when deleting a comment */
+  onDeleteComment?: (commentId: string) => void;
+  /** Called when resolving a comment thread */
+  onResolveComment?: (commentId: string) => void;
+  /** Called when unresolving a comment thread */
+  onUnresolveComment?: (commentId: string) => void;
+  /** Loading states */
+  isAddingComment?: boolean;
+  isEditingComment?: boolean;
+  isDeletingComment?: boolean;
+  isResolvingComment?: boolean;
+  /** Files that have been viewed */
   viewedFiles?: Set<string>;
+  /** Called when file viewed state changes */
   onToggleViewed?: (path: string) => void;
+  /** Whether to show viewed toggle */
   showViewedToggle?: boolean;
 }
 
@@ -152,46 +178,46 @@ export function DiffViewer({
   files,
   diff,
   prId,
-  comments = [],
+  comments = {},
+  currentUserId,
+  defaultViewMode,
   onAddComment,
-  onReplyToComment,
-  viewMode = 'unified',
-  onViewModeChange,
+  onReplyComment,
+  onEditComment,
+  onDeleteComment,
+  onResolveComment,
+  onUnresolveComment,
+  isAddingComment,
+  isEditingComment,
+  isDeletingComment,
+  isResolvingComment,
   viewedFiles = new Set(),
   onToggleViewed,
   showViewedToggle = false,
 }: DiffViewerProps) {
+  // Initialize view mode from localStorage or default
+  const [viewMode, setViewMode] = useState<DiffViewMode>(() => {
+    if (defaultViewMode) return defaultViewMode;
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem(DIFF_VIEW_PREFERENCE_KEY);
+      if (saved === 'split' || saved === 'unified') return saved;
+    }
+    return 'unified';
+  });
+
+  // Save preference to localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(DIFF_VIEW_PREFERENCE_KEY, viewMode);
+    }
+  }, [viewMode]);
+
   // Parse raw diff if provided
   const displayFiles = files || (diff ? parseDiff(diff) : []);
-  const [expandedFiles, setExpandedFiles] = useState<Set<string>>(
-    new Set(displayFiles.map((f) => f.path))
-  );
 
   // Check if AI is available
   const { data: aiStatus } = trpc.ai.status.useQuery();
   const aiAvailable = aiStatus?.available ?? false;
-
-  // Group comments by file path
-  const commentsByFile = useMemo(() => {
-    const grouped: Record<string, InlineComment[]> = {};
-    for (const comment of comments) {
-      if (!grouped[comment.path]) {
-        grouped[comment.path] = [];
-      }
-      grouped[comment.path].push(comment);
-    }
-    return grouped;
-  }, [comments]);
-
-  const toggleFile = (path: string) => {
-    const newExpanded = new Set(expandedFiles);
-    if (newExpanded.has(path)) {
-      newExpanded.delete(path);
-    } else {
-      newExpanded.add(path);
-    }
-    setExpandedFiles(newExpanded);
-  };
 
   if (displayFiles.length === 0) {
     return (
@@ -203,7 +229,7 @@ export function DiffViewer({
 
   return (
     <div className="space-y-4">
-      {/* Header with controls */}
+      {/* Header with summary and view toggle */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4 text-sm text-muted-foreground">
           <span>{displayFiles.length} file{displayFiles.length !== 1 ? 's' : ''} changed</span>
@@ -215,46 +241,61 @@ export function DiffViewer({
           </span>
         </div>
 
-        {onViewModeChange && (
-          <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
-            <Button
-              variant={viewMode === 'unified' ? 'secondary' : 'ghost'}
-              size="sm"
-              className="h-7 px-2 gap-1"
-              onClick={() => onViewModeChange('unified')}
-            >
-              <AlignJustify className="h-3 w-3" />
-              <span className="text-xs">Unified</span>
-            </Button>
-            <Button
-              variant={viewMode === 'split' ? 'secondary' : 'ghost'}
-              size="sm"
-              className="h-7 px-2 gap-1"
-              onClick={() => onViewModeChange('split')}
-            >
-              <Columns className="h-3 w-3" />
-              <span className="text-xs">Split</span>
-            </Button>
-          </div>
-        )}
+        {/* View mode toggle */}
+        <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={viewMode === 'unified' ? 'secondary' : 'ghost'}
+                size="icon-sm"
+                onClick={() => setViewMode('unified')}
+                className="h-7 w-7"
+              >
+                <AlignJustify className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Unified view</TooltipContent>
+          </Tooltip>
+          
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={viewMode === 'split' ? 'secondary' : 'ghost'}
+                size="icon-sm"
+                onClick={() => setViewMode('split')}
+                className="h-7 w-7"
+              >
+                <Columns className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Split view</TooltipContent>
+          </Tooltip>
+        </div>
       </div>
 
       {/* File list */}
       {displayFiles.map((file) => (
         <DiffFileView
           key={file.path}
+          viewMode={viewMode}
           file={file}
           prId={prId}
           aiAvailable={aiAvailable}
-          isExpanded={expandedFiles.has(file.path)}
-          onToggle={() => toggleFile(file.path)}
-          comments={commentsByFile[file.path] || []}
+          comments={comments[file.path] || []}
+          currentUserId={currentUserId}
           onAddComment={onAddComment}
-          onReplyToComment={onReplyToComment}
+          onReplyComment={onReplyComment}
+          onEditComment={onEditComment}
+          onDeleteComment={onDeleteComment}
+          onResolveComment={onResolveComment}
+          onUnresolveComment={onUnresolveComment}
+          isAddingComment={isAddingComment}
+          isEditingComment={isEditingComment}
+          isDeletingComment={isDeletingComment}
+          isResolvingComment={isResolvingComment}
           isViewed={viewedFiles.has(file.path)}
           onToggleViewed={onToggleViewed}
           showViewedToggle={showViewedToggle}
-          viewMode={viewMode}
         />
       ))}
     </div>
@@ -265,35 +306,46 @@ interface DiffFileViewProps {
   file: DiffFile;
   prId?: string;
   aiAvailable?: boolean;
-  isExpanded: boolean;
-  onToggle: () => void;
-  comments: InlineComment[];
-  onAddComment?: (path: string, line: number, side: 'LEFT' | 'RIGHT', body: string) => Promise<void>;
-  onReplyToComment?: (commentId: string, body: string) => Promise<void>;
+  comments: InlineCommentData[];
+  currentUserId?: string;
+  viewMode: DiffViewMode;
+  onAddComment?: (filePath: string, line: number, side: 'LEFT' | 'RIGHT', body: string) => void;
+  onReplyComment?: (commentId: string, body: string) => void;
+  onEditComment?: (commentId: string, body: string) => void;
+  onDeleteComment?: (commentId: string) => void;
+  onResolveComment?: (commentId: string) => void;
+  onUnresolveComment?: (commentId: string) => void;
+  isAddingComment?: boolean;
+  isEditingComment?: boolean;
+  isDeletingComment?: boolean;
+  isResolvingComment?: boolean;
   isViewed?: boolean;
   onToggleViewed?: (path: string) => void;
   showViewedToggle?: boolean;
-  viewMode: 'unified' | 'split';
 }
 
 function DiffFileView({
   file,
   prId,
   aiAvailable,
-  isExpanded,
-  onToggle,
   comments,
+  currentUserId,
+  viewMode,
   onAddComment,
-  onReplyToComment,
+  onReplyComment,
+  onEditComment,
+  onDeleteComment,
+  onResolveComment,
+  onUnresolveComment,
+  isAddingComment,
+  isEditingComment,
+  isDeletingComment,
+  isResolvingComment,
   isViewed = false,
   onToggleViewed,
   showViewedToggle = false,
-  viewMode,
 }: DiffFileViewProps) {
-  const [addingCommentAt, setAddingCommentAt] = useState<{
-    line: number;
-    side: 'LEFT' | 'RIGHT';
-  } | null>(null);
+  const [isExpanded, setIsExpanded] = useState(true);
   const [showExplanation, setShowExplanation] = useState(false);
   const [explanation, setExplanation] = useState<string | null>(null);
 
@@ -317,6 +369,36 @@ function DiffFileView({
     }
   }, [explanation, showExplanation, prId, file.path, explainMutation]);
 
+  // Group comments by line (only root comments, not replies)
+  const commentsByLine = useMemo(() => {
+    const grouped: Record<string, { root: InlineCommentData; replies: InlineCommentData[] }> = {};
+
+    // First, find all root comments (no replyToId)
+    const rootComments = comments.filter((c) => !c.replyToId && c.line !== null);
+    const repliesMap = new Map<string, InlineCommentData[]>();
+
+    // Group replies by their parent
+    comments.forEach((c) => {
+      if (c.replyToId) {
+        const existing = repliesMap.get(c.replyToId) || [];
+        existing.push(c);
+        repliesMap.set(c.replyToId, existing);
+      }
+    });
+
+    rootComments.forEach((root) => {
+      const key = `${root.side || 'RIGHT'}-${root.line}`;
+      grouped[key] = {
+        root,
+        replies: repliesMap.get(root.id) || [],
+      };
+    });
+
+    return grouped;
+  }, [comments]);
+
+  const commentCount = Object.keys(commentsByLine).length;
+
   const statusColors = {
     added: 'text-green-500 bg-green-500/10',
     deleted: 'text-red-500 bg-red-500/10',
@@ -324,33 +406,12 @@ function DiffFileView({
     renamed: 'text-blue-500 bg-blue-500/10',
   };
 
-  // Group comments by line
-  const commentsByLine = useMemo(() => {
-    const grouped: Record<string, InlineComment[]> = {};
-    for (const comment of comments) {
-      const key = `${comment.line}-${comment.side}`;
-      if (!grouped[key]) {
-        grouped[key] = [];
-      }
-      grouped[key].push(comment);
-    }
-    return grouped;
-  }, [comments]);
-
-  const handleAddComment = async (body: string) => {
-    if (!addingCommentAt || !onAddComment) return;
-    await onAddComment(file.path, addingCommentAt.line, addingCommentAt.side, body);
-    setAddingCommentAt(null);
-  };
-
-  const commentCount = comments.length;
-
   return (
     <div className={cn('border rounded-lg overflow-hidden', isViewed && 'opacity-60')}>
       {/* File header */}
       <div
         className="flex items-center gap-3 px-4 py-2 bg-muted/50 border-b cursor-pointer hover:bg-muted/70"
-        onClick={onToggle}
+        onClick={() => setIsExpanded(!isExpanded)}
       >
         <Button variant="ghost" size="icon" className="h-6 w-6 p-0">
           {isExpanded ? (
@@ -364,7 +425,7 @@ function DiffFileView({
           {file.oldPath && file.oldPath !== file.path ? (
             <>
               <span className="text-muted-foreground">{file.oldPath}</span>
-              <span className="mx-2">→</span>
+              <span className="mx-2">-&gt;</span>
               <span>{file.path}</span>
             </>
           ) : (
@@ -372,14 +433,13 @@ function DiffFileView({
           )}
         </span>
 
-        {/* Comment indicator */}
         {commentCount > 0 && (
           <Badge variant="outline" className="gap-1">
             <MessageSquare className="h-3 w-3" />
             {commentCount}
           </Badge>
         )}
-
+        
         {/* AI Explain button */}
         {aiAvailable && prId && (
           <Button
@@ -470,18 +530,43 @@ function DiffFileView({
           <table className="w-full font-mono text-sm">
             <tbody>
               {file.hunks.map((hunk, hunkIndex) => (
-                <HunkView
-                  key={hunkIndex}
-                  hunk={hunk}
-                  commentsByLine={commentsByLine}
-                  addingCommentAt={addingCommentAt}
-                  onStartAddComment={(line, side) => setAddingCommentAt({ line, side })}
-                  onCancelAddComment={() => setAddingCommentAt(null)}
-                  onAddComment={handleAddComment}
-                  onReplyToComment={onReplyToComment}
-                  canComment={!!onAddComment}
-                  viewMode={viewMode}
-                />
+                viewMode === 'split' ? (
+                  <SplitDiff
+                    key={hunkIndex}
+                    hunk={hunk}
+                    filePath={file.path}
+                    commentsByLine={commentsByLine}
+                    currentUserId={currentUserId}
+                    onAddComment={onAddComment}
+                    onReplyComment={onReplyComment}
+                    onEditComment={onEditComment}
+                    onDeleteComment={onDeleteComment}
+                    onResolveComment={onResolveComment}
+                    onUnresolveComment={onUnresolveComment}
+                    isAddingComment={isAddingComment}
+                    isEditingComment={isEditingComment}
+                    isDeletingComment={isDeletingComment}
+                    isResolvingComment={isResolvingComment}
+                  />
+                ) : (
+                  <HunkView
+                    key={hunkIndex}
+                    hunk={hunk}
+                    filePath={file.path}
+                    commentsByLine={commentsByLine}
+                    currentUserId={currentUserId}
+                    onAddComment={onAddComment}
+                    onReplyComment={onReplyComment}
+                    onEditComment={onEditComment}
+                    onDeleteComment={onDeleteComment}
+                    onResolveComment={onResolveComment}
+                    onUnresolveComment={onUnresolveComment}
+                    isAddingComment={isAddingComment}
+                    isEditingComment={isEditingComment}
+                    isDeletingComment={isDeletingComment}
+                    isResolvingComment={isResolvingComment}
+                  />
+                )
               ))}
             </tbody>
           </table>
@@ -493,121 +578,255 @@ function DiffFileView({
 
 interface HunkViewProps {
   hunk: DiffHunk;
-  commentsByLine: Record<string, InlineComment[]>;
-  addingCommentAt: { line: number; side: 'LEFT' | 'RIGHT' } | null;
-  onStartAddComment: (line: number, side: 'LEFT' | 'RIGHT') => void;
-  onCancelAddComment: () => void;
-  onAddComment: (body: string) => Promise<void>;
-  onReplyToComment?: (commentId: string, body: string) => Promise<void>;
-  canComment: boolean;
-  viewMode: 'unified' | 'split';
+  filePath: string;
+  commentsByLine: Record<string, { root: InlineCommentData; replies: InlineCommentData[] }>;
+  currentUserId?: string;
+  onAddComment?: (filePath: string, line: number, side: 'LEFT' | 'RIGHT', body: string) => void;
+  onReplyComment?: (commentId: string, body: string) => void;
+  onEditComment?: (commentId: string, body: string) => void;
+  onDeleteComment?: (commentId: string) => void;
+  onResolveComment?: (commentId: string) => void;
+  onUnresolveComment?: (commentId: string) => void;
+  isAddingComment?: boolean;
+  isEditingComment?: boolean;
+  isDeletingComment?: boolean;
+  isResolvingComment?: boolean;
 }
 
 function HunkView({
   hunk,
+  filePath,
   commentsByLine,
-  addingCommentAt,
-  onStartAddComment,
-  onCancelAddComment,
+  currentUserId,
   onAddComment,
-  onReplyToComment,
-  canComment,
-  viewMode,
+  onReplyComment,
+  onEditComment,
+  onDeleteComment,
+  onResolveComment,
+  onUnresolveComment,
+  isAddingComment,
+  isEditingComment,
+  isDeletingComment,
+  isResolvingComment,
 }: HunkViewProps) {
+  // Track which line has an active comment form
+  const [activeCommentLine, setActiveCommentLine] = useState<{
+    line: number;
+    side: 'LEFT' | 'RIGHT';
+  } | null>(null);
+
+  const handleAddCommentClick = useCallback(
+    (line: number, side: 'LEFT' | 'RIGHT') => {
+      setActiveCommentLine({ line, side });
+    },
+    []
+  );
+
+  const handleCommentSubmit = useCallback(
+    (body: string) => {
+      if (activeCommentLine && onAddComment) {
+        onAddComment(filePath, activeCommentLine.line, activeCommentLine.side, body);
+        setActiveCommentLine(null);
+      }
+    },
+    [activeCommentLine, filePath, onAddComment]
+  );
+
+  const handleCommentCancel = useCallback(() => {
+    setActiveCommentLine(null);
+  }, []);
+
   return (
     <>
       {/* Hunk header */}
       <tr className="bg-blue-500/10 text-blue-400">
-        <td colSpan={viewMode === 'split' ? 4 : 3} className="px-4 py-1 text-xs">
+        <td colSpan={4} className="px-4 py-1 text-xs">
           @@ -{hunk.oldStart},{hunk.oldLines} +{hunk.newStart},{hunk.newLines} @@
         </td>
       </tr>
 
       {/* Lines */}
       {hunk.lines.map((line, lineIndex) => {
-        const lineNumber = line.type === 'remove' ? line.oldLineNumber : line.newLineNumber;
-        const side = line.type === 'remove' ? 'LEFT' : 'RIGHT';
-        const commentKey = `${lineNumber}-${side}`;
-        const lineComments = commentsByLine[commentKey] || [];
-        const isAddingHere =
-          addingCommentAt?.line === lineNumber && addingCommentAt?.side === side;
+        const lineNum = line.type === 'remove' ? line.oldLineNumber : line.newLineNumber;
+        const side: 'LEFT' | 'RIGHT' = line.type === 'remove' ? 'LEFT' : 'RIGHT';
+        const commentKey = `${side}-${lineNum}`;
+        const threadData = commentsByLine[commentKey];
+        const isCommentFormOpen =
+          activeCommentLine?.line === lineNum && activeCommentLine?.side === side;
 
         return (
-          <React.Fragment key={lineIndex}>
-            <tr
-              className={cn(
-                'hover:bg-muted/30 group relative',
-                line.type === 'add' && 'bg-green-500/10',
-                line.type === 'remove' && 'bg-red-500/10'
-              )}
-            >
-              {/* Old line number */}
-              <td className="w-12 px-2 py-0.5 text-right text-muted-foreground select-none border-r border-border sticky left-0 bg-inherit">
-                {line.oldLineNumber || ''}
-              </td>
-
-              {/* New line number */}
-              <td className="w-12 px-2 py-0.5 text-right text-muted-foreground select-none border-r border-border sticky left-12 bg-inherit">
-                {line.newLineNumber || ''}
-              </td>
-
-              {/* Content */}
-              <td className="px-4 py-0.5 whitespace-pre relative">
-                {/* Add comment button */}
-                {canComment && !isAddingHere && (
-                  <button
-                    onClick={() => onStartAddComment(lineNumber!, side)}
-                    className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 w-5 h-5 flex items-center justify-center bg-primary text-primary-foreground rounded-full opacity-0 group-hover:opacity-100 hover:scale-110 transition-all duration-150 shadow-sm z-10"
-                    title="Add comment"
-                  >
-                    <MessageSquare className="h-3 w-3" />
-                  </button>
-                )}
-                <span
-                  className={cn(
-                    'mr-2 inline-block w-3',
-                    line.type === 'add' && 'text-green-400',
-                    line.type === 'remove' && 'text-red-400'
-                  )}
-                >
-                  {line.type === 'add' ? '+' : line.type === 'remove' ? '-' : ' '}
-                </span>
-                {line.content}
-              </td>
-            </tr>
-
-            {/* Inline comments */}
-            {lineComments.length > 0 && (
-              <tr>
-                <td colSpan={3} className="p-0">
-                  <InlineCommentThread
-                    comments={lineComments}
-                    onAddReply={
-                      onReplyToComment
-                        ? (body) => onReplyToComment(lineComments[0].id, body)
-                        : undefined
-                    }
-                  />
-                </td>
-              </tr>
-            )}
-
-            {/* Add comment form */}
-            {isAddingHere && (
-              <tr>
-                <td colSpan={3} className="p-0">
-                  <AddCommentForm
-                    onSubmit={onAddComment}
-                    onCancel={onCancelAddComment}
-                    side={side}
-                    line={lineNumber!}
-                  />
-                </td>
-              </tr>
-            )}
-          </React.Fragment>
+          <DiffLineRow
+            key={lineIndex}
+            line={line}
+            lineIndex={lineIndex}
+            filePath={filePath}
+            threadData={threadData}
+            currentUserId={currentUserId}
+            isCommentFormOpen={isCommentFormOpen}
+            onAddCommentClick={handleAddCommentClick}
+            onCommentSubmit={handleCommentSubmit}
+            onCommentCancel={handleCommentCancel}
+            onReplyComment={onReplyComment}
+            onEditComment={onEditComment}
+            onDeleteComment={onDeleteComment}
+            onResolveComment={onResolveComment}
+            onUnresolveComment={onUnresolveComment}
+            isAddingComment={isAddingComment}
+            isEditingComment={isEditingComment}
+            isDeletingComment={isDeletingComment}
+            isResolvingComment={isResolvingComment}
+            canComment={!!onAddComment}
+          />
         );
       })}
+    </>
+  );
+}
+
+interface DiffLineRowProps {
+  line: DiffLine;
+  lineIndex: number;
+  filePath: string;
+  threadData?: { root: InlineCommentData; replies: InlineCommentData[] };
+  currentUserId?: string;
+  isCommentFormOpen: boolean;
+  onAddCommentClick: (line: number, side: 'LEFT' | 'RIGHT') => void;
+  onCommentSubmit: (body: string) => void;
+  onCommentCancel: () => void;
+  onReplyComment?: (commentId: string, body: string) => void;
+  onEditComment?: (commentId: string, body: string) => void;
+  onDeleteComment?: (commentId: string) => void;
+  onResolveComment?: (commentId: string) => void;
+  onUnresolveComment?: (commentId: string) => void;
+  isAddingComment?: boolean;
+  isEditingComment?: boolean;
+  isDeletingComment?: boolean;
+  isResolvingComment?: boolean;
+  canComment: boolean;
+}
+
+function DiffLineRow({
+  line,
+  lineIndex,
+  filePath,
+  threadData,
+  currentUserId,
+  isCommentFormOpen,
+  onAddCommentClick,
+  onCommentSubmit,
+  onCommentCancel,
+  onReplyComment,
+  onEditComment,
+  onDeleteComment,
+  onResolveComment,
+  onUnresolveComment,
+  isAddingComment,
+  isEditingComment,
+  isDeletingComment,
+  isResolvingComment,
+  canComment,
+}: DiffLineRowProps) {
+  const [isHovered, setIsHovered] = useState(false);
+  const lineNum = line.type === 'remove' ? line.oldLineNumber : line.newLineNumber;
+  const side: 'LEFT' | 'RIGHT' = line.type === 'remove' ? 'LEFT' : 'RIGHT';
+
+  return (
+    <>
+      <tr
+        key={lineIndex}
+        className={cn(
+          'group hover:bg-muted/30',
+          line.type === 'add' && 'bg-green-500/10',
+          line.type === 'remove' && 'bg-red-500/10'
+        )}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
+        {/* Comment trigger button */}
+        <td className="w-8 px-1 py-0.5 text-center select-none border-r border-border bg-inherit">
+          {canComment && lineNum && isHovered && !isCommentFormOpen && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  className="w-5 h-5 flex items-center justify-center rounded bg-primary/10 hover:bg-primary/20 text-primary transition-colors"
+                  onClick={() => onAddCommentClick(lineNum, side)}
+                >
+                  <Plus className="h-3 w-3" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="left">
+                <p>Add comment on line {lineNum}</p>
+              </TooltipContent>
+            </Tooltip>
+          )}
+          {threadData && !isHovered && (
+            <MessageSquare className="h-3 w-3 text-primary mx-auto" />
+          )}
+        </td>
+
+        {/* Old line number */}
+        <td className="w-12 px-2 py-0.5 text-right text-muted-foreground select-none border-r border-border sticky left-0 bg-inherit">
+          {line.oldLineNumber || ''}
+        </td>
+
+        {/* New line number */}
+        <td className="w-12 px-2 py-0.5 text-right text-muted-foreground select-none border-r border-border sticky left-12 bg-inherit">
+          {line.newLineNumber || ''}
+        </td>
+
+        {/* Content */}
+        <td className="px-4 py-0.5 whitespace-pre">
+          <span
+            className={cn(
+              'mr-2 inline-block w-3',
+              line.type === 'add' && 'text-green-400',
+              line.type === 'remove' && 'text-red-400'
+            )}
+          >
+            {line.type === 'add' ? '+' : line.type === 'remove' ? '-' : ' '}
+          </span>
+          {line.content}
+        </td>
+      </tr>
+
+      {/* Inline comment form */}
+      {isCommentFormOpen && (
+        <tr>
+          <td colSpan={4} className="p-3 bg-muted/30">
+            <CommentForm
+              onSubmit={onCommentSubmit}
+              onCancel={onCommentCancel}
+              placeholder={`Comment on line ${lineNum}...`}
+              isLoading={isAddingComment}
+              autoFocus
+            />
+          </td>
+        </tr>
+      )}
+
+      {/* Existing comment thread */}
+      {threadData && !isCommentFormOpen && (
+        <tr>
+          <td colSpan={4} className="p-3 bg-muted/20">
+            <CommentThread
+              rootComment={threadData.root}
+              replies={threadData.replies}
+              currentUserId={currentUserId}
+              onReply={onReplyComment}
+              onEdit={onEditComment}
+              onDelete={onDeleteComment}
+              onResolve={onResolveComment}
+              onUnresolve={onUnresolveComment}
+              isReplying={isAddingComment}
+              isEditing={isEditingComment}
+              isDeleting={isDeletingComment}
+              isResolving={isResolvingComment}
+              filePath={filePath}
+              lineRange={threadData.root.line || undefined}
+            />
+          </td>
+        </tr>
+      )}
     </>
   );
 }

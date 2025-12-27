@@ -413,11 +413,25 @@ export const prComments = pgTable('pr_comments', {
   line: integer('line'), // Line number
   side: text('side'), // 'LEFT' or 'RIGHT' for diff
   commitSha: text('commit_sha'),
+  
+  // For multi-line comments
+  startLine: integer('start_line'), // Starting line for range selection
+  endLine: integer('end_line'), // Ending line for range selection (same as line for single-line)
 
   body: text('body').notNull(),
 
   // For replies
   replyToId: uuid('reply_to_id').references((): any => prComments.id),
+  
+  // Thread resolution
+  isResolved: boolean('is_resolved').notNull().default(false),
+  resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+  resolvedById: text('resolved_by_id'), // References better-auth user.id
+
+  // Code suggestions
+  suggestion: text('suggestion'), // The suggested code change
+  suggestionApplied: boolean('suggestion_applied').notNull().default(false),
+  suggestionCommitSha: text('suggestion_commit_sha'), // Commit SHA where suggestion was applied
 
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),

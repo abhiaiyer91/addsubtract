@@ -496,6 +496,154 @@ export const prCommentModel = {
       .returning();
     return result.length > 0;
   },
+
+  /**
+   * Resolve a comment thread
+   */
+  async resolve(id: string, resolvedById: string): Promise<PrComment | undefined> {
+    const db = getDb();
+    const [comment] = await db
+      .update(prComments)
+      .set({
+        isResolved: true,
+        resolvedAt: new Date(),
+        resolvedById,
+        updatedAt: new Date(),
+      })
+      .where(eq(prComments.id, id))
+      .returning();
+    return comment;
+  },
+
+  /**
+   * Unresolve a comment thread
+   */
+  async unresolve(id: string): Promise<PrComment | undefined> {
+    const db = getDb();
+    const [comment] = await db
+      .update(prComments)
+      .set({
+        isResolved: false,
+        resolvedAt: null,
+        resolvedById: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(prComments.id, id))
+      .returning();
+    return comment;
+  },
+
+  /**
+   * Get thread comments (root comment + all replies)
+   */
+  async getThread(rootCommentId: string): Promise<(PrComment & { user: Author })[]> {
+    const db = getDb();
+    
+    // Get the root comment and all replies
+    const result = await db
+      .select()
+      .from(prComments)
+      .innerJoin(user, eq(prComments.userId, user.id))
+      .where(
+        or(
+          eq(prComments.id, rootCommentId),
+          eq(prComments.replyToId, rootCommentId)
+        )
+      )
+      .orderBy(prComments.createdAt);
+
+    return result.map((r) => ({
+      ...r.pr_comments,
+      user: {
+        id: r.user.id,
+        name: r.user.name,
+        email: r.user.email,
+        username: r.user.username,
+        image: r.user.image,
+        avatarUrl: r.user.avatarUrl,
+      },
+    }));
+  },
+
+  /**
+   * List all inline comments for a PR, grouped by file
+   * Returns root comments only (replies are fetched via getThread)
+   */
+  async listInlineByPr(prId: string): Promise<(PrComment & { user: Author })[]> {
+    const db = getDb();
+    const result = await db
+      .select()
+      .from(prComments)
+      .innerJoin(user, eq(prComments.userId, user.id))
+      .where(
+        and(
+          eq(prComments.prId, prId),
+          isNull(prComments.replyToId), // Only root comments
+          sql`${prComments.path} IS NOT NULL` // Only inline comments
+        )
+      )
+      .orderBy(prComments.path, prComments.line, prComments.createdAt);
+
+    return result.map((r) => ({
+      ...r.pr_comments,
+      user: {
+        id: r.user.id,
+        name: r.user.name,
+        email: r.user.email,
+        username: r.user.username,
+        image: r.user.image,
+        avatarUrl: r.user.avatarUrl,
+      },
+    }));
+  },
+
+  /**
+   * Mark a suggestion as applied
+   */
+  async markSuggestionApplied(id: string, commitSha: string): Promise<PrComment | undefined> {
+    const db = getDb();
+    const [comment] = await db
+      .update(prComments)
+      .set({
+        suggestionApplied: true,
+        suggestionCommitSha: commitSha,
+        updatedAt: new Date(),
+      })
+      .where(eq(prComments.id, id))
+      .returning();
+    return comment;
+  },
+
+  /**
+   * Get pending suggestions for a PR (not yet applied)
+   */
+  async getPendingSuggestions(prId: string): Promise<(PrComment & { user: Author })[]> {
+    const db = getDb();
+    const result = await db
+      .select()
+      .from(prComments)
+      .innerJoin(user, eq(prComments.userId, user.id))
+      .where(
+        and(
+          eq(prComments.prId, prId),
+          sql`${prComments.suggestion} IS NOT NULL`,
+          eq(prComments.suggestionApplied, false)
+        )
+      )
+      .orderBy(prComments.path, prComments.line, prComments.createdAt);
+
+    return result.map((r) => ({
+      ...r.pr_comments,
+      user: {
+        id: r.user.id,
+        name: r.user.name,
+        email: r.user.email,
+        username: r.user.username,
+        image: r.user.image,
+        avatarUrl: r.user.avatarUrl,
+      },
+    }));
+  },
 };
 
 export const prLabelModel = {
