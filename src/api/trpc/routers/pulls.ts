@@ -18,6 +18,7 @@ import {
 } from '../../../db/models';
 import { mergePullRequest, checkMergeability, getDefaultMergeMessage } from '../../../server/storage/merge';
 import { getConflictDetails } from '../../../server/storage/conflicts';
+import { resolveDiskPath } from '../../../server/storage/repos';
 import { triggerAsyncReview } from '../../../ai/services/pr-review';
 import { exists } from '../../../utils/fs';
 import { eventBus, extractMentions } from '../../../events';
@@ -437,10 +438,7 @@ export const pullsRouter = router({
       }
 
       // Resolve disk path
-      const reposDir = process.env.REPOS_DIR || './repos';
-      const diskPath = path.isAbsolute(repo.diskPath) 
-        ? repo.diskPath 
-        : path.join(process.cwd(), reposDir, repo.diskPath.replace(/^\/repos\//, ''));
+      const diskPath = resolveDiskPath(repo.diskPath);
 
       if (!exists(diskPath)) {
         return { 
@@ -520,10 +518,7 @@ export const pullsRouter = router({
       const user = ctx.user;
 
       // Resolve disk path
-      const reposDir = process.env.REPOS_DIR || './repos';
-      const diskPath = path.isAbsolute(repo.diskPath) 
-        ? repo.diskPath 
-        : path.join(process.cwd(), reposDir, repo.diskPath.replace(/^\/repos\//, ''));
+      const diskPath = resolveDiskPath(repo.diskPath);
 
       if (!exists(diskPath)) {
         throw new TRPCError({
@@ -1103,10 +1098,7 @@ export const pullsRouter = router({
       }
 
       // Resolve disk path
-      const reposDir = process.env.REPOS_DIR || './repos';
-      const diskPath = path.isAbsolute(repo.diskPath)
-        ? repo.diskPath
-        : path.join(process.cwd(), reposDir, repo.diskPath.replace(/^\/repos\//, ''));
+      const diskPath = resolveDiskPath(repo.diskPath);
 
       if (!exists(diskPath)) {
         throw new TRPCError({
@@ -1140,7 +1132,7 @@ export const pullsRouter = router({
         
         try {
           // Create worktree from source branch
-          execSync(`git worktree add "${worktreePath}" ${pr.sourceBranch}`, {
+          execSync(`wit worktree add "${worktreePath}" ${pr.sourceBranch}`, {
             cwd: diskPath,
             encoding: 'utf-8',
           });
@@ -1155,14 +1147,14 @@ export const pullsRouter = router({
           const authorUsername = suggestionAuthor?.username || 'reviewer';
 
           // Stage and commit
-          execSync(`git add "${comment.path}"`, {
+          execSync(`wit add "${comment.path}"`, {
             cwd: worktreePath,
             encoding: 'utf-8',
           });
 
           const commitMessage = `Apply suggestion from @${authorUsername}\n\nCo-authored-by: ${ctx.user.name || ctx.user.username} <${ctx.user.email}>`;
           execSync(
-            `git commit -m "${commitMessage.replace(/"/g, '\\"')}"`,
+            `wit commit -m "${commitMessage.replace(/"/g, '\\"')}"`,
             {
               cwd: worktreePath,
               encoding: 'utf-8',
@@ -1177,13 +1169,13 @@ export const pullsRouter = router({
           );
 
           // Get the new commit SHA
-          const newSha = execSync('git rev-parse HEAD', {
+          const newSha = execSync('wit rev-parse HEAD', {
             cwd: worktreePath,
             encoding: 'utf-8',
           }).trim();
 
           // Push the change back to the source branch
-          execSync(`git push origin HEAD:${pr.sourceBranch}`, {
+          execSync(`wit push origin HEAD:${pr.sourceBranch}`, {
             cwd: worktreePath,
             encoding: 'utf-8',
           });
@@ -1202,7 +1194,7 @@ export const pullsRouter = router({
         } finally {
           // Clean up worktree
           try {
-            execSync(`git worktree remove "${worktreePath}" --force`, {
+            execSync(`wit worktree remove "${worktreePath}" --force`, {
               cwd: diskPath,
               encoding: 'utf-8',
             });
@@ -1454,10 +1446,7 @@ export const pullsRouter = router({
       }
 
       // Resolve disk path
-      const reposDir = process.env.REPOS_DIR || './repos';
-      const diskPath = path.isAbsolute(repo.diskPath)
-        ? repo.diskPath
-        : path.join(process.cwd(), reposDir, repo.diskPath.replace(/^\/repos\//, ''));
+      const diskPath = resolveDiskPath(repo.diskPath);
 
       if (!exists(diskPath)) {
         throw new TRPCError({
@@ -1522,10 +1511,7 @@ export const pullsRouter = router({
       }
 
       // Resolve disk path
-      const reposDir = process.env.REPOS_DIR || './repos';
-      const diskPath = path.isAbsolute(repo.diskPath)
-        ? repo.diskPath
-        : path.join(process.cwd(), reposDir, repo.diskPath.replace(/^\/repos\//, ''));
+      const diskPath = resolveDiskPath(repo.diskPath);
 
       if (!exists(diskPath)) {
         throw new TRPCError({
@@ -1752,10 +1738,7 @@ export const pullsRouter = router({
       }
 
       // Resolve disk path
-      const reposDir = process.env.REPOS_DIR || './repos';
-      const diskPath = path.isAbsolute(repo.diskPath)
-        ? repo.diskPath
-        : path.join(process.cwd(), reposDir, repo.diskPath.replace(/^\/repos\//, ''));
+      const diskPath = resolveDiskPath(repo.diskPath);
 
       if (!exists(diskPath)) {
         throw new TRPCError({

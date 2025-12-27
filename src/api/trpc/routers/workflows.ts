@@ -18,6 +18,7 @@ import {
 } from '../../../db/models';
 import { CIEngine, validateWorkflowFile } from '../../../ci';
 import { createExecutor } from '../../../ci/executor';
+import { resolveDiskPath } from '../../../server/storage/repos';
 
 export const workflowsRouter = router({
   /**
@@ -333,10 +334,7 @@ export const workflowsRouter = router({
         });
       }
 
-      const reposDir = process.env.REPOS_DIR || './repos';
-      const absoluteDiskPath = path.isAbsolute(repo.diskPath)
-        ? repo.diskPath
-        : path.join(reposDir, repo.diskPath.replace(/^\/repos\//, ''));
+      const absoluteDiskPath = resolveDiskPath(repo.diskPath);
 
       // Load the workflow
       const engine = new CIEngine({ repoPath: absoluteDiskPath });

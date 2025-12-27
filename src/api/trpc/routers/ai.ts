@@ -10,6 +10,7 @@ import * as path from 'path';
 import { execSync } from 'child_process';
 import { router, protectedProcedure, publicProcedure } from '../trpc';
 import { repoModel, prModel, collaboratorModel } from '../../../db/models';
+import { resolveDiskPath } from '../../../server/storage/repos';
 import { exists } from '../../../utils/fs';
 import { generatePRDescriptionTool } from '../../../ai/tools/generate-pr-description';
 import { getTsgitAgent, isAIAvailable } from '../../../ai/mastra';
@@ -123,10 +124,7 @@ export const aiRouter = router({
       }
 
       // Resolve disk path
-      const reposDir = process.env.REPOS_DIR || './repos';
-      const diskPath = path.isAbsolute(repo.diskPath)
-        ? repo.diskPath
-        : path.join(process.cwd(), reposDir, repo.diskPath.replace(/^\/repos\//, ''));
+      const diskPath = resolveDiskPath(repo.diskPath);
 
       if (!exists(diskPath)) {
         throw new TRPCError({
@@ -217,10 +215,7 @@ export const aiRouter = router({
       }
 
       // Resolve disk path
-      const reposDir = process.env.REPOS_DIR || './repos';
-      const diskPath = path.isAbsolute(repo.diskPath)
-        ? repo.diskPath
-        : path.join(process.cwd(), reposDir, repo.diskPath.replace(/^\/repos\//, ''));
+      const diskPath = resolveDiskPath(repo.diskPath);
 
       if (!exists(diskPath)) {
         throw new TRPCError({

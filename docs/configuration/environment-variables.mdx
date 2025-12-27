@@ -73,6 +73,79 @@ export NODE_ENV="production"
 
 ---
 
+## Repository Storage (REPOS_DIR)
+
+The `REPOS_DIR` environment variable controls where wit stores git repositories on disk. This is a critical setting for the platform to function correctly.
+
+<Warning>
+  If `REPOS_DIR` is not set correctly, you may see "Repository not found on disk" errors when trying to view files, save changes in the IDE, or perform git operations.
+</Warning>
+
+### How It Works
+
+When you create a repository through the web UI, wit:
+1. Creates a bare git repository at `{REPOS_DIR}/{username}/{repo-name}.git`
+2. Stores the path `/repos/{username}/{repo-name}.git` in the database
+3. Resolves this path using `REPOS_DIR` when accessing the repository
+
+### Configuration Examples
+
+```bash
+# Development (default) - relative to project directory
+REPOS_DIR=./repos
+
+# User home directory
+REPOS_DIR=~/.wit/repos
+
+# Absolute path for production
+REPOS_DIR=/var/lib/wit/repos
+
+# Docker volume
+REPOS_DIR=/data/repos
+```
+
+### Troubleshooting
+
+If you're getting "Repository not found on disk" errors:
+
+1. **Check where repos are stored:**
+   ```bash
+   # Find existing repositories
+   find ~/.wit -name "*.git" -type d 2>/dev/null
+   find ./repos -name "*.git" -type d 2>/dev/null
+   ```
+
+2. **Set REPOS_DIR to match:**
+   ```bash
+   # In your .env file
+   REPOS_DIR=/path/to/where/repos/actually/are
+   ```
+
+3. **Restart the server:**
+   ```bash
+   wit down && wit up
+   ```
+
+### Migration
+
+If you need to move repositories to a new location:
+
+```bash
+# 1. Stop the server
+wit down
+
+# 2. Move repositories
+mv ./repos /var/lib/wit/repos
+
+# 3. Update .env
+echo 'REPOS_DIR=/var/lib/wit/repos' >> .env
+
+# 4. Restart
+wit up
+```
+
+---
+
 ## Git Configuration
 
 | Variable | Description | Used For |

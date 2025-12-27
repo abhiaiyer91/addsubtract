@@ -8,6 +8,7 @@
 import { execSync } from 'child_process';
 import * as path from 'path';
 import { prModel, prReviewModel, prCommentModel, repoModel, userModel } from '../../db/models';
+import { resolveDiskPath } from '../../server/storage/repos';
 import { exists } from '../../utils/fs';
 
 /**
@@ -383,10 +384,7 @@ export async function runAIReview(prId: string): Promise<AIReviewResult | null> 
     }
 
     // Resolve disk path
-    const reposDir = process.env.REPOS_DIR || './repos';
-    const diskPath = path.isAbsolute(repo.diskPath)
-      ? repo.diskPath
-      : path.join(process.cwd(), reposDir, repo.diskPath.replace(/^\/repos\//, ''));
+    const diskPath = resolveDiskPath(repo.diskPath);
 
     if (!exists(diskPath)) {
       console.error('[AI Review] Repo not found on disk:', diskPath);

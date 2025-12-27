@@ -150,20 +150,21 @@ const analyzeTaskStep = createStep({
       if (packageJsonContent) {
         const pkg = JSON.parse(packageJsonContent);
       
-      if (pkg.dependencies?.react || pkg.devDependencies?.react) {
-        projectType = 'react';
-      } else if (pkg.dependencies?.vue || pkg.devDependencies?.vue) {
-        projectType = 'vue';
-      } else if (pkg.dependencies?.express || pkg.devDependencies?.express) {
-        projectType = 'express';
-      } else if (pkg.dependencies?.next || pkg.devDependencies?.next) {
-        projectType = 'nextjs';
-      } else if (pkg.dependencies?.hono || pkg.devDependencies?.hono) {
-        projectType = 'hono';
-      }
+        if (pkg.dependencies?.react || pkg.devDependencies?.react) {
+          projectType = 'react';
+        } else if (pkg.dependencies?.vue || pkg.devDependencies?.vue) {
+          projectType = 'vue';
+        } else if (pkg.dependencies?.express || pkg.devDependencies?.express) {
+          projectType = 'express';
+        } else if (pkg.dependencies?.next || pkg.devDependencies?.next) {
+          projectType = 'nextjs';
+        } else if (pkg.dependencies?.hono || pkg.devDependencies?.hono) {
+          projectType = 'hono';
+        }
       
-      if (pkg.devDependencies?.typescript) {
-        projectType += '-typescript';
+        if (pkg.devDependencies?.typescript) {
+          projectType += '-typescript';
+        }
       }
     } catch {
       // Could not read package.json

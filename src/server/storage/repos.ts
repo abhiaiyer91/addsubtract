@@ -61,6 +61,26 @@ export function getRepoDiskPath(
 }
 
 /**
+ * Resolve a stored diskPath to an absolute filesystem path.
+ * 
+ * Database stores paths like "/repos/owner/name.git" which need to be
+ * resolved relative to REPOS_DIR (e.g., "./repos" or "~/.wit/repos").
+ * 
+ * @param storedPath - The diskPath from the database (e.g., "/repos/owner/name.git")
+ * @returns The absolute filesystem path
+ */
+export function resolveDiskPath(storedPath: string): string {
+  const reposDir = process.env.REPOS_DIR || './repos';
+  
+  // Strip the /repos/ prefix if present, then join with actual REPOS_DIR
+  const relativePath = storedPath.replace(/^\/repos\//, '');
+  
+  return path.isAbsolute(reposDir) 
+    ? path.join(reposDir, relativePath)
+    : path.join(process.cwd(), reposDir, relativePath);
+}
+
+/**
  * Repository manager for server-side repository storage
  * Manages bare repositories organized by owner/repo structure
  */

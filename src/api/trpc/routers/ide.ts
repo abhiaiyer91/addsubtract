@@ -11,7 +11,7 @@ import { TRPCError } from '@trpc/server';
 import * as path from 'path';
 import { VirtualRepository, VirtualRepositoryManager } from '../../../primitives/virtual-repository';
 import { setVirtualRepo, getVirtualRepo, clearVirtualRepo } from '../../../ai/tools/virtual-write-file';
-import { getRepoDiskPath } from '../../../server/storage/repos';
+import { getRepoDiskPath, resolveDiskPath } from '../../../server/storage/repos';
 import { db } from '../../../db';
 import { repositories } from '../../../db/schema';
 import { eq, and } from 'drizzle-orm';
@@ -33,7 +33,11 @@ async function getRepoPath(owner: string, name: string): Promise<string | null> 
   });
 
   if (repo && repo.diskPath) {
-    return repo.diskPath;
+    // Resolve the stored path to an absolute filesystem path
+    const resolved = resolveDiskPath(repo.diskPath);
+    if (exists(resolved)) {
+      return resolved;
+    }
   }
 
   // Fall back to computed path
