@@ -9,6 +9,7 @@ export * from './types';
 export { eventBus, createEvent } from './bus';
 export { registerNotificationHandlers } from './handlers/notifications';
 export { registerCIHandlers } from './handlers/ci';
+export { registerMergeQueueHandlers, mergeQueueHandler } from './handlers/merge-queue';
 
 /**
  * Helper to extract @mentions from text

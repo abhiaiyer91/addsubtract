@@ -45,6 +45,31 @@ export const workflowRunStateEnum = pgEnum('workflow_run_state', [
   'cancelled',
 ]);
 
+/**
+ * Merge queue entry state enum
+ * Tracks the lifecycle of PRs in the merge queue
+ */
+export const mergeQueueStateEnum = pgEnum('merge_queue_state', [
+  'pending',      // Waiting in queue
+  'preparing',    // Building merge commit / running pre-merge checks
+  'testing',      // Running CI on the speculative merge
+  'ready',        // All checks passed, ready to merge
+  'merging',      // Actively merging
+  'completed',    // Successfully merged
+  'failed',       // Failed to merge (conflicts or CI failure)
+  'cancelled',    // Removed from queue
+]);
+
+/**
+ * Merge queue strategy enum
+ * How commits should be reassembled when merging
+ */
+export const mergeQueueStrategyEnum = pgEnum('merge_queue_strategy', [
+  'sequential',   // Merge PRs one at a time in order
+  'optimistic',   // Speculatively merge batches, rollback on failure
+  'adaptive',     // AI-driven: analyze conflicts and determine best order
+]);
+
 // ============ USERS ============
 
 export const users = pgTable('users', {
@@ -625,6 +650,189 @@ export const webhooks = pgTable('webhooks', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+// ============ MERGE QUEUE ============
+
+/**
+ * Merge queue configuration per repository
+ * Controls how the merge queue behaves for a given branch
+ */
+export const mergeQueueConfig = pgTable('merge_queue_config', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  repoId: uuid('repo_id')
+    .notNull()
+    .references(() => repositories.id, { onDelete: 'cascade' }),
+  
+  /** Target branch this config applies to (e.g., "main") */
+  targetBranch: text('target_branch').notNull(),
+  
+  /** Whether the merge queue is enabled */
+  enabled: boolean('enabled').notNull().default(true),
+  
+  /** Merge strategy */
+  strategy: mergeQueueStrategyEnum('strategy').notNull().default('adaptive'),
+  
+  /** Maximum batch size for optimistic merging */
+  maxBatchSize: integer('max_batch_size').notNull().default(5),
+  
+  /** Minimum wait time before processing (to batch PRs together) */
+  minWaitSeconds: integer('min_wait_seconds').notNull().default(60),
+  
+  /** Required CI checks to pass before merging */
+  requiredChecks: text('required_checks'), // JSON array of check names
+  
+  /** Whether to require all checks to pass (vs just required ones) */
+  requireAllChecks: boolean('require_all_checks').notNull().default(false),
+  
+  /** Whether to automatically rebase PRs before merging */
+  autoRebase: boolean('auto_rebase').notNull().default(true),
+  
+  /** Whether to delete branches after merging */
+  deleteBranchAfterMerge: boolean('delete_branch_after_merge').notNull().default(true),
+  
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  uniqueBranchConfig: unique().on(table.repoId, table.targetBranch),
+}));
+
+/**
+ * Merge queue entries
+ * Tracks PRs waiting in the merge queue
+ */
+export const mergeQueueEntries = pgTable('merge_queue_entries', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  
+  /** The pull request in the queue */
+  prId: uuid('pr_id')
+    .notNull()
+    .references(() => pullRequests.id, { onDelete: 'cascade' }),
+  
+  /** Repository */
+  repoId: uuid('repo_id')
+    .notNull()
+    .references(() => repositories.id, { onDelete: 'cascade' }),
+  
+  /** Target branch */
+  targetBranch: text('target_branch').notNull(),
+  
+  /** Position in the queue (lower = higher priority) */
+  position: integer('position').notNull(),
+  
+  /** Current state */
+  state: mergeQueueStateEnum('state').notNull().default('pending'),
+  
+  /** Priority (higher = more important, can jump queue) */
+  priority: integer('priority').notNull().default(0),
+  
+  /** User who added this to the queue */
+  addedById: text('added_by_id').notNull(),
+  
+  /** The HEAD SHA when added to queue */
+  headSha: text('head_sha').notNull(),
+  
+  /** The base SHA (target branch) when added */
+  baseSha: text('base_sha').notNull(),
+  
+  /** Speculative merge commit SHA (for testing) */
+  speculativeMergeSha: text('speculative_merge_sha'),
+  
+  /** Batch ID if part of an optimistic merge batch */
+  batchId: uuid('batch_id'),
+  
+  /** Files this PR touches (JSON array, for conflict detection) */
+  touchedFiles: text('touched_files'), // JSON array
+  
+  /** Estimated conflict score with other PRs (0-100) */
+  conflictScore: integer('conflict_score'),
+  
+  /** Error message if failed */
+  errorMessage: text('error_message'),
+  
+  /** Number of retry attempts */
+  retryCount: integer('retry_count').notNull().default(0),
+  
+  /** When this entry was added to the queue */
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  
+  /** When this entry was last updated */
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  
+  /** When processing started */
+  startedAt: timestamp('started_at', { withTimezone: true }),
+  
+  /** When completed (merged or failed) */
+  completedAt: timestamp('completed_at', { withTimezone: true }),
+});
+
+/**
+ * Merge queue batches
+ * Groups of PRs being merged together in optimistic/adaptive mode
+ */
+export const mergeQueueBatches = pgTable('merge_queue_batches', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  
+  repoId: uuid('repo_id')
+    .notNull()
+    .references(() => repositories.id, { onDelete: 'cascade' }),
+  
+  targetBranch: text('target_branch').notNull(),
+  
+  /** State of the batch */
+  state: mergeQueueStateEnum('state').notNull().default('preparing'),
+  
+  /** Base SHA the batch is built on */
+  baseSha: text('base_sha').notNull(),
+  
+  /** Final merge commit SHA if successful */
+  mergeSha: text('merge_sha'),
+  
+  /** Ordered list of PR IDs in this batch (JSON array) */
+  prOrder: text('pr_order').notNull(), // JSON array of PR IDs
+  
+  /** Reassembled commit graph (JSON - maps original commits to new ones) */
+  commitGraph: text('commit_graph'), // JSON
+  
+  /** Workflow run ID for CI checks */
+  workflowRunId: uuid('workflow_run_id').references(() => workflowRuns.id),
+  
+  /** Error message if failed */
+  errorMessage: text('error_message'),
+  
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  completedAt: timestamp('completed_at', { withTimezone: true }),
+});
+
+/**
+ * Merge queue history
+ * Audit log of merge queue operations
+ */
+export const mergeQueueHistory = pgTable('merge_queue_history', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  
+  prId: uuid('pr_id').references(() => pullRequests.id, { onDelete: 'set null' }),
+  repoId: uuid('repo_id')
+    .notNull()
+    .references(() => repositories.id, { onDelete: 'cascade' }),
+  
+  /** Action that occurred */
+  action: text('action').notNull(), // 'added', 'removed', 'merged', 'failed', 'reordered', 'batched'
+  
+  /** User who performed the action */
+  actorId: text('actor_id').notNull(),
+  
+  /** Previous state */
+  previousState: text('previous_state'),
+  
+  /** New state */
+  newState: text('new_state'),
+  
+  /** Additional metadata (JSON) */
+  metadata: text('metadata'),
+  
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
 // ============ CI/CD WORKFLOW RUNS ============
 
 /**
@@ -908,3 +1116,19 @@ export type NewJobRun = typeof jobRuns.$inferInsert;
 
 export type StepRun = typeof stepRuns.$inferSelect;
 export type NewStepRun = typeof stepRuns.$inferInsert;
+
+// Merge queue types
+export type MergeQueueState = (typeof mergeQueueStateEnum.enumValues)[number];
+export type MergeQueueStrategy = (typeof mergeQueueStrategyEnum.enumValues)[number];
+
+export type MergeQueueConfig = typeof mergeQueueConfig.$inferSelect;
+export type NewMergeQueueConfig = typeof mergeQueueConfig.$inferInsert;
+
+export type MergeQueueEntry = typeof mergeQueueEntries.$inferSelect;
+export type NewMergeQueueEntry = typeof mergeQueueEntries.$inferInsert;
+
+export type MergeQueueBatch = typeof mergeQueueBatches.$inferSelect;
+export type NewMergeQueueBatch = typeof mergeQueueBatches.$inferInsert;
+
+export type MergeQueueHistoryEntry = typeof mergeQueueHistory.$inferSelect;
+export type NewMergeQueueHistoryEntry = typeof mergeQueueHistory.$inferInsert;

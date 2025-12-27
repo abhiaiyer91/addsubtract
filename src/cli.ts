@@ -94,6 +94,8 @@ import {
   handleCodeReview,
   // CI/CD
   handleCI,
+  // Merge Queue
+  handleMergeQueue,
 } from './commands';
 import { handleHooks } from './core/hooks';
 import { handleSubmodule } from './core/submodule';
@@ -273,6 +275,15 @@ CI/CD:
   ci runs               Show recent workflow runs (requires server)
   ci view <run-id>      View workflow run details (requires server)
 
+Merge Queue:
+  merge-queue add       Add PR to merge queue (auto-queued merging)
+  merge-queue remove    Remove PR from queue
+  merge-queue status    Show queue position
+  merge-queue list      List PRs in queue
+  merge-queue stats     Show queue statistics
+  merge-queue enable    Enable merge queue for branch
+  merge-queue config    Configure queue settings
+
 Quality of Life:
   amend                 Quickly fix the last commit
   wip                   Quick WIP commit with auto-generated message
@@ -420,6 +431,8 @@ const COMMANDS = [
   'token',
   // CI/CD
   'ci',
+  // Merge Queue
+  'merge-queue',
   'help',
 ];
 
@@ -1037,6 +1050,18 @@ function main(): void {
       // CI/CD commands
       case 'ci':
         handleCI(args.slice(args.indexOf('ci') + 1)).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
+          }
+          process.exit(1);
+        });
+        return;
+
+      // Merge Queue commands
+      case 'merge-queue':
+        handleMergeQueue(args.slice(args.indexOf('merge-queue') + 1)).catch((error: Error) => {
           if (error instanceof TsgitError) {
             console.error((error as TsgitError).format());
           } else {
