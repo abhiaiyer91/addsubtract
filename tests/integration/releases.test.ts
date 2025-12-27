@@ -1,0 +1,599 @@
+/**
+ * Releases Integration Tests
+ * 
+ * Tests for release management including:
+ * - Release CRUD operations
+ * - Draft and prerelease handling
+ * - Asset management
+ * - Download tracking
+ */
+
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import {
+  startTestServer,
+  stopTestServer,
+  createTestClient,
+  createAuthenticatedClient,
+  uniqueUsername,
+  uniqueEmail,
+  uniqueRepoName,
+} from './setup';
+
+describe('Releases Flow', () => {
+  let ownerToken: string;
+  let ownerId: string;
+  let repoId: string;
+  let ownerUsername: string;
+
+  beforeAll(async () => {
+    await startTestServer();
+
+    const api = createTestClient();
+
+    // Create repo owner
+    ownerUsername = uniqueUsername('releaseowner');
+    const ownerResult = await api.auth.register.mutate({
+      username: ownerUsername,
+      email: uniqueEmail('releaseowner'),
+      password: 'password123',
+      name: 'Release Owner',
+    });
+    ownerToken = ownerResult.sessionId;
+    ownerId = ownerResult.user.id;
+
+    // Create a test repository
+    const ownerApi = createAuthenticatedClient(ownerToken);
+    const repo = await ownerApi.repos.create.mutate({
+      name: uniqueRepoName('release-test'),
+      description: 'Repo for release tests',
+      isPrivate: false,
+    });
+    repoId = repo.id;
+  }, 30000);
+
+  afterAll(async () => {
+    await stopTestServer();
+  });
+
+  describe('Release CRUD Operations', () => {
+    const uniqueTag = () => `v${Date.now()}.${Math.floor(Math.random() * 100)}`;
+
+    it('creates a release', async () => {
+      const authApi = createAuthenticatedClient(ownerToken);
+      const tagName = uniqueTag();
+
+      const release = await authApi.releases.create.mutate({
+        repoId,
+        tagName,
+        name: 'First Release',
+        body: 'Release notes for first release',
+        isDraft: false,
+        isPrerelease: false,
+      });
+
+      expect(release).toBeDefined();
+      expect(release.tagName).toBe(tagName);
+      expect(release.name).toBe('First Release');
+      expect(release.body).toBe('Release notes for first release');
+      expect(release.isDraft).toBe(false);
+      expect(release.isPrerelease).toBe(false);
+      expect(release.publishedAt).toBeDefined();
+    });
+
+    it('creates a draft release', async () => {
+      const authApi = createAuthenticatedClient(ownerToken);
+      const tagName = uniqueTag();
+
+      const release = await authApi.releases.create.mutate({
+        repoId,
+        tagName,
+        name: 'Draft Release',
+        isDraft: true,
+      });
+
+      expect(release.isDraft).toBe(true);
+      expect(release.publishedAt).toBeNull();
+    });
+
+    it('creates a prerelease', async () => {
+      const authApi = createAuthenticatedClient(ownerToken);
+      const tagName = uniqueTag();
+
+      const release = await authApi.releases.create.mutate({
+        repoId,
+        tagName,
+        name: 'Beta Release',
+        isPrerelease: true,
+      });
+
+      expect(release.isPrerelease).toBe(true);
+    });
+
+    it('gets release by ID', async () => {
+      const authApi = createAuthenticatedClient(ownerToken);
+      const api = createTestClient();
+      const tagName = uniqueTag();
+
+      const created = await authApi.releases.create.mutate({
+        repoId,
+        tagName,
+        name: 'Get By ID Test',
+      });
+
+      const release = await api.releases.getById.query({ id: created.id });
+
+      expect(release).toBeDefined();
+      expect(release.id).toBe(created.id);
+      expect(release.tagName).toBe(tagName);
+    });
+
+    it('gets release by tag name', async () => {
+      const authApi = createAuthenticatedClient(ownerToken);
+      const api = createTestClient();
+      const tagName = uniqueTag();
+
+      await authApi.releases.create.mutate({
+        repoId,
+        tagName,
+        name: 'Get By Tag Test',
+      });
+
+      const release = await api.releases.getByTag.query({ repoId, tagName });
+
+      expect(release).toBeDefined();
+      expect(release.tagName).toBe(tagName);
+    });
+
+    it('gets latest release', async () => {
+      const authApi = createAuthenticatedClient(ownerToken);
+      const api = createTestClient();
+      const tagName = uniqueTag();
+
+      await authApi.releases.create.mutate({
+        repoId,
+        tagName,
+        name: 'Latest Release',
+        isDraft: false,
+        isPrerelease: false,
+      });
+
+      const release = await api.releases.getLatest.query({ repoId });
+
+      expect(release).toBeDefined();
+      expect(release.isDraft).toBe(false);
+    });
+
+    it('gets latest including prerelease', async () => {
+      const authApi = createAuthenticatedClient(ownerToken);
+      const api = createTestClient();
+      const tagName = uniqueTag();
+
+      await authApi.releases.create.mutate({
+        repoId,
+        tagName,
+        name: 'Prerelease Latest',
+        isPrerelease: true,
+      });
+
+      const release = await api.releases.getLatest.query({
+        repoId,
+        includePrerelease: true,
+      });
+
+      expect(release).toBeDefined();
+    });
+
+    it('lists releases', async () => {
+      const authApi = createAuthenticatedClient(ownerToken);
+      const api = createTestClient();
+
+      // Create some releases
+      for (let i = 0; i < 3; i++) {
+        await authApi.releases.create.mutate({
+          repoId,
+          tagName: uniqueTag(),
+          name: `List Test ${i}`,
+        });
+      }
+
+      const result = await api.releases.list.query({ repoId });
+
+      expect(result.releases).toBeDefined();
+      expect(Array.isArray(result.releases)).toBe(true);
+      expect(result.releases.length).toBeGreaterThanOrEqual(3);
+      expect(result.total).toBeGreaterThanOrEqual(3);
+    });
+
+    it('lists releases excluding drafts by default', async () => {
+      const authApi = createAuthenticatedClient(ownerToken);
+      const api = createTestClient();
+
+      await authApi.releases.create.mutate({
+        repoId,
+        tagName: uniqueTag(),
+        name: 'Draft Excluded',
+        isDraft: true,
+      });
+
+      const result = await api.releases.list.query({ repoId });
+
+      expect(result.releases.every(r => !r.isDraft)).toBe(true);
+    });
+
+    it('lists releases including drafts', async () => {
+      const authApi = createAuthenticatedClient(ownerToken);
+      const api = createTestClient();
+
+      await authApi.releases.create.mutate({
+        repoId,
+        tagName: uniqueTag(),
+        name: 'Draft Included',
+        isDraft: true,
+      });
+
+      const result = await api.releases.list.query({
+        repoId,
+        includeDrafts: true,
+      });
+
+      expect(result.releases.some(r => r.isDraft)).toBe(true);
+    });
+
+    it('updates release', async () => {
+      const authApi = createAuthenticatedClient(ownerToken);
+      const tagName = uniqueTag();
+
+      const release = await authApi.releases.create.mutate({
+        repoId,
+        tagName,
+        name: 'Original Name',
+        body: 'Original body',
+      });
+
+      const updated = await authApi.releases.update.mutate({
+        id: release.id,
+        name: 'Updated Name',
+        body: 'Updated body',
+      });
+
+      expect(updated.name).toBe('Updated Name');
+      expect(updated.body).toBe('Updated body');
+    });
+
+    it('updates release tag name', async () => {
+      const authApi = createAuthenticatedClient(ownerToken);
+      const originalTag = uniqueTag();
+      const newTag = uniqueTag();
+
+      const release = await authApi.releases.create.mutate({
+        repoId,
+        tagName: originalTag,
+        name: 'Tag Update Test',
+      });
+
+      const updated = await authApi.releases.update.mutate({
+        id: release.id,
+        tagName: newTag,
+      });
+
+      expect(updated.tagName).toBe(newTag);
+    });
+
+    it('publishes a draft release', async () => {
+      const authApi = createAuthenticatedClient(ownerToken);
+      const tagName = uniqueTag();
+
+      const release = await authApi.releases.create.mutate({
+        repoId,
+        tagName,
+        name: 'To Publish',
+        isDraft: true,
+      });
+
+      expect(release.isDraft).toBe(true);
+      expect(release.publishedAt).toBeNull();
+
+      const published = await authApi.releases.publish.mutate({ id: release.id });
+
+      expect(published.isDraft).toBe(false);
+      expect(published.publishedAt).toBeDefined();
+    });
+
+    it('fails to publish already published release', async () => {
+      const authApi = createAuthenticatedClient(ownerToken);
+      const tagName = uniqueTag();
+
+      const release = await authApi.releases.create.mutate({
+        repoId,
+        tagName,
+        name: 'Already Published',
+        isDraft: false,
+      });
+
+      await expect(
+        authApi.releases.publish.mutate({ id: release.id })
+      ).rejects.toThrow();
+    });
+
+    it('deletes release', async () => {
+      const authApi = createAuthenticatedClient(ownerToken);
+      const api = createTestClient();
+      const tagName = uniqueTag();
+
+      const release = await authApi.releases.create.mutate({
+        repoId,
+        tagName,
+        name: 'To Delete',
+      });
+
+      const result = await authApi.releases.delete.mutate({ id: release.id });
+      expect(result.success).toBe(true);
+
+      await expect(
+        api.releases.getById.query({ id: release.id })
+      ).rejects.toThrow();
+    });
+  });
+
+  describe('Release Assets', () => {
+    let releaseId: string;
+
+    beforeEach(async () => {
+      const authApi = createAuthenticatedClient(ownerToken);
+      const tagName = `v${Date.now()}.${Math.floor(Math.random() * 100)}`;
+
+      const release = await authApi.releases.create.mutate({
+        repoId,
+        tagName,
+        name: 'Asset Test Release',
+      });
+      releaseId = release.id;
+    });
+
+    it('creates an asset', async () => {
+      const authApi = createAuthenticatedClient(ownerToken);
+
+      const asset = await authApi.releases.assets.create.mutate({
+        releaseId,
+        name: 'app-v1.0.0.zip',
+        contentType: 'application/zip',
+        size: 1024000,
+        downloadUrl: 'https://example.com/downloads/app-v1.0.0.zip',
+      });
+
+      expect(asset).toBeDefined();
+      expect(asset.name).toBe('app-v1.0.0.zip');
+      expect(asset.contentType).toBe('application/zip');
+      expect(asset.size).toBe(1024000);
+      expect(asset.downloadCount).toBe(0);
+    });
+
+    it('fails to create duplicate asset name', async () => {
+      const authApi = createAuthenticatedClient(ownerToken);
+
+      await authApi.releases.assets.create.mutate({
+        releaseId,
+        name: 'duplicate.zip',
+        contentType: 'application/zip',
+        size: 1024,
+        downloadUrl: 'https://example.com/duplicate.zip',
+      });
+
+      await expect(
+        authApi.releases.assets.create.mutate({
+          releaseId,
+          name: 'duplicate.zip',
+          contentType: 'application/zip',
+          size: 2048,
+          downloadUrl: 'https://example.com/duplicate2.zip',
+        })
+      ).rejects.toThrow();
+    });
+
+    it('gets asset by ID', async () => {
+      const authApi = createAuthenticatedClient(ownerToken);
+      const api = createTestClient();
+
+      const created = await authApi.releases.assets.create.mutate({
+        releaseId,
+        name: 'get-by-id.tar.gz',
+        contentType: 'application/gzip',
+        size: 512000,
+        downloadUrl: 'https://example.com/get-by-id.tar.gz',
+      });
+
+      const asset = await api.releases.assets.getById.query({ id: created.id });
+
+      expect(asset).toBeDefined();
+      expect(asset.id).toBe(created.id);
+      expect(asset.name).toBe('get-by-id.tar.gz');
+    });
+
+    it('lists assets for release', async () => {
+      const authApi = createAuthenticatedClient(ownerToken);
+      const api = createTestClient();
+
+      await authApi.releases.assets.create.mutate({
+        releaseId,
+        name: 'asset1.zip',
+        contentType: 'application/zip',
+        size: 1024,
+        downloadUrl: 'https://example.com/asset1.zip',
+      });
+
+      await authApi.releases.assets.create.mutate({
+        releaseId,
+        name: 'asset2.zip',
+        contentType: 'application/zip',
+        size: 2048,
+        downloadUrl: 'https://example.com/asset2.zip',
+      });
+
+      const assets = await api.releases.assets.list.query({ releaseId });
+
+      expect(Array.isArray(assets)).toBe(true);
+      expect(assets.length).toBe(2);
+    });
+
+    it('updates asset', async () => {
+      const authApi = createAuthenticatedClient(ownerToken);
+
+      const asset = await authApi.releases.assets.create.mutate({
+        releaseId,
+        name: 'original.zip',
+        contentType: 'application/zip',
+        size: 1024,
+        downloadUrl: 'https://example.com/original.zip',
+      });
+
+      const updated = await authApi.releases.assets.update.mutate({
+        id: asset.id,
+        name: 'renamed.zip',
+        contentType: 'application/x-zip-compressed',
+      });
+
+      expect(updated.name).toBe('renamed.zip');
+      expect(updated.contentType).toBe('application/x-zip-compressed');
+    });
+
+    it('records download', async () => {
+      const authApi = createAuthenticatedClient(ownerToken);
+      const api = createTestClient();
+
+      const asset = await authApi.releases.assets.create.mutate({
+        releaseId,
+        name: 'download-track.zip',
+        contentType: 'application/zip',
+        size: 1024,
+        downloadUrl: 'https://example.com/download-track.zip',
+      });
+
+      expect(asset.downloadCount).toBe(0);
+
+      // Record multiple downloads
+      await api.releases.assets.recordDownload.mutate({ id: asset.id });
+      await api.releases.assets.recordDownload.mutate({ id: asset.id });
+      await api.releases.assets.recordDownload.mutate({ id: asset.id });
+
+      const updated = await api.releases.assets.getById.query({ id: asset.id });
+      expect(updated.downloadCount).toBe(3);
+    });
+
+    it('gets total downloads for release', async () => {
+      const authApi = createAuthenticatedClient(ownerToken);
+      const api = createTestClient();
+
+      const asset1 = await authApi.releases.assets.create.mutate({
+        releaseId,
+        name: 'total1.zip',
+        contentType: 'application/zip',
+        size: 1024,
+        downloadUrl: 'https://example.com/total1.zip',
+      });
+
+      const asset2 = await authApi.releases.assets.create.mutate({
+        releaseId,
+        name: 'total2.zip',
+        contentType: 'application/zip',
+        size: 2048,
+        downloadUrl: 'https://example.com/total2.zip',
+      });
+
+      await api.releases.assets.recordDownload.mutate({ id: asset1.id });
+      await api.releases.assets.recordDownload.mutate({ id: asset1.id });
+      await api.releases.assets.recordDownload.mutate({ id: asset2.id });
+
+      const result = await api.releases.assets.getTotalDownloads.query({ releaseId });
+      expect(result.total).toBe(3);
+    });
+
+    it('deletes asset', async () => {
+      const authApi = createAuthenticatedClient(ownerToken);
+      const api = createTestClient();
+
+      const asset = await authApi.releases.assets.create.mutate({
+        releaseId,
+        name: 'to-delete.zip',
+        contentType: 'application/zip',
+        size: 1024,
+        downloadUrl: 'https://example.com/to-delete.zip',
+      });
+
+      const result = await authApi.releases.assets.delete.mutate({ id: asset.id });
+      expect(result.success).toBe(true);
+
+      await expect(
+        api.releases.assets.getById.query({ id: asset.id })
+      ).rejects.toThrow();
+    });
+  });
+
+  describe('Edge Cases', () => {
+    it('fails to get non-existent release', async () => {
+      const api = createTestClient();
+
+      await expect(
+        api.releases.getById.query({ id: '00000000-0000-0000-0000-000000000000' })
+      ).rejects.toThrow();
+    });
+
+    it('fails to get release by non-existent tag', async () => {
+      const api = createTestClient();
+
+      await expect(
+        api.releases.getByTag.query({ repoId, tagName: 'non-existent-tag' })
+      ).rejects.toThrow();
+    });
+
+    it('fails to create asset for non-existent release', async () => {
+      const authApi = createAuthenticatedClient(ownerToken);
+
+      await expect(
+        authApi.releases.assets.create.mutate({
+          releaseId: '00000000-0000-0000-0000-000000000000',
+          name: 'no-release.zip',
+          contentType: 'application/zip',
+          size: 1024,
+          downloadUrl: 'https://example.com/no-release.zip',
+        })
+      ).rejects.toThrow();
+    });
+
+    it('handles pagination correctly', async () => {
+      const authApi = createAuthenticatedClient(ownerToken);
+      const api = createTestClient();
+
+      // Create a new repo with fresh releases
+      const newRepo = await authApi.repos.create.mutate({
+        name: uniqueRepoName('pagination-test'),
+        description: 'Pagination test repo',
+        isPrivate: false,
+      });
+
+      for (let i = 0; i < 5; i++) {
+        await authApi.releases.create.mutate({
+          repoId: newRepo.id,
+          tagName: `v0.${i}.0`,
+          name: `Pagination ${i}`,
+        });
+      }
+
+      const page1 = await api.releases.list.query({
+        repoId: newRepo.id,
+        limit: 2,
+        offset: 0,
+      });
+
+      const page2 = await api.releases.list.query({
+        repoId: newRepo.id,
+        limit: 2,
+        offset: 2,
+      });
+
+      expect(page1.releases.length).toBe(2);
+      expect(page2.releases.length).toBe(2);
+      expect(page1.hasMore).toBe(true);
+      expect(page1.releases[0].id).not.toBe(page2.releases[0].id);
+    });
+  });
+});
