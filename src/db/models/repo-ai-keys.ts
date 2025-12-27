@@ -1,0 +1,289 @@
+/**
+ * Repository AI Keys Model
+ * 
+ * Handles storage and retrieval of encrypted AI API keys per repository.
+ * Only repository owners can manage these keys.
+ */
+
+import { eq, and } from 'drizzle-orm';
+import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'crypto';
+import { getDb } from '../index';
+import {
+  repoAiKeys,
+  repositories,
+  type RepoAiKey,
+  type NewRepoAiKey,
+  type AiProvider,
+} from '../schema';
+
+// Encryption configuration
+const ALGORITHM = 'aes-256-gcm';
+const KEY_LENGTH = 32;
+const IV_LENGTH = 16;
+const AUTH_TAG_LENGTH = 16;
+
+/**
+ * Get encryption key from environment or generate a default one
+ * In production, this should always be set via ENCRYPTION_KEY env var
+ */
+function getEncryptionKey(): Buffer {
+  const secret = process.env.ENCRYPTION_KEY || process.env.BETTER_AUTH_SECRET || 'default-dev-key-change-in-production';
+  return scryptSync(secret, 'wit-ai-keys-salt', KEY_LENGTH);
+}
+
+/**
+ * Encrypt an API key for storage
+ */
+function encryptApiKey(plainKey: string): string {
+  const key = getEncryptionKey();
+  const iv = randomBytes(IV_LENGTH);
+  const cipher = createCipheriv(ALGORITHM, key, iv);
+  
+  let encrypted = cipher.update(plainKey, 'utf8', 'hex');
+  encrypted += cipher.final('hex');
+  
+  const authTag = cipher.getAuthTag();
+  
+  // Format: iv:authTag:encryptedData (all hex)
+  return `${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted}`;
+}
+
+/**
+ * Decrypt an API key from storage
+ */
+function decryptApiKey(encryptedData: string): string {
+  const key = getEncryptionKey();
+  const [ivHex, authTagHex, encrypted] = encryptedData.split(':');
+  
+  const iv = Buffer.from(ivHex, 'hex');
+  const authTag = Buffer.from(authTagHex, 'hex');
+  
+  const decipher = createDecipheriv(ALGORITHM, key, iv);
+  decipher.setAuthTag(authTag);
+  
+  let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+  decrypted += decipher.final('utf8');
+  
+  return decrypted;
+}
+
+/**
+ * Get key hint (last 4 characters) for display
+ */
+function getKeyHint(apiKey: string): string {
+  return `...${apiKey.slice(-4)}`;
+}
+
+export interface RepoAiKeyInfo {
+  id: string;
+  provider: AiProvider;
+  keyHint: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export const repoAiKeyModel = {
+  /**
+   * Set an AI API key for a repository
+   * Creates or updates the key for the specified provider
+   */
+  async setKey(
+    repoId: string,
+    provider: AiProvider,
+    apiKey: string,
+    userId: string
+  ): Promise<RepoAiKeyInfo> {
+    const db = getDb();
+    
+    const encryptedKey = encryptApiKey(apiKey);
+    const keyHint = getKeyHint(apiKey);
+    
+    // Check if key already exists for this provider
+    const existing = await db
+      .select()
+      .from(repoAiKeys)
+      .where(
+        and(
+          eq(repoAiKeys.repoId, repoId),
+          eq(repoAiKeys.provider, provider)
+        )
+      )
+      .limit(1);
+    
+    if (existing.length > 0) {
+      // Update existing key
+      const [updated] = await db
+        .update(repoAiKeys)
+        .set({
+          encryptedKey,
+          keyHint,
+          updatedAt: new Date(),
+        })
+        .where(eq(repoAiKeys.id, existing[0].id))
+        .returning();
+      
+      return {
+        id: updated.id,
+        provider: updated.provider,
+        keyHint: updated.keyHint,
+        createdAt: updated.createdAt,
+        updatedAt: updated.updatedAt,
+      };
+    }
+    
+    // Create new key
+    const [created] = await db
+      .insert(repoAiKeys)
+      .values({
+        repoId,
+        provider,
+        encryptedKey,
+        keyHint,
+        createdById: userId,
+      })
+      .returning();
+    
+    return {
+      id: created.id,
+      provider: created.provider,
+      keyHint: created.keyHint,
+      createdAt: created.createdAt,
+      updatedAt: created.updatedAt,
+    };
+  },
+
+  /**
+   * Get all AI keys for a repository (without decrypting)
+   * Returns key metadata only - safe to display to users
+   */
+  async listKeys(repoId: string): Promise<RepoAiKeyInfo[]> {
+    const db = getDb();
+    
+    const keys = await db
+      .select({
+        id: repoAiKeys.id,
+        provider: repoAiKeys.provider,
+        keyHint: repoAiKeys.keyHint,
+        createdAt: repoAiKeys.createdAt,
+        updatedAt: repoAiKeys.updatedAt,
+      })
+      .from(repoAiKeys)
+      .where(eq(repoAiKeys.repoId, repoId));
+    
+    return keys;
+  },
+
+  /**
+   * Get a decrypted API key for a specific provider
+   * Used internally when making AI API calls
+   */
+  async getDecryptedKey(repoId: string, provider: AiProvider): Promise<string | null> {
+    const db = getDb();
+    
+    const [key] = await db
+      .select()
+      .from(repoAiKeys)
+      .where(
+        and(
+          eq(repoAiKeys.repoId, repoId),
+          eq(repoAiKeys.provider, provider)
+        )
+      )
+      .limit(1);
+    
+    if (!key) {
+      return null;
+    }
+    
+    try {
+      return decryptApiKey(key.encryptedKey);
+    } catch (error) {
+      console.error(`Failed to decrypt AI key for repo ${repoId}, provider ${provider}:`, error);
+      return null;
+    }
+  },
+
+  /**
+   * Get any available API key for a repository
+   * Prefers OpenAI, then Anthropic
+   */
+  async getAnyKey(repoId: string): Promise<{ provider: AiProvider; key: string } | null> {
+    // Try OpenAI first
+    const openaiKey = await this.getDecryptedKey(repoId, 'openai');
+    if (openaiKey) {
+      return { provider: 'openai', key: openaiKey };
+    }
+    
+    // Fall back to Anthropic
+    const anthropicKey = await this.getDecryptedKey(repoId, 'anthropic');
+    if (anthropicKey) {
+      return { provider: 'anthropic', key: anthropicKey };
+    }
+    
+    return null;
+  },
+
+  /**
+   * Delete an AI key
+   */
+  async deleteKey(repoId: string, provider: AiProvider): Promise<boolean> {
+    const db = getDb();
+    
+    const result = await db
+      .delete(repoAiKeys)
+      .where(
+        and(
+          eq(repoAiKeys.repoId, repoId),
+          eq(repoAiKeys.provider, provider)
+        )
+      )
+      .returning();
+    
+    return result.length > 0;
+  },
+
+  /**
+   * Delete all AI keys for a repository
+   */
+  async deleteAllKeys(repoId: string): Promise<number> {
+    const db = getDb();
+    
+    const result = await db
+      .delete(repoAiKeys)
+      .where(eq(repoAiKeys.repoId, repoId))
+      .returning();
+    
+    return result.length;
+  },
+
+  /**
+   * Check if a repository has any AI keys configured
+   */
+  async hasKeys(repoId: string): Promise<boolean> {
+    const db = getDb();
+    
+    const [key] = await db
+      .select({ id: repoAiKeys.id })
+      .from(repoAiKeys)
+      .where(eq(repoAiKeys.repoId, repoId))
+      .limit(1);
+    
+    return !!key;
+  },
+
+  /**
+   * Check if repository owner
+   * Only owners can manage AI keys
+   */
+  async isRepoOwner(repoId: string, userId: string): Promise<boolean> {
+    const db = getDb();
+    
+    const [repo] = await db
+      .select({ ownerId: repositories.ownerId })
+      .from(repositories)
+      .where(eq(repositories.id, repoId))
+      .limit(1);
+    
+    return repo?.ownerId === userId;
+  },
+};

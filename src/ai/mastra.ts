@@ -100,6 +100,7 @@ export function getTsgitAgent(config?: AIConfig): Agent {
 
 /**
  * Check if AI is available (model and API key configured)
+ * This checks for server-level keys only
  */
 export function isAIAvailable(): boolean {
   // Check for common AI provider API keys
@@ -108,6 +109,89 @@ export function isAIAvailable(): boolean {
   const hasCustomModel = !!process.env.WIT_AI_MODEL;
   
   return hasOpenAI || hasAnthropic || hasCustomModel;
+}
+
+/**
+ * Check if AI is available for a specific repository
+ * This checks both repo-level and server-level keys
+ */
+export async function isAIAvailableForRepo(repoId: string): Promise<boolean> {
+  // First check server-level keys
+  if (isAIAvailable()) {
+    return true;
+  }
+  
+  // Then check repo-level keys
+  try {
+    const { repoAiKeyModel } = await import('../db/models/repo-ai-keys.js');
+    return await repoAiKeyModel.hasKeys(repoId);
+  } catch {
+    // If we can't check repo keys (e.g., no DB), fall back to server check
+    return false;
+  }
+}
+
+/**
+ * Get the API key for a specific provider and repository
+ * Checks repo-level keys first, then falls back to server-level keys
+ */
+export async function getApiKeyForRepo(
+  repoId: string | null,
+  provider: 'openai' | 'anthropic'
+): Promise<string | null> {
+  // If we have a repo ID, try repo-level keys first
+  if (repoId) {
+    try {
+      const { repoAiKeyModel } = await import('../db/models/repo-ai-keys.js');
+      const key = await repoAiKeyModel.getDecryptedKey(repoId, provider);
+      if (key) {
+        return key;
+      }
+    } catch {
+      // If we can't get repo keys, fall through to server keys
+    }
+  }
+  
+  // Fall back to server-level keys
+  if (provider === 'openai') {
+    return process.env.OPENAI_API_KEY || null;
+  } else if (provider === 'anthropic') {
+    return process.env.ANTHROPIC_API_KEY || null;
+  }
+  
+  return null;
+}
+
+/**
+ * Get any available API key for a repository
+ * Prefers repo-level keys, then server-level keys
+ * Returns the provider and key
+ */
+export async function getAnyApiKeyForRepo(
+  repoId: string | null
+): Promise<{ provider: 'openai' | 'anthropic'; key: string } | null> {
+  // If we have a repo ID, try repo-level keys first
+  if (repoId) {
+    try {
+      const { repoAiKeyModel } = await import('../db/models/repo-ai-keys.js');
+      const repoKey = await repoAiKeyModel.getAnyKey(repoId);
+      if (repoKey) {
+        return repoKey;
+      }
+    } catch {
+      // If we can't get repo keys, fall through to server keys
+    }
+  }
+  
+  // Fall back to server-level keys
+  if (process.env.OPENAI_API_KEY) {
+    return { provider: 'openai', key: process.env.OPENAI_API_KEY };
+  }
+  if (process.env.ANTHROPIC_API_KEY) {
+    return { provider: 'anthropic', key: process.env.ANTHROPIC_API_KEY };
+  }
+  
+  return null;
 }
 
 /**
@@ -121,5 +205,53 @@ export function getAIInfo(): { available: boolean; model: string; provider: stri
     available: isAIAvailable(),
     model,
     provider,
+  };
+}
+
+/**
+ * Get AI info for a specific repository
+ */
+export async function getAIInfoForRepo(repoId: string): Promise<{
+  available: boolean;
+  source: 'repository' | 'server' | null;
+  model: string;
+  provider: string;
+}> {
+  const model = process.env.WIT_AI_MODEL || 'openai/gpt-4o';
+  const [defaultProvider] = model.split('/');
+  
+  // Check repo-level keys first
+  if (repoId) {
+    try {
+      const { repoAiKeyModel } = await import('../db/models/repo-ai-keys.js');
+      const hasRepoKeys = await repoAiKeyModel.hasKeys(repoId);
+      if (hasRepoKeys) {
+        return {
+          available: true,
+          source: 'repository',
+          model,
+          provider: defaultProvider,
+        };
+      }
+    } catch {
+      // Fall through
+    }
+  }
+  
+  // Check server-level keys
+  if (isAIAvailable()) {
+    return {
+      available: true,
+      source: 'server',
+      model,
+      provider: defaultProvider,
+    };
+  }
+  
+  return {
+    available: false,
+    source: null,
+    model,
+    provider: defaultProvider,
   };
 }

@@ -104,3 +104,6 @@ export {
   agentMessageModel,
   agentFileChangeModel,
 } from './agent';
+
+// Repository AI Keys model
+export { repoAiKeyModel, type RepoAiKeyInfo } from './repo-ai-keys';
