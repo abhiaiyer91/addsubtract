@@ -1,9 +1,11 @@
 import { useParams, Link } from 'react-router-dom';
-import { GitBranch, Trash2, Loader2 } from 'lucide-react';
+import { GitBranch, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { RepoLayout } from './components/repo-layout';
+import { BranchListSkeleton } from '@/components/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
 import { useSession } from '@/lib/auth-client';
 import { trpc } from '@/lib/trpc';
 
@@ -31,11 +33,7 @@ export function BranchesPage() {
         )}
       </div>
 
-      {isLoading && (
-        <div className="flex items-center justify-center py-8">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
-      )}
+      {isLoading && <BranchListSkeleton count={5} />}
 
       {error && (
         <div className="text-center py-8 text-destructive">
@@ -44,9 +42,16 @@ export function BranchesPage() {
       )}
 
       {branches && branches.length === 0 && (
-        <div className="text-center py-8 text-muted-foreground">
-          No branches found
-        </div>
+        <EmptyState
+          icon={GitBranch}
+          title="Only the default branch exists"
+          description="Create a new branch to start working on features or fixes."
+          action={
+            authenticated ? (
+              <Button>Create branch</Button>
+            ) : undefined
+          }
+        />
       )}
 
       {branches && branches.length > 0 && (

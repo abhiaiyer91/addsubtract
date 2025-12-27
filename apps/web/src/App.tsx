@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { TRPCProvider } from './lib/trpc';
 import { Layout } from './components/layout';
+import { Toaster } from './components/ui/toaster';
 
 // Routes
 import { HomePage } from './routes/index';
@@ -68,6 +69,7 @@ export function App() {
             <Route path="/:owner/:repo/actions" element={<WorkflowsPage />} />
           </Route>
         </Routes>
+        <Toaster />
       </BrowserRouter>
     </TRPCProvider>
   );

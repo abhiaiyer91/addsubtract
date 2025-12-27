@@ -24,7 +24,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { RepoLayout } from './components/repo-layout';
-import { Loading } from '@/components/ui/loading';
+import { PRListSkeleton } from '@/components/skeleton';
 import { useSession } from '@/lib/auth-client';
 import { trpc } from '@/lib/trpc';
 import { formatRelativeTime } from '@/lib/utils';
@@ -90,7 +90,20 @@ export function PullsPage() {
   if (isLoading) {
     return (
       <RepoLayout owner={owner!} repo={repo!}>
-        <Loading text="Loading pull requests..." />
+        <div className="space-y-4">
+          {/* Header skeleton */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-6">
+              <div className="h-6 w-32 bg-muted rounded animate-shimmer bg-gradient-to-r from-muted via-muted-foreground/10 to-muted bg-[length:200%_100%]" />
+              <div className="flex items-center gap-1">
+                <div className="h-8 w-20 bg-muted rounded animate-shimmer bg-gradient-to-r from-muted via-muted-foreground/10 to-muted bg-[length:200%_100%]" />
+                <div className="h-8 w-20 bg-muted rounded animate-shimmer bg-gradient-to-r from-muted via-muted-foreground/10 to-muted bg-[length:200%_100%]" />
+              </div>
+            </div>
+            <div className="h-9 w-36 bg-muted rounded animate-shimmer bg-gradient-to-r from-muted via-muted-foreground/10 to-muted bg-[length:200%_100%]" />
+          </div>
+          <PRListSkeleton count={5} />
+        </div>
       </RepoLayout>
     );
   }
