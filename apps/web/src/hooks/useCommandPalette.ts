@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { useCallback, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useHotkeys } from 'react-hotkeys-hook';
 import { trpc } from '@/lib/trpc';
 import { useSession, signOut } from '@/lib/auth-client';
 import {
@@ -66,29 +65,8 @@ export function useCommandPalette() {
     return null;
   }, [params.owner, params.repo]);
 
-  // Register global Cmd+K shortcut
-  useHotkeys('mod+k', (e) => {
-    e.preventDefault();
-    toggle();
-  }, { enableOnFormTags: false });
-
-  // Register / for focus search (when not in input)
-  useHotkeys('/', (e) => {
-    e.preventDefault();
-    open();
-  }, { enableOnFormTags: false });
-
-  // Register ? for shortcuts help
-  useHotkeys('shift+/', (e) => {
-    e.preventDefault();
-    shortcutsModal.toggle();
-  }, { enableOnFormTags: false });
-
-  // Close on escape
-  useHotkeys('escape', () => {
-    if (isOpen) close();
-    if (shortcutsModal.isOpen) shortcutsModal.close();
-  }, { enableOnFormTags: true });
+  // NOTE: Global shortcuts (Cmd+K, /, ?) are registered in useGlobalShortcuts
+  // to avoid duplicate registrations that would cause toggle to fire twice
 
   // Get available commands based on context
   const availableCommands = useMemo(() => {
