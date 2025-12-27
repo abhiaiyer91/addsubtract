@@ -13,7 +13,7 @@ import {
   orgModel,
   orgMemberModel,
 } from '../../../db/models';
-import { BareRepository, forkRepository, getRepoDiskPath } from '../../../server/storage/repos';
+import { BareRepository, forkRepository, getRepoDiskPath, RepoManager, resolveDiskPath } from '../../../server/storage/repos';
 import { exists } from '../../../utils/fs';
 import { eventBus } from '../../../events';
 
@@ -21,10 +21,15 @@ import { eventBus } from '../../../events';
  * Helper to get a BareRepository from disk path
  */
 function getRepoFromDisk(diskPath: string): BareRepository | null {
-  // diskPath is like /repos/owner/name.git
-  // We need to resolve it relative to REPOS_DIR or use absolute path
+  // diskPath is stored as /repos/owner/name.git in the database
+  // We need to resolve it relative to REPOS_DIR
   const reposDir = process.env.REPOS_DIR || './repos';
-  const absolutePath = path.isAbsolute(diskPath) ? diskPath : path.join(process.cwd(), reposDir, diskPath.replace(/^\/repos\//, ''));
+  
+  // Strip the /repos/ prefix if present, then join with actual REPOS_DIR
+  const relativePath = diskPath.replace(/^\/repos\//, '');
+  const absolutePath = path.isAbsolute(reposDir) 
+    ? path.join(reposDir, relativePath)
+    : path.join(process.cwd(), reposDir, relativePath);
   
   if (!exists(absolutePath) || !exists(path.join(absolutePath, 'objects'))) {
     return null;
@@ -176,6 +181,21 @@ export const reposRouter = router({
 
       const diskPath = `/repos/${ctx.user.username}/${input.name}.git`;
 
+      // Create the bare repository on disk
+      const reposDir = process.env.REPOS_DIR || './repos';
+      const repoManager = new RepoManager(reposDir);
+      try {
+        repoManager.initBareRepo(ctx.user.username, input.name);
+      } catch (error) {
+        // If the repo already exists on disk, that's fine
+        if (error instanceof Error && !error.message.includes('already exists')) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to create repository on disk',
+          });
+        }
+      }
+
       const repo = await repoModel.create({
         name: input.name,
         description: input.description,
@@ -244,6 +264,21 @@ export const reposRouter = router({
       }
 
       const diskPath = `/repos/${org.name}/${input.name}.git`;
+
+      // Create the bare repository on disk
+      const reposDir = process.env.REPOS_DIR || './repos';
+      const repoManager = new RepoManager(reposDir);
+      try {
+        repoManager.initBareRepo(org.name, input.name);
+      } catch (error) {
+        // If the repo already exists on disk, that's fine
+        if (error instanceof Error && !error.message.includes('already exists')) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to create repository on disk',
+          });
+        }
+      }
 
       const repo = await repoModel.create({
         name: input.name,
@@ -1114,35 +1149,86 @@ export const reposRouter = router({
 
       try {
         const commit = bareRepo.objects.readCommit(input.sha);
+        const { formatUnifiedDiff, diff: computeDiff } = await import('../../../core/diff');
         
         // Get the diff between this commit and its parent
-        let diff = '';
+        let diffText = '';
         const parentHash = commit.parentHashes[0];
         
-        if (parentHash) {
-          // Diff against parent
-          const { execSync } = require('child_process');
-          try {
-            diff = execSync(`git diff ${parentHash} ${input.sha}`, {
-              cwd: result.repo.diskPath,
-              encoding: 'utf-8',
-              maxBuffer: 10 * 1024 * 1024, // 10MB
-            });
-          } catch {
-            diff = '';
+        try {
+          if (parentHash) {
+            // Get parent tree
+            const parentCommit = bareRepo.objects.readCommit(parentHash);
+            const parentTree = bareRepo.objects.readTree(parentCommit.treeHash);
+            const currentTree = bareRepo.objects.readTree(commit.treeHash);
+            
+            // Build file maps for comparison
+            const getFilesFromTree = (tree: any, prefix = ''): Map<string, string> => {
+              const files = new Map<string, string>();
+              for (const entry of tree.entries) {
+                const fullPath = prefix ? `${prefix}/${entry.name}` : entry.name;
+                if (entry.mode === '40000') {
+                  // Directory - recurse
+                  const subTree = bareRepo.objects.readTree(entry.hash);
+                  const subFiles = getFilesFromTree(subTree, fullPath);
+                  subFiles.forEach((hash, path) => files.set(path, hash));
+                } else {
+                  files.set(fullPath, entry.hash);
+                }
+              }
+              return files;
+            };
+            
+            const parentFiles = getFilesFromTree(parentTree);
+            const currentFiles = getFilesFromTree(currentTree);
+            
+            // Generate diff for changed files
+            const diffParts: string[] = [];
+            const allPaths = new Set([...parentFiles.keys(), ...currentFiles.keys()]);
+            
+            for (const filePath of allPaths) {
+              const parentHash = parentFiles.get(filePath);
+              const currentHash = currentFiles.get(filePath);
+              
+              if (parentHash === currentHash) continue;
+              
+              const oldContent = parentHash ? bareRepo.objects.readBlob(parentHash).toString() : '';
+              const newContent = currentHash ? bareRepo.objects.readBlob(currentHash).toString() : '';
+              
+              const fileDiff = computeDiff(oldContent, newContent);
+              if (fileDiff.length > 0) {
+                diffParts.push(formatUnifiedDiff(filePath, filePath, fileDiff));
+              }
+            }
+            
+            diffText = diffParts.join('\n');
+          } else {
+            // First commit - show all files as added
+            const currentTree = bareRepo.objects.readTree(commit.treeHash);
+            const diffParts: string[] = [];
+            
+            const showTreeFiles = (tree: any, prefix = ''): void => {
+              for (const entry of tree.entries) {
+                const fullPath = prefix ? `${prefix}/${entry.name}` : entry.name;
+                if (entry.mode === '40000') {
+                  const subTree = bareRepo.objects.readTree(entry.hash);
+                  showTreeFiles(subTree, fullPath);
+                } else {
+                  const content = bareRepo.objects.readBlob(entry.hash).toString();
+                  const fileDiff = computeDiff('', content);
+                  if (fileDiff.length > 0) {
+                    diffParts.push(formatUnifiedDiff('/dev/null', fullPath, fileDiff));
+                  }
+                }
+              }
+            };
+            
+            showTreeFiles(currentTree);
+            diffText = diffParts.join('\n');
           }
-        } else {
-          // First commit - show all files as added
-          const { execSync } = require('child_process');
-          try {
-            diff = execSync(`git show ${input.sha} --format=""`, {
-              cwd: result.repo.diskPath,
-              encoding: 'utf-8',
-              maxBuffer: 10 * 1024 * 1024,
-            });
-          } catch {
-            diff = '';
-          }
+        } catch {
+          // If diff computation fails, return empty diff
+          diffText = '';
         }
 
         return {
@@ -1160,7 +1246,7 @@ export const reposRouter = router({
           },
           parents: commit.parentHashes,
           tree: commit.treeHash,
-          diff,
+          diff: diffText,
         };
       } catch (error) {
         console.error('[repos.getCommit] Error:', error);
@@ -1332,87 +1418,136 @@ export const reposRouter = router({
       }
 
       try {
-        const { execSync } = require('child_process');
-        const fs = require('fs');
-        const os = require('os');
+        // Import wit core classes
+        const { Blob, Tree, Commit } = await import('../../../core/object');
+        const { Author } = await import('../../../core/types');
+
+        // Get user info for commit author
+        const user = await userModel.findById(ctx.user.id);
+        const authorName = user?.name || user?.username || 'wit user';
+        const authorEmail = user?.email || `${ctx.user.id}@wit.local`;
+
+        // Resolve the branch ref to get the current commit
+        const branchRef = `refs/heads/${input.ref}`;
+        const currentCommitHash = bareRepo.refs.resolve(branchRef);
         
-        // Create a temporary worktree to make the commit
-        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wit-update-'));
-        
-        try {
-          // Clone the repo to a temp directory
-          execSync(`git clone --branch ${input.ref} ${result.repo.diskPath} ${tmpDir}`, {
-            encoding: 'utf-8',
-          });
-
-          // Write the file
-          const filePath = path.join(tmpDir, input.path);
-          const fileDir = path.dirname(filePath);
-          
-          // Create parent directories if needed
-          if (!fs.existsSync(fileDir)) {
-            fs.mkdirSync(fileDir, { recursive: true });
-          }
-          
-          fs.writeFileSync(filePath, input.content, 'utf-8');
-
-          // Configure git user
-          const user = await userModel.findById(ctx.user.id);
-          const authorName = user?.name || user?.username || 'wit user';
-          const authorEmail = user?.email || `${ctx.user.id}@wit.local`;
-          
-          execSync(`git config user.name "${authorName}"`, { cwd: tmpDir });
-          execSync(`git config user.email "${authorEmail}"`, { cwd: tmpDir });
-
-          // Stage and commit
-          execSync(`git add "${input.path}"`, { cwd: tmpDir });
-          execSync(`git commit -m "${input.message.replace(/"/g, '\\"')}"`, { cwd: tmpDir });
-
-          // Push back to the bare repo
-          execSync(`git push origin ${input.ref}`, { cwd: tmpDir });
-
-          // Get the new commit SHA
-          const newSha = execSync('git rev-parse HEAD', { cwd: tmpDir, encoding: 'utf-8' }).trim();
-
-          // Record activity
-          await activityHelpers.recordActivity({
-            type: 'commit',
-            userId: ctx.user.id,
-            repoId: result.repo.id,
-            targetId: newSha,
-            targetType: 'commit',
-            metadata: {
-              message: input.message,
-              path: input.path,
-            },
-          });
-
-          // Emit event
-          eventBus.emit('commit.created', {
-            repo: result.repo,
-            commit: {
-              sha: newSha,
-              message: input.message,
-              author: { name: authorName, email: authorEmail },
-            },
-            branch: input.ref,
-            userId: ctx.user.id,
-          });
-
-          return {
-            sha: newSha,
-            path: input.path,
-            branch: input.ref,
-          };
-        } finally {
-          // Cleanup temp directory
-          fs.rmSync(tmpDir, { recursive: true, force: true });
+        // Get the current tree (or start fresh if no commits yet)
+        let currentTreeEntries: Array<{ mode: string; name: string; hash: string }> = [];
+        if (currentCommitHash) {
+          const currentCommit = bareRepo.objects.readCommit(currentCommitHash);
+          const currentTree = bareRepo.objects.readTree(currentCommit.treeHash);
+          currentTreeEntries = [...currentTree.entries];
         }
+
+        // Write the new file content as a blob
+        const contentBuffer = Buffer.from(input.content, 'utf-8');
+        const blobHash = bareRepo.objects.writeBlob(contentBuffer);
+
+        // Build the new tree with the updated file
+        // Handle nested paths by building tree hierarchy
+        const pathParts = input.path.split('/').filter(Boolean);
+        
+        if (pathParts.length === 1) {
+          // Simple case: file in root directory
+          const fileName = pathParts[0];
+          // Remove existing entry if present
+          currentTreeEntries = currentTreeEntries.filter(e => e.name !== fileName);
+          // Add the new/updated file
+          currentTreeEntries.push({
+            mode: '100644',
+            name: fileName,
+            hash: blobHash,
+          });
+        } else {
+          // Complex case: nested path - need to build subtrees
+          // For now, use a simpler approach: rebuild the tree hierarchy
+          const updateTree = (
+            entries: Array<{ mode: string; name: string; hash: string }>,
+            parts: string[],
+            fileHash: string
+          ): Array<{ mode: string; name: string; hash: string }> => {
+            const [current, ...rest] = parts;
+            
+            if (rest.length === 0) {
+              // This is the file - update or add it
+              const newEntries = entries.filter(e => e.name !== current);
+              newEntries.push({ mode: '100644', name: current, hash: fileHash });
+              return newEntries;
+            }
+            
+            // This is a directory - find or create it
+            const existingDir = entries.find(e => e.name === current && e.mode === '40000');
+            let subEntries: Array<{ mode: string; name: string; hash: string }> = [];
+            
+            if (existingDir) {
+              const subTree = bareRepo.objects.readTree(existingDir.hash);
+              subEntries = [...subTree.entries];
+            }
+            
+            // Recursively update the subtree
+            const updatedSubEntries = updateTree(subEntries, rest, fileHash);
+            
+            // Write the updated subtree
+            const newSubTree = new Tree(updatedSubEntries);
+            const subTreeHash = bareRepo.objects.writeObject(newSubTree);
+            
+            // Update the parent entries
+            const newEntries = entries.filter(e => e.name !== current);
+            newEntries.push({ mode: '40000', name: current, hash: subTreeHash });
+            return newEntries;
+          };
+          
+          currentTreeEntries = updateTree(currentTreeEntries, pathParts, blobHash);
+        }
+
+        // Write the new root tree
+        const newTree = new Tree(currentTreeEntries);
+        const newTreeHash = bareRepo.objects.writeObject(newTree);
+
+        // Create the commit
+        const timestamp = Math.floor(Date.now() / 1000);
+        const timezone = '+0000';
+        const author = {
+          name: authorName,
+          email: authorEmail,
+          timestamp,
+          timezone,
+        };
+
+        const parentHashes = currentCommitHash ? [currentCommitHash] : [];
+        const commit = new Commit(newTreeHash, parentHashes, author, author, input.message);
+        const newSha = bareRepo.objects.writeObject(commit);
+
+        // Update the branch ref to point to the new commit
+        bareRepo.refs.updateBranch(input.ref, newSha);
+
+        // Record activity
+        await activityHelpers.logPush(ctx.user.id, result.repo.id, input.ref, [
+          { sha: newSha, message: input.message },
+        ]);
+
+        // Emit event
+        eventBus.emit('commit.created', {
+          repo: result.repo,
+          commit: {
+            sha: newSha,
+            message: input.message,
+            author: { name: authorName, email: authorEmail },
+          },
+          branch: input.ref,
+          userId: ctx.user.id,
+        });
+
+        return {
+          sha: newSha,
+          path: input.path,
+          branch: input.ref,
+        };
       } catch (error) {
         console.error('[repos.updateFile] Error:', error);
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to update file',
+          message: error instanceof Error ? error.message : 'Failed to update file',
         });
       }
     }),

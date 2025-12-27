@@ -5,6 +5,14 @@
  * HTTP (via Hono) and SSH protocols.
  */
 
+// Load environment variables from .env file in the current working directory
+import * as dotenv from 'dotenv';
+import * as path from 'path';
+
+// Try to load .env from cwd first, then from __dirname (for spawned processes)
+dotenv.config(); // Try cwd
+dotenv.config({ path: path.join(__dirname, '../../.env') }); // Try project root
+
 import { Hono } from 'hono';
 import { serve, ServerType } from '@hono/node-server';
 import { logger } from 'hono/logger';
