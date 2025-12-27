@@ -87,7 +87,6 @@
         "commands/debugging",
         "commands/advanced",
         "commands/agent",
-        "commands/inbox",
         "commands/dashboard",
         "commands/wrapped",
         "commands/journal",
