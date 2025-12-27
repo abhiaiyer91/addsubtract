@@ -1,0 +1,258 @@
+---
+title: 'fsck'
+description: 'Verify the integrity of repository objects'
+---
+
+# wit fsck
+
+The `wit fsck` (file system check) command verifies the integrity and connectivity of objects in the repository.
+
+## Overview
+
+`fsck` checks for:
+- Corrupted objects
+- Missing objects
+- Dangling objects (unreachable)
+- Invalid references
+- Connectivity issues
+
+## Usage
+
+```bash
+# Full repository check
+wit fsck
+
+# Check specific aspects
+wit fsck --connectivity-only
+wit fsck --dangling
+wit fsck --unreachable
+
+# Verbose output
+wit fsck --verbose
+```
+
+## Output
+
+```bash
+$ wit fsck
+
+Checking repository integrity...
+
+Objects: 1,234 checked
+  Blobs: 500
+  Trees: 400
+  Commits: 300
+  Tags: 34
+
+References: 46 checked
+  Branches: 12
+  Tags: 34
+
+✓ No issues found
+```
+
+### With Issues
+
+```bash
+$ wit fsck
+
+Checking repository integrity...
+
+Objects: 1,234 checked
+
+Issues found:
+  ✗ Missing object: abc123def456 (referenced by commit xyz789)
+  ✗ Corrupted object: 789xyz012abc (bad header)
+  ! Dangling commit: 456def789abc (unreachable)
+
+Summary:
+  Errors: 2
+  Warnings: 1
+
+Run 'wit fsck --repair' to attempt automatic fixes
+```
+
+## Options
+
+| Option | Description |
+|--------|-------------|
+| `--full` | Full check including pack files |
+| `--connectivity-only` | Only check object connectivity |
+| `--dangling` | Report dangling (unreachable) objects |
+| `--unreachable` | Show all unreachable objects |
+| `--verbose` | Verbose output |
+| `--strict` | Strict checking mode |
+| `--lost-found` | Write dangling objects to `.wit/lost-found/` |
+| `--repair` | Attempt to repair issues (use with caution) |
+
+## Common Checks
+
+### Object Integrity
+
+Verifies each object:
+- Correct hash matches content
+- Valid object format
+- Proper compression
+
+### Connectivity
+
+Ensures all references are valid:
+- Commits reference valid trees
+- Trees reference valid blobs and trees
+- Parent commits exist
+
+### References
+
+Validates all refs:
+- Branches point to valid commits
+- Tags point to valid objects
+- HEAD is valid
+
+## Examples
+
+### Quick Check
+
+```bash
+# Fast connectivity check
+wit fsck --connectivity-only
+```
+
+### Find Dangling Objects
+
+```bash
+# Find unreachable commits (possibly from rebase/reset)
+wit fsck --dangling
+
+Dangling commits:
+  abc123 - "WIP: feature work" (2 days ago)
+  def456 - "Temp commit" (5 days ago)
+
+# These can be recovered with:
+wit checkout abc123
+# Or added to lost-found:
+wit fsck --lost-found
+```
+
+### Verbose Check
+
+```bash
+$ wit fsck --verbose
+
+Checking objects...
+  [1/1234] Checking blob abc123...
+  [2/1234] Checking blob def456...
+  ...
+  [1234/1234] Checking commit xyz789...
+
+Checking references...
+  Checking refs/heads/main...
+  Checking refs/heads/feature...
+  ...
+
+All checks passed!
+```
+
+### Strict Mode
+
+```bash
+# Stricter validation (catches more edge cases)
+wit fsck --strict
+```
+
+## Recovering Lost Data
+
+### From Dangling Objects
+
+```bash
+# Find dangling commits
+wit fsck --dangling
+
+# Recovery options:
+# 1. Checkout directly
+wit checkout <commit-hash>
+
+# 2. Create a branch
+wit branch recovered <commit-hash>
+
+# 3. Cherry-pick
+wit cherry-pick <commit-hash>
+```
+
+### From Lost-Found
+
+```bash
+# Write dangling objects to lost-found
+wit fsck --lost-found
+
+# Check lost-found directory
+ls .wit/lost-found/
+
+# Objects are named by their hash
+# Recover by type:
+wit cat-file -t <hash>  # Check type
+wit cat-file -p <hash>  # Print content
+```
+
+## Repair Mode
+
+> **Warning:** Use `--repair` with caution. Always backup first.
+
+```bash
+# Backup first
+cp -r .wit .wit.backup
+
+# Attempt repair
+wit fsck --repair
+```
+
+Repair can:
+- Remove references to missing objects
+- Rebuild broken links where possible
+- Clean up corrupted partial objects
+
+## When to Use
+
+### After System Crash
+
+```bash
+# Check for corruption after unexpected shutdown
+wit fsck --full
+```
+
+### After Disk Errors
+
+```bash
+# Verify after disk issues
+wit fsck --strict
+```
+
+### Periodic Maintenance
+
+```bash
+# Regular health check
+wit fsck
+```
+
+### Before Important Operations
+
+```bash
+# Verify before major operations
+wit fsck && wit push --all
+```
+
+## Comparison with Git
+
+| Feature | wit fsck | git fsck |
+|---------|----------|----------|
+| Object verification | Yes | Yes |
+| Connectivity check | Yes | Yes |
+| Dangling detection | Yes | Yes |
+| Lost-found recovery | Yes | Yes |
+| Repair mode | Yes | No (manual) |
+| Progress output | Yes | Minimal |
+
+## Related
+
+- [wit gc](/commands/advanced) - Garbage collection
+- [wit reflog](/commands/advanced) - Reference history
+- [wit cat-file](/commands/advanced) - Inspect objects

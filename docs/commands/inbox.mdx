@@ -1,0 +1,237 @@
+---
+title: 'Inbox'
+description: 'Graphite-style PR inbox for staying on top of code reviews'
+---
+
+# wit inbox
+
+The `wit inbox` command provides a unified inbox for managing pull requests, similar to Graphite's PR inbox. Stay on top of code reviews with a single command.
+
+## Overview
+
+The inbox shows:
+- **Review Requested** - PRs waiting for your review
+- **Your PRs** - Your open pull requests and their status
+- **Participated** - PRs you've commented on or reviewed
+
+## Usage
+
+```bash
+# Show full inbox with all sections
+wit inbox
+
+# Show specific sections
+wit inbox review           # PRs awaiting your review
+wit inbox mine             # Your open PRs
+wit inbox participated     # PRs you've participated in
+wit inbox summary          # Quick count of each section
+```
+
+## Commands
+
+### Full Inbox
+
+```bash
+$ wit inbox
+
+  PR Inbox
+  ──────────────────────────────────────
+
+  Review 3   Mine 2   Participated 5
+
+  Review Requested (3)
+  ────────────────────────────────────────
+  ● ✓ ○ #123 Add user authentication
+     myrepo · johndoe · 2h ago
+
+  ● ○ ○ #121 Fix database connection
+     myrepo · janedoe · 5h ago
+  ...
+
+  Your PRs (2)
+  ────────────────────────────────────────
+  ● ✓ ✓ #125 Implement caching layer
+     ✓ Approved - ready to merge
+  ...
+```
+
+### Review Requested
+
+Focus on PRs that need your review:
+
+```bash
+$ wit inbox review
+
+  Review Requested
+  PRs waiting for your review
+  ────────────────────────────────────────
+
+  ● ✓ ○ #123 Add user authentication
+     myrepo · johndoe · 2h ago
+
+  ────────────────────────────────────────
+  Review a PR: wit pr view <number> or wit pr checkout <number>
+```
+
+### Your PRs
+
+See the status of your open pull requests:
+
+```bash
+$ wit inbox mine
+
+  Your Pull Requests
+  Open PRs you've created
+  ────────────────────────────────────────
+
+  ● ✓ ✓ #125 Implement caching layer
+     ✓ Approved - ready to merge
+
+  ● ✓ ○ #124 Add API rate limiting
+     ○ Awaiting review
+
+  ────────────────────────────────────────
+  Icons: ✓ CI passed  ✗ CI failed  ○ Pending
+```
+
+### Participated
+
+PRs you've been involved in:
+
+```bash
+$ wit inbox participated
+
+  Participated
+  PRs you've reviewed or commented on
+  ────────────────────────────────────────
+
+  ● ✓ ✓ #120 Refactor database layer
+     myrepo · teammate · 1d ago
+```
+
+### Summary
+
+Quick overview of counts:
+
+```bash
+$ wit inbox summary
+
+  Inbox Summary
+  ──────────────────────────────────
+
+  ● Review Requested:  3 PRs
+  ● Your Open PRs:     2 PRs
+  ● Participated:      5 PRs
+
+  → 3 PRs awaiting your review
+```
+
+## Options
+
+| Option | Description |
+|--------|-------------|
+| `-h, --help` | Show help message |
+| `--limit <n>` | Limit number of results (default: 10) |
+| `--all` | Show all results (no limit) |
+| `--json` | Output as JSON |
+
+## Status Icons
+
+The inbox uses icons to show PR and CI status at a glance:
+
+### State Icons
+| Icon | Meaning |
+|------|---------|
+| `●` (green) | Open |
+| `●` (magenta) | Merged |
+| `●` (red) | Closed |
+
+### CI Status Icons
+| Icon | Meaning |
+|------|---------|
+| `✓` (green) | CI passed |
+| `✗` (red) | CI failed |
+| `○` (yellow) | Pending |
+| `·` (dim) | No CI |
+
+### Review Status Icons
+| Icon | Meaning |
+|------|---------|
+| `✓` (green) | Approved |
+| `!` (red) | Changes requested |
+| `●` (yellow) | Commented |
+| `○` (dim) | Awaiting review |
+
+## JSON Output
+
+For scripting and automation:
+
+```bash
+$ wit inbox --json
+
+{
+  "summary": {
+    "awaitingReview": 3,
+    "myPrsOpen": 2,
+    "participated": 5
+  },
+  "awaitingReview": [...],
+  "myPrs": [...],
+  "participated": [...]
+}
+```
+
+## Workflow
+
+### Daily Review Routine
+
+```bash
+# Check what needs attention
+wit inbox summary
+
+# Review PRs waiting for you
+wit inbox review
+
+# For each PR:
+wit pr checkout 123    # Check out the PR
+wit diff               # Review changes
+wit pr review 123      # Submit review
+```
+
+### Monitor Your PRs
+
+```bash
+# Check status of your PRs
+wit inbox mine
+
+# If approved and CI passes, merge
+wit pr merge 125
+
+# If changes requested
+wit pr checkout 124
+# Make changes...
+wit commit -m "Address review feedback"
+wit push
+```
+
+## Requirements
+
+The inbox requires:
+- Running wit server (`wit serve`) or
+- GitHub authentication (`wit github login`)
+
+If you see connection errors:
+
+```bash
+# Start the local server
+wit serve
+
+# Or authenticate with GitHub
+wit github login
+```
+
+## Related Commands
+
+- [wit pr](/platform/pull-requests) - Manage pull requests
+- [wit review](/features/review) - AI-powered code review
+- [wit github](/features/github) - GitHub integration
