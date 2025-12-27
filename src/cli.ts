@@ -61,6 +61,8 @@ import {
   // Advanced features
   handleReflog,
   handleGC,
+  // Stacked diffs
+  handleStack,
   // Collaborator management
   handleCollaborator,
   // Server command
@@ -193,6 +195,16 @@ Advanced Features:
   protect               Manage branch protection rules
   reflog                Show reference log
   gc                    Run garbage collection
+
+Stacked Diffs:
+  stack create <name>   Start a new stack from current branch
+  stack push [name]     Create a new branch on top of the stack
+  stack list            Show all stacks
+  stack show            Show current stack visualization
+  stack sync            Rebase entire stack when base changes
+  stack submit          Push all stack branches for review
+  stack up/down         Navigate the stack
+  stack pop             Remove top branch from stack
 
 Branch Protection:
   protect               List all protection rules
@@ -350,6 +362,8 @@ const COMMANDS = [
   'github',
   // Advanced features
   'hooks', 'submodule', 'worktree', 'protect', 'reflog', 'gc',
+  // Stacked diffs
+  'stack',
   // Collaborator management
   'collaborator',
   // Server
@@ -866,6 +880,10 @@ function main(): void {
         handleGC(cmdArgs);
         break;
 
+      case 'stack':
+        handleStack(rawArgs);
+        break;
+
       // Collaborator management
       case 'collaborator':
         // Collaborator commands are async due to email sending
@@ -951,6 +969,7 @@ function main(): void {
           process.exit(1);
         });
         return;
+
       default: {
         // Provide suggestions for unknown commands
         const similar = findSimilar(command, COMMANDS);

@@ -226,6 +226,23 @@ export {
 } from './branch-compare';
 
 // =============================================================================
+// Stack View (Stacked Diffs)
+// =============================================================================
+
+export {
+  StackViewEntry,
+  StackBranchStatus,
+  StackViewManager,
+  getStackList,
+  getStackVisualization,
+  renderStackListHTML,
+  renderStackVisualizationHTML,
+  renderStackCreateModalHTML,
+  renderStackPushModalHTML,
+  getStackStyles as getStackViewStyles,
+} from './stack-view';
+
+// =============================================================================
 // Utility: Get All UI Styles
 // =============================================================================
 
@@ -241,6 +258,7 @@ import { getConflictResolverStyles } from './conflict-resolver';
 import { getVirtualScrollStyles, getListStyles } from './virtual-scroll';
 import { getStashStyles } from './stash';
 import { getBranchCompareStyles } from './branch-compare';
+import { getStackStyles as getStackViewStyles } from './stack-view';
 
 /**
  * Get all UI component styles bundled together
@@ -358,5 +376,6 @@ export function getAllStyles(themeName: string = 'github-dark'): string {
     ${getListStyles()}
     ${getStashStyles()}
     ${getBranchCompareStyles()}
+    ${getStackViewStyles()}
   `;
 }

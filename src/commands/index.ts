@@ -68,6 +68,9 @@ export { handleGitHub, GitHubManager, getGitHubManager } from './github';
 export { handleReflog, ReflogManager, updateReflog } from './reflog';
 export { handleGC, GarbageCollector } from './gc';
 
+// Stacked diffs
+export { handleStack, StackManager } from './stack';
+
 // Server command
 export { handleServe } from './serve';
 

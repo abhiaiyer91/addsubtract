@@ -233,6 +233,9 @@ export {
   handleProtect,
 } from './branch-protection';
 
+// Stacked diffs
+export { StackManager, StackMetadata, SyncResult, SubmitResult, StackNode } from './stack';
+
 // Remote infrastructure
 export { Remote, RemoteManager } from './remote';
 export {
