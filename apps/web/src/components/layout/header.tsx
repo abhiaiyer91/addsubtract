@@ -46,8 +46,8 @@ export function Header() {
     <>
       <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur-xl">
         <div className="container flex h-14 md:h-16 items-center justify-between px-4 md:px-6">
-          {/* Left section - Logo + Nav */}
-          <div className="flex items-center gap-4 md:gap-8">
+          {/* Left section - Logo + Search */}
+          <div className="flex items-center gap-3 md:gap-4 flex-1">
             {/* Mobile menu button */}
             <Button
               variant="ghost"
@@ -58,40 +58,29 @@ export function Header() {
               {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </Button>
 
-            <Link to="/" className="flex items-center gap-2 group">
+            <Link to={authenticated ? "/inbox" : "/"} className="flex items-center gap-2 group flex-shrink-0">
               <div className="p-1.5 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
                 <GitBranch className="h-4 w-4 md:h-5 md:w-5 text-primary" />
               </div>
               <span className="font-bold text-lg md:text-xl tracking-tight">wit</span>
             </Link>
 
-            {authenticated && (
-              <nav className="hidden md:flex items-center gap-1">
-                <Link
-                  to="/explore"
-                  className="px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-full transition-all duration-200"
-                >
-                  Explore
-                </Link>
-              </nav>
-            )}
-          </div>
-
-          {/* Center section - Search (opens command palette) */}
-          <div className="hidden sm:flex flex-1 max-w-md mx-4">
-            <button
-              onClick={openCommandPalette}
-              className="flex h-10 w-full items-center gap-2 rounded-full border border-border/40 bg-muted/20 px-4 py-2 text-sm transition-all duration-300 hover:border-muted-foreground/30 hover:bg-muted/30 focus:border-primary/50 focus:bg-card focus:outline-none focus:ring-2 focus:ring-primary/20"
-            >
-              <Search className="h-4 w-4 text-muted-foreground" />
-              <span className="flex-1 text-left text-muted-foreground/50">
-                Search or jump to...
-              </span>
-              <kbd className="kbd hidden sm:inline-flex">
-                {isMac() ? '\u2318' : 'Ctrl'}
-              </kbd>
-              <kbd className="kbd hidden sm:inline-flex">K</kbd>
-            </button>
+            {/* Search bar - right next to logo */}
+            <div className="hidden sm:flex flex-1 max-w-md">
+              <button
+                onClick={openCommandPalette}
+                className="flex h-10 w-full items-center gap-2 rounded-full border border-border/40 bg-muted/20 px-4 py-2 text-sm transition-all duration-300 hover:border-muted-foreground/30 hover:bg-muted/30 focus:border-primary/50 focus:bg-card focus:outline-none focus:ring-2 focus:ring-primary/20"
+              >
+                <Search className="h-4 w-4 text-muted-foreground" />
+                <span className="flex-1 text-left text-muted-foreground/50">
+                  Search or jump to...
+                </span>
+                <kbd className="kbd hidden sm:inline-flex">
+                  {isMac() ? '\u2318' : 'Ctrl'}
+                </kbd>
+                <kbd className="kbd hidden sm:inline-flex">K</kbd>
+              </button>
+            </div>
           </div>
 
           {/* Right section - User actions */}
@@ -238,14 +227,6 @@ export function Header() {
                   >
                     <Inbox className="h-4 w-4" />
                     Inbox
-                  </Link>
-                  <Link
-                    to="/explore"
-                    className="flex items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-lg transition-all"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    <BookOpen className="h-4 w-4" />
-                    Explore
                   </Link>
                   <Link
                     to="/new"
