@@ -1,7 +1,7 @@
 /**
  * Mastra Configuration for wit
  * 
- * Sets up the Mastra instance with the wit agent, tools, and memory.
+ * Sets up the Mastra instance with the wit agent, tools, memory, and workflows.
  * Uses LibSQL for persistent storage of conversation history.
  */
 
@@ -13,6 +13,7 @@ import { Memory } from '@mastra/memory';
 import { LibSQLStore } from '@mastra/libsql';
 import { witAgent, createTsgitAgent } from './agent.js';
 import { witTools } from './tools/index.js';
+import { prReviewWorkflow, issueTriageWorkflow, codeGenerationWorkflow } from './workflows/index.js';
 import type { AIConfig } from './types.js';
 
 let mastraInstance: Mastra | null = null;
@@ -70,6 +71,11 @@ export function createTsgitMastra(config: AIConfig = {}): Mastra {
       wit: agent,
     },
     tools: witTools,
+    workflows: {
+      prReview: prReviewWorkflow,
+      issueTriage: issueTriageWorkflow,
+      codeGeneration: codeGenerationWorkflow,
+    },
     memory: {
       wit: memory,
     },
@@ -257,4 +263,150 @@ export async function getAIInfoForRepo(repoId: string): Promise<{
     model,
     provider: defaultProvider,
   };
+}
+
+// =============================================================================
+// Workflow Execution Helpers
+// =============================================================================
+
+import type { PRReviewInput, PRReviewOutput } from './workflows/pr-review.workflow.js';
+import type { IssueTriageInput, IssueTriageOutput } from './workflows/issue-triage.workflow.js';
+import type { CodeGenerationInput, CodeGenerationOutput } from './workflows/code-generation.workflow.js';
+
+/**
+ * Run the PR Review workflow
+ * 
+ * @param input - PR review input parameters
+ * @returns PR review results including issues, suggestions, and score
+ */
+export async function runPRReviewWorkflow(input: PRReviewInput): Promise<PRReviewOutput> {
+  const mastra = getTsgitMastra();
+  const workflow = mastra.getWorkflow('prReview');
+  
+  const run = await workflow.createRunAsync();
+  const result = await run.start({ inputData: input });
+  
+  if (result.status === 'failed') {
+    return {
+      success: false,
+      summary: 'Workflow failed',
+      approved: false,
+      score: 0,
+      issues: [],
+      suggestions: [],
+      securityConcerns: [],
+      error: 'Workflow execution failed',
+    };
+  }
+  
+  return result.result as PRReviewOutput;
+}
+
+/**
+ * Run the Issue Triage workflow
+ * 
+ * @param input - Issue triage input parameters
+ * @returns Triage results including labels, priority, and assignee suggestions
+ */
+export async function runIssueTriageWorkflow(input: IssueTriageInput): Promise<IssueTriageOutput> {
+  const mastra = getTsgitMastra();
+  const workflow = mastra.getWorkflow('issueTriage');
+  
+  const run = await workflow.createRunAsync();
+  const result = await run.start({ inputData: input });
+  
+  if (result.status === 'failed') {
+    return {
+      success: false,
+      issueType: 'other',
+      priority: 'none',
+      suggestedLabels: [],
+      relatedFiles: [],
+      similarIssues: [],
+      reasoning: 'Workflow failed',
+      error: 'Workflow execution failed',
+    };
+  }
+  
+  return result.result as IssueTriageOutput;
+}
+
+/**
+ * Run the Code Generation workflow
+ * 
+ * @param input - Code generation input parameters
+ * @returns Generated files and validation results
+ */
+export async function runCodeGenerationWorkflow(input: CodeGenerationInput): Promise<CodeGenerationOutput> {
+  const mastra = getTsgitMastra();
+  const workflow = mastra.getWorkflow('codeGeneration');
+  
+  const run = await workflow.createRunAsync();
+  const result = await run.start({ inputData: input });
+  
+  if (result.status === 'failed') {
+    return {
+      success: false,
+      generatedFiles: [],
+      validation: {},
+      summary: 'Workflow failed',
+      error: 'Workflow execution failed',
+    };
+  }
+  
+  return result.result as CodeGenerationOutput;
+}
+
+/**
+ * Stream the PR Review workflow execution
+ * 
+ * @param input - PR review input parameters
+ * @returns AsyncIterator of workflow events
+ */
+export async function* streamPRReviewWorkflow(input: PRReviewInput) {
+  const mastra = getTsgitMastra();
+  const workflow = mastra.getWorkflow('prReview');
+  
+  const run = await workflow.createRunAsync();
+  const result = await run.stream({ inputData: input });
+  
+  for await (const chunk of result.fullStream) {
+    yield chunk;
+  }
+}
+
+/**
+ * Stream the Issue Triage workflow execution
+ * 
+ * @param input - Issue triage input parameters  
+ * @returns AsyncIterator of workflow events
+ */
+export async function* streamIssueTriageWorkflow(input: IssueTriageInput) {
+  const mastra = getTsgitMastra();
+  const workflow = mastra.getWorkflow('issueTriage');
+  
+  const run = await workflow.createRunAsync();
+  const result = await run.stream({ inputData: input });
+  
+  for await (const chunk of result.fullStream) {
+    yield chunk;
+  }
+}
+
+/**
+ * Stream the Code Generation workflow execution
+ * 
+ * @param input - Code generation input parameters
+ * @returns AsyncIterator of workflow events
+ */
+export async function* streamCodeGenerationWorkflow(input: CodeGenerationInput) {
+  const mastra = getTsgitMastra();
+  const workflow = mastra.getWorkflow('codeGeneration');
+  
+  const run = await workflow.createRunAsync();
+  const result = await run.stream({ inputData: input });
+  
+  for await (const chunk of result.fullStream) {
+    yield chunk;
+  }
 }

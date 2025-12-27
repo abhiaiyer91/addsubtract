@@ -2,7 +2,7 @@
  * Events Module
  * 
  * Event-driven architecture for the wit platform.
- * Events trigger notifications, webhooks, activity logs, etc.
+ * Events trigger notifications, webhooks, activity logs, AI workflows, etc.
  */
 
 export * from './types';
@@ -11,6 +11,7 @@ export { registerNotificationHandlers } from './handlers/notifications';
 export { registerCIHandlers } from './handlers/ci';
 export { registerMergeQueueHandlers, mergeQueueHandler } from './handlers/merge-queue';
 export { registerTriageHandlers } from './handlers/triage';
+export { registerPRReviewHandlers, triggerAsyncPRReview } from './handlers/pr-review';
 
 /**
  * Helper to extract @mentions from text
