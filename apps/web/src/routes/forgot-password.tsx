@@ -24,27 +24,24 @@ export function ForgotPasswordPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
-      <div className="w-full max-w-md space-y-6">
-        <div className="flex flex-col items-center text-center">
-          <Link to="/" className="mb-6">
-            <div className="p-3 rounded-2xl bg-primary/10 border border-primary/20">
-              <GitBranch className="h-8 w-8 text-primary" />
-            </div>
-          </Link>
-          <h1 className="text-2xl font-bold">Reset your password</h1>
-          <p className="text-muted-foreground mt-2">
-            Enter your email address and we'll send you a link to reset your password
-          </p>
-        </div>
-
+      <div className="w-full max-w-md">
         <Card>
           {!submitted ? (
             <form onSubmit={handleSubmit}>
-              <CardHeader>
-                <CardTitle>Forgot password</CardTitle>
-                <CardDescription>
-                  We'll email you instructions to reset your password
-                </CardDescription>
+              <CardHeader className="space-y-4">
+                <div className="flex justify-center">
+                  <Link to="/">
+                    <div className="p-3 rounded-2xl bg-primary/10 border border-primary/20">
+                      <GitBranch className="h-8 w-8 text-primary" />
+                    </div>
+                  </Link>
+                </div>
+                <div className="text-center space-y-2">
+                  <CardTitle className="text-2xl">Reset your password</CardTitle>
+                  <CardDescription>
+                    Enter your email address and we'll send you a link to reset your password
+                  </CardDescription>
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
