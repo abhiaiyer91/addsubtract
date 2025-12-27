@@ -1131,6 +1131,272 @@ export class ApiClient {
       return this.request('GET', `/api/repos/${owner}/${repo}/cycles/velocity${query}`);
     },
   };
+
+  // ============================================================================
+  // Journal Operations (Notion-like docs)
+  // ============================================================================
+
+  readonly journal = {
+    /**
+     * List journal pages for a repository
+     */
+    list: async (
+      owner: string,
+      repo: string,
+      options?: {
+        parentId?: string | null;
+        status?: 'draft' | 'published' | 'archived';
+      }
+    ): Promise<JournalPage[]> => {
+      const params = new URLSearchParams();
+      if (options?.parentId !== undefined) {
+        params.set('parentId', options.parentId ?? 'null');
+      }
+      if (options?.status) params.set('status', options.status);
+      const query = params.toString() ? `?${params.toString()}` : '';
+      return this.request('GET', `/api/repos/${owner}/${repo}/journal${query}`);
+    },
+
+    /**
+     * Get page tree (hierarchical structure)
+     */
+    tree: async (
+      owner: string,
+      repo: string,
+      options?: { status?: 'draft' | 'published' | 'archived' }
+    ): Promise<JournalPageTree[]> => {
+      const params = new URLSearchParams();
+      if (options?.status) params.set('status', options.status);
+      const query = params.toString() ? `?${params.toString()}` : '';
+      return this.request('GET', `/api/repos/${owner}/${repo}/journal/tree${query}`);
+    },
+
+    /**
+     * Get a page by slug
+     */
+    get: async (owner: string, repo: string, slug: string): Promise<JournalPageWithAuthor> => {
+      return this.request('GET', `/api/repos/${owner}/${repo}/journal/${encodeURIComponent(slug)}`);
+    },
+
+    /**
+     * Create a journal page
+     */
+    create: async (
+      owner: string,
+      repo: string,
+      data: {
+        title: string;
+        slug?: string;
+        content?: string;
+        icon?: string;
+        coverImage?: string;
+        parentId?: string;
+        status?: 'draft' | 'published' | 'archived';
+      }
+    ): Promise<JournalPage> => {
+      return this.request('POST', `/api/repos/${owner}/${repo}/journal`, data);
+    },
+
+    /**
+     * Update a journal page
+     */
+    update: async (
+      owner: string,
+      repo: string,
+      slug: string,
+      data: {
+        title?: string;
+        content?: string;
+        icon?: string | null;
+        coverImage?: string | null;
+      }
+    ): Promise<JournalPage> => {
+      return this.request(
+        'PATCH',
+        `/api/repos/${owner}/${repo}/journal/${encodeURIComponent(slug)}`,
+        data
+      );
+    },
+
+    /**
+     * Delete a journal page
+     */
+    delete: async (owner: string, repo: string, slug: string): Promise<void> => {
+      return this.request(
+        'DELETE',
+        `/api/repos/${owner}/${repo}/journal/${encodeURIComponent(slug)}`
+      );
+    },
+
+    /**
+     * Publish a page
+     */
+    publish: async (owner: string, repo: string, slug: string): Promise<JournalPage> => {
+      return this.request(
+        'POST',
+        `/api/repos/${owner}/${repo}/journal/${encodeURIComponent(slug)}/publish`
+      );
+    },
+
+    /**
+     * Unpublish a page (back to draft)
+     */
+    unpublish: async (owner: string, repo: string, slug: string): Promise<JournalPage> => {
+      return this.request(
+        'POST',
+        `/api/repos/${owner}/${repo}/journal/${encodeURIComponent(slug)}/unpublish`
+      );
+    },
+
+    /**
+     * Archive a page
+     */
+    archive: async (owner: string, repo: string, slug: string): Promise<JournalPage> => {
+      return this.request(
+        'POST',
+        `/api/repos/${owner}/${repo}/journal/${encodeURIComponent(slug)}/archive`
+      );
+    },
+
+    /**
+     * Move a page
+     */
+    move: async (
+      owner: string,
+      repo: string,
+      slug: string,
+      data: { newParentId?: string | null; newPosition?: number }
+    ): Promise<JournalPage> => {
+      return this.request(
+        'POST',
+        `/api/repos/${owner}/${repo}/journal/${encodeURIComponent(slug)}/move`,
+        data
+      );
+    },
+
+    /**
+     * Search pages
+     */
+    search: async (
+      owner: string,
+      repo: string,
+      query: string,
+      options?: { status?: 'draft' | 'published' | 'archived'; limit?: number }
+    ): Promise<JournalPage[]> => {
+      const params = new URLSearchParams({ q: query });
+      if (options?.status) params.set('status', options.status);
+      if (options?.limit) params.set('limit', options.limit.toString());
+      return this.request('GET', `/api/repos/${owner}/${repo}/journal/search?${params.toString()}`);
+    },
+
+    /**
+     * Get page history
+     */
+    history: async (
+      owner: string,
+      repo: string,
+      slug: string,
+      limit?: number
+    ): Promise<JournalPageHistoryEntry[]> => {
+      const query = limit ? `?limit=${limit}` : '';
+      return this.request(
+        'GET',
+        `/api/repos/${owner}/${repo}/journal/${encodeURIComponent(slug)}/history${query}`
+      );
+    },
+
+    /**
+     * Restore page to a specific version
+     */
+    restoreVersion: async (
+      owner: string,
+      repo: string,
+      slug: string,
+      version: number
+    ): Promise<JournalPage> => {
+      return this.request(
+        'POST',
+        `/api/repos/${owner}/${repo}/journal/${encodeURIComponent(slug)}/restore`,
+        { version }
+      );
+    },
+
+    /**
+     * Get page count
+     */
+    count: async (
+      owner: string,
+      repo: string,
+      status?: 'draft' | 'published' | 'archived'
+    ): Promise<number> => {
+      const query = status ? `?status=${status}` : '';
+      return this.request('GET', `/api/repos/${owner}/${repo}/journal/count${query}`);
+    },
+
+    // =========================================================================
+    // Comment Operations
+    // =========================================================================
+
+    /**
+     * List comments for a page
+     */
+    listComments: async (
+      owner: string,
+      repo: string,
+      slug: string
+    ): Promise<Array<JournalComment & { user: { id: string; name: string; image: string | null } }>> => {
+      return this.request(
+        'GET',
+        `/api/repos/${owner}/${repo}/journal/${encodeURIComponent(slug)}/comments`
+      );
+    },
+
+    /**
+     * Create a comment
+     */
+    createComment: async (
+      owner: string,
+      repo: string,
+      slug: string,
+      data: { body: string; blockId?: string; replyToId?: string }
+    ): Promise<JournalComment> => {
+      return this.request(
+        'POST',
+        `/api/repos/${owner}/${repo}/journal/${encodeURIComponent(slug)}/comments`,
+        data
+      );
+    },
+
+    /**
+     * Delete a comment
+     */
+    deleteComment: async (
+      owner: string,
+      repo: string,
+      slug: string,
+      commentId: string
+    ): Promise<void> => {
+      return this.request(
+        'DELETE',
+        `/api/repos/${owner}/${repo}/journal/${encodeURIComponent(slug)}/comments/${commentId}`
+      );
+    },
+
+    /**
+     * Resolve a comment
+     */
+    resolveComment: async (
+      owner: string,
+      repo: string,
+      slug: string,
+      commentId: string
+    ): Promise<JournalComment> => {
+      return this.request(
+        'POST',
+        `/api/repos/${owner}/${repo}/journal/${encodeURIComponent(slug)}/comments/${commentId}/resolve`
+      );
+    },
+  };
 }
 
 // ============================================================================
@@ -1163,6 +1429,56 @@ export interface Cycle {
   endDate: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface JournalPage {
+  id: string;
+  repoId: string;
+  title: string;
+  slug: string;
+  content?: string;
+  icon?: string;
+  coverImage?: string;
+  parentId?: string;
+  position: number;
+  status: 'draft' | 'published' | 'archived';
+  authorId: string;
+  createdAt: string;
+  updatedAt: string;
+  publishedAt?: string;
+}
+
+export interface JournalPageWithAuthor extends JournalPage {
+  author: { id: string; name: string; image: string | null };
+}
+
+export interface JournalPageTree extends JournalPage {
+  children: JournalPageTree[];
+}
+
+export interface JournalComment {
+  id: string;
+  pageId: string;
+  userId: string;
+  body: string;
+  blockId?: string;
+  replyToId?: string;
+  isResolved: boolean;
+  resolvedAt?: string;
+  resolvedById?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface JournalPageHistoryEntry {
+  id: string;
+  pageId: string;
+  title: string;
+  content?: string;
+  authorId: string;
+  version: number;
+  changeDescription?: string;
+  createdAt: string;
 }
 
 // ============================================================================

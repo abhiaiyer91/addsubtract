@@ -99,6 +99,8 @@ import {
   handleCI,
   // Merge Queue
   handleMergeQueue,
+  // Journal (Notion-like docs)
+  handleJournal,
 } from './commands';
 import { handleHooks } from './core/hooks';
 import { handleSubmodule } from './core/submodule';
@@ -319,6 +321,16 @@ Issue Tracking (Linear-inspired):
   cycle current         Show active cycle progress
   cycle add <issue>     Add issue to current cycle
 
+Documentation (Notion-like journal):
+  journal               List journal pages
+  journal create <title> Create a new page
+  journal view <slug>   View page content
+  journal edit <slug>   Update a page
+  journal tree          Show page hierarchy
+  journal search <q>    Search pages
+  journal publish       Publish a draft page
+  journal history       View page version history
+
 Monorepo Support:
   scope                 Show current repository scope
   scope set <path>...   Limit operations to specific paths
@@ -424,6 +436,8 @@ const COMMANDS = [
   'ai', 'agent', 'search', 'review',
   // Issue tracking
   'issue', 'cycle', 'project',
+  // Journal (Notion-like docs)
+  'journal',
   'cat-file', 'hash-object', 'ls-files', 'ls-tree',
   // Plumbing commands
   'rev-parse', 'update-ref', 'symbolic-ref', 'for-each-ref', 'show-ref', 'fsck',
@@ -1113,6 +1127,18 @@ function main(): void {
       // Merge Queue commands
       case 'merge-queue':
         handleMergeQueue(args.slice(args.indexOf('merge-queue') + 1)).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
+          }
+          process.exit(1);
+        });
+        return;
+
+      // Journal (Notion-like docs)
+      case 'journal':
+        handleJournal(args.slice(args.indexOf('journal') + 1)).catch((error: Error) => {
           if (error instanceof TsgitError) {
             console.error((error as TsgitError).format());
           } else {

@@ -22,6 +22,7 @@ import { searchRouter } from './search';
 import { projectsRouter } from './projects';
 import { cyclesRouter } from './cycles';
 import { mergeQueueRouter } from './merge-queue';
+import { journalRouter } from './journal';
 
 /**
  * Main application router
@@ -51,6 +52,7 @@ export const appRouter = router({
   projects: projectsRouter,
   cycles: cyclesRouter,
   mergeQueue: mergeQueueRouter,
+  journal: journalRouter,
 });
 
 /**
@@ -82,4 +84,5 @@ export {
   projectsRouter,
   cyclesRouter,
   mergeQueueRouter,
+  journalRouter,
 };

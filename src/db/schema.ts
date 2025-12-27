@@ -1356,6 +1356,108 @@ export const agentFileChanges = pgTable('agent_file_changes', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+// ============ JOURNAL (Notion-like documentation) ============
+
+/**
+ * Journal page status enum
+ * Tracks whether a page is draft, published, or archived
+ */
+export const journalPageStatusEnum = pgEnum('journal_page_status', [
+  'draft',
+  'published',
+  'archived',
+]);
+
+/**
+ * Journal pages table - Notion-like documentation pages per repository
+ * Supports hierarchical structure, rich content, icons, and covers
+ */
+export const journalPages = pgTable('journal_pages', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  repoId: uuid('repo_id')
+    .notNull()
+    .references(() => repositories.id, { onDelete: 'cascade' }),
+  
+  // Content
+  title: text('title').notNull(),
+  slug: text('slug').notNull(), // URL-friendly identifier
+  content: text('content'), // Markdown or JSON (for block-based content)
+  
+  // Visual customization (Notion-style)
+  icon: text('icon'), // Emoji or icon identifier
+  coverImage: text('cover_image'), // URL to cover image
+  
+  // Hierarchy - for nested pages like Notion
+  parentId: uuid('parent_id'),
+  position: integer('position').notNull().default(0), // Order among siblings
+  
+  // Status
+  status: journalPageStatusEnum('status').notNull().default('draft'),
+  
+  // Author
+  authorId: text('author_id').notNull(), // References better-auth user.id
+  
+  // Timestamps
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  publishedAt: timestamp('published_at', { withTimezone: true }),
+}, (table) => ({
+  // Slugs must be unique within a repository
+  uniqueSlugPerRepo: unique().on(table.repoId, table.slug),
+}));
+
+/**
+ * Journal page comments - for collaborative editing
+ */
+export const journalComments = pgTable('journal_comments', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  pageId: uuid('page_id')
+    .notNull()
+    .references(() => journalPages.id, { onDelete: 'cascade' }),
+  userId: text('user_id').notNull(), // References better-auth user.id
+  
+  body: text('body').notNull(),
+  
+  // For inline comments at specific positions
+  blockId: text('block_id'), // ID of the block this comment is attached to
+  
+  // For replies
+  replyToId: uuid('reply_to_id').references((): any => journalComments.id),
+  
+  // Resolution
+  isResolved: boolean('is_resolved').notNull().default(false),
+  resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+  resolvedById: text('resolved_by_id'),
+  
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+/**
+ * Journal page history - version history for pages
+ */
+export const journalPageHistory = pgTable('journal_page_history', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  pageId: uuid('page_id')
+    .notNull()
+    .references(() => journalPages.id, { onDelete: 'cascade' }),
+  
+  // Snapshot of the page at this version
+  title: text('title').notNull(),
+  content: text('content'),
+  
+  // Who made this version
+  authorId: text('author_id').notNull(),
+  
+  // Version number (auto-incremented per page)
+  version: integer('version').notNull(),
+  
+  // Optional description of changes
+  changeDescription: text('change_description'),
+  
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
 // ============ TYPE EXPORTS ============
 
 export type AgentSession = typeof agentSessions.$inferSelect;
@@ -1528,3 +1630,15 @@ export type NewMergeQueueBatch = typeof mergeQueueBatches.$inferInsert;
 
 export type MergeQueueHistoryEntry = typeof mergeQueueHistory.$inferSelect;
 export type NewMergeQueueHistoryEntry = typeof mergeQueueHistory.$inferInsert;
+
+// Journal types
+export type JournalPageStatus = (typeof journalPageStatusEnum.enumValues)[number];
+
+export type JournalPage = typeof journalPages.$inferSelect;
+export type NewJournalPage = typeof journalPages.$inferInsert;
+
+export type JournalComment = typeof journalComments.$inferSelect;
+export type NewJournalComment = typeof journalComments.$inferInsert;
+
+export type JournalPageHistoryEntry = typeof journalPageHistory.$inferSelect;
+export type NewJournalPageHistoryEntry = typeof journalPageHistory.$inferInsert;
