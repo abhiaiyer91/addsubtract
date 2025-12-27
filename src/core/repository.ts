@@ -14,6 +14,7 @@ import { PartialCloneManager, SparseCheckoutManager } from './partial-clone';
 import { RemoteManager } from './remote';
 import { setHashAlgorithm, getHashAlgorithm, HashAlgorithm } from '../utils/hash';
 import { HookManager } from './hooks';
+import { CollaboratorManager } from './collaborators';
 
 /**
  * Repository configuration
@@ -57,6 +58,7 @@ export class Repository {
   readonly sparseCheckout: SparseCheckoutManager;
   readonly hooks: HookManager;
   readonly remotes: RemoteManager;
+  readonly collaborators: CollaboratorManager;
 
   private config: RepositoryConfig;
 
@@ -83,6 +85,7 @@ export class Repository {
     this.sparseCheckout = new SparseCheckoutManager(this.gitDir);
     this.hooks = new HookManager(this.gitDir, this.workDir);
     this.remotes = new RemoteManager(this.gitDir);
+    this.collaborators = new CollaboratorManager(this.gitDir);
   }
 
   /**
@@ -151,6 +154,7 @@ export class Repository {
     repo.scopeManager.init();
     repo.hooks.init();
     repo.remotes.init();
+    repo.collaborators.init();
 
     console.log(`Initialized wit repository with ${hashAlgo} hashing`);
 

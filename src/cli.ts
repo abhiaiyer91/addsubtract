@@ -59,6 +59,8 @@ import {
   // Advanced features
   handleReflog,
   handleGC,
+  // Collaborator management
+  handleCollaborator,
 } from './commands';
 import { handleHooks } from './core/hooks';
 import { handleSubmodule } from './core/submodule';
@@ -162,6 +164,14 @@ Advanced Features:
   reflog                Show reference log
   gc                    Run garbage collection
 
+Collaborator Management:
+  collaborator          List collaborators
+  collaborator add      Invite a collaborator (email, role)
+  collaborator remove   Remove a collaborator
+  collaborator update   Update collaborator role
+  collaborator accept   Accept invitation (token)
+  collaborator team     Manage teams
+
 Quality of Life:
   amend                 Quickly fix the last commit
   wip                   Quick WIP commit with auto-generated message
@@ -247,6 +257,8 @@ const COMMANDS = [
   'remote', 'clone', 'fetch', 'pull', 'push',
   // Advanced features
   'hooks', 'submodule', 'worktree', 'reflog', 'gc',
+  // Collaborator management
+  'collaborator',
   'help',
 ];
 
@@ -688,6 +700,15 @@ function main(): void {
       case 'gc':
         handleGC(cmdArgs);
         break;
+
+      // Collaborator management
+      case 'collaborator':
+        // Collaborator commands are async due to email sending
+        handleCollaborator(args.slice(args.indexOf('collaborator') + 1)).catch((error: Error) => {
+          console.error(`error: ${error.message}`);
+          process.exit(1);
+        });
+        return; // Exit main() to let async handle complete
 
       default: {
         // Provide suggestions for unknown commands

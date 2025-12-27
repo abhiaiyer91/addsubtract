@@ -64,3 +64,23 @@ export { handlePush, push } from './push';
 // Advanced features
 export { handleReflog, ReflogManager, updateReflog } from './reflog';
 export { handleGC, GarbageCollector } from './gc';
+
+// Collaborator management
+export {
+  handleCollaborator,
+  listCollaborators,
+  addCollaborator,
+  removeCollaborator,
+  updateCollaboratorRole,
+  showCollaborator,
+  acceptInvitation,
+  revokeInvitation,
+  listInvitations,
+  showActivityLog,
+  showStats as showCollaboratorStats,
+  listTeams,
+  createTeam,
+  deleteTeam,
+  addTeamMember,
+  removeTeamMember,
+} from './collaborator';
