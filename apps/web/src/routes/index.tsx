@@ -164,11 +164,11 @@ function FeatureCard({
   description: string;
 }) {
   return (
-    <div className="feature-card group">
-      <div className="p-3 w-fit rounded-xl bg-primary/10 text-primary mb-4 transition-all duration-300 group-hover:bg-primary/20 group-hover:shadow-glow-sm">
+    <div className="feature-card group transition-all duration-300 hover:scale-105 hover:shadow-xl hover:border-primary/30">
+      <div className="p-3 w-fit rounded-xl bg-primary/10 text-primary mb-4 transition-all duration-300 group-hover:bg-primary/20 group-hover:shadow-glow-sm group-hover:scale-110">
         {icon}
       </div>
-      <h3 className="text-lg font-semibold mb-2">{title}</h3>
+      <h3 className="text-lg font-semibold mb-2 transition-colors duration-300 group-hover:text-primary">{title}</h3>
       <p className="text-muted-foreground leading-relaxed">{description}</p>
     </div>
   );

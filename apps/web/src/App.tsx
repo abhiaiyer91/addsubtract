@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { TRPCProvider } from './lib/trpc';
 import { Layout } from './components/layout';
 import { Toaster } from './components/ui/toaster';
@@ -56,10 +57,22 @@ import { TeamDetailPage } from './routes/org/team-detail';
 import { SearchPage } from './routes/search';
 import { InboxPage } from './routes/inbox';
 
+// Scroll to top on route change
+function ScrollToTop() {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+
+  return null;
+}
+
 export function App() {
   return (
     <TRPCProvider>
       <BrowserRouter>
+        <ScrollToTop />
         {/* Global keyboard-first components */}
         <CommandPalette />
         <ShortcutsModal />

@@ -45,8 +45,8 @@ export function Header() {
   return (
     <>
       <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur-xl">
-        <div className="container flex h-14 md:h-16 items-center justify-between px-4 md:px-6">
-          {/* Left section - Logo + Search */}
+        <div className="container flex h-14 md:h-16 items-center px-4 md:px-6">
+          {/* Left section - Logo */}
           <div className="flex items-center gap-3 md:gap-4 flex-1">
             {/* Mobile menu button */}
             <Button
@@ -64,20 +64,21 @@ export function Header() {
               </div>
               <span className="font-bold text-lg md:text-xl tracking-tight">Wit</span>
             </Link>
+          </div>
 
-            {/* Search bar - centered */}
-            <div className="hidden sm:flex flex-1 justify-center">
-              <button
-                onClick={openCommandPalette}
-                className="flex h-10 w-full max-w-md items-center gap-2 rounded-full border border-border/40 bg-muted/20 px-4 py-2 text-sm transition-all duration-300 hover:border-muted-foreground/30 hover:bg-muted/30 focus:border-primary/50 focus:bg-card focus:outline-none focus:ring-2 focus:ring-primary/20"
-              >
-                <Search className="h-4 w-4 text-muted-foreground" />
-                <span className="flex-1 text-left text-muted-foreground/50">
-                  Search or jump to...
-                </span>
-                <kbd className="kbd hidden sm:inline-flex">
-                  {isMac() ? '\u2318' : 'Ctrl'}
-                </kbd>
+          {/* Center section - Search bar */}
+          <div className="hidden sm:flex flex-1 justify-center">
+            <button
+              onClick={openCommandPalette}
+              className="flex h-10 w-full max-w-md items-center gap-2 rounded-full border border-border/40 bg-muted/20 px-4 py-2 text-sm transition-all duration-300 hover:border-muted-foreground/30 hover:bg-muted/30 focus:border-primary/50 focus:bg-card focus:outline-none focus:ring-2 focus:ring-primary/20"
+            >
+              <Search className="h-4 w-4 text-muted-foreground" />
+              <span className="flex-1 text-left text-muted-foreground/50">
+                Search or jump to...
+              </span>
+              <kbd className="kbd hidden sm:inline-flex">
+                {isMac() ? '\u2318' : 'Ctrl'}
+              </kbd>
                 <kbd className="kbd hidden sm:inline-flex">K</kbd>
               </button>
             </div>
