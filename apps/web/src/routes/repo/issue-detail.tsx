@@ -113,7 +113,14 @@ export function IssueDetailPage() {
       });
     },
     onSettled: () => {
+      // Invalidate all issue-related queries to ensure UI is updated everywhere
       utils.issues.get.invalidate({ repoId: repoData?.repo.id!, number: issueNumber });
+      utils.issues.list.invalidate({ repoId: repoData?.repo.id! });
+      utils.issues.listGroupedByStatus.invalidate({ repoId: repoData?.repo.id! });
+      utils.issues.inboxAssignedToMe.invalidate();
+      utils.issues.inboxCreatedByMe.invalidate();
+      utils.issues.inboxParticipated.invalidate();
+      utils.issues.inboxSummary.invalidate();
     },
   });
 
@@ -153,7 +160,14 @@ export function IssueDetailPage() {
       });
     },
     onSettled: () => {
+      // Invalidate all issue-related queries to ensure UI is updated everywhere
       utils.issues.get.invalidate({ repoId: repoData?.repo.id!, number: issueNumber });
+      utils.issues.list.invalidate({ repoId: repoData?.repo.id! });
+      utils.issues.listGroupedByStatus.invalidate({ repoId: repoData?.repo.id! });
+      utils.issues.inboxAssignedToMe.invalidate();
+      utils.issues.inboxCreatedByMe.invalidate();
+      utils.issues.inboxParticipated.invalidate();
+      utils.issues.inboxSummary.invalidate();
     },
   });
 

@@ -102,12 +102,56 @@ export function KanbanBoard({
 
   const utils = trpc.useUtils();
   const updateStatus = trpc.issues.updateStatus.useMutation({
+    onMutate: async ({ issueId, status: newStatus }) => {
+      // Cancel outgoing refetches
+      await utils.issues.listGroupedByStatus.cancel({ repoId });
+      
+      // Snapshot previous data
+      const previousData = utils.issues.listGroupedByStatus.getData({ repoId });
+      
+      // Optimistically update the kanban board
+      utils.issues.listGroupedByStatus.setData({ repoId }, (old) => {
+        if (!old) return old;
+        
+        const newData = { ...old };
+        let movedIssue: KanbanIssue | null = null;
+        
+        // Find and remove the issue from its current column
+        for (const status of Object.keys(newData)) {
+          const index = newData[status]?.findIndex((issue) => issue.id === issueId);
+          if (index !== undefined && index >= 0 && newData[status]) {
+            movedIssue = { ...newData[status][index], status: newStatus };
+            newData[status] = newData[status].filter((issue) => issue.id !== issueId);
+          }
+        }
+        
+        // Add to the new column
+        if (movedIssue) {
+          newData[newStatus] = [...(newData[newStatus] || []), movedIssue];
+        }
+        
+        return newData;
+      });
+      
+      return { previousData };
+    },
     onSuccess: () => {
-      utils.issues.listGroupedByStatus.invalidate({ repoId });
       setError(null);
     },
-    onError: (err) => {
+    onError: (err, _variables, context) => {
+      // Roll back on error
+      if (context?.previousData) {
+        utils.issues.listGroupedByStatus.setData({ repoId }, context.previousData);
+      }
       setError(err.message);
+    },
+    onSettled: () => {
+      // Invalidate all issue-related queries to ensure UI is updated everywhere
+      utils.issues.listGroupedByStatus.invalidate({ repoId });
+      utils.issues.list.invalidate({ repoId });
+      utils.issues.inboxAssignedToMe.invalidate();
+      utils.issues.inboxCreatedByMe.invalidate();
+      utils.issues.inboxParticipated.invalidate();
     },
   });
 

@@ -11,6 +11,7 @@ export function NewIssuePage() {
   const navigate = useNavigate();
   const { data: session } = useSession();
   const authenticated = !!session?.user;
+  const utils = trpc.useUtils();
 
   // Fetch repository data to get the repo ID
   const { data: repoData, isLoading: repoLoading } = trpc.repos.get.useQuery(
@@ -25,6 +26,13 @@ export function NewIssuePage() {
         title: 'Issue created',
         description: `Issue #${data.number} has been created successfully.`,
       });
+      // Invalidate issue-related queries so lists refresh
+      if (repoData?.repo.id) {
+        utils.issues.list.invalidate({ repoId: repoData.repo.id });
+        utils.issues.listGroupedByStatus.invalidate({ repoId: repoData.repo.id });
+      }
+      utils.issues.inboxCreatedByMe.invalidate();
+      utils.issues.inboxSummary.invalidate();
       // Redirect to the new issue
       navigate(`/${owner}/${repo}/issues/${data.number}`);
     },
