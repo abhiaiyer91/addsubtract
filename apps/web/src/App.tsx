@@ -10,6 +10,9 @@ import { BranchSwitcher } from './components/branch';
 import { HomePage } from './routes/index';
 import { LoginPage } from './routes/login';
 import { RegisterPage } from './routes/register';
+import { ForgotPasswordPage } from './routes/forgot-password';
+import { TermsPage } from './routes/terms';
+import { PrivacyPage } from './routes/privacy';
 import { UserHomePage } from './routes/user-home';
 import { RepoPage } from './routes/repo';
 import { TreePage } from './routes/repo/tree';
@@ -84,6 +87,9 @@ export function App() {
             <Route path="/" element={<HomePage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/terms" element={<TermsPage />} />
+            <Route path="/privacy" element={<PrivacyPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/settings/keys" element={<SSHKeysPage />} />
             <Route path="/settings/tokens" element={<TokensPage />} />
