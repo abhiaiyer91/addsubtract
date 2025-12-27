@@ -1,4 +1,4 @@
-⎯⎯ Failed Tests 45 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+⎯ Failed Tests 9 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
 
  FAIL  tests/integration/inbox.test.ts > PR Inbox > Review Submission > marks review as completed when review is submitted
 AssertionError: expected 'pending' to be 'completed' // Object.is equality
@@ -14,345 +14,73 @@ Received: "pending"
     182|     });
     183|
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/45]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/9]⎯
 
  FAIL  tests/integration/organizations.test.ts > Organizations Flow > Member Management > lists organization members
 TRPCClientError: Failed query: select "org_members"."org_id", "org_members"."user_id", "org_members"."role", "org_members"."created_at", "users"."id", "users"."username", "users"."email", "users"."name", "users"."avatar_url", "users"."bio", "users"."location", "users"."website", "users"."password_hash", "users"."created_at", "users"."updated_at" from "org_members" inner join "users" on "org_members"."user_id" = "users"."id" where "org_members"."org_id" = $1
-params: 58826ac3-f361-4d12-9227-435a33ec83ac
+params: 2f1357f6-dc2b-4f80-921a-519699f9985a
  ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
  ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/45]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/9]⎯
 
  FAIL  tests/integration/organizations.test.ts > Organizations Flow > Member Management > updates member role
 TRPCClientError: Failed query: select "org_members"."org_id", "org_members"."user_id", "org_members"."role", "org_members"."created_at", "users"."id", "users"."username", "users"."email", "users"."name", "users"."avatar_url", "users"."bio", "users"."location", "users"."website", "users"."password_hash", "users"."created_at", "users"."updated_at" from "org_members" inner join "users" on "org_members"."user_id" = "users"."id" where ("org_members"."org_id" = $1 and "org_members"."role" = $2)
-params: 3eb6025a-cb93-4a91-8120-30a6241a03ee,owner
+params: 05794a99-eaf2-4e13-b9bd-92436fa24956,owner
  ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
  ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/45]⎯
-
- FAIL  tests/integration/organizations.test.ts > Organizations Flow > Team Management > adds member to team
-TRPCClientError: Failed query: select "team_id", "user_id", "created_at" from "team_members" where ("team_members"."team_id" = $1 and "team_members"."user_id" = $2)
-params: fab596d1-5961-4317-874c-44930cc620d3,qqhtPm9iHK41pJtwYhxAdKDOGsm9O6ZZ
- ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
- ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/45]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/9]⎯
 
  FAIL  tests/integration/organizations.test.ts > Organizations Flow > Team Management > lists team members
-TRPCClientError: Failed query: select "team_id", "user_id", "created_at" from "team_members" where ("team_members"."team_id" = $1 and "team_members"."user_id" = $2)
-params: 5db37dcf-dbdb-4340-8142-8c2e8d5758e3,qqhtPm9iHK41pJtwYhxAdKDOGsm9O6ZZ
+TRPCClientError: Failed query: select "team_members"."team_id", "team_members"."user_id", "team_members"."created_at", "users"."id", "users"."username", "users"."email", "users"."name", "users"."avatar_url", "users"."bio", "users"."location", "users"."website", "users"."password_hash", "users"."created_at", "users"."updated_at" from "team_members" inner join "users" on "team_members"."user_id" = "users"."id" where "team_members"."team_id" = $1
+params: 342cccf3-ee8c-4a00-b4bb-e03faeaa1621
  ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
  ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/45]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/9]⎯
 
  FAIL  tests/integration/organizations.test.ts > Organizations Flow > Team Management > removes member from team
-TRPCClientError: Failed query: select "team_id", "user_id", "created_at" from "team_members" where ("team_members"."team_id" = $1 and "team_members"."user_id" = $2)
-params: 6c9f48d5-43f0-4c5b-93d6-fa9b5724e6b3,qqhtPm9iHK41pJtwYhxAdKDOGsm9O6ZZ
+TRPCClientError: Failed query: select "team_members"."team_id", "team_members"."user_id", "team_members"."created_at", "users"."id", "users"."username", "users"."email", "users"."name", "users"."avatar_url", "users"."bio", "users"."location", "users"."website", "users"."password_hash", "users"."created_at", "users"."updated_at" from "team_members" inner join "users" on "team_members"."user_id" = "users"."id" where "team_members"."team_id" = $1
+params: 1fd73076-5a99-4ed9-9c43-dc224531f81f
  ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
  ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/45]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/9]⎯
 
  FAIL  tests/integration/organizations.test.ts > Organizations Flow > Team Management > member can remove themselves from team
-TRPCClientError: Failed query: select "team_id", "user_id", "created_at" from "team_members" where ("team_members"."team_id" = $1 and "team_members"."user_id" = $2)
-params: f5f1a06d-2b2b-4d45-8e53-803ea75517ed,qqhtPm9iHK41pJtwYhxAdKDOGsm9O6ZZ
+TRPCClientError: Failed query: select "team_members"."team_id", "team_members"."user_id", "team_members"."created_at", "users"."id", "users"."username", "users"."email", "users"."name", "users"."avatar_url", "users"."bio", "users"."location", "users"."website", "users"."password_hash", "users"."created_at", "users"."updated_at" from "team_members" inner join "users" on "team_members"."user_id" = "users"."id" where "team_members"."team_id" = $1
+params: 02309c56-8e9c-4377-bc82-38cf367f0072
  ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
  ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/45]⎯
-
- FAIL  tests/integration/releases.test.ts > Releases Flow > Release CRUD Operations > gets release by ID
- FAIL  tests/integration/releases.test.ts > Releases Flow > Release CRUD Operations > lists releases
- FAIL  tests/integration/releases.test.ts > Releases Flow > Release CRUD Operations > lists releases excluding drafts by default
- FAIL  tests/integration/releases.test.ts > Releases Flow > Release CRUD Operations > lists releases including drafts
- FAIL  tests/integration/releases.test.ts > Releases Flow > Edge Cases > handles pagination correctly
-TRPCClientError: Cannot read properties of undefined (reading 'referencedTable')
- ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
- ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/45]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/9]⎯
 
  FAIL  tests/integration/repository-advanced.test.ts > Repository Advanced Features > Repository Forking > forks a public repository
-TRPCClientError: Failed to fork repository on disk: Source repository not found: /repos/repoowner-1766864198872-5fjhhr/to-fork-1766864200709-o27rp0.git
+TRPCClientError: Failed to fork repository on disk: Source repository not found: /repos/repoowner-1766865488847-6xhtbo/to-fork-1766865489888-05akbf.git
  ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
  ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/45]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/9]⎯
 
  FAIL  tests/integration/repository-advanced.test.ts > Repository Advanced Features > Repository Forking > forks with custom name
-TRPCClientError: Failed to fork repository on disk: Source repository not found: /repos/repoowner-1766864198872-5fjhhr/fork-custom-1766864200910-3pye07.git
+TRPCClientError: Failed to fork repository on disk: Source repository not found: /repos/repoowner-1766865488847-6xhtbo/fork-custom-1766865489991-vqrix8.git
  ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
  ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/45]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/9]⎯
 
  FAIL  tests/integration/repository-advanced.test.ts > Repository Advanced Features > Repository Forking > lists forks of a repository
-TRPCClientError: Failed to fork repository on disk: Source repository not found: /repos/repoowner-1766864198872-5fjhhr/list-forks-1766864201250-n92mhv.git
+TRPCClientError: Failed to fork repository on disk: Source repository not found: /repos/repoowner-1766865488847-6xhtbo/list-forks-1766865490315-cyj1sw.git
  ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
  ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/45]⎯
-
- FAIL  tests/integration/repository-advanced.test.ts > Repository Advanced Features > Repository Starring > stars a repository
-AssertionError: expected { starred: true } to be true // Object.is equality
-
-- Expected:
-true
-
-+ Received:
-{
-  "starred": true,
-}
-
- ❯ tests/integration/repository-advanced.test.ts:185:25
-    183|
-    184|       const isStarred = await userApi.repos.isStarred.query({ repoId: starRepoId });
-    185|       expect(isStarred).toBe(true);
-       |                         ^
-    186|     });
-    187|
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/45]⎯
-
- FAIL  tests/integration/repository-advanced.test.ts > Repository Advanced Features > Repository Starring > unstars a repository
-AssertionError: expected { starred: false } to be false // Object.is equality
-
-- Expected:
-false
-
-+ Received:
-{
-  "starred": false,
-}
-
- ❯ tests/integration/repository-advanced.test.ts:195:25
-    193|
-    194|       const isStarred = await userApi.repos.isStarred.query({ repoId: starRepoId });
-    195|       expect(isStarred).toBe(false);
-       |                         ^
-    196|     });
-    197|
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/45]⎯
-
- FAIL  tests/integration/repository-advanced.test.ts > Repository Advanced Features > Repository Starring > checks if repository is starred
-AssertionError: expected { starred: false } to be false // Object.is equality
-
-- Expected:
-false
-
-+ Received:
-{
-  "starred": false,
-}
-
- ❯ tests/integration/repository-advanced.test.ts:203:26
-    201|       // Not starred initially
-    202|       const beforeStar = await userApi.repos.isStarred.query({ repoId: starRepoId });
-    203|       expect(beforeStar).toBe(false);
-       |                          ^
-    204|
-    205|       // Star it
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/45]⎯
-
- FAIL  tests/integration/repository-advanced.test.ts > Repository Advanced Features > Repository Watching > watches a repository
-AssertionError: expected { watching: true } to be true // Object.is equality
-
-- Expected:
-true
-
-+ Received:
-{
-  "watching": true,
-}
-
- ❯ tests/integration/repository-advanced.test.ts:257:26
-    255|
-    256|       const isWatching = await userApi.repos.isWatching.query({ repoId: watchRepoId });
-    257|       expect(isWatching).toBe(true);
-       |                          ^
-    258|     });
-    259|
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/45]⎯
-
- FAIL  tests/integration/repository-advanced.test.ts > Repository Advanced Features > Repository Watching > unwatches a repository
-AssertionError: expected { watching: false } to be false // Object.is equality
-
-- Expected:
-false
-
-+ Received:
-{
-  "watching": false,
-}
-
- ❯ tests/integration/repository-advanced.test.ts:267:26
-    265|
-    266|       const isWatching = await userApi.repos.isWatching.query({ repoId: watchRepoId });
-    267|       expect(isWatching).toBe(false);
-       |                          ^
-    268|     });
-    269|
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/45]⎯
-
- FAIL  tests/integration/repository-advanced.test.ts > Repository Advanced Features > Repository Watching > checks if repository is watched
-AssertionError: expected { watching: false } to be false // Object.is equality
-
-- Expected:
-false
-
-+ Received:
-{
-  "watching": false,
-}
-
- ❯ tests/integration/repository-advanced.test.ts:274:27
-    272|
-    273|       const beforeWatch = await userApi.repos.isWatching.query({ repoId: watchRepoId });
-    274|       expect(beforeWatch).toBe(false);
-       |                           ^
-    275|
-    276|       await userApi.repos.watch.mutate({ repoId: watchRepoId });
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/45]⎯
-
- FAIL  tests/integration/ssh-keys.test.ts > SSH Keys Flow > SSH Key CRUD Operations > adds an SSH key
-AssertionError: expected 'Failed query: select "id", "user_id",…' to contain 'Invalid SSH key'
-
-- Expected
-+ Received
-
-- Invalid SSH key
-+ Failed query: select "id", "user_id", "title", "public_key", "fingerprint", "key_type", "last_used_at", "created_at" from "ssh_keys" where "ssh_keys"."user_id" = $1
-+ params: 7Wxw9NRtFfyWY6MgLAkgkh4Rlgzajmgp
-
- ❯ tests/integration/ssh-keys.test.ts:80:31
-     78|       } catch (error: any) {
-     79|         // Key parsing may fail with test keys - that's expected
-     80|         expect(error.message).toContain('Invalid SSH key');
-       |                               ^
-     81|       }
-     82|     });
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/45]⎯
-
- FAIL  tests/integration/ssh-keys.test.ts > SSH Keys Flow > SSH Key CRUD Operations > fails to add invalid SSH key
-AssertionError: expected [Function] to throw error including 'Invalid SSH key' but got 'Failed query: select "id", "user_id",…'
-
-- Expected
-+ Received
-
-- Invalid SSH key
-+ Failed query: select "id", "user_id", "title", "public_key", "fingerprint", "key_type", "last_used_at", "created_at" from "ssh_keys" where "ssh_keys"."user_id" = $1
-+ params: 7Wxw9NRtFfyWY6MgLAkgkh4Rlgzajmgp
-
- ❯ tests/integration/ssh-keys.test.ts:87:7
-     85|       const authApi = createAuthenticatedClient(userToken);
-     86|
-     87|       await expect(
-       |       ^
-     88|         authApi.sshKeys.add.mutate({
-     89|           title: 'Invalid Key',
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[19/45]⎯
-
- FAIL  tests/integration/ssh-keys.test.ts > SSH Keys Flow > SSH Key CRUD Operations > lists SSH keys
- FAIL  tests/integration/ssh-keys.test.ts > SSH Keys Flow > SSH Key CRUD Operations > gets SSH key by ID
- FAIL  tests/integration/ssh-keys.test.ts > SSH Keys Flow > SSH Key CRUD Operations > updates SSH key title
- FAIL  tests/integration/ssh-keys.test.ts > SSH Keys Flow > SSH Key CRUD Operations > deletes SSH key
- FAIL  tests/integration/ssh-keys.test.ts > SSH Keys Flow > SSH Key Fingerprint > verifies fingerprint
- FAIL  tests/integration/ssh-keys.test.ts > SSH Keys Flow > SSH Key Limits > enforces maximum key limit per user
-TRPCClientError: Failed query: select "id", "user_id", "title", "public_key", "fingerprint", "key_type", "last_used_at", "created_at" from "ssh_keys" where "ssh_keys"."user_id" = $1
-params: 7Wxw9NRtFfyWY6MgLAkgkh4Rlgzajmgp
- ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
- ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[20/45]⎯
-
- FAIL  tests/integration/ssh-keys.test.ts > SSH Keys Flow > SSH Key CRUD Operations > fails to get other users SSH key
-TRPCClientError: Failed query: select "id", "user_id", "title", "public_key", "fingerprint", "key_type", "last_used_at", "created_at" from "ssh_keys" where "ssh_keys"."user_id" = $1
-params: dHkZj1Bq0XZcCFYZaFKKjX1uP41Tj3O1
- ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
- ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[21/45]⎯
-
- FAIL  tests/integration/tokens.test.ts > Tokens Flow > Token CRUD Operations > creates a token
- FAIL  tests/integration/tokens.test.ts > Tokens Flow > Token CRUD Operations > creates token with multiple scopes
- FAIL  tests/integration/tokens.test.ts > Tokens Flow > Token CRUD Operations > creates token with expiration
- FAIL  tests/integration/tokens.test.ts > Tokens Flow > Token CRUD Operations > creates token without expiration
- FAIL  tests/integration/tokens.test.ts > Tokens Flow > Token CRUD Operations > lists tokens
- FAIL  tests/integration/tokens.test.ts > Tokens Flow > Token CRUD Operations > gets token by ID
- FAIL  tests/integration/tokens.test.ts > Tokens Flow > Token CRUD Operations > deletes token
- FAIL  tests/integration/tokens.test.ts > Tokens Flow > Token Verification > verifies valid token
- FAIL  tests/integration/tokens.test.ts > Tokens Flow > Token Verification > rejects expired token
- FAIL  tests/integration/tokens.test.ts > Tokens Flow > Token Security > token value is only returned once at creation
- FAIL  tests/integration/tokens.test.ts > Tokens Flow > Token Security > token prefix is consistent
- FAIL  tests/integration/tokens.test.ts > Tokens Flow > Edge Cases > handles very long token name
-TRPCClientError: Failed query: select "id", "user_id", "name", "token_hash", "token_prefix", "scopes", "last_used_at", "expires_at", "created_at" from "personal_access_tokens" where "personal_access_tokens"."user_id" = $1
-params: vISA0rSAoSWJ1Ep0X4pH2jjDK4o2jBQc
- ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
- ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22/45]⎯
-
- FAIL  tests/integration/tokens.test.ts > Tokens Flow > Token CRUD Operations > fails to get other users token
-TRPCClientError: Failed query: select "id", "user_id", "name", "token_hash", "token_prefix", "scopes", "last_used_at", "expires_at", "created_at" from "personal_access_tokens" where "personal_access_tokens"."user_id" = $1
-params: N4MpPeoQ8h6m8Dd661geCl8Y2FXXcHm2
- ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
- ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[23/45]⎯
-
- FAIL  tests/integration/tokens.test.ts > Tokens Flow > Token Limits > enforces maximum token limit per user
-AssertionError: expected 'Failed query: select "id", "user_id",…' to contain 'Maximum'
-
-- Expected
-+ Received
-
-- Maximum
-+ Failed query: select "id", "user_id", "name", "token_hash", "token_prefix", "scopes", "last_used_at", "expires_at", "created_at" from "personal_access_tokens" where "personal_access_tokens"."user_id" = $1
-+ params: GCtcHyV5WKNinojilERSoixL4wEsHOVY
-
- ❯ tests/integration/tokens.test.ts:319:31
-    317|       } catch (error: any) {
-    318|         // Expected to fail at some point due to limit
-    319|         expect(error.message).toContain('Maximum');
-       |                               ^
-    320|       }
-    321|
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[24/45]⎯
-
- FAIL  tests/integration/webhooks.test.ts > Webhooks Flow > Webhook CRUD Operations > clears webhook secret
-AssertionError: expected '********' to be null
-
-- Expected:
-null
-
-+ Received:
-"********"
-
- ❯ tests/integration/webhooks.test.ts:265:30
-    263|       });
-    264|
-    265|       expect(updated.secret).toBeNull();
-       |                              ^
-    266|     });
-    267|
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[25/45]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/9]⎯
 
 
- Test Files  7 failed | 51 passed | 1 skipped (59)
-      Tests  45 failed | 1339 passed | 32 skipped (1416)
-   Start at  20:36:16
-   Duration  198.32s (transform 4.22s, setup 0ms, import 69.02s, tests 108.94s, environment 20ms)
+ Test Files  3 failed | 55 passed | 1 skipped (59)
+      Tests  9 failed | 1375 passed | 32 skipped (1416)
+   Start at  20:58:03
+   Duration  134.24s (transform 3.34s, setup 0ms, import 42.77s, tests 79.86s, environment 10ms)
 
 peteradelodun@Peters-MBP wit %

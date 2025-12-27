@@ -712,6 +712,9 @@ export const pullsRouter = router({
         commitSha: input.commitSha,
       });
 
+      // Mark review request as completed
+      await prReviewerModel.completeReview(input.prId, ctx.user.id);
+
       // Emit pr.reviewed event
       const repo = await repoModel.findById(pr.repoId);
       if (repo) {
