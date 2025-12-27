@@ -60,7 +60,7 @@
   "license": "MIT",
   "devDependencies": {
     "@eslint/js": "^9.39.2",
-    "@types/node": "^20.10.0",
+    "@types/node": "^20.19.27",
     "@types/pg": "^8.16.0",
     "@types/uuid": "^10.0.0",
     "@typescript-eslint/eslint-plugin": "^8.50.1",
@@ -74,10 +74,13 @@
     "vitest": "^4.0.16"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.1",
     "@hono/node-server": "^1.19.7",
     "@hono/trpc-server": "^0.4.1",
     "@mastra/core": "^1.0.0-beta.17",
     "@opentelemetry/api": "^1.9.0",
+    "@mastra/libsql": "^1.0.0-beta.10",
+    "@mastra/memory": "^1.0.0-beta.9",
     "@trpc/client": "^11.8.1",
     "@trpc/server": "^11.8.1",
     "@types/blessed": "^0.1.27",

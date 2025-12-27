@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Users, Plus, Trash2, Loader2, ChevronLeft, Crown, Shield, User } from 'lucide-react';
+import { Users, Plus, Trash2, Loader2, ChevronLeft, Crown, Shield, User, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -23,6 +22,19 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { Loading } from '@/components/ui/loading';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useSession } from '@/lib/auth-client';
@@ -41,7 +53,9 @@ export function OrgMembersPage() {
   const authenticated = !!session?.user;
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [userId, setUserId] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [popoverOpen, setPopoverOpen] = useState(false);
   const [role, setRole] = useState('member');
   const [error, setError] = useState<string | null>(null);
 
@@ -62,10 +76,22 @@ export function OrgMembersPage() {
     { enabled: !!org?.id && !!session?.user?.id }
   );
 
+  // Search users
+  const { data: searchResults } = trpc.users.search.useQuery(
+    { query: searchQuery, limit: 10 },
+    { enabled: searchQuery.length >= 2 }
+  );
+
+  // Filter out users who are already members
+  const filteredResults = searchResults?.filter(user => 
+    !members?.some(m => m.userId === user.id)
+  ) || [];
+
   const addMember = trpc.organizations.addMember.useMutation({
     onSuccess: () => {
       setIsDialogOpen(false);
-      setUserId('');
+      setSelectedUserId(null);
+      setSearchQuery('');
       setRole('member');
       setError(null);
       utils.organizations.listMembers.invalidate({ orgId: org?.id! });
@@ -91,8 +117,8 @@ export function OrgMembersPage() {
     e.preventDefault();
     setError(null);
 
-    if (!userId.trim()) {
-      setError('User ID is required');
+    if (!selectedUserId) {
+      setError('Please select a user to add');
       return;
     }
 
@@ -100,10 +126,13 @@ export function OrgMembersPage() {
 
     addMember.mutate({
       orgId: org.id,
-      userId: userId.trim(),
+      userId: selectedUserId,
       role: role as 'member' | 'admin' | 'owner',
     });
   };
+
+  // Get selected user for display
+  const selectedUser = searchResults?.find(u => u.id === selectedUserId);
 
   const handleRoleChange = (memberId: string, newRole: string) => {
     if (!org?.id) return;
@@ -203,20 +232,80 @@ export function OrgMembersPage() {
                 <DialogHeader>
                   <DialogTitle>Add Member</DialogTitle>
                   <DialogDescription>
-                    Add a new member to the organization.
+                    Search for a user to add to the organization.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                   <div className="space-y-2">
-                    <Label htmlFor="userId">User ID</Label>
-                    <Input
-                      id="userId"
-                      placeholder="Enter user ID"
-                      value={userId}
-                      onChange={(e) => setUserId(e.target.value)}
-                    />
+                    <Label>Search for user</Label>
+                    <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={popoverOpen}
+                          className="w-full justify-between"
+                        >
+                          {selectedUser ? (
+                            <div className="flex items-center gap-2">
+                              <Avatar className="h-5 w-5">
+                                <AvatarImage src={selectedUser.avatarUrl || undefined} />
+                                <AvatarFallback className="text-xs">
+                                  {(selectedUser.username || 'U').slice(0, 2).toUpperCase()}
+                                </AvatarFallback>
+                              </Avatar>
+                              <span>{selectedUser.name || selectedUser.username}</span>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">Search for a user...</span>
+                          )}
+                          <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0" align="start">
+                        <Command>
+                          <CommandInput
+                            placeholder="Search by name or username..."
+                            value={searchQuery}
+                            onValueChange={setSearchQuery}
+                          />
+                          <CommandList>
+                            <CommandEmpty>
+                              {searchQuery.length < 2 
+                                ? 'Type at least 2 characters to search...' 
+                                : 'No users found.'}
+                            </CommandEmpty>
+                            <CommandGroup>
+                              {filteredResults.map((user) => (
+                                <CommandItem
+                                  key={user.id}
+                                  value={user.username || user.id}
+                                  onSelect={() => {
+                                    setSelectedUserId(user.id);
+                                    setPopoverOpen(false);
+                                  }}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <Avatar className="h-6 w-6">
+                                      <AvatarImage src={user.avatarUrl || undefined} />
+                                      <AvatarFallback className="text-xs">
+                                        {(user.username || 'U').slice(0, 2).toUpperCase()}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <div className="flex flex-col">
+                                      <span className="font-medium">{user.name || user.username}</span>
+                                      <span className="text-xs text-muted-foreground">@{user.username}</span>
+                                    </div>
+                                  </div>
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                     <p className="text-xs text-muted-foreground">
-                      Enter the user's ID to add them.
+                      Search for users by name or username.
                     </p>
                   </div>
 
@@ -250,7 +339,7 @@ export function OrgMembersPage() {
                   >
                     Cancel
                   </Button>
-                  <Button type="submit" disabled={addMember.isPending}>
+                  <Button type="submit" disabled={addMember.isPending || !selectedUserId}>
                     {addMember.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Add Member
                   </Button>

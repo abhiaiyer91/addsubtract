@@ -43,6 +43,9 @@ export interface BranchProtectionRule {
   restrictPushAccess: boolean;        // Restrict who can push
   allowedPushers: string[];           // List of allowed user/team IDs
   
+  // Merge queue
+  requireMergeQueue: boolean;         // Require PRs to go through merge queue
+  
   // Metadata
   createdAt: number;                  // Unix timestamp
   updatedAt: number;                  // Unix timestamp
@@ -78,7 +81,8 @@ export type ViolationType =
   | 'PUSH_ACCESS_DENIED'
   | 'REVIEWS_REQUIRED'
   | 'STATUS_CHECKS_REQUIRED'
-  | 'BRANCH_NOT_UP_TO_DATE';
+  | 'BRANCH_NOT_UP_TO_DATE'
+  | 'MERGE_QUEUE_REQUIRED';
 
 /**
  * Storage format for branch protection rules
@@ -98,6 +102,7 @@ const DEFAULT_RULE: Omit<BranchProtectionRule, 'id' | 'pattern' | 'createdAt' | 
   requireCodeOwnerReview: false,
   requireStatusChecks: false,
   requiredStatusChecks: [],
+  requireMergeQueue: false,
   requireBranchUpToDate: false,
   allowForcePush: false,
   allowDeletions: false,

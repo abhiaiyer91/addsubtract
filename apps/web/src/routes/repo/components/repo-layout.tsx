@@ -13,6 +13,7 @@ import {
   Layers,
   MoreHorizontal,
   Sparkles,
+  BookOpen,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -23,10 +24,17 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ChatPanel } from '@/components/ai/chat-panel';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { AgentPanel } from '@/components/agent/agent-panel';
 import { useSession } from '@/lib/auth-client';
 import { trpc } from '@/lib/trpc';
 import { toastSuccess, toastError } from '@/components/ui/use-toast';
+import { cn } from '@/lib/utils';
 
 interface RepoLayoutProps {
   owner: string;
@@ -220,6 +228,7 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
     if (path.includes('/issues')) return 'issues';
     if (path.includes('/pulls') || path.includes('/pull/')) return 'pulls';
     if (path.includes('/stacks')) return 'stacks';
+    if (path.includes('/journal')) return 'journal';
     if (path.includes('/settings')) return 'settings';
     return 'code';
   };
@@ -264,17 +273,29 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
 
         {/* Action buttons - responsive layout */}
         <div className="flex items-center gap-2 flex-shrink-0">
-          {/* Ask AI button */}
+          {/* Agent button */}
           {authenticated && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2 h-9"
-              onClick={() => setIsChatOpen(true)}
-            >
-              <Sparkles className="h-4 w-4" />
-              <span className="hidden sm:inline">Ask AI</span>
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={isChatOpen ? 'default' : 'outline'}
+                    size="sm"
+                    className={cn(
+                      'gap-2 h-9 transition-all',
+                      isChatOpen && 'bg-primary/90 shadow-glow'
+                    )}
+                    onClick={() => setIsChatOpen(!isChatOpen)}
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    <span className="hidden sm:inline">Agent</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {isChatOpen ? 'Close agent panel' : 'Open AI agent'}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           )}
 
           {authenticated && (
@@ -405,6 +426,10 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
             <Layers className="h-4 w-4" />
             <span className="hidden sm:inline">Stacks</span>
           </Link>
+          <Link to={`/${owner}/${repo}/journal`} className={tabClass('journal')}>
+            <BookOpen className="h-4 w-4" />
+            <span className="hidden sm:inline">Journal</span>
+          </Link>
           {authenticated && (
             <Link to={`/${owner}/${repo}/settings`} className={tabClass('settings')}>
               <Settings className="h-4 w-4" />
@@ -417,9 +442,9 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
       {/* Page content */}
       {children}
 
-      {/* AI Chat Panel */}
+      {/* Agent Panel */}
       {authenticated && (
-        <ChatPanel
+        <AgentPanel
           repoId={repoInfo.id}
           repoName={repoInfo.name}
           owner={owner}

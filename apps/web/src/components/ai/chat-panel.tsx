@@ -120,7 +120,7 @@ export function ChatPanel({ repoId, repoName, owner, isOpen, onClose }: ChatPane
       <div className="flex items-center justify-between px-4 py-3 border-b">
         <div className="flex items-center gap-2">
           <Sparkles className="h-5 w-5 text-primary" />
-          <span className="font-medium">Ask AI</span>
+          <span className="font-medium">Agent</span>
           <Badge variant="secondary" className="text-xs">
             {repoName}
           </Badge>
@@ -320,7 +320,7 @@ export function AskAIButton({ onClick, className }: AskAIButtonProps) {
       className={cn('gap-2', className)}
     >
       <Sparkles className="h-4 w-4" />
-      Ask AI
+      Agent
     </Button>
   );
 }

@@ -1,0 +1,392 @@
+---
+title: 'Branch Protection'
+description: 'Protect important branches with rules and restrictions'
+---
+
+
+wit provides comprehensive branch protection rules to safeguard important branches like `main`, `release/*`, and others from accidental or unauthorized changes.
+
+## Overview
+
+Branch protection allows you to:
+- Block direct pushes (require pull requests)
+- Prevent force pushes
+- Block branch deletion
+- Require code reviews
+- Enforce status checks
+- Restrict who can push
+
+## Quick Start
+
+```bash
+# Protect your main branch
+wit protect add main --require-pr --no-force-push --no-delete
+
+# Protect release branches
+wit protect add "release/*" --preset strict
+
+# List all protection rules
+wit protect list
+
+# Check protection status
+wit protect status main
+```
+
+## Commands
+
+### List Rules
+
+```bash
+$ wit protect list
+
+Branch protection rules:
+
+  main
+    PR required, no force-push, no delete, 2 approval(s)
+
+  release/*
+    PR required, no force-push, no delete, status checks
+```
+
+### Add a Rule
+
+```bash
+wit protect add <pattern> [options]
+```
+
+**Examples:**
+
+```bash
+# Basic protection
+wit protect add main
+
+# Require pull requests
+wit protect add main --require-pr
+
+# Full protection
+wit protect add main --require-pr --approvals 2 --no-force-push --no-delete
+
+# Use a preset
+wit protect add main --preset strict
+```
+
+### Update a Rule
+
+```bash
+wit protect update <pattern> [options]
+```
+
+**Examples:**
+
+```bash
+# Increase required approvals
+wit protect update main --approvals 3
+
+# Add status checks
+wit protect update main --status-checks "test,build"
+```
+
+### Remove a Rule
+
+```bash
+wit protect remove <pattern>
+```
+
+### Show Rule Details
+
+```bash
+$ wit protect show main
+
+Pattern: main
+ID: abc123-...
+
+Push restrictions:
+  - Require pull request: Yes
+  - Allow force push: No
+  - Allow deletion: No
+
+Review requirements:
+  - Required approvals: 2
+  - Dismiss stale reviews: Yes
+  - Require code owner review: Yes
+
+Status checks:
+  - Require status checks: Yes
+  - Required checks: test, build, lint
+  - Require branch up-to-date: Yes
+
+Created: 2024-01-15T10:00:00.000Z
+Updated: 2024-01-20T14:30:00.000Z
+```
+
+### Check Operations
+
+Verify if an operation would be allowed:
+
+```bash
+# Check if push is allowed
+wit protect check main --push
+
+# Check force push
+wit protect check main --force-push
+
+# Check deletion
+wit protect check main --delete
+
+# Check merge requirements
+wit protect check main --merge
+```
+
+### Protection Status
+
+See a summary of protection for a branch:
+
+```bash
+$ wit protect status main
+
+Protection status for 'main':
+
+  Push: Blocked (PR required)
+  Force push: Blocked
+  Deletion: Blocked
+  Reviews: Required
+  Status checks: Required
+
+Matching rules: main
+```
+
+## Options
+
+### Push Restrictions
+
+| Option | Description |
+|--------|-------------|
+| `--require-pr` | Block direct pushes, require pull requests |
+| `--no-require-pr` | Allow direct pushes |
+| `--no-force-push` | Block force pushes |
+| `--allow-force-push` | Allow force pushes |
+| `--no-delete` | Block branch deletion |
+| `--allow-delete` | Allow branch deletion |
+| `--restrict-push` | Restrict who can push |
+| `--allowed-pushers <users>` | Comma-separated list of allowed users |
+
+### Review Requirements
+
+| Option | Description |
+|--------|-------------|
+| `--approvals <n>` | Number of required approvals (0-10) |
+| `--dismiss-stale` | Dismiss approvals when new commits are pushed |
+| `--require-codeowner` | Require review from code owners |
+
+### Status Checks
+
+| Option | Description |
+|--------|-------------|
+| `--status-checks <checks>` | Comma-separated list of required checks |
+| `--require-up-to-date` | Require branch to be up-to-date before merge |
+
+### Metadata
+
+| Option | Description |
+|--------|-------------|
+| `--description <text>` | Description for the rule |
+| `--preset <name>` | Use a preset (basic, standard, strict) |
+
+## Presets
+
+wit includes built-in presets for common protection scenarios:
+
+### Basic
+
+```bash
+wit protect add main --preset basic
+```
+
+- Blocks force push
+- Blocks deletion
+- Allows direct push
+
+### Standard
+
+```bash
+wit protect add main --preset standard
+```
+
+- Requires pull request
+- Requires 1 approval
+- Dismisses stale reviews
+- Blocks force push
+- Blocks deletion
+
+### Strict
+
+```bash
+wit protect add main --preset strict
+```
+
+- Requires pull request
+- Requires 2 approvals
+- Dismisses stale reviews
+- Requires code owner review
+- Requires status checks
+- Requires branch up-to-date
+- Blocks force push
+- Blocks deletion
+
+## Pattern Matching
+
+Protection rules support glob-style patterns:
+
+| Pattern | Matches |
+|---------|---------|
+| `main` | Exact match |
+| `release/*` | `release/1.0`, `release/2.0` |
+| `feature/**` | `feature/foo`, `feature/foo/bar` |
+| `*/protected` | `team/protected`, `user/protected` |
+
+**Examples:**
+
+```bash
+# Protect all release branches
+wit protect add "release/*" --preset standard
+
+# Protect all branches in the hotfix namespace
+wit protect add "hotfix/**" --require-pr
+
+# Protect production and staging
+wit protect add "production" --preset strict
+wit protect add "staging" --approvals 1
+```
+
+## Storage
+
+Branch protection rules are stored in `.wit/branch-protection.json`:
+
+```json
+{
+  "version": 1,
+  "rules": [
+    {
+      "id": "abc123...",
+      "pattern": "main",
+      "requirePullRequest": true,
+      "requiredApprovals": 2,
+      "allowForcePush": false,
+      "allowDeletions": false,
+      ...
+    }
+  ]
+}
+```
+
+## Enforcement
+
+### Push Operations
+
+When you attempt to push to a protected branch:
+
+```bash
+$ wit push origin main
+
+✗ Operation blocked on 'main'
+
+Protection violations:
+  ✗ Direct pushes to 'main' are blocked. Please create a pull request.
+    Rule: main (DIRECT_PUSH_BLOCKED)
+```
+
+### Force Push
+
+```bash
+$ wit push --force origin main
+
+✗ Operation blocked on 'main'
+
+Protection violations:
+  ✗ Force pushes to 'main' are not allowed.
+    Rule: main (FORCE_PUSH_BLOCKED)
+```
+
+### Branch Deletion
+
+```bash
+$ wit branch -D main
+
+✗ Operation blocked on 'main'
+
+Protection violations:
+  ✗ Deletion of branch 'main' is not allowed.
+    Rule: main (DELETION_BLOCKED)
+```
+
+## Programmatic Usage
+
+Branch protection can be managed programmatically:
+
+```typescript
+import { BranchProtectionEngine, PROTECTION_PRESETS } from 'wit';
+
+const engine = new BranchProtectionEngine(gitDir);
+const manager = engine.getManager();
+
+// Add a rule
+manager.addRule('main', {
+  requirePullRequest: true,
+  requiredApprovals: 2,
+  allowForcePush: false,
+  ...PROTECTION_PRESETS.strict,
+});
+
+// Check if push is allowed
+const result = engine.canPush('main', 'user123');
+if (!result.allowed) {
+  console.log('Violations:', result.violations);
+}
+
+// Get protection summary
+const summary = engine.getProtectionSummary('main');
+console.log('Protected:', summary.isProtected);
+console.log('Blocks push:', summary.blocksPush);
+```
+
+## Best Practices
+
+### Main Branch
+
+```bash
+wit protect add main \
+  --require-pr \
+  --approvals 2 \
+  --dismiss-stale \
+  --require-codeowner \
+  --status-checks "test,build,lint" \
+  --require-up-to-date \
+  --no-force-push \
+  --no-delete
+```
+
+### Release Branches
+
+```bash
+wit protect add "release/*" \
+  --require-pr \
+  --approvals 1 \
+  --no-force-push \
+  --no-delete
+```
+
+### Feature Branches
+
+Generally, feature branches don't need protection, but you might want to protect long-running ones:
+
+```bash
+wit protect add "feature/major-refactor" \
+  --require-pr \
+  --approvals 1
+```
+
+## Related
+
+- [wit merge](/commands/merge) - Merge branches with conflict resolution
+- [wit pr](/platform/pull-requests) - Pull request management
+- [wit hooks](/features/hooks) - Pre-commit and pre-push hooks

@@ -3,20 +3,16 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
   GitBranch,
   Search,
-  Bell,
+  Inbox,
   Plus,
   ChevronDown,
   Settings,
   LogOut,
   User,
   BookOpen,
-  Check,
-  GitPullRequest,
-  CircleDot,
-  MessageSquare,
-  AtSign,
   Menu,
   X,
+  Building2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -30,7 +26,6 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useSession, signOut } from '@/lib/auth-client';
 import { trpc } from '@/lib/trpc';
-import { formatRelativeTime } from '@/lib/utils';
 import { useCommandPaletteStore } from '@/hooks/useCommandPalette';
 import { isMac } from '@/lib/commands';
 
@@ -51,8 +46,8 @@ export function Header() {
     <>
       <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur-xl">
         <div className="container flex h-14 md:h-16 items-center justify-between px-4 md:px-6">
-          {/* Left section - Logo + Nav */}
-          <div className="flex items-center gap-4 md:gap-8">
+          {/* Left section - Logo + Search */}
+          <div className="flex items-center gap-3 md:gap-4 flex-1">
             {/* Mobile menu button */}
             <Button
               variant="ghost"
@@ -63,52 +58,29 @@ export function Header() {
               {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </Button>
 
-            <Link to="/" className="flex items-center gap-2 group">
+            <Link to={authenticated ? "/inbox" : "/"} className="flex items-center gap-2 group flex-shrink-0">
               <div className="p-1.5 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
                 <GitBranch className="h-4 w-4 md:h-5 md:w-5 text-primary" />
               </div>
               <span className="font-bold text-lg md:text-xl tracking-tight">wit</span>
             </Link>
 
-            {authenticated && (
-              <nav className="hidden md:flex items-center gap-1">
-                <Link
-                  to="/explore"
-                  className="px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-full transition-all duration-200"
-                >
-                  Explore
-                </Link>
-                <Link
-                  to="/pulls"
-                  className="px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-full transition-all duration-200"
-                >
-                  Pull requests
-                </Link>
-                <Link
-                  to="/issues"
-                  className="px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-full transition-all duration-200"
-                >
-                  Issues
-                </Link>
-              </nav>
-            )}
-          </div>
-
-          {/* Center section - Search (opens command palette) */}
-          <div className="hidden sm:flex flex-1 max-w-md mx-4">
-            <button
-              onClick={openCommandPalette}
-              className="flex h-10 w-full items-center gap-2 rounded-full border border-border/40 bg-muted/20 px-4 py-2 text-sm transition-all duration-300 hover:border-muted-foreground/30 hover:bg-muted/30 focus:border-primary/50 focus:bg-card focus:outline-none focus:ring-2 focus:ring-primary/20"
-            >
-              <Search className="h-4 w-4 text-muted-foreground" />
-              <span className="flex-1 text-left text-muted-foreground/50">
-                Search or jump to...
-              </span>
-              <kbd className="kbd hidden sm:inline-flex">
-                {isMac() ? '\u2318' : 'Ctrl'}
-              </kbd>
-              <kbd className="kbd hidden sm:inline-flex">K</kbd>
-            </button>
+            {/* Search bar - right next to logo */}
+            <div className="hidden sm:flex flex-1 max-w-md">
+              <button
+                onClick={openCommandPalette}
+                className="flex h-10 w-full items-center gap-2 rounded-full border border-border/40 bg-muted/20 px-4 py-2 text-sm transition-all duration-300 hover:border-muted-foreground/30 hover:bg-muted/30 focus:border-primary/50 focus:bg-card focus:outline-none focus:ring-2 focus:ring-primary/20"
+              >
+                <Search className="h-4 w-4 text-muted-foreground" />
+                <span className="flex-1 text-left text-muted-foreground/50">
+                  Search or jump to...
+                </span>
+                <kbd className="kbd hidden sm:inline-flex">
+                  {isMac() ? '\u2318' : 'Ctrl'}
+                </kbd>
+                <kbd className="kbd hidden sm:inline-flex">K</kbd>
+              </button>
+            </div>
           </div>
 
           {/* Right section - User actions */}
@@ -138,11 +110,19 @@ export function Header() {
                       <BookOpen className="mr-2 h-4 w-4" />
                       New repository
                     </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => navigate('/orgs/new')}>
+                      <Building2 className="mr-2 h-4 w-4" />
+                      New organization
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
 
-                {/* Notifications */}
-                <NotificationsDropdown />
+                {/* Organization Switcher */}
+                <OrganizationSwitcher />
+
+                {/* Inbox button */}
+                <InboxButton />
 
                 {/* User menu */}
                 <DropdownMenu>
@@ -241,28 +221,12 @@ export function Header() {
               {authenticated && (
                 <>
                   <Link
-                    to="/explore"
+                    to="/inbox"
                     className="flex items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-lg transition-all"
                     onClick={() => setMobileMenuOpen(false)}
                   >
-                    <BookOpen className="h-4 w-4" />
-                    Explore
-                  </Link>
-                  <Link
-                    to="/pulls"
-                    className="flex items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-lg transition-all"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    <GitPullRequest className="h-4 w-4" />
-                    Pull requests
-                  </Link>
-                  <Link
-                    to="/issues"
-                    className="flex items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-lg transition-all"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    <CircleDot className="h-4 w-4" />
-                    Issues
+                    <Inbox className="h-4 w-4" />
+                    Inbox
                   </Link>
                   <Link
                     to="/new"
@@ -271,6 +235,14 @@ export function Header() {
                   >
                     <Plus className="h-4 w-4" />
                     New repository
+                  </Link>
+                  <Link
+                    to="/orgs/new"
+                    className="flex items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-lg transition-all"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <Building2 className="h-4 w-4" />
+                    New organization
                   </Link>
                 </>
               )}
@@ -300,124 +272,76 @@ export function Header() {
   );
 }
 
-function NotificationsDropdown() {
+function OrganizationSwitcher() {
   const navigate = useNavigate();
-  const { data: unreadCount } = trpc.notifications.unreadCount.useQuery();
-  const { data: notifications } = trpc.notifications.list.useQuery({ limit: 10 });
-  const utils = trpc.useUtils();
-  
-  const markAsRead = trpc.notifications.markAsRead.useMutation({
-    onSuccess: () => {
-      utils.notifications.unreadCount.invalidate();
-      utils.notifications.list.invalidate();
-    },
+  const { data: session } = useSession();
+  const { data: userOrgs } = trpc.organizations.listForUser.useQuery(undefined, {
+    enabled: !!session?.user,
   });
 
-  const markAllAsRead = trpc.notifications.markAllAsRead.useMutation({
-    onSuccess: () => {
-      utils.notifications.unreadCount.invalidate();
-      utils.notifications.list.invalidate();
-    },
-  });
-
-  const getNotificationIcon = (type: string) => {
-    switch (type) {
-      case 'pr_review_requested':
-      case 'pr_reviewed':
-      case 'pr_merged':
-        return <GitPullRequest className="h-4 w-4 text-purple-500" />;
-      case 'pr_comment':
-      case 'issue_comment':
-        return <MessageSquare className="h-4 w-4 text-blue-500" />;
-      case 'issue_assigned':
-        return <CircleDot className="h-4 w-4 text-green-500" />;
-      case 'mention':
-        return <AtSign className="h-4 w-4 text-yellow-500" />;
-      default:
-        return <Bell className="h-4 w-4 text-muted-foreground" />;
-    }
-  };
-
-  const handleNotificationClick = (notification: any) => {
-    if (!notification.read) {
-      markAsRead.mutate({ id: notification.id });
-    }
-    if (notification.url) {
-      navigate(notification.url);
-    }
-  };
+  if (!userOrgs || userOrgs.length === 0) {
+    return null;
+  }
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative h-9 w-9">
-          <Bell className="h-4 w-4" />
-          {unreadCount && unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 h-4 w-4 bg-blue-500 rounded-full text-[10px] flex items-center justify-center text-white font-medium">
-              {unreadCount > 9 ? '9+' : unreadCount}
-            </span>
-          )}
+        <Button variant="ghost" size="sm" className="hidden md:flex gap-1 h-9">
+          <Building2 className="h-4 w-4" />
+          <ChevronDown className="h-3 w-3" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-80">
-        <DropdownMenuLabel className="flex items-center justify-between">
-          <span>Notifications</span>
-          {unreadCount && unreadCount > 0 && (
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="h-auto p-0 text-xs text-muted-foreground hover:text-foreground"
-              onClick={() => markAllAsRead.mutate()}
-            >
-              <Check className="h-3 w-3 mr-1" />
-              Mark all read
-            </Button>
-          )}
-        </DropdownMenuLabel>
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuLabel>Switch context</DropdownMenuLabel>
         <DropdownMenuSeparator />
-        {!notifications || notifications.length === 0 ? (
-          <div className="p-4 text-center text-sm text-muted-foreground">
-            No notifications
+        <DropdownMenuItem onClick={() => navigate(`/${session?.user?.username}`)}>
+          <User className="mr-2 h-4 w-4" />
+          <div className="flex flex-col">
+            <span className="font-medium">{session?.user?.name || session?.user?.username}</span>
+            <span className="text-xs text-muted-foreground">Personal account</span>
           </div>
-        ) : (
-          <>
-            {notifications.map((notification) => (
-              <DropdownMenuItem
-                key={notification.id}
-                className={`flex items-start gap-3 p-3 cursor-pointer ${!notification.read ? 'bg-muted/50' : ''}`}
-                onClick={() => handleNotificationClick(notification)}
-              >
-                <div className="mt-0.5">
-                  {getNotificationIcon(notification.type)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className={`text-sm truncate ${!notification.read ? 'font-medium' : ''}`}>
-                    {notification.title}
-                  </p>
-                  {notification.actor && (
-                    <p className="text-xs text-muted-foreground">
-                      {notification.actor.name || notification.actor.username}
-                    </p>
-                  )}
-                  <p className="text-xs text-muted-foreground">
-                    {formatRelativeTime(notification.createdAt)}
-                  </p>
-                </div>
-                {!notification.read && (
-                  <div className="h-2 w-2 bg-blue-500 rounded-full mt-1.5" />
-                )}
-              </DropdownMenuItem>
-            ))}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem 
-              className="text-center text-sm text-primary justify-center"
-              onClick={() => navigate('/notifications')}
-            >
-              View all notifications
-            </DropdownMenuItem>
-          </>
-        )}
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel className="text-xs text-muted-foreground">Organizations</DropdownMenuLabel>
+        {userOrgs.map((membership) => (
+          <DropdownMenuItem
+            key={membership.orgId}
+            onClick={() => navigate(`/org/${membership.org.name}`)}
+          >
+            <Building2 className="mr-2 h-4 w-4" />
+            <div className="flex flex-col">
+              <span className="font-medium">{membership.org.displayName || membership.org.name}</span>
+              <span className="text-xs text-muted-foreground capitalize">{membership.role}</span>
+            </div>
+          </DropdownMenuItem>
+        ))}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => navigate('/orgs/new')}>
+          <Plus className="mr-2 h-4 w-4" />
+          Create organization
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+function InboxButton() {
+  const navigate = useNavigate();
+  const { data: unreadCount } = trpc.notifications.unreadCount.useQuery();
+
+  return (
+    <Button 
+      variant="ghost" 
+      size="icon" 
+      className="relative h-9 w-9"
+      onClick={() => navigate('/inbox')}
+    >
+      <Inbox className="h-4 w-4" />
+      {unreadCount && unreadCount > 0 && (
+        <span className="absolute -top-1 -right-1 h-4 w-4 bg-blue-500 rounded-full text-[10px] flex items-center justify-center text-white font-medium">
+          {unreadCount > 9 ? '9+' : unreadCount}
+        </span>
+      )}
+    </Button>
   );
 }

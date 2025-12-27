@@ -153,7 +153,7 @@ export const aiRouter = router({
           commits,
           title: input.existingTitle,
           existingDescription: input.existingDescription,
-        });
+        }) as any;
 
         return {
           title: result.title,

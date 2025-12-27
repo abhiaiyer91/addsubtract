@@ -16,9 +16,17 @@ import { branchProtectionRouter } from './branch-protection';
 import { notificationsRouter } from './notifications';
 import { stacksRouter } from './stacks';
 import { workflowsRouter } from './workflows';
+import { agentRouter } from './agent';
 import { aiRouter } from './ai';
 import { searchRouter } from './search';
 import { collaboratorsRouter } from './collaborators';
+import { projectsRouter } from './projects';
+import { cyclesRouter } from './cycles';
+import { mergeQueueRouter } from './merge-queue';
+import { journalRouter } from './journal';
+import { repoAiKeysRouter } from './repo-ai-keys';
+import { dashboardRouter } from './dashboard';
+import { wrappedRouter } from './wrapped';
 
 /**
  * Main application router
@@ -42,9 +50,17 @@ export const appRouter = router({
   notifications: notificationsRouter,
   stacks: stacksRouter,
   workflows: workflowsRouter,
+  agent: agentRouter,
   ai: aiRouter,
   search: searchRouter,
   collaborators: collaboratorsRouter,
+  projects: projectsRouter,
+  cycles: cyclesRouter,
+  mergeQueue: mergeQueueRouter,
+  journal: journalRouter,
+  repoAiKeys: repoAiKeysRouter,
+  dashboard: dashboardRouter,
+  wrapped: wrappedRouter,
 });
 
 /**
@@ -70,7 +86,15 @@ export {
   branchProtectionRouter,
   notificationsRouter,
   stacksRouter,
+  agentRouter,
   aiRouter,
   searchRouter,
   collaboratorsRouter,
+  projectsRouter,
+  cyclesRouter,
+  mergeQueueRouter,
+  journalRouter,
+  repoAiKeysRouter,
+  dashboardRouter,
+  wrappedRouter,
 };

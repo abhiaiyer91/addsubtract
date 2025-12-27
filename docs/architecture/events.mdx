@@ -1,0 +1,398 @@
+---
+title: 'Events System'
+description: 'Event-driven architecture for notifications, webhooks, and automation'
+---
+
+
+wit uses an event-driven architecture to power notifications, webhooks, CI/CD triggers, and other automated workflows.
+
+## Overview
+
+The events system provides:
+- Real-time event emission for repository activities
+- Handler registration for processing events
+- Integration with notifications, CI, and webhooks
+- Extensibility for custom event handling
+
+## Event Types
+
+### Repository Events
+
+| Event | Description |
+|-------|-------------|
+| `repo.created` | New repository created |
+| `repo.deleted` | Repository deleted |
+| `repo.visibility_changed` | Public/private changed |
+
+### Push Events
+
+| Event | Description |
+|-------|-------------|
+| `push` | Commits pushed to repository |
+| `branch.created` | New branch created |
+| `branch.deleted` | Branch deleted |
+| `tag.created` | New tag created |
+| `tag.deleted` | Tag deleted |
+
+### Pull Request Events
+
+| Event | Description |
+|-------|-------------|
+| `pr.opened` | PR opened |
+| `pr.closed` | PR closed |
+| `pr.merged` | PR merged |
+| `pr.reopened` | PR reopened |
+| `pr.review_requested` | Review requested |
+| `pr.review_submitted` | Review submitted |
+| `pr.comment` | Comment added |
+
+### Issue Events
+
+| Event | Description |
+|-------|-------------|
+| `issue.opened` | Issue opened |
+| `issue.closed` | Issue closed |
+| `issue.reopened` | Issue reopened |
+| `issue.comment` | Comment added |
+| `issue.assigned` | Assignee added |
+| `issue.labeled` | Label added |
+
+### CI Events
+
+| Event | Description |
+|-------|-------------|
+| `ci.workflow_started` | Workflow started |
+| `ci.workflow_completed` | Workflow finished |
+| `ci.job_started` | Job started |
+| `ci.job_completed` | Job finished |
+| `ci.job_failed` | Job failed |
+
+### Mention Events
+
+| Event | Description |
+|-------|-------------|
+| `mention.user` | User mentioned in text |
+| `mention.team` | Team mentioned in text |
+
+### Merge Queue Events
+
+| Event | Description |
+|-------|-------------|
+| `merge_queue.added` | PR added to queue |
+| `merge_queue.removed` | PR removed from queue |
+| `merge_queue.testing` | Testing started |
+| `merge_queue.merged` | PR merged via queue |
+| `merge_queue.failed` | Queue merge failed |
+
+## Event Bus
+
+The central event bus manages event emission and handler registration.
+
+### Emitting Events
+
+```typescript
+import { eventBus, createEvent } from 'wit/events';
+
+// Create and emit an event
+const event = createEvent('pr.opened', {
+  repository: { id: repoId, name: 'my-repo' },
+  pullRequest: { id: prId, number: 123, title: 'Add feature' },
+  author: { id: userId, username: 'johndoe' },
+  timestamp: new Date(),
+});
+
+eventBus.emit(event);
+```
+
+### Subscribing to Events
+
+```typescript
+import { eventBus } from 'wit/events';
+
+// Subscribe to specific event type
+eventBus.on('pr.opened', async (event) => {
+  console.log(`PR #${event.pullRequest.number} opened`);
+});
+
+// Subscribe to all events of a category
+eventBus.on('pr.*', async (event) => {
+  console.log(`PR event: ${event.type}`);
+});
+
+// Subscribe to all events
+eventBus.on('*', async (event) => {
+  console.log(`Event: ${event.type}`);
+});
+```
+
+## Built-in Handlers
+
+### Notification Handler
+
+Automatically creates notifications for relevant events:
+
+```typescript
+import { registerNotificationHandlers } from 'wit/events';
+
+// Register notification handlers
+registerNotificationHandlers(eventBus);
+```
+
+This creates notifications for:
+- PR comments and reviews
+- Mentions in comments
+- Review requests
+- Issue assignments
+- Access grants
+
+### CI Handler
+
+Triggers CI workflows based on events:
+
+```typescript
+import { registerCIHandlers } from 'wit/events';
+
+// Register CI handlers
+registerCIHandlers(eventBus, ciExecutor);
+```
+
+Triggered by:
+- Push events
+- PR opened/synchronized
+- Manual workflow dispatch
+
+### Merge Queue Handler
+
+Processes merge queue state changes:
+
+```typescript
+import { registerMergeQueueHandlers } from 'wit/events';
+
+// Register merge queue handlers
+registerMergeQueueHandlers(eventBus);
+```
+
+## Event Structure
+
+All events follow a common structure:
+
+```typescript
+interface Event {
+  id: string;           // Unique event ID
+  type: string;         // Event type (e.g., 'pr.opened')
+  timestamp: Date;      // When the event occurred
+  repository?: {        // Repository context (if applicable)
+    id: string;
+    name: string;
+    owner: string;
+  };
+  actor?: {             // Who triggered the event
+    id: string;
+    username: string;
+  };
+  // Additional fields based on event type
+}
+```
+
+### Example Events
+
+**Push Event:**
+```typescript
+{
+  id: 'evt_abc123',
+  type: 'push',
+  timestamp: '2024-01-20T10:30:00Z',
+  repository: {
+    id: 'repo_123',
+    name: 'my-repo',
+    owner: 'johndoe'
+  },
+  actor: {
+    id: 'user_456',
+    username: 'johndoe'
+  },
+  ref: 'refs/heads/main',
+  before: 'abc123...',
+  after: 'def456...',
+  commits: [
+    { id: 'def456', message: 'Add feature', author: 'johndoe' }
+  ]
+}
+```
+
+**PR Review Event:**
+```typescript
+{
+  id: 'evt_xyz789',
+  type: 'pr.review_submitted',
+  timestamp: '2024-01-20T11:00:00Z',
+  repository: { ... },
+  actor: { id: 'user_789', username: 'reviewer' },
+  pullRequest: {
+    id: 'pr_123',
+    number: 42,
+    title: 'Add new feature'
+  },
+  review: {
+    id: 'review_456',
+    state: 'approved',
+    body: 'Looks good!'
+  }
+}
+```
+
+## Custom Event Handlers
+
+### Creating a Handler
+
+```typescript
+import { eventBus } from 'wit/events';
+
+// Simple handler
+function myHandler(event) {
+  console.log('Received event:', event.type);
+}
+
+eventBus.on('push', myHandler);
+
+// Async handler
+eventBus.on('pr.merged', async (event) => {
+  await notifyTeam(event);
+  await updateMetrics(event);
+});
+```
+
+### Handler with Filtering
+
+```typescript
+eventBus.on('push', async (event) => {
+  // Only process pushes to main
+  if (event.ref !== 'refs/heads/main') return;
+  
+  await deployToStaging(event);
+});
+```
+
+### Error Handling
+
+```typescript
+eventBus.on('pr.opened', async (event) => {
+  try {
+    await processEvent(event);
+  } catch (error) {
+    console.error('Handler error:', error);
+    // Event bus continues with other handlers
+  }
+});
+```
+
+## Helper Functions
+
+### Extracting Mentions
+
+```typescript
+import { extractMentions } from 'wit/events';
+
+const text = 'Hey @johndoe, can you review this? cc @janedoe';
+const mentions = extractMentions(text);
+// ['johndoe', 'janedoe']
+```
+
+### Creating Events
+
+```typescript
+import { createEvent } from 'wit/events';
+
+const event = createEvent('custom.event', {
+  customField: 'value',
+  // Auto-adds: id, type, timestamp
+});
+```
+
+## Integration Points
+
+### Webhooks
+
+Events are automatically sent to configured webhooks:
+
+```typescript
+// When an event is emitted, webhooks are triggered
+eventBus.on('*', async (event) => {
+  const webhooks = await getWebhooksForRepo(event.repository.id);
+  
+  for (const webhook of webhooks) {
+    if (webhook.events.includes(event.type)) {
+      await sendWebhook(webhook.url, event);
+    }
+  }
+});
+```
+
+### Activity Feed
+
+Events populate the activity feed:
+
+```typescript
+eventBus.on('*', async (event) => {
+  await createActivityEntry({
+    type: event.type,
+    actor: event.actor,
+    repository: event.repository,
+    details: event,
+    timestamp: event.timestamp,
+  });
+});
+```
+
+### Real-time Updates
+
+Events can be sent to connected clients:
+
+```typescript
+import { broadcastToRepo } from 'wit/realtime';
+
+eventBus.on('*', async (event) => {
+  if (event.repository) {
+    broadcastToRepo(event.repository.id, event);
+  }
+});
+```
+
+## Testing Event Handlers
+
+```typescript
+import { eventBus, createEvent } from 'wit/events';
+
+describe('My Handler', () => {
+  it('processes pr.opened events', async () => {
+    const processed = [];
+    
+    eventBus.on('pr.opened', (event) => {
+      processed.push(event);
+    });
+    
+    const event = createEvent('pr.opened', {
+      pullRequest: { number: 1 }
+    });
+    
+    eventBus.emit(event);
+    
+    expect(processed).toHaveLength(1);
+    expect(processed[0].pullRequest.number).toBe(1);
+  });
+});
+```
+
+## Best Practices
+
+1. **Keep handlers fast** - Long-running operations should be queued
+2. **Handle errors gracefully** - Don't let one handler break others
+3. **Use specific events** - Subscribe to specific types when possible
+4. **Idempotency** - Design handlers to be safely re-run
+5. **Logging** - Log event processing for debugging
+
+## Related
+
+- [Webhooks API](/api-reference/webhooks) - Configure webhooks
+- [Notifications API](/api-reference/notifications) - Notification system
+- [CI/CD](/features/ci-cd) - CI/CD integration

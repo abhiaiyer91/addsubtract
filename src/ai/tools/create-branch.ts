@@ -96,10 +96,10 @@ Optionally switch to the new branch immediately.`,
       journal.record(
         'branch',
         [name, switchTo ? '--switch' : ''],
-        `Created branch: ${name}`,
+        `Created branch: ${name}${switchTo ? ' and switched to it' : ''}`,
         beforeState,
         afterState,
-        { branchName: name, switchedTo: switchTo }
+        { commitHash }
       );
 
       return {

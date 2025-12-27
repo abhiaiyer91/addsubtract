@@ -40,7 +40,27 @@ export {
   issueLabelModel,
   issueInboxModel,
   ISSUE_STATUSES,
+  ISSUE_PRIORITIES,
+  PRIORITY_CONFIG,
 } from './issue';
+
+// Issue relations model
+export { issueRelationModel } from './issue-relations';
+
+// Issue activity model
+export { issueActivityModel, type ActivityAction } from './issue-activity';
+
+// Issue template model
+export { issueTemplateModel } from './issue-template';
+
+// Issue view model
+export { issueViewModel, type ViewFilters, type ViewDisplayOptions } from './issue-view';
+
+// Project models
+export { projectModel, projectUpdateModel, PROJECT_STATUSES, PROJECT_HEALTH, PROJECT_STATUS_CONFIG } from './project';
+
+// Cycle model
+export { cycleModel } from './cycle';
 
 // Activity model
 export { activityModel, activityHelpers, type ActivityType, type ActivityPayload } from './activity';
@@ -77,3 +97,51 @@ export {
   type StackBranchWithPR,
   type StackWithDetails,
 } from './stack';
+
+// Agent models (coding agent sessions and messages)
+export {
+  agentSessionModel,
+  agentMessageModel,
+  agentFileChangeModel,
+} from './agent';
+
+// Repository AI Keys model
+export { repoAiKeyModel, type RepoAiKeyInfo } from './repo-ai-keys';
+
+// User Stats model (dashboard data)
+export {
+  userStatsModel,
+  type ContributionDay,
+  type ContributionStreak,
+  type UserContributionStats,
+  type DashboardSummary,
+  type DashboardRepo,
+  type ActivityFeedItem,
+} from './user-stats';
+
+// Journal models (Notion-like documentation)
+export {
+  journalPageModel,
+  journalCommentModel,
+  journalPageHistoryModel,
+  generateSlug,
+  JOURNAL_PAGE_STATUSES,
+  JOURNAL_STATUS_CONFIG,
+} from './journal';
+
+// Wrapped model (monthly activity insights)
+export {
+  wrappedModel,
+  type WrappedData,
+  type WrappedPeriod,
+  type ActivityBreakdown,
+  type DailyActivity,
+  type HourlyDistribution,
+  type DayOfWeekDistribution,
+  type TopRepository,
+  type TopCollaborator,
+  type StreakInfo,
+  type FunStats,
+  type AIUsageStats,
+  type CIStats,
+} from './wrapped';

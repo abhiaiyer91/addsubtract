@@ -6,6 +6,24 @@
 import { Issue, IssueStatus, IssuePriority, IssueManager, STATUS_CONFIG, PRIORITY_CONFIG, Cycle } from '../core/issues';
 
 /**
+ * Extended issue with Linear-style fields
+ */
+export interface IssueWithExtras extends Issue {
+  dueDate?: number;
+  estimate?: number;
+  parentId?: string;
+  parentNumber?: number;
+  subIssueCount?: number;
+  subIssueProgress?: number;
+  projectName?: string;
+  cycleNumber?: number;
+  isBlocked?: boolean;
+  blockedByCount?: number;
+  blockingCount?: number;
+  relatedCount?: number;
+}
+
+/**
  * Board column configuration
  */
 export interface BoardColumn {
@@ -16,9 +34,10 @@ export interface BoardColumn {
 }
 
 /**
- * Default board columns
+ * Default board columns - includes triage for Linear-style workflow
  */
 export const DEFAULT_COLUMNS: BoardColumn[] = [
+  { status: 'triage' as IssueStatus, title: 'Triage', icon: '◇', color: '#9ca3af' },
   { status: 'backlog', title: 'Backlog', icon: '○', color: '#6b7280' },
   { status: 'todo', title: 'Todo', icon: '◔', color: '#f59e0b' },
   { status: 'in_progress', title: 'In Progress', icon: '◑', color: '#3b82f6' },
@@ -27,11 +46,46 @@ export const DEFAULT_COLUMNS: BoardColumn[] = [
 ];
 
 /**
+ * Relations data type
+ */
+interface RelationsData {
+  blocking?: number[];
+  blockedBy?: number[];
+  related?: number[];
+  duplicates?: number[];
+  duplicatedBy?: number[];
+}
+
+/**
+ * Due date status helper
+ */
+function getDueDateStatus(dueDate: number | undefined): { label: string; class: string } | null {
+  if (!dueDate) return null;
+  
+  const now = Date.now();
+  const diffDays = Math.ceil((dueDate - now) / (1000 * 60 * 60 * 24));
+  
+  if (diffDays < 0) {
+    return { label: `${Math.abs(diffDays)}d overdue`, class: 'due-overdue' };
+  } else if (diffDays === 0) {
+    return { label: 'Due today', class: 'due-today' };
+  } else if (diffDays <= 3) {
+    return { label: `${diffDays}d`, class: 'due-soon' };
+  } else if (diffDays <= 7) {
+    return { label: `${diffDays}d`, class: 'due-week' };
+  }
+  
+  const date = new Date(dueDate);
+  return { label: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), class: 'due-normal' };
+}
+
+/**
  * Render issue card HTML
  */
 export function renderIssueCard(issue: Issue, manager: IssueManager): string {
   const priorityConfig = PRIORITY_CONFIG[issue.priority];
   const displayId = manager.getDisplayId(issue);
+  const extIssue = issue as IssueWithExtras;
   
   const labels = issue.labels.map(label => 
     `<span class="issue-label">${escapeHtml(label)}</span>`
@@ -45,23 +99,75 @@ export function renderIssueCard(issue: Issue, manager: IssueManager): string {
   
   const typeIcon = getTypeIcon(issue.type);
   
+  // Due date badge
+  const dueStatus = getDueDateStatus(extIssue.dueDate);
+  const dueBadge = dueStatus 
+    ? `<span class="issue-due-badge ${dueStatus.class}">${dueStatus.label}</span>`
+    : '';
+  
+  // Sub-issue progress indicator
+  const subProgress = extIssue.subIssueCount && extIssue.subIssueCount > 0
+    ? `<div class="issue-sub-progress" title="${extIssue.subIssueProgress || 0}% complete">
+         <span class="sub-icon">⊟</span>
+         <span class="sub-count">${extIssue.subIssueProgress || 0}%</span>
+       </div>`
+    : '';
+  
+  // Blocked indicator
+  const blockedBadge = extIssue.isBlocked || (extIssue.blockedByCount && extIssue.blockedByCount > 0)
+    ? `<span class="issue-blocked-badge" title="Blocked by ${extIssue.blockedByCount || 1} issue(s)">🚫</span>`
+    : '';
+  
+  // Blocking indicator
+  const blockingBadge = extIssue.blockingCount && extIssue.blockingCount > 0
+    ? `<span class="issue-blocking-badge" title="Blocking ${extIssue.blockingCount} issue(s)">⚠️</span>`
+    : '';
+  
+  // Estimate badge
+  const estimateBadge = extIssue.estimate
+    ? `<span class="issue-estimate-badge">${extIssue.estimate}pts</span>`
+    : '';
+  
+  // Parent indicator (for sub-issues)
+  const parentIndicator = extIssue.parentNumber
+    ? `<span class="issue-parent-indicator" title="Sub-issue of #${extIssue.parentNumber}">↳</span>`
+    : '';
+  
+  // Project/Cycle indicators
+  const projectBadge = extIssue.projectName
+    ? `<span class="issue-project-badge" title="Project: ${escapeHtml(extIssue.projectName)}">📁</span>`
+    : '';
+  
+  const cycleBadge = extIssue.cycleNumber
+    ? `<span class="issue-cycle-badge" title="Cycle ${extIssue.cycleNumber}">🔄 ${extIssue.cycleNumber}</span>`
+    : '';
+  
   return `
-    <div class="issue-card" 
+    <div class="issue-card ${extIssue.isBlocked ? 'issue-card-blocked' : ''}" 
          data-id="${issue.id}" 
          data-number="${issue.number}"
          data-status="${issue.status}"
          draggable="true"
          onclick="openIssueDetail('${issue.id}')">
       <div class="issue-card-header">
-        <span class="issue-id">${displayId}</span>
-        <span class="issue-priority" style="color: ${priorityConfig.color}" title="${issue.priority}">
-          ${priorityConfig.icon}
-        </span>
+        <span class="issue-id">${parentIndicator}${displayId}</span>
+        <div class="issue-card-badges">
+          ${blockedBadge}
+          ${blockingBadge}
+          <span class="issue-priority" style="color: ${priorityConfig.color}" title="${issue.priority}">
+            ${priorityConfig.icon}
+          </span>
+        </div>
       </div>
       <div class="issue-card-title">${escapeHtml(issue.title)}</div>
+      ${subProgress}
       <div class="issue-card-footer">
         <div class="issue-card-meta">
           <span class="issue-type" title="${issue.type}">${typeIcon}</span>
+          ${dueBadge}
+          ${estimateBadge}
+          ${projectBadge}
+          ${cycleBadge}
           ${labels}
         </div>
         ${assignee}
@@ -186,14 +292,40 @@ export function renderIssueList(issues: Issue[], manager: IssueManager): string 
     const statusConfig = STATUS_CONFIG[issue.status];
     const priorityConfig = PRIORITY_CONFIG[issue.priority];
     const displayId = manager.getDisplayId(issue);
+    const extIssue = issue as IssueWithExtras;
     
     const labels = issue.labels.map(label => 
       `<span class="issue-label">${escapeHtml(label)}</span>`
     ).join('');
     
+    // Check if overdue
+    const isOverdue = extIssue.dueDate && extIssue.dueDate < Date.now();
+    const dueStatus = getDueDateStatus(extIssue.dueDate);
+    
+    // Sub-issue indicator
+    const hasSubIssues = extIssue.subIssueCount && extIssue.subIssueCount > 0;
+    const subIssueIndicator = hasSubIssues 
+      ? `<span class="sub-issue-toggle" onclick="event.stopPropagation(); toggleSubIssues('${issue.id}')">▶</span>`
+      : '';
+    
+    // Parent indicator
+    const parentIndicator = extIssue.parentNumber 
+      ? `<span class="issue-parent-indicator" title="Sub-issue of #${extIssue.parentNumber}">↳</span>`
+      : '';
+    
+    // Blocked indicator
+    const blockedIndicator = extIssue.isBlocked || (extIssue.blockedByCount && extIssue.blockedByCount > 0)
+      ? `<span class="issue-blocked-badge" title="Blocked">🚫</span>`
+      : '';
+    
     return `
-      <tr class="issue-row" onclick="openIssueDetail('${issue.id}')">
-        <td class="issue-id-cell">${displayId}</td>
+      <tr class="issue-row ${isOverdue ? 'overdue' : ''} ${hasSubIssues ? 'has-sub-issues' : ''} ${extIssue.parentNumber ? 'sub-issue' : ''}" 
+          data-id="${issue.id}"
+          onclick="openIssueDetail('${issue.id}')">
+        <td class="issue-id-cell">
+          ${subIssueIndicator}${parentIndicator}${displayId}
+          ${blockedIndicator}
+        </td>
         <td class="issue-status-cell">
           <span class="status-badge" style="background: ${statusConfig.color}20; color: ${statusConfig.color}">
             ${statusConfig.icon} ${issue.status.replace('_', ' ')}
@@ -206,7 +338,14 @@ export function renderIssueList(issues: Issue[], manager: IssueManager): string 
         </td>
         <td class="issue-title-cell">
           <span class="issue-title">${escapeHtml(issue.title)}</span>
+          ${hasSubIssues ? `<span class="sub-issue-count">(${extIssue.subIssueProgress || 0}%)</span>` : ''}
           <div class="issue-labels">${labels}</div>
+        </td>
+        <td class="issue-due-cell">
+          ${dueStatus ? `<span class="issue-due-badge ${dueStatus.class}">${dueStatus.label}</span>` : ''}
+        </td>
+        <td class="issue-estimate-cell">
+          ${extIssue.estimate ? `${extIssue.estimate}pts` : ''}
         </td>
         <td class="issue-assignee-cell">
           ${issue.assignee ? `<span class="assignee">@${escapeHtml(issue.assignee)}</span>` : ''}
@@ -225,6 +364,23 @@ export function renderIssueList(issues: Issue[], manager: IssueManager): string 
           <h2>Issues</h2>
           <span class="list-count">${issues.length} issues</span>
         </div>
+        <div class="board-filters">
+          <div class="filter-dropdown">
+            <button class="filter-button" onclick="toggleFilter('priority')">
+              Priority <span>▼</span>
+            </button>
+          </div>
+          <div class="filter-dropdown">
+            <button class="filter-button" onclick="toggleFilter('due')">
+              Due Date <span>▼</span>
+            </button>
+          </div>
+          <div class="filter-dropdown">
+            <button class="filter-button" onclick="toggleFilter('project')">
+              Project <span>▼</span>
+            </button>
+          </div>
+        </div>
         <div class="list-actions">
           <button class="btn btn-primary" onclick="createIssue()">
             <svg viewBox="0 0 16 16" fill="currentColor" width="14" height="14">
@@ -241,6 +397,8 @@ export function renderIssueList(issues: Issue[], manager: IssueManager): string 
             <th>Status</th>
             <th></th>
             <th>Title</th>
+            <th>Due</th>
+            <th>Est</th>
             <th>Assignee</th>
             <th>Updated</th>
           </tr>
@@ -260,6 +418,7 @@ export function renderIssueDetail(issue: Issue, manager: IssueManager): string {
   const displayId = manager.getDisplayId(issue);
   const statusConfig = STATUS_CONFIG[issue.status];
   const priorityConfig = PRIORITY_CONFIG[issue.priority];
+  const extIssue = issue as IssueWithExtras;
   
   const comments = manager.getComments(issue.id);
   const activity = manager.getActivity(issue.id);
@@ -277,6 +436,138 @@ export function renderIssueDetail(issue: Issue, manager: IssueManager): string {
   const labels = issue.labels.map(label => 
     `<span class="issue-label">${escapeHtml(label)}</span>`
   ).join('');
+
+  // Due date display
+  const dueStatus = getDueDateStatus(extIssue.dueDate);
+  const dueDateHtml = extIssue.dueDate 
+    ? `<div class="meta-row">
+         <span class="meta-label">Due Date</span>
+         <div class="due-date-container">
+           <span class="issue-due-badge ${dueStatus?.class || ''}">${dueStatus?.label || ''}</span>
+           <button class="btn-icon" onclick="clearDueDate('${issue.id}')" title="Clear due date">×</button>
+         </div>
+       </div>`
+    : `<div class="meta-row">
+         <span class="meta-label">Due Date</span>
+         <button class="btn btn-sm" onclick="setDueDate('${issue.id}')">Set due date</button>
+       </div>`;
+
+  // Estimate display
+  const estimateHtml = `
+    <div class="meta-row">
+      <span class="meta-label">Estimate</span>
+      <input type="number" 
+             class="estimate-input" 
+             value="${extIssue.estimate || ''}" 
+             placeholder="Points"
+             min="0"
+             onchange="updateIssueEstimate('${issue.id}', this.value)">
+    </div>`;
+
+  // Parent/Sub-issues section
+  let hierarchyHtml = '';
+  if (extIssue.parentNumber) {
+    hierarchyHtml = `
+      <div class="meta-row">
+        <span class="meta-label">Parent</span>
+        <span class="parent-link" onclick="openIssueByNumber(${extIssue.parentNumber})">#${extIssue.parentNumber}</span>
+        <button class="btn-icon" onclick="removeParent('${issue.id}')" title="Remove parent">×</button>
+      </div>`;
+  }
+  
+  if (extIssue.subIssueCount && extIssue.subIssueCount > 0) {
+    hierarchyHtml += `
+      <div class="meta-row">
+        <span class="meta-label">Sub-issues</span>
+        <div class="sub-issues-summary">
+          <span>${extIssue.subIssueCount} sub-issues</span>
+          <div class="issue-sub-progress-bar">
+            <div class="issue-sub-progress-bar-fill" style="width: ${extIssue.subIssueProgress || 0}%"></div>
+          </div>
+          <span>${extIssue.subIssueProgress || 0}%</span>
+        </div>
+      </div>`;
+  }
+
+  // Project/Cycle section
+  let projectCycleHtml = '';
+  if (extIssue.projectName) {
+    projectCycleHtml += `
+      <div class="meta-row">
+        <span class="meta-label">Project</span>
+        <span class="project-link">${escapeHtml(extIssue.projectName)}</span>
+      </div>`;
+  }
+  if (extIssue.cycleNumber) {
+    projectCycleHtml += `
+      <div class="meta-row">
+        <span class="meta-label">Cycle</span>
+        <span class="cycle-link">Cycle ${extIssue.cycleNumber}</span>
+      </div>`;
+  }
+
+  // Relations section
+  // Check if manager has getRelations method (it may be added in extended versions)
+  const managerWithRelations = manager as IssueManager & { getRelations?: (id: string) => RelationsData | null };
+  const relations = managerWithRelations.getRelations ? managerWithRelations.getRelations(issue.id) : null;
+  let relationsHtml = '';
+  if (relations && (relations.blockedBy?.length || relations.blocking?.length || 
+      relations.related?.length || relations.duplicates?.length)) {
+    relationsHtml = `
+      <div class="issue-relations">
+        <h3>Relations</h3>
+        ${relations.blockedBy?.length ? `
+          <div class="relation-group">
+            <div class="relation-label blocked-by">🚫 Blocked by</div>
+            <div class="relation-items">
+              ${relations.blockedBy.map((num: number) => 
+                `<span class="relation-item blocked-by" onclick="openIssueByNumber(${num})">#${num}</span>`
+              ).join('')}
+            </div>
+          </div>
+        ` : ''}
+        ${relations.blocking?.length ? `
+          <div class="relation-group">
+            <div class="relation-label blocking">⚠️ Blocking</div>
+            <div class="relation-items">
+              ${relations.blocking.map((num: number) => 
+                `<span class="relation-item blocking" onclick="openIssueByNumber(${num})">#${num}</span>`
+              ).join('')}
+            </div>
+          </div>
+        ` : ''}
+        ${relations.related?.length ? `
+          <div class="relation-group">
+            <div class="relation-label related">🔗 Related</div>
+            <div class="relation-items">
+              ${relations.related.map((num: number) => 
+                `<span class="relation-item" onclick="openIssueByNumber(${num})">#${num}</span>`
+              ).join('')}
+            </div>
+          </div>
+        ` : ''}
+        ${relations.duplicates?.length ? `
+          <div class="relation-group">
+            <div class="relation-label duplicate">📋 Duplicates</div>
+            <div class="relation-items">
+              ${relations.duplicates.map((num: number) => 
+                `<span class="relation-item" onclick="openIssueByNumber(${num})">#${num}</span>`
+              ).join('')}
+            </div>
+          </div>
+        ` : ''}
+        <button class="btn btn-sm" onclick="addRelation('${issue.id}')">Add relation</button>
+      </div>
+    `;
+  } else {
+    relationsHtml = `
+      <div class="issue-relations">
+        <h3>Relations</h3>
+        <div class="no-relations">No relations</div>
+        <button class="btn btn-sm" onclick="addRelation('${issue.id}')">Add relation</button>
+      </div>
+    `;
+  }
   
   return `
     <div class="issue-detail-panel">
@@ -312,6 +603,9 @@ export function renderIssueDetail(issue: Issue, manager: IssueManager): string {
           </select>
         </div>
         
+        ${dueDateHtml}
+        ${estimateHtml}
+        
         <div class="meta-row">
           <span class="meta-label">Assignee</span>
           <input type="text" 
@@ -321,6 +615,9 @@ export function renderIssueDetail(issue: Issue, manager: IssueManager): string {
                  onchange="updateIssueAssignee('${issue.id}', this.value)">
         </div>
         
+        ${hierarchyHtml}
+        ${projectCycleHtml}
+        
         <div class="meta-row">
           <span class="meta-label">Labels</span>
           <div class="labels-container">
@@ -328,6 +625,8 @@ export function renderIssueDetail(issue: Issue, manager: IssueManager): string {
           </div>
         </div>
       </div>
+      
+      ${relationsHtml}
       
       <div class="issue-detail-description">
         <h3>Description</h3>
@@ -947,6 +1246,368 @@ export function getIssueBoardStyles(): string {
       border: 2px dashed var(--border-focus);
       border-radius: var(--radius-md);
     }
+    
+    /* ================================================================
+       Linear-style Enhancements
+       ================================================================ */
+    
+    /* Issue card badges container */
+    .issue-card-badges {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    
+    /* Blocked issue card styling */
+    .issue-card-blocked {
+      border-left: 3px solid var(--accent-danger);
+      opacity: 0.85;
+    }
+    
+    .issue-card-blocked:hover {
+      opacity: 1;
+    }
+    
+    /* Due date badges */
+    .issue-due-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 6px;
+      border-radius: var(--radius-sm);
+      font-size: var(--font-size-xs);
+      font-weight: 500;
+    }
+    
+    .issue-due-badge.due-overdue {
+      background: rgba(239, 68, 68, 0.15);
+      color: #ef4444;
+    }
+    
+    .issue-due-badge.due-today {
+      background: rgba(245, 158, 11, 0.15);
+      color: #f59e0b;
+    }
+    
+    .issue-due-badge.due-soon {
+      background: rgba(234, 179, 8, 0.15);
+      color: #eab308;
+    }
+    
+    .issue-due-badge.due-week {
+      background: rgba(59, 130, 246, 0.1);
+      color: #3b82f6;
+    }
+    
+    .issue-due-badge.due-normal {
+      background: var(--bg-overlay);
+      color: var(--text-tertiary);
+    }
+    
+    /* Blocked/Blocking badges */
+    .issue-blocked-badge,
+    .issue-blocking-badge {
+      font-size: 12px;
+      cursor: help;
+    }
+    
+    /* Estimate badge */
+    .issue-estimate-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 6px;
+      background: var(--bg-overlay);
+      border-radius: var(--radius-sm);
+      font-size: var(--font-size-xs);
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+    
+    /* Parent indicator */
+    .issue-parent-indicator {
+      color: var(--text-tertiary);
+      margin-right: 2px;
+    }
+    
+    /* Project/Cycle badges */
+    .issue-project-badge,
+    .issue-cycle-badge {
+      font-size: 11px;
+      padding: 2px 4px;
+      background: var(--bg-overlay);
+      border-radius: var(--radius-sm);
+      color: var(--text-tertiary);
+    }
+    
+    /* Sub-issue progress */
+    .issue-sub-progress {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin: var(--spacing-xs) 0;
+      padding: 4px 8px;
+      background: var(--bg-overlay);
+      border-radius: var(--radius-sm);
+      font-size: var(--font-size-xs);
+    }
+    
+    .issue-sub-progress .sub-icon {
+      color: var(--text-tertiary);
+    }
+    
+    .issue-sub-progress .sub-count {
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+    
+    /* Sub-issue progress bar (alternative display) */
+    .issue-sub-progress-bar {
+      height: 4px;
+      background: var(--bg-overlay);
+      border-radius: var(--radius-full);
+      overflow: hidden;
+      margin: var(--spacing-xs) 0;
+    }
+    
+    .issue-sub-progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent-primary) 0%, var(--accent-success) 100%);
+      border-radius: var(--radius-full);
+      transition: width 0.3s ease;
+    }
+    
+    /* Relations section in detail panel */
+    .issue-relations {
+      margin-bottom: var(--spacing-lg);
+    }
+    
+    .issue-relations h3 {
+      font-size: var(--font-size-sm);
+      font-weight: 600;
+      color: var(--text-tertiary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: var(--spacing-md);
+    }
+    
+    .relation-group {
+      margin-bottom: var(--spacing-sm);
+    }
+    
+    .relation-label {
+      font-size: var(--font-size-xs);
+      color: var(--text-tertiary);
+      margin-bottom: var(--spacing-xs);
+    }
+    
+    .relation-label.blocked-by {
+      color: var(--accent-danger);
+    }
+    
+    .relation-label.blocking {
+      color: var(--accent-warning);
+    }
+    
+    .relation-label.related {
+      color: var(--accent-info);
+    }
+    
+    .relation-label.duplicate {
+      color: var(--text-tertiary);
+    }
+    
+    .relation-items {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--spacing-xs);
+    }
+    
+    .relation-item {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 8px;
+      background: var(--bg-overlay);
+      border-radius: var(--radius-md);
+      font-size: var(--font-size-xs);
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+    
+    .relation-item:hover {
+      background: var(--bg-hover);
+      color: var(--text-primary);
+    }
+    
+    .relation-item.blocked-by {
+      border-left: 2px solid var(--accent-danger);
+    }
+    
+    .relation-item.blocking {
+      border-left: 2px solid var(--accent-warning);
+    }
+    
+    /* Project progress in sidebar */
+    .project-progress-sidebar {
+      padding: var(--spacing-md);
+      background: var(--bg-surface);
+      border-radius: var(--radius-lg);
+      margin-bottom: var(--spacing-md);
+    }
+    
+    .project-progress-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: var(--spacing-sm);
+    }
+    
+    .project-progress-name {
+      font-weight: 600;
+      font-size: var(--font-size-sm);
+    }
+    
+    .project-progress-status {
+      font-size: var(--font-size-xs);
+      padding: 2px 8px;
+      border-radius: var(--radius-full);
+      background: var(--bg-overlay);
+      color: var(--text-secondary);
+    }
+    
+    .project-progress-status.in_progress {
+      background: rgba(59, 130, 246, 0.15);
+      color: #3b82f6;
+    }
+    
+    .project-progress-status.completed {
+      background: rgba(34, 197, 94, 0.15);
+      color: #22c55e;
+    }
+    
+    .project-progress-status.at_risk {
+      background: rgba(245, 158, 11, 0.15);
+      color: #f59e0b;
+    }
+    
+    /* Filter dropdowns for priority/project/cycle */
+    .board-filters {
+      display: flex;
+      gap: var(--spacing-sm);
+      margin-bottom: var(--spacing-md);
+    }
+    
+    .filter-dropdown {
+      position: relative;
+    }
+    
+    .filter-button {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-xs);
+      padding: var(--spacing-sm) var(--spacing-md);
+      background: var(--bg-overlay);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-md);
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+    
+    .filter-button:hover {
+      border-color: var(--border-focus);
+      color: var(--text-primary);
+    }
+    
+    .filter-button.active {
+      background: var(--accent-primary);
+      color: white;
+      border-color: var(--accent-primary);
+    }
+    
+    .filter-menu {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      margin-top: var(--spacing-xs);
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-lg);
+      min-width: 180px;
+      z-index: 100;
+      display: none;
+    }
+    
+    .filter-menu.open {
+      display: block;
+    }
+    
+    .filter-option {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-sm);
+      padding: var(--spacing-sm) var(--spacing-md);
+      cursor: pointer;
+      transition: background var(--transition-fast);
+    }
+    
+    .filter-option:hover {
+      background: var(--bg-hover);
+    }
+    
+    .filter-option.selected {
+      background: rgba(var(--accent-primary-rgb), 0.1);
+    }
+    
+    /* Overdue issues highlight in list view */
+    .issue-row.overdue {
+      background: rgba(239, 68, 68, 0.05);
+    }
+    
+    .issue-row.overdue:hover {
+      background: rgba(239, 68, 68, 0.1);
+    }
+    
+    /* Due date column in list view */
+    .issue-due-cell {
+      white-space: nowrap;
+    }
+    
+    /* Estimate column in list view */
+    .issue-estimate-cell {
+      font-family: var(--font-mono);
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+    }
+    
+    /* Sub-issues expandable section */
+    .issue-row.has-sub-issues .issue-id-cell {
+      cursor: pointer;
+    }
+    
+    .issue-row.sub-issue {
+      background: var(--bg-overlay);
+    }
+    
+    .issue-row.sub-issue .issue-id-cell {
+      padding-left: calc(var(--spacing-md) + 20px);
+    }
+    
+    .sub-issue-toggle {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 16px;
+      height: 16px;
+      margin-right: var(--spacing-xs);
+      cursor: pointer;
+      color: var(--text-tertiary);
+    }
+    
+    .sub-issue-toggle:hover {
+      color: var(--text-primary);
+    }
   `;
 }
 
@@ -1106,6 +1767,157 @@ export function getIssueBoardScript(): string {
         closeIssueDetail();
       }
     });
+    
+    // ================================================================
+    // Linear-style additional functions
+    // ================================================================
+    
+    async function updateIssueEstimate(issueId, estimate) {
+      try {
+        await fetch('/api/issues/' + issueId, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ estimate: estimate ? parseInt(estimate) : null })
+        });
+        loadIssues();
+      } catch (err) {
+        showToast('Failed to update estimate', 'error');
+      }
+    }
+    
+    async function setDueDate(issueId) {
+      const dateStr = prompt('Due date (YYYY-MM-DD or "tomorrow", "next week"):');
+      if (!dateStr) return;
+      
+      try {
+        // Try to parse relative dates
+        let dueDate;
+        const lower = dateStr.toLowerCase().trim();
+        if (lower === 'today') {
+          dueDate = new Date().toISOString();
+        } else if (lower === 'tomorrow') {
+          const d = new Date();
+          d.setDate(d.getDate() + 1);
+          dueDate = d.toISOString();
+        } else if (lower === 'next week') {
+          const d = new Date();
+          d.setDate(d.getDate() + 7);
+          dueDate = d.toISOString();
+        } else {
+          dueDate = new Date(dateStr).toISOString();
+        }
+        
+        await fetch('/api/issues/' + issueId, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dueDate })
+        });
+        showToast('Due date set', 'success');
+        openIssueDetail(issueId);
+      } catch (err) {
+        showToast('Failed to set due date', 'error');
+      }
+    }
+    
+    async function clearDueDate(issueId) {
+      try {
+        await fetch('/api/issues/' + issueId, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dueDate: null })
+        });
+        showToast('Due date cleared', 'success');
+        openIssueDetail(issueId);
+      } catch (err) {
+        showToast('Failed to clear due date', 'error');
+      }
+    }
+    
+    async function removeParent(issueId) {
+      try {
+        await fetch('/api/issues/' + issueId + '/parent', {
+          method: 'DELETE'
+        });
+        showToast('Parent removed', 'success');
+        openIssueDetail(issueId);
+        loadIssues();
+      } catch (err) {
+        showToast('Failed to remove parent', 'error');
+      }
+    }
+    
+    function openIssueByNumber(number) {
+      fetch('/api/issues/by-number/' + number)
+        .then(res => res.json())
+        .then(issue => {
+          openIssueDetail(issue.id);
+        })
+        .catch(err => {
+          showToast('Issue not found', 'error');
+        });
+    }
+    
+    async function addRelation(issueId) {
+      const relatedNumber = prompt('Related issue number:');
+      if (!relatedNumber) return;
+      
+      const relationType = prompt('Relation type (blocks, relates_to, duplicates):') || 'relates_to';
+      
+      try {
+        await fetch('/api/issues/' + issueId + '/relations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            relatedNumber: parseInt(relatedNumber),
+            type: relationType
+          })
+        });
+        showToast('Relation added', 'success');
+        openIssueDetail(issueId);
+      } catch (err) {
+        showToast('Failed to add relation', 'error');
+      }
+    }
+    
+    function toggleSubIssues(issueId) {
+      const row = document.querySelector('[data-id="' + issueId + '"]');
+      if (!row) return;
+      
+      const toggle = row.querySelector('.sub-issue-toggle');
+      const isExpanded = toggle.textContent.trim() === '▼';
+      
+      // Find all sub-issue rows for this parent
+      const subRows = document.querySelectorAll('.sub-issue[data-parent="' + issueId + '"]');
+      
+      if (isExpanded) {
+        // Collapse
+        toggle.textContent = '▶';
+        subRows.forEach(r => r.style.display = 'none');
+      } else {
+        // Expand
+        toggle.textContent = '▼';
+        subRows.forEach(r => r.style.display = '');
+      }
+    }
+    
+    // Filter menu toggle
+    function toggleFilter(filterType) {
+      const menu = document.querySelector('.filter-menu.' + filterType);
+      if (menu) {
+        menu.classList.toggle('open');
+      }
+    }
+    
+    // Apply filter
+    async function applyFilter(filterType, value) {
+      const params = new URLSearchParams(window.location.search);
+      if (value) {
+        params.set(filterType, value);
+      } else {
+        params.delete(filterType);
+      }
+      window.location.search = params.toString();
+    }
   `;
 }
 

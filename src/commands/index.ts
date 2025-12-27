@@ -17,6 +17,7 @@ export { handleScope } from './scope';
 
 // AI-powered commands
 export { handleAI, handleAICommit, handleReview, handleExplain, handleResolve } from './ai';
+export { handleAgent, AGENT_HELP } from './agent';
 // Quality of Life commands (new!)
 export { amend, handleAmend } from './amend';
 export { wip, handleWip } from './wip';
@@ -80,10 +81,13 @@ export { COMMAND_HELP, formatCommandHelp, printCommandHelp, hasHelpFlag } from '
 // Platform commands (CLI extensions)
 export { handlePr, PR_HELP } from './pr';
 export { handleIssue, ISSUE_HELP } from './issue';
-export { handleInbox, INBOX_HELP } from './inbox';
+export { handleDashboard, DASHBOARD_HELP } from './dashboard';
 
 // Issue tracking (Linear-inspired) - cycle/sprint management
-export { handleCycle } from './cycle';
+export { handleCycle, CYCLE_HELP } from './cycle';
+
+// Project management (Linear-inspired)
+export { handleProject, PROJECT_HELP } from './project';
 
 // Platform management commands
 export { handleUp, UP_HELP } from './up';
@@ -104,6 +108,15 @@ export { handleCodeReview, REVIEW_HELP } from './review';
 
 // CI/CD commands
 export { handleCI, CI_HELP } from './ci';
+
+// Merge Queue commands
+export { handleMergeQueue, MERGE_QUEUE_HELP } from './merge-queue';
+
+// Journal commands (Notion-like docs)
+export { handleJournal, JOURNAL_HELP } from './journal';
+
+// Wrapped - Monthly activity insights (Spotify Wrapped-style)
+export { handleWrapped } from './wrapped';
 
 // Collaborator management
 export {

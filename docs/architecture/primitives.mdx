@@ -1,0 +1,116 @@
+---
+title: 'Git-backed Primitives'
+description: 'Building blocks for AI agents and automation'
+---
+
+
+wit provides Git-backed primitives that enable AI agents and automation tools to interact with repositories safely and persistently.
+
+## Overview
+
+Primitives include:
+- **Filesystem** - Git-backed virtual filesystem
+- **Knowledge** - Git-backed key-value store
+
+## Filesystem Primitive
+
+A virtual filesystem that stores files as Git objects.
+
+### Usage
+
+```typescript
+import { GitFilesystem } from 'wit/primitives';
+
+const fs = new GitFilesystem(gitDir);
+
+// Write a file
+await fs.writeFile('path/to/file.txt', 'content');
+
+// Read a file
+const content = await fs.readFile('path/to/file.txt');
+
+// List directory
+const entries = await fs.readdir('path/to');
+
+// Check if exists
+const exists = await fs.exists('path/to/file.txt');
+
+// Delete file
+await fs.unlink('path/to/file.txt');
+```
+
+### Features
+
+- Files stored as Git blobs
+- Directory structure as Git trees
+- Full history tracking
+- Branch isolation
+- Conflict detection
+
+## Knowledge Primitive
+
+A Git-backed key-value store for agent memory and state.
+
+### Usage
+
+```typescript
+import { GitKnowledge } from 'wit/primitives';
+
+const kb = new GitKnowledge(gitDir, 'agent-memory');
+
+// Store a value
+await kb.set('user-preferences', { theme: 'dark' });
+
+// Retrieve a value
+const prefs = await kb.get('user-preferences');
+
+// List all keys
+const keys = await kb.keys();
+
+// Delete a key
+await kb.delete('user-preferences');
+```
+
+### Features
+
+- JSON serialization
+- Namespace isolation
+- Version history
+- Merge capabilities
+
+## Use Cases
+
+### AI Agent State
+
+Store agent conversation history and learned context:
+
+```typescript
+const memory = new GitKnowledge(gitDir, 'ai-agent');
+
+// Store conversation
+await memory.set(`thread-${threadId}`, {
+  messages: [...],
+  context: {...},
+});
+
+// Retrieve for continuity
+const thread = await memory.get(`thread-${threadId}`);
+```
+
+### Configuration Management
+
+Store and version configuration:
+
+```typescript
+const config = new GitKnowledge(gitDir, 'config');
+
+await config.set('deployment', {
+  environment: 'production',
+  replicas: 3,
+});
+```
+
+## Related
+
+- [Agent](/commands/agent) - AI coding agent
+- [Events](/architecture/events) - Event system

@@ -1,0 +1,350 @@
+---
+title: 'Migrating from Git'
+description: 'Seamlessly migrate existing Git repositories to wit'
+---
+
+
+wit can migrate existing Git repositories while preserving your complete history. The migration process re-hashes all objects using SHA-256 and stores them in wit's format.
+
+## Overview
+
+When migrating from Git:
+- All commits, branches, and tags are preserved
+- Full history is maintained
+- Hash references are updated (SHA-1 to SHA-256)
+- A mapping file is created for reference
+
+## Quick Migration
+
+For most repositories, cloning with wit handles migration automatically:
+
+```bash
+# Clone a Git repository (auto-migrates)
+wit clone https://github.com/user/repo.git
+
+# Or clone and keep SHA-1 hashes for compatibility
+wit clone https://github.com/user/repo.git --hash-algorithm sha1
+```
+
+## Manual Migration
+
+For more control over the migration process:
+
+```bash
+# Initialize wit in an existing Git repo
+cd existing-git-repo
+wit init --migrate
+
+# Or migrate to a new location
+wit migrate /path/to/git-repo /path/to/new-wit-repo
+```
+
+## Migration Process
+
+The migration goes through these phases:
+
+1. **Scanning** - Discovers all Git objects
+2. **Objects** - Migrates blobs, trees, commits, tags
+3. **Refs** - Updates branches and tag references
+4. **HEAD** - Sets up the HEAD reference
+5. **Complete** - Saves mapping file
+
+### Progress Output
+
+```bash
+$ wit migrate .git .wit
+
+Scanning Git objects...
+  Found 1,234 objects
+
+Migrating objects...
+  [████████████████████] 100%
+  Blobs: 500
+  Trees: 400
+  Commits: 300
+  Tags: 34
+
+Migrating refs...
+  Branches: 12
+  Tags: 34
+
+Migration complete!
+  Objects: 1,234
+  Branches: 12
+  Tags: 34
+  
+Mapping saved to .wit/git-migration-map
+```
+
+## Hash Algorithm Options
+
+wit supports both SHA-1 (for Git compatibility) and SHA-256:
+
+### SHA-256 (Default)
+More secure and future-proof:
+
+```bash
+wit init --migrate --hash-algorithm sha256
+```
+
+### SHA-1 (Compatible)
+Maintains original Git hashes:
+
+```bash
+wit init --migrate --hash-algorithm sha1
+```
+
+## Checking Migration Feasibility
+
+Before migrating, check for potential issues:
+
+```bash
+$ wit migrate --check /path/to/git-repo
+
+Migration check for /path/to/git-repo:
+
+  ✓ Git directory found
+  ✓ Objects directory valid
+  ✓ HEAD file present
+
+  Warnings:
+  - Shallow clone detected - migration will be incomplete
+  - Submodules detected - nested repositories will not be migrated
+
+  Statistics:
+    Objects: ~1,234
+    Branches: 12
+    Tags: 34
+
+Can migrate: Yes (with warnings)
+```
+
+## Handling Special Cases
+
+### Shallow Clones
+
+Shallow clones have incomplete history:
+
+```bash
+# First, unshallow if possible
+git fetch --unshallow
+
+# Then migrate
+wit init --migrate
+```
+
+Or accept incomplete history:
+
+```bash
+wit init --migrate --allow-shallow
+```
+
+### Submodules
+
+Submodules are referenced but not automatically migrated:
+
+```bash
+# Migrate main repo
+wit init --migrate
+
+# Migrate submodules separately
+cd submodule
+wit init --migrate
+```
+
+### Git LFS
+
+Large files stored in Git LFS need special handling:
+
+```bash
+# Fetch all LFS objects first
+git lfs fetch --all
+
+# Then migrate
+wit init --migrate
+```
+
+wit's native large file handling will be used going forward:
+
+```bash
+# Configure large file threshold
+wit config wit.largeFileThreshold 2M
+```
+
+### Pack Files
+
+wit automatically handles Git pack files during migration:
+
+```bash
+# Pack files are unpacked and objects extracted
+# No special handling needed
+```
+
+## Migration Mapping
+
+A mapping file is created at `.wit/git-migration-map`:
+
+```bash
+$ head .wit/git-migration-map
+
+# Git SHA-1 to wit hash mapping
+abc123def456... f7e8d9c0b1a2...
+789xyz012abc... 3a4b5c6d7e8f...
+```
+
+This allows you to:
+- Look up original Git hashes
+- Verify migration completeness
+- Debug any issues
+
+### Using the Mapping
+
+```typescript
+import { loadMigrationMap } from 'wit';
+
+const map = loadMigrationMap('.wit');
+const newHash = map.get('abc123def456...');
+```
+
+## Post-Migration
+
+After migration:
+
+### Verify the Migration
+
+```bash
+# Check repository status
+wit status
+
+# Verify history
+wit log
+
+# Check branches
+wit branch -a
+
+# Verify tags
+wit tag -l
+```
+
+### Update Remote
+
+If you want to push to a wit server:
+
+```bash
+# Add wit remote
+wit remote add wit-origin git@wit-server:user/repo.git
+
+# Push all branches
+wit push wit-origin --all
+
+# Push all tags
+wit push wit-origin --tags
+```
+
+### Keep Git Remote (Optional)
+
+You can keep the Git remote for interoperability:
+
+```bash
+# Keep origin pointing to GitHub
+# Add wit remote separately
+wit remote add wit git@wit-server:user/repo.git
+
+# Push to both
+wit push origin main
+wit push wit main
+```
+
+## Programmatic Migration
+
+For automation:
+
+```typescript
+import { migrateFromGit, getMigrationStats, canMigrateGitRepo } from 'wit';
+
+// Check feasibility
+const check = canMigrateGitRepo('/path/to/.git');
+if (!check.canMigrate) {
+  console.log('Issues:', check.issues);
+  process.exit(1);
+}
+
+// Get stats first
+const stats = await getMigrationStats('/path/to/.git');
+console.log(`Will migrate ${stats.objectCount} objects`);
+
+// Perform migration
+const result = await migrateFromGit({
+  gitDir: '/path/to/.git',
+  witDir: '/path/to/.wit',
+  hashAlgorithm: 'sha256',
+  onProgress: (progress) => {
+    console.log(`${progress.phase}: ${progress.current}/${progress.total}`);
+  },
+});
+
+console.log('Migration complete:', {
+  commits: result.commits,
+  branches: result.branches,
+  errors: result.errors,
+});
+```
+
+## Rollback
+
+If you need to go back to Git:
+
+```bash
+# The original .git directory is preserved by default
+# Simply remove .wit and use .git
+rm -rf .wit
+
+# Or if you migrated to a new location
+# Just use your original Git repository
+```
+
+## Troubleshooting
+
+### Missing Objects
+
+```bash
+# Check for loose objects and pack files
+ls .git/objects/
+
+# Verify pack integrity
+git verify-pack -v .git/objects/pack/*.idx
+```
+
+### Hash Collisions
+
+Very rare, but if encountered:
+
+```bash
+# Use a different hash algorithm
+wit init --migrate --hash-algorithm sha256
+```
+
+### Large Repositories
+
+For very large repos, the migration can take time:
+
+```bash
+# Check size first
+wit migrate --check /path/to/repo
+
+# Consider migrating in stages
+# or running overnight
+```
+
+## Best Practices
+
+1. **Backup First** - Always backup before migration
+2. **Clean History** - Consider cleaning up history before migrating
+3. **Verify After** - Always verify the migration completed correctly
+4. **Test Workflows** - Test your workflows in the new wit repo
+
+## Related
+
+- [wit clone](/commands/remotes) - Clone repositories
+- [wit init](/commands/basic-workflow) - Initialize repositories
+- [Large Files](/features/large-files) - Large file handling

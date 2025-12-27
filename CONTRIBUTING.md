@@ -1,16 +1,41 @@
 # Contributing to wit
 
-Thank you for your interest in contributing to wit! This document will help you get started.
+Welcome! We're excited that you want to contribute to wit - a modern, AI-native version control system. This guide will help you get started.
 
-## Quick Start
+## Important: AI-Generated Code Only
+
+**We only accept contributions that are generated using coding agents** (such as Claude, Cursor, Copilot, or similar AI coding assistants).
+
+Why? Because wit is built for the AI-first era of software development. We believe:
+
+1. **Consistency** - AI agents produce code that follows established patterns more reliably
+2. **Documentation** - AI-generated code tends to be well-documented and self-explanatory
+3. **Quality** - Modern coding agents write comprehensive tests and handle edge cases
+4. **Dogfooding** - We're building tools for AI-assisted development, so we use them ourselves
+
+When submitting a PR, please mention which coding agent you used to generate your contribution.
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+- **Node.js** >= 22.13.0
+- **Docker** (for PostgreSQL)
+- A coding agent (Claude, Cursor, Copilot, etc.)
+
+### Quick Setup
 
 ```bash
-# Clone and setup
+# Clone the repository
 git clone https://github.com/abhiaiyer91/wit.git
 cd wit
+
+# Install dependencies
 npm install
 
-# Start PostgreSQL (required for platform features)
+# Start PostgreSQL
 npm run docker:db
 
 # Setup environment
@@ -24,47 +49,6 @@ npm test
 npm link
 wit --help
 ```
-
-**Requirements:**
-- Node.js >= 22.13.0
-- Docker (for PostgreSQL)
-
-## Project Structure
-
-```
-wit/
-├── apps/
-│   └── web/                 # Web UI (React + Vite)
-├── src/
-│   ├── cli.ts               # CLI entry point
-│   ├── commands/            # Command implementations (57 commands)
-│   ├── core/                # Core Git functionality
-│   │   ├── repository.ts    # Main repository class
-│   │   ├── object-store.ts  # Object storage (SHA-1/SHA-256)
-│   │   ├── refs.ts          # References (branches, tags)
-│   │   ├── merge.ts         # Merge logic
-│   │   ├── hooks.ts         # Git hooks system
-│   │   ├── protocol/        # Git protocol implementation
-│   │   └── ...
-│   ├── ai/                  # AI-powered features
-│   │   ├── agent.ts         # Mastra AI agent
-│   │   └── tools/           # AI tools (commit, review, etc.)
-│   ├── api/                 # tRPC API layer
-│   │   └── trpc/            # API routers
-│   ├── db/                  # Database (Drizzle ORM)
-│   │   ├── schema.ts        # Database schema
-│   │   └── models/          # Data models
-│   ├── server/              # HTTP server (Hono)
-│   ├── primitives/          # Filesystem & knowledge primitives
-│   ├── ui/                  # Terminal UI components
-│   └── utils/               # Utilities (hash, compression, fs)
-├── tests/
-│   └── integration/         # Integration tests
-├── docs/                    # Documentation (Mintlify)
-└── docker-compose.yml       # Development services
-```
-
-## Development Setup
 
 ### Environment Variables
 
@@ -99,20 +83,42 @@ npm run db:seed
 npm run db:studio
 ```
 
-### Running the Development Server
+---
 
-```bash
-# Run the platform server with hot reload
-npm run dev
+## Project Structure
 
-# Or run CLI commands directly
-npm run dev:cli -- <command>
-
-# Run web UI development server
-npm run dev:web
+```
+wit/
+├── apps/
+│   └── web/                 # Web UI (React + Vite)
+├── src/
+│   ├── cli.ts               # CLI entry point
+│   ├── commands/            # Command implementations (57 commands)
+│   ├── core/                # Core Git functionality
+│   │   ├── repository.ts    # Main repository class
+│   │   ├── object-store.ts  # Object storage (SHA-1/SHA-256)
+│   │   ├── refs.ts          # References (branches, tags)
+│   │   ├── merge.ts         # Merge logic
+│   │   ├── hooks.ts         # Git hooks system
+│   │   └── protocol/        # Git protocol implementation
+│   ├── ai/                  # AI-powered features
+│   │   ├── agent.ts         # Mastra AI agent
+│   │   └── tools/           # AI tools (commit, review, etc.)
+│   ├── api/                 # tRPC API layer
+│   ├── db/                  # Database (Drizzle ORM)
+│   ├── server/              # HTTP server (Hono)
+│   ├── primitives/          # Filesystem & knowledge primitives
+│   ├── ui/                  # Terminal UI components
+│   └── utils/               # Utilities (hash, compression, fs)
+├── tests/
+│   └── integration/         # Integration tests
+├── docs/                    # Documentation (Mintlify)
+└── docker-compose.yml       # Development services
 ```
 
-## Contribution Areas
+---
+
+## Ways to Contribute
 
 ### 1. CLI Commands (`src/commands/`)
 
@@ -157,15 +163,17 @@ Mintlify-powered docs:
 - Tutorials and guides
 - Architecture docs
 
-## How to Contribute
+---
 
-### 1. Find Something to Work On
+## Contribution Workflow
+
+### Step 1: Find Something to Work On
 
 - Check [ROADMAP.md](./ROADMAP.md) for planned features
 - Look for issues labeled `good first issue`
 - Propose new features via GitHub issues
 
-### 2. Create a Branch
+### Step 2: Create a Branch
 
 ```bash
 git checkout -b feature/your-feature
@@ -173,117 +181,13 @@ git checkout -b feature/your-feature
 git checkout -b fix/your-fix
 ```
 
-### 3. Implement Your Changes
+### Step 3: Implement with Your Coding Agent
 
-Follow the patterns established in existing code. Here's an example command:
+Use your preferred coding agent to implement the changes. Here's an example prompt you might give your agent:
 
-```typescript
-// src/commands/your-command.ts
+> "I want to add a new command to wit called `wit stats` that shows repository statistics. Follow the patterns in `src/commands/wip.ts` for structure and `src/commands/log.ts` for output formatting. Add tests in `src/__tests__/stats.test.ts`."
 
-import { Repository } from '../core/repository';
-import { TsgitError, ErrorCode } from '../core/errors';
-
-const colors = {
-  green: (s: string) => `\x1b[32m${s}\x1b[0m`,
-  yellow: (s: string) => `\x1b[33m${s}\x1b[0m`,
-  red: (s: string) => `\x1b[31m${s}\x1b[0m`,
-  dim: (s: string) => `\x1b[2m${s}\x1b[0m`,
-};
-
-export interface YourCommandOptions {
-  // Define options here
-}
-
-/**
- * Your command - brief description
- */
-export function yourCommand(options: YourCommandOptions): void {
-  const repo = Repository.find();
-  
-  // Implementation
-}
-
-/**
- * CLI handler
- */
-export function handleYourCommand(args: string[]): void {
-  const options: YourCommandOptions = {};
-  
-  // Parse args
-  for (let i = 0; i < args.length; i++) {
-    // Handle flags and arguments
-  }
-  
-  try {
-    yourCommand(options);
-    console.log(colors.green('✓') + ' Success message');
-  } catch (error) {
-    if (error instanceof TsgitError) {
-      console.error(error.format());
-    } else if (error instanceof Error) {
-      console.error(colors.red('error: ') + error.message);
-    }
-    process.exit(1);
-  }
-}
-```
-
-### 4. Register Your Command
-
-Add to `src/commands/index.ts`:
-
-```typescript
-export { handleYourCommand } from './your-command';
-```
-
-Add to `src/cli.ts`:
-
-```typescript
-// In COMMANDS array
-const COMMANDS = [
-  // ... existing commands
-  'your-command',
-];
-
-// In switch statement
-case 'your-command':
-  handleYourCommand(cmdArgs);
-  break;
-```
-
-### 5. Add Tests
-
-Create `src/__tests__/your-command.test.ts`:
-
-```typescript
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { createTestRepo, cleanupTestRepo } from './test-utils';
-
-describe('your-command', () => {
-  let testDir: string;
-
-  beforeEach(() => {
-    const setup = createTestRepo();
-    testDir = setup.dir;
-  });
-
-  afterEach(() => {
-    cleanupTestRepo(testDir);
-  });
-
-  it('should do the expected thing', () => {
-    // Arrange
-    // Act
-    // Assert
-  });
-
-  it('should handle edge cases', () => {
-    // Test error handling
-  });
-});
-```
-
-### 6. Run Tests Locally
+### Step 4: Run Tests
 
 ```bash
 # Run all tests
@@ -299,7 +203,7 @@ npm run test:coverage
 npm run test:watch
 ```
 
-### 7. Submit a Pull Request
+### Step 5: Submit a Pull Request
 
 ```bash
 # Ensure tests pass
@@ -312,7 +216,12 @@ npm run build
 git push -u origin feature/your-feature
 ```
 
-CI will automatically run tests on your PR.
+In your PR description, please include:
+- What coding agent you used
+- A brief description of what the agent was asked to do
+- Any manual adjustments you made (if any)
+
+---
 
 ## Code Style Guidelines
 
@@ -364,9 +273,21 @@ export function myFunction(param1: string, param2: number): Result {
 }
 ```
 
+---
+
 ## Testing
 
 The project uses Vitest for testing. Current test count: **397+ tests**.
+
+### Test Categories
+
+| Category | Location | Description |
+|----------|----------|-------------|
+| Unit tests | `src/__tests__/` | Individual command tests |
+| Integration | `tests/integration/` | Full flow tests |
+| API tests | `src/api/__tests__/` | tRPC router tests |
+
+### Running Tests
 
 ```bash
 # Run all tests
@@ -385,13 +306,22 @@ npm run test:coverage
 npm run test:watch
 ```
 
-### Test Categories
+---
 
-| Category | Location | Description |
-|----------|----------|-------------|
-| Unit tests | `src/__tests__/` | Individual command tests |
-| Integration | `tests/integration/` | Full flow tests |
-| API tests | `src/api/__tests__/` | tRPC router tests |
+## Reference Implementations
+
+When implementing new features, reference these well-structured examples:
+
+| Type | File | Description |
+|------|------|-------------|
+| Simple command | `src/commands/wip.ts` | Minimal command structure |
+| Complex command | `src/commands/merge.ts` | Multi-step with conflicts |
+| Stateful command | `src/commands/stash.ts` | Saves/restores state |
+| Plumbing command | `src/commands/reset.ts` | Low-level operations |
+| Remote command | `src/commands/push.ts` | Network operations |
+| AI tool | `src/ai/tools/commit.ts` | AI-powered feature |
+
+---
 
 ## CI/CD
 
@@ -407,18 +337,7 @@ GitHub Actions runs on every push and PR:
 
 Ensure your PR passes CI before requesting review.
 
-## Reference Implementations
-
-When implementing new features, reference these well-structured examples:
-
-| Type | File | Description |
-|------|------|-------------|
-| Simple command | `src/commands/wip.ts` | Minimal command structure |
-| Complex command | `src/commands/merge.ts` | Multi-step with conflicts |
-| Stateful command | `src/commands/stash.ts` | Saves/restores state |
-| Plumbing command | `src/commands/reset.ts` | Low-level operations |
-| Remote command | `src/commands/push.ts` | Network operations |
-| AI tool | `src/ai/tools/commit.ts` | AI-powered feature |
+---
 
 ## Getting Help
 
@@ -427,6 +346,8 @@ When implementing new features, reference these well-structured examples:
 - See [docs/architecture/overview.mdx](./docs/architecture/overview.mdx) for design philosophy
 - Open an issue for discussion
 - Reference the [README](./README.md) for user-facing documentation
+
+---
 
 ## License
 

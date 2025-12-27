@@ -27,6 +27,7 @@ import {
   handleScope,
   // AI commands
   handleAI,
+  handleAgent,
   // Quality of Life commands
   handleAmend,
   handleWip,
@@ -77,9 +78,11 @@ import {
   // Platform commands
   handlePr,
   handleIssue,
-  handleInbox,
+  handleDashboard,
   // Issue tracking (Linear-inspired) - also exports handleCycle
   handleCycle,
+  // Project management (Linear-inspired)
+  handleProject,
   // Platform management
   handleUp,
   handleDown,
@@ -94,6 +97,12 @@ import {
   handleCodeReview,
   // CI/CD
   handleCI,
+  // Merge Queue
+  handleMergeQueue,
+  // Journal (Notion-like docs)
+  handleJournal,
+  // Wrapped (Monthly activity insights)
+  handleWrapped,
 } from './commands';
 import { handleHooks } from './core/hooks';
 import { handleSubmodule } from './core/submodule';
@@ -236,6 +245,14 @@ Server:
   serve --repos <path>  Set repository storage directory
 
 Platform Commands:
+  dashboard             Your personal dashboard (PRs, issues, repos, stats)
+  dashboard prs         View all PR sections (awaiting review, yours, participated)
+  dashboard issues      View assigned/created issues
+  dashboard repos       View your repositories
+  dashboard activity    View recent activity feed
+  dashboard stats       View contribution statistics
+  dashboard summary     Quick counts summary
+  
   pr create             Create pull request from current branch
   pr list               List pull requests
   pr view <number>      View pull request details
@@ -243,11 +260,6 @@ Platform Commands:
   pr close <number>     Close a pull request
   pr review [<number>]  AI code review using CodeRabbit
   pr review-status      Check CodeRabbit configuration
-  
-  inbox                 PR inbox - stay on top of reviews
-  inbox review          Show PRs awaiting your review
-  inbox mine            Show your open PRs
-  inbox participated    Show PRs you've participated in
   
   issue create <title>  Create new issue
   issue list            List issues
@@ -273,6 +285,15 @@ CI/CD:
   ci runs               Show recent workflow runs (requires server)
   ci view <run-id>      View workflow run details (requires server)
 
+Merge Queue:
+  merge-queue add       Add PR to merge queue (auto-queued merging)
+  merge-queue remove    Remove PR from queue
+  merge-queue status    Show queue position
+  merge-queue list      List PRs in queue
+  merge-queue stats     Show queue statistics
+  merge-queue enable    Enable merge queue for branch
+  merge-queue config    Configure queue settings
+
 Quality of Life:
   amend                 Quickly fix the last commit
   wip                   Quick WIP commit with auto-generated message
@@ -281,6 +302,7 @@ Quality of Life:
   blame <file>          Show who changed each line
   stats                 Repository statistics dashboard
   snapshot              Create/restore quick checkpoints
+  wrapped               Monthly activity insights (your coding Wrapped!)
 
 Issue Tracking (Linear-inspired):
   issue create "Title"  Create a new issue
@@ -290,9 +312,30 @@ Issue Tracking (Linear-inspired):
   issue close <id>      Close an issue
   issue board           Show kanban board view
   issue stats           Show issue statistics
+  issue priority <n> <p> Set issue priority (urgent/high/medium/low/none)
+  issue due <n> <date>  Set due date
+  issue block <a> <b>   Mark issue A as blocking issue B
+  
+  project create "Name" Create a new project
+  project list          List projects
+  project view "Name"   View project details
+  project issues "Name" List issues in a project
+  project progress "N"  Show project progress
+  project complete "N"  Mark project as complete
+  
   cycle create          Create a new sprint/cycle
   cycle current         Show active cycle progress
   cycle add <issue>     Add issue to current cycle
+
+Documentation (Notion-like journal):
+  journal               List journal pages
+  journal create <title> Create a new page
+  journal view <slug>   View page content
+  journal edit <slug>   Update a page
+  journal tree          Show page hierarchy
+  journal search <q>    Search pages
+  journal publish       Publish a draft page
+  journal history       View page version history
 
 Monorepo Support:
   scope                 Show current repository scope
@@ -301,7 +344,11 @@ Monorepo Support:
   scope clear           Clear scope restrictions
 
 AI-Powered Features:
-  search <query>        Semantic code search (the killer feature!)
+  agent                 Interactive coding assistant (the killer feature!)
+  agent ask <query>     One-shot question to the coding agent
+  agent status          Show agent configuration
+  
+  search <query>        Semantic code search
   search index          Index repo for semantic search
   search status         Show index health
   search -i             Interactive search mode
@@ -345,6 +392,8 @@ Environment Variables:
 Examples:
   wit ui                    # Launch terminal UI
   wit web                   # Launch web UI
+  wit agent                 # Start interactive coding agent
+  wit agent "add tests"     # One-shot agent query
   wit init
   wit add .
   wit commit -m "Initial commit"
@@ -390,9 +439,11 @@ const COMMANDS = [
   'amend', 'wip', 'fixup', 'cleanup', 'blame', 'stats', 'snapshot',
   'scope', 'graph',
   'ui', 'web',
-  'ai', 'search', 'review',
+  'ai', 'agent', 'search', 'review',
   // Issue tracking
-  'issue', 'cycle',
+  'issue', 'cycle', 'project',
+  // Journal (Notion-like docs)
+  'journal',
   'cat-file', 'hash-object', 'ls-files', 'ls-tree',
   // Plumbing commands
   'rev-parse', 'update-ref', 'symbolic-ref', 'for-each-ref', 'show-ref', 'fsck',
@@ -413,13 +464,17 @@ const COMMANDS = [
   // Server
   'serve',
   // Platform commands
-  'pr', 'issue', 'inbox',
+  'pr', 'issue', 'dashboard',
   // Platform management
   'up', 'down', 'platform-status',
   // Authentication
   'token',
   // CI/CD
   'ci',
+  // Merge Queue
+  'merge-queue',
+  // Wrapped
+  'wrapped',
   'help',
 ];
 
@@ -739,6 +794,18 @@ function main(): void {
         });
         return; // Exit main() to let async handle complete
 
+      case 'agent':
+        // Interactive coding agent
+        handleAgent(rawArgs).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
+          }
+          process.exit(1);
+        });
+        return; // Exit main() to let async handle complete
+
       case 'search':
         // Semantic search - the "holy shit" feature
         handleSearch(rawArgs).catch((error: Error) => {
@@ -972,8 +1039,8 @@ function main(): void {
         });
         return; // Exit main() to let async handle complete
 
-      case 'inbox':
-        handleInbox(args.slice(args.indexOf('inbox') + 1)).catch((error: Error) => {
+      case 'dashboard':
+        handleDashboard(args.slice(args.indexOf('dashboard') + 1)).catch((error: Error) => {
           if (error instanceof TsgitError) {
             console.error((error as TsgitError).format());
           } else {
@@ -985,8 +1052,27 @@ function main(): void {
 
       // Issue tracking - cycle commands (Linear-inspired sprints)
       case 'cycle':
-        handleCycle(rawArgs);
-        break;
+        handleCycle(rawArgs).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
+          }
+          process.exit(1);
+        });
+        return; // Exit main() to let async handle complete
+
+      // Project management (Linear-inspired)
+      case 'project':
+        handleProject(args.slice(args.indexOf('project') + 1)).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
+          }
+          process.exit(1);
+        });
+        return; // Exit main() to let async handle complete
 
       // Platform management commands
       case 'up':
@@ -1037,6 +1123,42 @@ function main(): void {
       // CI/CD commands
       case 'ci':
         handleCI(args.slice(args.indexOf('ci') + 1)).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
+          }
+          process.exit(1);
+        });
+        return;
+
+      // Merge Queue commands
+      case 'merge-queue':
+        handleMergeQueue(args.slice(args.indexOf('merge-queue') + 1)).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
+          }
+          process.exit(1);
+        });
+        return;
+
+      // Journal (Notion-like docs)
+      case 'journal':
+        handleJournal(args.slice(args.indexOf('journal') + 1)).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
+          }
+          process.exit(1);
+        });
+        return;
+
+      // Wrapped (Monthly activity insights)
+      case 'wrapped':
+        handleWrapped(args.slice(args.indexOf('wrapped') + 1)).catch((error: Error) => {
           if (error instanceof TsgitError) {
             console.error((error as TsgitError).format());
           } else {

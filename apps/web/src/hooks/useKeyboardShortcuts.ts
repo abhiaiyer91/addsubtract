@@ -29,18 +29,21 @@ export function useGlobalShortcuts() {
     toggleShortcuts();
   }, { enableOnFormTags: false });
 
-  // g then h - Go home
-  useHotkeys('g h', () => {
+  // Alt+h - Go home
+  useHotkeys('alt+h', (e) => {
+    e.preventDefault();
     navigate('/');
   }, { enableOnFormTags: false });
 
-  // g then n - Go to notifications
-  useHotkeys('g n', () => {
+  // Alt+n - Go to notifications
+  useHotkeys('alt+n', (e) => {
+    e.preventDefault();
     navigate('/notifications');
   }, { enableOnFormTags: false });
 
-  // g then s - Go to settings
-  useHotkeys('g s', () => {
+  // Alt+s - Go to settings
+  useHotkeys('alt+s', (e) => {
+    e.preventDefault();
     navigate('/settings');
   }, { enableOnFormTags: false });
 }
@@ -59,28 +62,33 @@ export function useRepoShortcuts() {
     return null;
   }, [params.owner, params.repo]);
 
-  // g then c - Go to code
-  useHotkeys('g c', () => {
+  // Alt+c - Go to code
+  useHotkeys('alt+c', (e) => {
+    e.preventDefault();
     if (repoPath) navigate(repoPath);
   }, { enableOnFormTags: false, enabled: !!repoPath });
 
-  // g then i - Go to issues
-  useHotkeys('g i', () => {
+  // Alt+i - Go to issues
+  useHotkeys('alt+i', (e) => {
+    e.preventDefault();
     if (repoPath) navigate(`${repoPath}/issues`);
   }, { enableOnFormTags: false, enabled: !!repoPath });
 
-  // g then p - Go to pull requests
-  useHotkeys('g p', () => {
+  // Alt+p - Go to pull requests
+  useHotkeys('alt+p', (e) => {
+    e.preventDefault();
     if (repoPath) navigate(`${repoPath}/pulls`);
   }, { enableOnFormTags: false, enabled: !!repoPath });
 
-  // g then a - Go to actions
-  useHotkeys('g a', () => {
+  // Alt+a - Go to actions
+  useHotkeys('alt+a', (e) => {
+    e.preventDefault();
     if (repoPath) navigate(`${repoPath}/actions`);
   }, { enableOnFormTags: false, enabled: !!repoPath });
 
-  // g then b - Go to branches
-  useHotkeys('g b', () => {
+  // Alt+b - Go to branches
+  useHotkeys('alt+b', (e) => {
+    e.preventDefault();
     if (repoPath) navigate(`${repoPath}/branches`);
   }, { enableOnFormTags: false, enabled: !!repoPath });
 
@@ -100,26 +108,30 @@ export function useListShortcuts(options: {
   const { items, selectedIndex, onSelect, onOpen, onCreate } = options;
 
   // j - Next item
-  useHotkeys('j', () => {
+  useHotkeys('j', (e) => {
+    e.preventDefault();
     const nextIndex = Math.min(selectedIndex + 1, items.length - 1);
     onSelect(nextIndex);
   }, { enableOnFormTags: false });
 
   // k - Previous item
-  useHotkeys('k', () => {
+  useHotkeys('k', (e) => {
+    e.preventDefault();
     const prevIndex = Math.max(selectedIndex - 1, 0);
     onSelect(prevIndex);
   }, { enableOnFormTags: false });
 
   // o or Enter - Open selected
-  useHotkeys('o, enter', () => {
+  useHotkeys('o, enter', (e) => {
+    e.preventDefault();
     if (onOpen && items[selectedIndex]) {
       onOpen(items[selectedIndex]);
     }
   }, { enableOnFormTags: false });
 
   // c - Create new
-  useHotkeys('c', () => {
+  useHotkeys('c', (e) => {
+    e.preventDefault();
     if (onCreate) onCreate();
   }, { enableOnFormTags: false });
 }

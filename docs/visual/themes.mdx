@@ -1,0 +1,328 @@
+---
+title: 'Themes'
+description: 'Customize the visual appearance of wit interfaces'
+---
+
+
+wit includes a comprehensive theme system for customizing the visual appearance of the web UI and terminal output.
+
+## Available Themes
+
+wit ships with 7 built-in themes:
+
+| Theme | Description |
+|-------|-------------|
+| `github-dark` | GitHub's dark theme (default) |
+| `github-light` | GitHub's light theme |
+| `dracula` | Popular dark theme with vibrant colors |
+| `nord` | Arctic, bluish color palette |
+| `one-dark` | Atom's One Dark theme |
+| `monokai` | Classic Monokai color scheme |
+| `high-contrast` | Accessibility-focused high contrast |
+
+## Setting a Theme
+
+### Web UI
+
+```bash
+# Set theme for web UI
+wit config --global ui.theme dracula
+
+# Or in the web UI, use the theme picker in settings
+```
+
+### Terminal
+
+```bash
+# Set terminal color theme
+wit config --global terminal.theme nord
+
+# Disable colors entirely
+wit config --global color.ui false
+```
+
+## Theme Preview
+
+### GitHub Dark (Default)
+The default theme with GitHub's familiar dark color palette.
+
+- Primary: `#58a6ff` (blue)
+- Success: `#3fb950` (green)
+- Warning: `#d29922` (yellow)
+- Danger: `#f85149` (red)
+
+### GitHub Light
+Clean light theme for bright environments.
+
+- Primary: `#0969da` (blue)
+- Success: `#1a7f37` (green)
+- Warning: `#9a6700` (yellow)
+- Danger: `#cf222e` (red)
+
+### Dracula
+Vibrant dark theme with excellent readability.
+
+- Primary: `#8be9fd` (cyan)
+- Success: `#50fa7b` (green)
+- Warning: `#f1fa8c` (yellow)
+- Danger: `#ff5555` (red)
+
+### Nord
+Arctic color palette with a calm aesthetic.
+
+- Primary: `#88c0d0` (frost blue)
+- Success: `#a3be8c` (aurora green)
+- Warning: `#ebcb8b` (aurora yellow)
+- Danger: `#bf616a` (aurora red)
+
+### High Contrast
+Maximum contrast for accessibility.
+
+- Primary: `#00ffff` (cyan)
+- Success: `#00ff00` (lime)
+- Warning: `#ffff00` (yellow)
+- Danger: `#ff0000` (red)
+
+## Theme Colors
+
+### Color Categories
+
+Each theme defines colors for:
+
+**Backgrounds:**
+- `bgPrimary` - Main background
+- `bgSecondary` - Secondary areas
+- `bgTertiary` - Tertiary areas
+- `bgElevated` - Elevated elements
+- `bgOverlay` - Overlays and modals
+
+**Text:**
+- `textPrimary` - Primary text
+- `textSecondary` - Secondary text
+- `textMuted` - Muted/disabled text
+- `textInverse` - Text on colored backgrounds
+
+**Accents:**
+- `accentPrimary` - Primary accent (links, buttons)
+- `accentSecondary` - Secondary accent
+- `accentSuccess` - Success states
+- `accentWarning` - Warning states
+- `accentDanger` - Error/danger states
+- `accentInfo` - Informational
+
+**Git-Specific:**
+- `gitAdded` - Added files/lines
+- `gitModified` - Modified files/lines
+- `gitDeleted` - Deleted files/lines
+- `gitUntracked` - Untracked files
+- `gitConflict` - Conflict markers
+- `gitRenamed` - Renamed files
+
+**Syntax Highlighting:**
+- `syntaxKeyword` - Keywords
+- `syntaxString` - Strings
+- `syntaxNumber` - Numbers
+- `syntaxComment` - Comments
+- `syntaxFunction` - Functions
+- `syntaxVariable` - Variables
+- `syntaxOperator` - Operators
+- `syntaxType` - Types
+
+**Graph Colors:**
+- 8 distinct colors for branch visualization
+
+## Using in Code
+
+### Get a Theme
+
+```typescript
+import { getTheme, getThemeNames, themes } from 'wit/ui';
+
+// Get theme by name
+const theme = getTheme('dracula');
+console.log(theme.colors.accentPrimary);
+
+// List available themes
+const names = getThemeNames();
+// ['github-dark', 'github-light', 'dracula', ...]
+
+// Access all themes
+Object.keys(themes).forEach(name => {
+  console.log(`${name}: ${themes[name].displayName}`);
+});
+```
+
+### Generate CSS
+
+```typescript
+import { generateThemeCSS, getTheme } from 'wit/ui';
+
+const theme = getTheme('nord');
+const css = generateThemeCSS(theme);
+
+// Use in HTML
+document.head.insertAdjacentHTML('beforeend', `<style>${css}</style>`);
+```
+
+Generated CSS uses custom properties:
+
+```css
+:root {
+  --bg-primary: #2e3440;
+  --bg-secondary: #3b4252;
+  --text-primary: #eceff4;
+  --accent-primary: #88c0d0;
+  --git-added: #a3be8c;
+  /* ... */
+}
+```
+
+### Generate Terminal Colors
+
+```typescript
+import { generateTerminalTheme, getTheme } from 'wit/ui';
+
+const theme = getTheme('dracula');
+const colors = generateTerminalTheme(theme);
+
+console.log(colors.success + 'Success!' + colors.reset);
+console.log(colors.added + '+ Added line' + colors.reset);
+```
+
+## Theme Manager
+
+For dynamic theme switching:
+
+```typescript
+import { themeManager } from 'wit/ui';
+
+// Get current theme
+const current = themeManager.getTheme();
+console.log('Current theme:', current.name);
+
+// Switch theme
+themeManager.setTheme('monokai');
+
+// Toggle dark/light mode
+themeManager.toggleDarkMode();
+
+// Subscribe to changes
+const unsubscribe = themeManager.subscribe((theme) => {
+  console.log('Theme changed to:', theme.name);
+  applyTheme(theme);
+});
+
+// Cleanup
+unsubscribe();
+```
+
+## Custom Themes
+
+Create a custom theme by extending an existing one:
+
+```typescript
+import { Theme, githubDark } from 'wit/ui';
+
+const myTheme: Theme = {
+  ...githubDark,
+  name: 'my-custom-theme',
+  displayName: 'My Custom Theme',
+  colors: {
+    ...githubDark.colors,
+    accentPrimary: '#ff6b6b',
+    accentSecondary: '#4ecdc4',
+    // Override other colors as needed
+  },
+};
+
+// Register custom theme
+themes['my-custom-theme'] = myTheme;
+
+// Use it
+themeManager.setTheme('my-custom-theme');
+```
+
+## Typography
+
+Themes include typography settings:
+
+```typescript
+interface ThemeTypography {
+  fontFamily: string;       // Sans-serif font stack
+  fontFamilyMono: string;   // Monospace font stack
+  fontSizeXs: string;       // 11px
+  fontSizeSm: string;       // 12px
+  fontSizeBase: string;     // 14px
+  fontSizeLg: string;       // 16px
+  fontSizeXl: string;       // 20px
+  fontSizeXxl: string;      // 24px
+  lineHeight: number;       // 1.5
+  lineHeightTight: number;  // 1.25
+  lineHeightRelaxed: number; // 1.75
+}
+```
+
+## Spacing and Effects
+
+```typescript
+// Spacing scale
+interface ThemeSpacing {
+  xs: string;   // 4px
+  sm: string;   // 8px
+  md: string;   // 16px
+  lg: string;   // 24px
+  xl: string;   // 32px
+  xxl: string;  // 48px
+}
+
+// Effects
+interface ThemeEffects {
+  borderRadius: string;      // 6px
+  borderRadiusLg: string;    // 12px
+  borderRadiusFull: string;  // 9999px
+  shadow: string;            // Subtle shadow
+  shadowLg: string;          // Large shadow
+  shadowXl: string;          // Extra large shadow
+  transitionFast: string;    // 0.1s
+  transitionBase: string;    // 0.2s
+  transitionSlow: string;    // 0.3s
+  blur: string;              // blur(10px)
+}
+```
+
+## Accessibility
+
+### High Contrast Theme
+
+The `high-contrast` theme is designed for maximum accessibility:
+
+- Pure black background (#000000)
+- Pure white text (#ffffff)
+- Bright, saturated colors
+- No rounded corners (easier to see boundaries)
+
+### Color Blindness
+
+Theme colors are chosen to be distinguishable for common forms of color blindness. The graph visualization uses 8 distinct colors with varying hue and saturation.
+
+### System Preference
+
+Detect and follow system dark/light preference:
+
+```typescript
+// Check system preference
+const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+themeManager.setTheme(prefersDark ? 'github-dark' : 'github-light');
+
+// Listen for changes
+window.matchMedia('(prefers-color-scheme: dark)')
+  .addEventListener('change', (e) => {
+    themeManager.setTheme(e.matches ? 'github-dark' : 'github-light');
+  });
+```
+
+## Related
+
+- [Web UI](/visual/web-ui) - Web dashboard
+- [Terminal UI](/visual/terminal-ui) - Terminal interface
+- [Graph](/visual/graph) - Commit graph visualization

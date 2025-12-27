@@ -1,0 +1,368 @@
+---
+title: 'SSH Server'
+description: 'Host repositories over SSH protocol'
+---
+
+
+wit includes a built-in SSH server for hosting repositories, enabling secure `git clone`, `push`, and `pull` operations over SSH.
+
+## Overview
+
+The SSH server provides:
+- Public key authentication
+- Support for git-upload-pack (fetch/clone)
+- Support for git-receive-pack (push)
+- Integration with wit's key management system
+- Connection statistics and monitoring
+
+## Starting the SSH Server
+
+The SSH server runs as part of the wit platform:
+
+```bash
+# Start the full platform (includes SSH)
+wit up
+
+# Or start just the server
+wit serve --ssh
+
+# Specify SSH port
+wit serve --ssh-port 2222
+```
+
+## Configuration
+
+### Environment Variables
+
+```bash
+# SSH server port
+SSH_PORT=2222
+
+# Repository storage directory
+REPOS_DIR=/var/lib/wit/repos
+
+# Host key path (auto-generated if not present)
+SSH_HOST_KEY=/etc/wit/ssh_host_key
+```
+
+### Generating Host Keys
+
+```bash
+# Generate RSA key
+ssh-keygen -t rsa -b 4096 -f /etc/wit/ssh_host_rsa_key -N ""
+
+# Generate Ed25519 key (recommended)
+ssh-keygen -t ed25519 -f /etc/wit/ssh_host_ed25519_key -N ""
+```
+
+## User SSH Keys
+
+Users authenticate using SSH public keys.
+
+### Adding a Key
+
+```bash
+# Add your SSH key
+wit ssh-key add "$(cat ~/.ssh/id_ed25519.pub)"
+
+# Add with a name
+wit ssh-key add "$(cat ~/.ssh/id_ed25519.pub)" --name "Work Laptop"
+```
+
+### Managing Keys
+
+```bash
+# List your SSH keys
+wit ssh-key list
+
+# Remove a key
+wit ssh-key remove <key-id>
+```
+
+### Key Format
+
+Supported key types:
+- RSA (ssh-rsa) - 2048+ bits recommended
+- Ed25519 (ssh-ed25519) - recommended
+- ECDSA (ecdsa-sha2-nistp256/384/521)
+
+## Connecting via SSH
+
+### Clone a Repository
+
+```bash
+# Standard SSH clone
+git clone ssh://git@wit-server:2222/owner/repo.git
+
+# Or using SCP-style syntax
+git clone git@wit-server:owner/repo.git
+```
+
+### Push and Pull
+
+```bash
+# Push changes
+git push origin main
+
+# Pull changes
+git pull origin main
+```
+
+### SSH Config
+
+Add to `~/.ssh/config` for convenience:
+
+```ssh-config
+Host wit
+    HostName wit-server.example.com
+    User git
+    Port 2222
+    IdentityFile ~/.ssh/id_ed25519
+```
+
+Then use:
+
+```bash
+git clone wit:owner/repo.git
+```
+
+## Access Control
+
+### Repository Permissions
+
+Access is controlled by wit's collaborator system:
+
+| Role | Read | Write | Admin |
+|------|------|-------|-------|
+| Viewer | Yes | No | No |
+| Contributor | Yes | Yes | No |
+| Maintainer | Yes | Yes | Partial |
+| Admin | Yes | Yes | Yes |
+| Owner | Yes | Yes | Yes |
+
+### Anonymous Access
+
+By default, anonymous access is disabled. To enable read-only anonymous access:
+
+```bash
+# In server configuration
+SSH_ALLOW_ANONYMOUS_READ=true
+```
+
+## Monitoring
+
+### Server Statistics
+
+```bash
+$ wit ssh-status
+
+SSH Server Status
+
+  Host: 0.0.0.0:2222
+  Uptime: 5 days, 12 hours
+
+  Connections:
+    Total: 1,234
+    Active: 3
+    Failed auth: 45
+
+  Operations:
+    Clones: 890
+    Pushes: 344
+```
+
+### Connection Events
+
+The SSH server emits events that can be monitored:
+
+```typescript
+import { SSHServer } from 'wit/server';
+
+server.on('connection', (session) => {
+  console.log(`New connection from ${session.remoteAddress}`);
+});
+
+server.on('authenticated', (session) => {
+  console.log(`User ${session.username} authenticated`);
+});
+
+server.on('git-command', (session, command) => {
+  console.log(`${session.username} running ${command.service}`);
+});
+
+server.on('disconnect', (session) => {
+  console.log(`Session ${session.sessionId} ended`);
+});
+```
+
+## Security
+
+### Key Fingerprints
+
+Keys are identified by SHA-256 fingerprints:
+
+```bash
+$ wit ssh-key list
+
+SSH Keys:
+
+  ID: abc123
+  Name: Work Laptop
+  Fingerprint: SHA256:xyzABC123...
+  Added: 2024-01-15
+  Last used: 2024-01-20
+```
+
+### Key Deactivation
+
+Deactivate a key without deleting it:
+
+```bash
+wit ssh-key deactivate <key-id>
+
+# Reactivate later
+wit ssh-key activate <key-id>
+```
+
+### Session Limits
+
+Configure connection limits:
+
+```bash
+# Maximum concurrent connections
+SSH_MAX_CONNECTIONS=100
+
+# Connection timeout (ms)
+SSH_CONNECTION_TIMEOUT=120000
+```
+
+## Docker Deployment
+
+### Docker Compose
+
+```yaml
+version: '3'
+services:
+  wit:
+    image: wit/wit-server
+    ports:
+      - "3000:3000"  # HTTP
+      - "2222:22"    # SSH
+    volumes:
+      - repos:/var/lib/wit/repos
+      - ssh-keys:/etc/wit/ssh
+    environment:
+      - SSH_PORT=22
+      - DATABASE_URL=postgresql://...
+
+volumes:
+  repos:
+  ssh-keys:
+```
+
+### Generating Keys in Docker
+
+```bash
+docker exec wit-server wit ssh-host-key generate
+```
+
+## Programmatic Usage
+
+### Creating an SSH Server
+
+```typescript
+import { SSHServer, generateHostKey, SSHKeyManager } from 'wit/server';
+
+// Generate host key
+const hostKey = await generateHostKey('ed25519');
+
+// Create key manager
+const keyManager = new SSHKeyManager(db);
+
+// Create server
+const server = new SSHServer({
+  port: 2222,
+  hostKeys: [hostKey],
+  repoRoot: '/var/lib/wit/repos',
+}, keyManager);
+
+// Start server
+await server.start();
+
+// Get statistics
+const stats = server.getStats();
+console.log(`Active connections: ${stats.activeConnections}`);
+```
+
+### Managing Keys Programmatically
+
+```typescript
+import { SSHKeyManager, parsePublicKey } from 'wit/server';
+
+const manager = new SSHKeyManager(db);
+
+// Parse and add a key
+const keyInfo = parsePublicKey(publicKeyString);
+await manager.addKey(userId, {
+  publicKey: publicKeyString,
+  fingerprint: keyInfo.fingerprint,
+  name: 'My Key',
+});
+
+// Find key by fingerprint
+const key = await manager.findByFingerprint(fingerprint);
+
+// Update last used
+await manager.updateLastUsed(key.id);
+```
+
+## Troubleshooting
+
+### Connection Refused
+
+```bash
+# Check if SSH server is running
+wit ssh-status
+
+# Check port binding
+netstat -tlnp | grep 2222
+```
+
+### Authentication Failed
+
+```bash
+# Verify your key is added
+wit ssh-key list
+
+# Check key fingerprint matches
+ssh-keygen -lf ~/.ssh/id_ed25519.pub
+
+# Test connection with verbose output
+ssh -vT git@wit-server -p 2222
+```
+
+### Permission Denied
+
+```bash
+# Check repository access
+wit collaborator list owner/repo
+
+# Verify your role
+wit collaborator show owner/repo --user yourusername
+```
+
+## Comparison with HTTP
+
+| Feature | SSH | HTTP |
+|---------|-----|------|
+| Authentication | Public key | Token/Password |
+| Setup complexity | Medium | Low |
+| Firewall-friendly | No | Yes |
+| Performance | Slightly faster | Good |
+| 2FA support | Via key management | Built-in |
+
+## Related
+
+- [wit serve](/platform/server) - HTTP server
+- [wit tokens](/features/tokens) - Personal access tokens
+- [wit collaborator](/features/collaborators) - Access control

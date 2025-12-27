@@ -16,12 +16,48 @@ export const ownerTypeEnum = pgEnum('owner_type', ['user', 'organization']);
 export const prStateEnum = pgEnum('pr_state', ['open', 'closed', 'merged']);
 export const issueStateEnum = pgEnum('issue_state', ['open', 'closed']);
 export const issueStatusEnum = pgEnum('issue_status', [
+  'triage',
   'backlog',
   'todo', 
   'in_progress',
   'in_review',
   'done',
   'canceled',
+]);
+
+// Issue priority levels (Linear-style)
+export const issuePriorityEnum = pgEnum('issue_priority', [
+  'none',
+  'low',
+  'medium',
+  'high',
+  'urgent',
+]);
+
+// Issue relation types for dependencies
+export const issueRelationTypeEnum = pgEnum('issue_relation_type', [
+  'blocks',
+  'blocked_by',
+  'relates_to',
+  'duplicates',
+  'duplicated_by',
+]);
+
+// Project status (Linear-style)
+export const projectStatusEnum = pgEnum('project_status', [
+  'backlog',
+  'planned',
+  'in_progress',
+  'paused',
+  'completed',
+  'canceled',
+]);
+
+// Project health for updates
+export const projectHealthEnum = pgEnum('project_health', [
+  'on_track',
+  'at_risk',
+  'off_track',
 ]);
 export const milestoneStateEnum = pgEnum('milestone_state', ['open', 'closed']);
 export const reviewStateEnum = pgEnum('review_state', [
@@ -43,6 +79,31 @@ export const workflowRunStateEnum = pgEnum('workflow_run_state', [
   'completed',
   'failed',
   'cancelled',
+]);
+
+/**
+ * Merge queue entry state enum
+ * Tracks the lifecycle of PRs in the merge queue
+ */
+export const mergeQueueStateEnum = pgEnum('merge_queue_state', [
+  'pending',      // Waiting in queue
+  'preparing',    // Building merge commit / running pre-merge checks
+  'testing',      // Running CI on the speculative merge
+  'ready',        // All checks passed, ready to merge
+  'merging',      // Actively merging
+  'completed',    // Successfully merged
+  'failed',       // Failed to merge (conflicts or CI failure)
+  'cancelled',    // Removed from queue
+]);
+
+/**
+ * Merge queue strategy enum
+ * How commits should be reassembled when merging
+ */
+export const mergeQueueStrategyEnum = pgEnum('merge_queue_strategy', [
+  'sequential',   // Merge PRs one at a time in order
+  'optimistic',   // Speculatively merge batches, rollback on failure
+  'adaptive',     // AI-driven: analyze conflicts and determine best order
 ]);
 
 // ============ USERS ============
@@ -484,14 +545,32 @@ export const issues = pgTable('issues', {
   
   // Workflow status for Kanban board (Linear-style)
   status: issueStatusEnum('status').notNull().default('backlog'),
+  
+  // Priority (Linear-style: none, low, medium, high, urgent)
+  priority: issuePriorityEnum('priority').notNull().default('none'),
+  
+  // Due date for time-sensitive issues
+  dueDate: timestamp('due_date', { withTimezone: true }),
+  
+  // Estimate in story points or hours
+  estimate: integer('estimate'),
 
   authorId: text('author_id').notNull(), // References better-auth user.id
   assigneeId: text('assignee_id'), // References better-auth user.id
+  
+  // Parent issue for sub-issues hierarchy
+  parentId: uuid('parent_id'),
 
   // Milestone reference
   milestoneId: uuid('milestone_id').references(() => milestones.id, {
     onDelete: 'set null',
   }),
+  
+  // Project reference (Linear-style projects)
+  projectId: uuid('project_id'),
+  
+  // Cycle/Sprint reference
+  cycleId: uuid('cycle_id'),
 
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
@@ -539,6 +618,197 @@ export const issueLabels = pgTable(
     pk: primaryKey({ columns: [table.issueId, table.labelId] }),
   })
 );
+
+// ============ ISSUE RELATIONS ============
+
+/**
+ * Issue relations table - tracks dependencies between issues
+ * Supports: blocks, blocked_by, relates_to, duplicates, duplicated_by
+ */
+export const issueRelations = pgTable(
+  'issue_relations',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    issueId: uuid('issue_id')
+      .notNull()
+      .references(() => issues.id, { onDelete: 'cascade' }),
+    relatedIssueId: uuid('related_issue_id')
+      .notNull()
+      .references(() => issues.id, { onDelete: 'cascade' }),
+    type: issueRelationTypeEnum('type').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    createdById: text('created_by_id').notNull(),
+  },
+  (table) => ({
+    uniqueRelation: unique().on(table.issueId, table.relatedIssueId, table.type),
+  })
+);
+
+// ============ PROJECTS (Linear-style) ============
+
+/**
+ * Projects table - larger units of work containing multiple issues
+ * Similar to Linear projects with status, lead, members, and timeline
+ */
+export const projects = pgTable('projects', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  repoId: uuid('repo_id')
+    .notNull()
+    .references(() => repositories.id, { onDelete: 'cascade' }),
+  
+  name: text('name').notNull(),
+  description: text('description'),
+  icon: text('icon'), // emoji or icon identifier
+  color: text('color').default('888888'),
+  
+  status: projectStatusEnum('status').notNull().default('backlog'),
+  
+  // Project lead
+  leadId: text('lead_id'),
+  
+  // Timeline
+  startDate: timestamp('start_date', { withTimezone: true }),
+  targetDate: timestamp('target_date', { withTimezone: true }),
+  completedAt: timestamp('completed_at', { withTimezone: true }),
+  
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+/**
+ * Project members - users participating in a project
+ */
+export const projectMembers = pgTable(
+  'project_members',
+  {
+    projectId: uuid('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    userId: text('user_id').notNull(),
+    role: text('role').default('member'), // 'lead', 'member'
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.projectId, table.userId] }),
+  })
+);
+
+/**
+ * Project updates/check-ins - status updates for projects
+ */
+export const projectUpdates = pgTable('project_updates', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  projectId: uuid('project_id')
+    .notNull()
+    .references(() => projects.id, { onDelete: 'cascade' }),
+  authorId: text('author_id').notNull(),
+  body: text('body').notNull(),
+  health: projectHealthEnum('health'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// ============ CYCLES/SPRINTS ============
+
+/**
+ * Cycles table - time-boxed iterations (sprints)
+ * Similar to Linear cycles with start/end dates and velocity tracking
+ */
+export const cycles = pgTable('cycles', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  repoId: uuid('repo_id')
+    .notNull()
+    .references(() => repositories.id, { onDelete: 'cascade' }),
+  
+  name: text('name').notNull(), // "Sprint 1", "Cycle 23", etc.
+  number: integer('number').notNull(), // Auto-incrementing per repo
+  description: text('description'),
+  
+  startDate: timestamp('start_date', { withTimezone: true }).notNull(),
+  endDate: timestamp('end_date', { withTimezone: true }).notNull(),
+  
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// ============ ISSUE TEMPLATES ============
+
+/**
+ * Issue templates - reusable templates for creating issues
+ */
+export const issueTemplates = pgTable('issue_templates', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  repoId: uuid('repo_id')
+    .notNull()
+    .references(() => repositories.id, { onDelete: 'cascade' }),
+  
+  name: text('name').notNull(),
+  description: text('description'),
+  
+  titleTemplate: text('title_template'),
+  bodyTemplate: text('body_template'),
+  
+  // Default values (JSON for labels array)
+  defaultLabels: text('default_labels'), // JSON array of label IDs
+  defaultAssigneeId: text('default_assignee_id'),
+  defaultPriority: text('default_priority'),
+  defaultStatus: text('default_status'),
+  
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// ============ SAVED VIEWS ============
+
+/**
+ * Issue views - saved filter configurations
+ */
+export const issueViews = pgTable('issue_views', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  repoId: uuid('repo_id')
+    .notNull()
+    .references(() => repositories.id, { onDelete: 'cascade' }),
+  creatorId: text('creator_id').notNull(),
+  
+  name: text('name').notNull(),
+  description: text('description'),
+  
+  // JSON filter configuration
+  filters: text('filters').notNull(),
+  // JSON: groupBy, sortBy, viewType (list/board/timeline)
+  displayOptions: text('display_options'),
+  
+  isShared: boolean('is_shared').notNull().default(false),
+  
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// ============ ISSUE ACTIVITY LOG ============
+
+/**
+ * Issue activities - audit log for all issue changes
+ */
+export const issueActivities = pgTable('issue_activities', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  issueId: uuid('issue_id')
+    .notNull()
+    .references(() => issues.id, { onDelete: 'cascade' }),
+  actorId: text('actor_id').notNull(),
+  
+  // Action type: 'created', 'updated', 'status_changed', 'assigned', 'labeled', etc.
+  action: text('action').notNull(),
+  
+  // Which field changed (for updates)
+  field: text('field'),
+  oldValue: text('old_value'),
+  newValue: text('new_value'),
+  
+  // Additional context as JSON
+  metadata: text('metadata'),
+  
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
 
 export const prLabels = pgTable(
   'pr_labels',
@@ -622,6 +892,189 @@ export const webhooks = pgTable('webhooks', {
 
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// ============ MERGE QUEUE ============
+
+/**
+ * Merge queue configuration per repository
+ * Controls how the merge queue behaves for a given branch
+ */
+export const mergeQueueConfig = pgTable('merge_queue_config', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  repoId: uuid('repo_id')
+    .notNull()
+    .references(() => repositories.id, { onDelete: 'cascade' }),
+  
+  /** Target branch this config applies to (e.g., "main") */
+  targetBranch: text('target_branch').notNull(),
+  
+  /** Whether the merge queue is enabled */
+  enabled: boolean('enabled').notNull().default(true),
+  
+  /** Merge strategy */
+  strategy: mergeQueueStrategyEnum('strategy').notNull().default('adaptive'),
+  
+  /** Maximum batch size for optimistic merging */
+  maxBatchSize: integer('max_batch_size').notNull().default(5),
+  
+  /** Minimum wait time before processing (to batch PRs together) */
+  minWaitSeconds: integer('min_wait_seconds').notNull().default(60),
+  
+  /** Required CI checks to pass before merging */
+  requiredChecks: text('required_checks'), // JSON array of check names
+  
+  /** Whether to require all checks to pass (vs just required ones) */
+  requireAllChecks: boolean('require_all_checks').notNull().default(false),
+  
+  /** Whether to automatically rebase PRs before merging */
+  autoRebase: boolean('auto_rebase').notNull().default(true),
+  
+  /** Whether to delete branches after merging */
+  deleteBranchAfterMerge: boolean('delete_branch_after_merge').notNull().default(true),
+  
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  uniqueBranchConfig: unique().on(table.repoId, table.targetBranch),
+}));
+
+/**
+ * Merge queue entries
+ * Tracks PRs waiting in the merge queue
+ */
+export const mergeQueueEntries = pgTable('merge_queue_entries', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  
+  /** The pull request in the queue */
+  prId: uuid('pr_id')
+    .notNull()
+    .references(() => pullRequests.id, { onDelete: 'cascade' }),
+  
+  /** Repository */
+  repoId: uuid('repo_id')
+    .notNull()
+    .references(() => repositories.id, { onDelete: 'cascade' }),
+  
+  /** Target branch */
+  targetBranch: text('target_branch').notNull(),
+  
+  /** Position in the queue (lower = higher priority) */
+  position: integer('position').notNull(),
+  
+  /** Current state */
+  state: mergeQueueStateEnum('state').notNull().default('pending'),
+  
+  /** Priority (higher = more important, can jump queue) */
+  priority: integer('priority').notNull().default(0),
+  
+  /** User who added this to the queue */
+  addedById: text('added_by_id').notNull(),
+  
+  /** The HEAD SHA when added to queue */
+  headSha: text('head_sha').notNull(),
+  
+  /** The base SHA (target branch) when added */
+  baseSha: text('base_sha').notNull(),
+  
+  /** Speculative merge commit SHA (for testing) */
+  speculativeMergeSha: text('speculative_merge_sha'),
+  
+  /** Batch ID if part of an optimistic merge batch */
+  batchId: uuid('batch_id'),
+  
+  /** Files this PR touches (JSON array, for conflict detection) */
+  touchedFiles: text('touched_files'), // JSON array
+  
+  /** Estimated conflict score with other PRs (0-100) */
+  conflictScore: integer('conflict_score'),
+  
+  /** Error message if failed */
+  errorMessage: text('error_message'),
+  
+  /** Number of retry attempts */
+  retryCount: integer('retry_count').notNull().default(0),
+  
+  /** When this entry was added to the queue */
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  
+  /** When this entry was last updated */
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  
+  /** When processing started */
+  startedAt: timestamp('started_at', { withTimezone: true }),
+  
+  /** When completed (merged or failed) */
+  completedAt: timestamp('completed_at', { withTimezone: true }),
+});
+
+/**
+ * Merge queue batches
+ * Groups of PRs being merged together in optimistic/adaptive mode
+ */
+export const mergeQueueBatches = pgTable('merge_queue_batches', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  
+  repoId: uuid('repo_id')
+    .notNull()
+    .references(() => repositories.id, { onDelete: 'cascade' }),
+  
+  targetBranch: text('target_branch').notNull(),
+  
+  /** State of the batch */
+  state: mergeQueueStateEnum('state').notNull().default('preparing'),
+  
+  /** Base SHA the batch is built on */
+  baseSha: text('base_sha').notNull(),
+  
+  /** Final merge commit SHA if successful */
+  mergeSha: text('merge_sha'),
+  
+  /** Ordered list of PR IDs in this batch (JSON array) */
+  prOrder: text('pr_order').notNull(), // JSON array of PR IDs
+  
+  /** Reassembled commit graph (JSON - maps original commits to new ones) */
+  commitGraph: text('commit_graph'), // JSON
+  
+  /** Workflow run ID for CI checks */
+  workflowRunId: uuid('workflow_run_id').references(() => workflowRuns.id),
+  
+  /** Error message if failed */
+  errorMessage: text('error_message'),
+  
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  completedAt: timestamp('completed_at', { withTimezone: true }),
+});
+
+/**
+ * Merge queue history
+ * Audit log of merge queue operations
+ */
+export const mergeQueueHistory = pgTable('merge_queue_history', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  
+  prId: uuid('pr_id').references(() => pullRequests.id, { onDelete: 'set null' }),
+  repoId: uuid('repo_id')
+    .notNull()
+    .references(() => repositories.id, { onDelete: 'cascade' }),
+  
+  /** Action that occurred */
+  action: text('action').notNull(), // 'added', 'removed', 'merged', 'failed', 'reordered', 'batched'
+  
+  /** User who performed the action */
+  actorId: text('actor_id').notNull(),
+  
+  /** Previous state */
+  previousState: text('previous_state'),
+  
+  /** New state */
+  newState: text('new_state'),
+  
+  /** Additional metadata (JSON) */
+  metadata: text('metadata'),
+  
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
 // ============ CI/CD WORKFLOW RUNS ============
@@ -794,7 +1247,271 @@ export const notifications = pgTable('notifications', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+// ============ AGENT SESSIONS ============
+
+export const agentSessionStatusEnum = pgEnum('agent_session_status', [
+  'active',
+  'completed',
+  'cancelled',
+]);
+
+export const agentMessageRoleEnum = pgEnum('agent_message_role', [
+  'user',
+  'assistant',
+  'tool',
+  'system',
+]);
+
+/**
+ * Agent sessions table
+ * Tracks conversations between users and the wit coding agent
+ */
+export const agentSessions = pgTable('agent_sessions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  
+  // User who created the session
+  userId: text('user_id').notNull(), // References better-auth user.id
+  
+  // Repository context (optional - agent can work without a repo)
+  repoId: uuid('repo_id').references(() => repositories.id, { onDelete: 'set null' }),
+  
+  // Branch the agent is working on
+  branch: text('branch'),
+  
+  // Session title (auto-generated or user-provided)
+  title: text('title'),
+  
+  // Current status
+  status: agentSessionStatusEnum('status').notNull().default('active'),
+  
+  // Timestamps
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+/**
+ * Agent messages table
+ * Stores all messages in agent conversations
+ */
+export const agentMessages = pgTable('agent_messages', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  
+  // Parent session
+  sessionId: uuid('session_id')
+    .notNull()
+    .references(() => agentSessions.id, { onDelete: 'cascade' }),
+  
+  // Message role
+  role: agentMessageRoleEnum('role').notNull(),
+  
+  // Message content
+  content: text('content').notNull(),
+  
+  // Tool calls made by the assistant (JSON array)
+  toolCalls: text('tool_calls'), // JSON: [{ name, args, result }]
+  
+  // Token usage for this message
+  promptTokens: integer('prompt_tokens'),
+  completionTokens: integer('completion_tokens'),
+  
+  // Timestamp
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+/**
+ * Agent file changes table
+ * Tracks proposed file changes before they're applied
+ */
+export const agentFileChanges = pgTable('agent_file_changes', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  
+  // Parent session
+  sessionId: uuid('session_id')
+    .notNull()
+    .references(() => agentSessions.id, { onDelete: 'cascade' }),
+  
+  // Message that proposed this change
+  messageId: uuid('message_id')
+    .references(() => agentMessages.id, { onDelete: 'cascade' }),
+  
+  // File path relative to repo root
+  filePath: text('file_path').notNull(),
+  
+  // Type of change
+  changeType: text('change_type').notNull(), // 'create' | 'edit' | 'delete'
+  
+  // Original content (for undo)
+  originalContent: text('original_content'),
+  
+  // Proposed new content
+  proposedContent: text('proposed_content'),
+  
+  // Approval status
+  approved: boolean('approved'),
+  
+  // When the change was applied
+  appliedAt: timestamp('applied_at', { withTimezone: true }),
+  
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// ============ REPOSITORY AI KEYS ============
+
+export const aiProviderEnum = pgEnum('ai_provider', [
+  'openai',
+  'anthropic',
+]);
+
+/**
+ * Repository AI Keys table
+ * Stores encrypted API keys for AI providers per repository
+ * Only repository owners can view/manage these keys
+ */
+export const repoAiKeys = pgTable('repo_ai_keys', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  
+  // Repository this key belongs to
+  repoId: uuid('repo_id')
+    .notNull()
+    .references(() => repositories.id, { onDelete: 'cascade' }),
+  
+  // AI provider (openai, anthropic)
+  provider: aiProviderEnum('provider').notNull(),
+  
+  // Encrypted API key (we store encrypted, never plain text)
+  encryptedKey: text('encrypted_key').notNull(),
+  
+  // Last 4 characters of the key for display (e.g., "...xyz1")
+  keyHint: text('key_hint').notNull(),
+  
+  // User who added this key
+  createdById: text('created_by_id').notNull(),
+  
+  // Timestamps
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  // Only one key per provider per repo
+  uniqueProviderPerRepo: unique().on(table.repoId, table.provider),
+}));
+
+// ============ JOURNAL (Notion-like documentation) ============
+
+/**
+ * Journal page status enum
+ * Tracks whether a page is draft, published, or archived
+ */
+export const journalPageStatusEnum = pgEnum('journal_page_status', [
+  'draft',
+  'published',
+  'archived',
+]);
+
+/**
+ * Journal pages table - Notion-like documentation pages per repository
+ * Supports hierarchical structure, rich content, icons, and covers
+ */
+export const journalPages = pgTable('journal_pages', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  repoId: uuid('repo_id')
+    .notNull()
+    .references(() => repositories.id, { onDelete: 'cascade' }),
+  
+  // Content
+  title: text('title').notNull(),
+  slug: text('slug').notNull(), // URL-friendly identifier
+  content: text('content'), // Markdown or JSON (for block-based content)
+  
+  // Visual customization (Notion-style)
+  icon: text('icon'), // Emoji or icon identifier
+  coverImage: text('cover_image'), // URL to cover image
+  
+  // Hierarchy - for nested pages like Notion
+  parentId: uuid('parent_id'),
+  position: integer('position').notNull().default(0), // Order among siblings
+  
+  // Status
+  status: journalPageStatusEnum('status').notNull().default('draft'),
+  
+  // Author
+  authorId: text('author_id').notNull(), // References better-auth user.id
+  
+  // Timestamps
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  publishedAt: timestamp('published_at', { withTimezone: true }),
+}, (table) => ({
+  // Slugs must be unique within a repository
+  uniqueSlugPerRepo: unique().on(table.repoId, table.slug),
+}));
+
+/**
+ * Journal page comments - for collaborative editing
+ */
+export const journalComments = pgTable('journal_comments', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  pageId: uuid('page_id')
+    .notNull()
+    .references(() => journalPages.id, { onDelete: 'cascade' }),
+  userId: text('user_id').notNull(), // References better-auth user.id
+  
+  body: text('body').notNull(),
+  
+  // For inline comments at specific positions
+  blockId: text('block_id'), // ID of the block this comment is attached to
+  
+  // For replies
+  replyToId: uuid('reply_to_id').references((): any => journalComments.id),
+  
+  // Resolution
+  isResolved: boolean('is_resolved').notNull().default(false),
+  resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+  resolvedById: text('resolved_by_id'),
+  
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+/**
+ * Journal page history - version history for pages
+ */
+export const journalPageHistory = pgTable('journal_page_history', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  pageId: uuid('page_id')
+    .notNull()
+    .references(() => journalPages.id, { onDelete: 'cascade' }),
+  
+  // Snapshot of the page at this version
+  title: text('title').notNull(),
+  content: text('content'),
+  
+  // Who made this version
+  authorId: text('author_id').notNull(),
+  
+  // Version number (auto-incremented per page)
+  version: integer('version').notNull(),
+  
+  // Optional description of changes
+  changeDescription: text('change_description'),
+  
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+
 // ============ TYPE EXPORTS ============
+
+export type RepoAiKey = typeof repoAiKeys.$inferSelect;
+export type NewRepoAiKey = typeof repoAiKeys.$inferInsert;
+export type AiProvider = (typeof aiProviderEnum.enumValues)[number];
+
+export type AgentSession = typeof agentSessions.$inferSelect;
+export type NewAgentSession = typeof agentSessions.$inferInsert;
+
+export type AgentMessage = typeof agentMessages.$inferSelect;
+export type NewAgentMessage = typeof agentMessages.$inferInsert;
+
+export type AgentFileChange = typeof agentFileChanges.$inferSelect;
+export type NewAgentFileChange = typeof agentFileChanges.$inferInsert;
 
 export type Notification = typeof notifications.$inferSelect;
 export type NewNotification = typeof notifications.$inferInsert;
@@ -893,7 +1610,41 @@ export type NewWebhook = typeof webhooks.$inferInsert;
 export type MilestoneState = (typeof milestoneStateEnum.enumValues)[number];
 export type IssueState = (typeof issueStateEnum.enumValues)[number];
 export type IssueStatus = (typeof issueStatusEnum.enumValues)[number];
+export type IssuePriority = (typeof issuePriorityEnum.enumValues)[number];
+export type IssueRelationType = (typeof issueRelationTypeEnum.enumValues)[number];
+export type ProjectStatus = (typeof projectStatusEnum.enumValues)[number];
+export type ProjectHealth = (typeof projectHealthEnum.enumValues)[number];
 export type PrState = (typeof prStateEnum.enumValues)[number];
+
+// Issue Relations
+export type IssueRelation = typeof issueRelations.$inferSelect;
+export type NewIssueRelation = typeof issueRelations.$inferInsert;
+
+// Projects
+export type Project = typeof projects.$inferSelect;
+export type NewProject = typeof projects.$inferInsert;
+
+export type ProjectMember = typeof projectMembers.$inferSelect;
+export type NewProjectMember = typeof projectMembers.$inferInsert;
+
+export type ProjectUpdate = typeof projectUpdates.$inferSelect;
+export type NewProjectUpdate = typeof projectUpdates.$inferInsert;
+
+// Cycles
+export type Cycle = typeof cycles.$inferSelect;
+export type NewCycle = typeof cycles.$inferInsert;
+
+// Issue Templates
+export type IssueTemplate = typeof issueTemplates.$inferSelect;
+export type NewIssueTemplate = typeof issueTemplates.$inferInsert;
+
+// Issue Views
+export type IssueView = typeof issueViews.$inferSelect;
+export type NewIssueView = typeof issueViews.$inferInsert;
+
+// Issue Activities
+export type IssueActivity = typeof issueActivities.$inferSelect;
+export type NewIssueActivity = typeof issueActivities.$inferInsert;
 
 // Workflow run types
 export type WorkflowRunState = 'queued' | 'in_progress' | 'completed' | 'failed' | 'cancelled';
@@ -907,3 +1658,31 @@ export type NewJobRun = typeof jobRuns.$inferInsert;
 
 export type StepRun = typeof stepRuns.$inferSelect;
 export type NewStepRun = typeof stepRuns.$inferInsert;
+
+// Merge queue types
+export type MergeQueueState = (typeof mergeQueueStateEnum.enumValues)[number];
+export type MergeQueueStrategy = (typeof mergeQueueStrategyEnum.enumValues)[number];
+
+export type MergeQueueConfig = typeof mergeQueueConfig.$inferSelect;
+export type NewMergeQueueConfig = typeof mergeQueueConfig.$inferInsert;
+
+export type MergeQueueEntry = typeof mergeQueueEntries.$inferSelect;
+export type NewMergeQueueEntry = typeof mergeQueueEntries.$inferInsert;
+
+export type MergeQueueBatch = typeof mergeQueueBatches.$inferSelect;
+export type NewMergeQueueBatch = typeof mergeQueueBatches.$inferInsert;
+
+export type MergeQueueHistoryEntry = typeof mergeQueueHistory.$inferSelect;
+export type NewMergeQueueHistoryEntry = typeof mergeQueueHistory.$inferInsert;
+
+// Journal types
+export type JournalPageStatus = (typeof journalPageStatusEnum.enumValues)[number];
+
+export type JournalPage = typeof journalPages.$inferSelect;
+export type NewJournalPage = typeof journalPages.$inferInsert;
+
+export type JournalComment = typeof journalComments.$inferSelect;
+export type NewJournalComment = typeof journalComments.$inferInsert;
+
+export type JournalPageHistoryEntry = typeof journalPageHistory.$inferSelect;
+export type NewJournalPageHistoryEntry = typeof journalPageHistory.$inferInsert;

@@ -1,0 +1,66 @@
+---
+title: 'Activity API'
+description: 'API reference for activity feed'
+---
+
+
+The Activity API provides access to repository activity feeds and user timelines.
+
+## Endpoints
+
+### List Repository Activity
+
+```typescript
+const activity = await client.activity.listForRepo.query({
+  repoId: 'repo_123',
+  limit: 50,
+  cursor: 'cursor_abc', // For pagination
+});
+```
+
+### List User Activity
+
+```typescript
+const activity = await client.activity.listForUser.query({
+  userId: 'user_456',
+  limit: 50,
+});
+```
+
+### Get Activity Entry
+
+```typescript
+const entry = await client.activity.get.query({
+  id: 'activity_789',
+});
+```
+
+## Activity Types
+
+| Type | Description |
+|------|-------------|
+| `push` | Commits pushed |
+| `pr_opened` | PR opened |
+| `pr_merged` | PR merged |
+| `pr_closed` | PR closed |
+| `issue_opened` | Issue opened |
+| `issue_closed` | Issue closed |
+| `comment` | Comment added |
+| `review` | Review submitted |
+
+## Activity Schema
+
+```typescript
+interface Activity {
+  id: string;
+  type: string;
+  actor: { id: string; username: string };
+  repository: { id: string; name: string };
+  details: Record<string, any>;
+  createdAt: string;
+}
+```
+
+## Related
+
+- [Events](/architecture/events) - Event system

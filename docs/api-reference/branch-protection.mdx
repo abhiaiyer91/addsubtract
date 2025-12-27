@@ -1,0 +1,331 @@
+---
+title: 'Branch Protection API'
+description: 'API reference for managing branch protection rules'
+---
+
+
+The Branch Protection API allows you to programmatically manage protection rules for repository branches.
+
+## Overview
+
+Branch protection rules control:
+- Who can push to branches
+- Whether pull requests are required
+- Required reviews and status checks
+- Force push and deletion permissions
+
+## tRPC Endpoints
+
+### List Rules
+
+Get all branch protection rules for a repository.
+
+```typescript
+const rules = await client.branchProtection.list.query({
+  repoId: 'repo_123',
+});
+```
+
+**Response:**
+```typescript
+[
+  {
+    id: 'rule_abc',
+    pattern: 'main',
+    requirePullRequest: true,
+    requiredApprovals: 2,
+    allowForcePush: false,
+    allowDeletions: false,
+    // ... other fields
+  }
+]
+```
+
+### Get Rule
+
+Get a specific branch protection rule.
+
+```typescript
+const rule = await client.branchProtection.get.query({
+  repoId: 'repo_123',
+  ruleId: 'rule_abc',
+});
+```
+
+### Create Rule
+
+Create a new branch protection rule.
+
+```typescript
+const rule = await client.branchProtection.create.mutate({
+  repoId: 'repo_123',
+  pattern: 'main',
+  requirePullRequest: true,
+  requiredApprovals: 2,
+  dismissStaleReviews: true,
+  requireCodeOwnerReview: false,
+  requireStatusChecks: true,
+  requiredStatusChecks: ['test', 'build'],
+  requireBranchUpToDate: true,
+  allowForcePush: false,
+  allowDeletions: false,
+  restrictPushAccess: false,
+  allowedPushers: [],
+});
+```
+
+### Update Rule
+
+Update an existing branch protection rule.
+
+```typescript
+const rule = await client.branchProtection.update.mutate({
+  repoId: 'repo_123',
+  ruleId: 'rule_abc',
+  requiredApprovals: 3,
+  requireCodeOwnerReview: true,
+});
+```
+
+### Delete Rule
+
+Delete a branch protection rule.
+
+```typescript
+await client.branchProtection.delete.mutate({
+  repoId: 'repo_123',
+  ruleId: 'rule_abc',
+});
+```
+
+### Check Access
+
+Check if an operation is allowed on a branch.
+
+```typescript
+const result = await client.branchProtection.checkAccess.query({
+  repoId: 'repo_123',
+  branch: 'main',
+  operation: 'push', // 'push' | 'force-push' | 'delete' | 'merge'
+  userId: 'user_456',
+});
+
+// Response
+{
+  allowed: false,
+  violations: [
+    {
+      ruleId: 'rule_abc',
+      pattern: 'main',
+      type: 'DIRECT_PUSH_BLOCKED',
+      message: "Direct pushes to 'main' are blocked. Please create a pull request."
+    }
+  ],
+  matchedRules: [/* ... */]
+}
+```
+
+### Get Branch Status
+
+Get protection status for a specific branch.
+
+```typescript
+const status = await client.branchProtection.getBranchStatus.query({
+  repoId: 'repo_123',
+  branch: 'main',
+});
+
+// Response
+{
+  isProtected: true,
+  blocksPush: true,
+  blocksForcePush: true,
+  blocksDeletion: true,
+  requiresReviews: true,
+  requiresStatusChecks: true,
+  rules: [/* matching rules */]
+}
+```
+
+## Rule Schema
+
+### BranchProtectionRule
+
+```typescript
+interface BranchProtectionRule {
+  id: string;
+  pattern: string;
+  
+  // Push restrictions
+  requirePullRequest: boolean;
+  requiredApprovals: number;
+  dismissStaleReviews: boolean;
+  requireCodeOwnerReview: boolean;
+  
+  // Status checks
+  requireStatusChecks: boolean;
+  requiredStatusChecks: string[];
+  requireBranchUpToDate: boolean;
+  
+  // Push controls
+  allowForcePush: boolean;
+  allowDeletions: boolean;
+  restrictPushAccess: boolean;
+  allowedPushers: string[];
+  
+  // Merge queue
+  requireMergeQueue: boolean;
+  
+  // Metadata
+  description?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+### Violation Types
+
+| Type | Description |
+|------|-------------|
+| `DIRECT_PUSH_BLOCKED` | Direct pushes are blocked, PR required |
+| `FORCE_PUSH_BLOCKED` | Force pushes are not allowed |
+| `DELETION_BLOCKED` | Branch deletion is not allowed |
+| `PUSH_ACCESS_DENIED` | User not in allowed pushers list |
+| `REVIEWS_REQUIRED` | Required reviews not met |
+| `STATUS_CHECKS_REQUIRED` | Required status checks not passing |
+| `BRANCH_NOT_UP_TO_DATE` | Branch needs to be rebased |
+| `MERGE_QUEUE_REQUIRED` | Must use merge queue |
+
+## Presets
+
+Apply common configurations using presets:
+
+```typescript
+// Basic preset
+await client.branchProtection.applyPreset.mutate({
+  repoId: 'repo_123',
+  pattern: 'main',
+  preset: 'basic',
+});
+
+// Standard preset
+await client.branchProtection.applyPreset.mutate({
+  repoId: 'repo_123',
+  pattern: 'main',
+  preset: 'standard',
+});
+
+// Strict preset
+await client.branchProtection.applyPreset.mutate({
+  repoId: 'repo_123',
+  pattern: 'main',
+  preset: 'strict',
+});
+```
+
+### Preset Configurations
+
+**Basic:**
+```typescript
+{
+  requirePullRequest: false,
+  requiredApprovals: 0,
+  allowForcePush: false,
+  allowDeletions: false,
+}
+```
+
+**Standard:**
+```typescript
+{
+  requirePullRequest: true,
+  requiredApprovals: 1,
+  dismissStaleReviews: true,
+  allowForcePush: false,
+  allowDeletions: false,
+}
+```
+
+**Strict:**
+```typescript
+{
+  requirePullRequest: true,
+  requiredApprovals: 2,
+  dismissStaleReviews: true,
+  requireCodeOwnerReview: true,
+  requireStatusChecks: true,
+  requireBranchUpToDate: true,
+  allowForcePush: false,
+  allowDeletions: false,
+}
+```
+
+## Pattern Matching
+
+Patterns support glob-style matching:
+
+| Pattern | Matches |
+|---------|---------|
+| `main` | Exact match for `main` |
+| `release/*` | `release/1.0`, `release/2.0` |
+| `feature/**` | `feature/foo`, `feature/foo/bar` |
+| `*/protected` | `team/protected`, `user/protected` |
+
+## Library Usage
+
+For direct library integration:
+
+```typescript
+import { 
+  BranchProtectionEngine, 
+  BranchProtectionManager,
+  PROTECTION_PRESETS 
+} from 'wit';
+
+// Create engine
+const engine = new BranchProtectionEngine(gitDir);
+const manager = engine.getManager();
+
+// Add rule
+const rule = manager.addRule('main', {
+  ...PROTECTION_PRESETS.strict,
+  description: 'Main branch protection',
+});
+
+// Check operations
+const pushResult = engine.canPush('main', userId);
+const forcePushResult = engine.canForcePush('main', userId);
+const deleteResult = engine.canDeleteBranch('main', userId);
+const mergeResult = engine.canMerge('main', {
+  approvalCount: 2,
+  passedChecks: ['test', 'build'],
+  isBranchUpToDate: true,
+});
+
+// Get summary
+const summary = engine.getProtectionSummary('main');
+console.log('Protected:', summary.isProtected);
+console.log('Blocks push:', summary.blocksPush);
+```
+
+## Error Handling
+
+```typescript
+try {
+  await client.branchProtection.create.mutate({
+    repoId: 'repo_123',
+    pattern: 'main', // Already exists
+    // ...
+  });
+} catch (error) {
+  if (error.code === 'CONFLICT') {
+    console.log('Rule already exists for this pattern');
+  }
+}
+```
+
+## Related
+
+- [Branch Protection](/features/branch-protection) - CLI documentation
+- [Pull Requests API](/api-reference/pulls) - PR management
+- [Webhooks API](/api-reference/webhooks) - Event notifications

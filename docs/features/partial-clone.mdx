@@ -1,0 +1,361 @@
+---
+title: 'Partial Clone'
+description: 'On-demand object fetching and sparse checkout for large repositories'
+---
+
+
+Partial clone allows you to clone large repositories without downloading all objects upfront. Combined with sparse checkout, you can work with only the parts of a repository you need.
+
+## Overview
+
+Partial clone provides:
+- **Blobless clones** - Skip large file contents until needed
+- **Treeless clones** - Skip tree objects for faster clone
+- **Sparse checkout** - Only checkout specific directories
+- **On-demand fetching** - Objects fetched when accessed
+
+## Quick Start
+
+```bash
+# Clone without blobs (fetch on demand)
+wit clone --filter=blob:none https://github.com/large/repo.git
+
+# Clone with sparse checkout
+wit clone --sparse https://github.com/large/repo.git
+cd repo
+wit sparse-checkout set src/ docs/
+```
+
+## Clone Filters
+
+### Blobless Clone
+
+Skip all blobs (file contents) during clone:
+
+```bash
+wit clone --filter=blob:none <url>
+```
+
+Blobs are fetched when you:
+- Checkout a file
+- Run `wit diff`
+- Read file contents
+
+### Blob Size Limit
+
+Only skip blobs larger than a threshold:
+
+```bash
+# Skip blobs larger than 1MB
+wit clone --filter=blob:limit=1048576 <url>
+
+# Skip blobs larger than 5MB
+wit clone --filter=blob:limit=5242880 <url>
+```
+
+### Treeless Clone
+
+Skip trees and blobs (fastest clone):
+
+```bash
+wit clone --filter=tree:0 <url>
+```
+
+Only commit objects are downloaded initially.
+
+## Sparse Checkout
+
+Sparse checkout limits which files are checked out to your working directory.
+
+### Enable Sparse Checkout
+
+```bash
+# Enable with specific paths
+wit sparse-checkout set src/ tests/
+
+# Add more paths
+wit sparse-checkout add docs/
+
+# List current patterns
+wit sparse-checkout list
+```
+
+### Cone Mode
+
+Cone mode (default) only allows directory-based patterns for better performance:
+
+```bash
+# These work in cone mode
+wit sparse-checkout set src/
+wit sparse-checkout set src/components/
+
+# Non-directory patterns require disabling cone mode
+wit sparse-checkout set --no-cone "*.md"
+```
+
+### Patterns
+
+```bash
+# Include a directory and all contents
+src/
+
+# Include specific subdirectory
+src/components/
+
+# Exclude pattern (requires --no-cone)
+!src/test/
+
+# Wildcard pattern (requires --no-cone)
+*.ts
+```
+
+### Disable Sparse Checkout
+
+```bash
+# Checkout everything
+wit sparse-checkout disable
+```
+
+## Configuration
+
+### Enable Partial Clone Mode
+
+```bash
+# Enable for an existing repo
+wit config --local wit.partialClone true
+wit config --local wit.partialClone.remoteUrl origin
+
+# Set blob filter
+wit config --local wit.partialClone.blobFilter "blob:limit=1048576"
+```
+
+### Sparse Checkout Configuration
+
+Patterns are stored in `.wit/info/sparse-checkout`:
+
+```bash
+$ cat .wit/info/sparse-checkout
+src/
+docs/
+tests/unit/
+```
+
+## Object Availability
+
+Check where objects are stored:
+
+```typescript
+import { PartialCloneManager } from 'wit';
+
+const manager = new PartialCloneManager(gitDir, objectStore);
+
+// Check object availability
+const availability = manager.checkAvailability(hash);
+// 'local' | 'remote' | 'missing'
+
+// Get object info without fetching
+const info = manager.getObjectInfo(hash);
+// { hash, type, size, available }
+
+// Get statistics
+const stats = manager.getStats();
+// { localCount, remoteCount, localSize, remoteSize }
+```
+
+## Fetching Objects
+
+### Automatic Fetching
+
+Objects are fetched automatically when accessed:
+
+```bash
+# Checkout triggers blob fetch
+wit checkout main
+
+# Diff triggers blob fetch
+wit diff HEAD~1
+
+# Log with patches triggers blob fetch
+wit log -p
+```
+
+### Manual Fetching
+
+```bash
+# Fetch specific objects
+wit fetch-object <hash>
+
+# Fetch all objects for a path
+wit fetch --path src/
+
+# Fetch all missing objects
+wit fetch --all
+```
+
+## Workflow Examples
+
+### Large Monorepo
+
+```bash
+# Clone with minimal data
+wit clone --filter=blob:none --sparse https://github.com/company/monorepo.git
+cd monorepo
+
+# Only work on your team's directory
+wit sparse-checkout set packages/my-team/
+
+# Other directories are not checked out
+ls packages/
+# Only shows: my-team/
+
+# Later, if you need another package
+wit sparse-checkout add packages/shared/
+```
+
+### Large Binary Assets
+
+```bash
+# Clone skipping large files
+wit clone --filter=blob:limit=1048576 https://github.com/project/repo.git
+
+# Small files are available immediately
+# Large files (assets, binaries) are fetched on demand
+
+# Pre-fetch specific directory's large files
+wit fetch --path assets/icons/
+```
+
+### Documentation Contribution
+
+```bash
+# Clone only what you need
+wit clone --sparse https://github.com/project/docs.git
+cd docs
+
+# Only checkout docs directory
+wit sparse-checkout set docs/
+
+# Make changes, commit, push
+# Never downloads source code!
+```
+
+## Programmatic Usage
+
+```typescript
+import { PartialCloneManager, SparseCheckoutManager } from 'wit';
+
+// Partial clone management
+const partialManager = new PartialCloneManager(gitDir, objectStore);
+
+// Enable partial clone
+partialManager.enable(remoteUrl, { type: 'blob:limit', limit: 1048576 });
+
+// Check if enabled
+if (partialManager.isEnabled()) {
+  console.log('Partial clone active');
+}
+
+// Fetch objects
+const objects = await partialManager.fetchObjects([hash1, hash2]);
+
+// Sparse checkout management
+const sparseManager = new SparseCheckoutManager(gitDir);
+
+// Enable with patterns
+sparseManager.enable(['src/', 'tests/']);
+
+// Check if path should be checked out
+if (sparseManager.shouldCheckout('src/index.ts')) {
+  // Checkout the file
+}
+
+// Add patterns
+sparseManager.addPatterns(['docs/']);
+
+// Remove patterns
+sparseManager.removePatterns(['tests/e2e/']);
+```
+
+## Statistics
+
+Monitor partial clone usage:
+
+```bash
+$ wit partial-clone status
+
+Partial Clone Status
+
+  Enabled: Yes
+  Remote: origin
+
+  Objects:
+    Local: 1,234 (45 MB)
+    Remote: 5,678 (2.3 GB)
+    Total: 6,912
+
+  Sparse Checkout:
+    Enabled: Yes
+    Mode: Cone
+    Patterns: 3
+```
+
+## Troubleshooting
+
+### Object Not Available
+
+```bash
+$ wit show abc123
+Error: Object abc123 requires fetching from remote
+
+# Fetch the object
+wit fetch-object abc123
+
+# Or fetch related objects
+wit fetch --all
+```
+
+### Sparse Checkout Conflicts
+
+```bash
+# If you have uncommitted changes in excluded paths
+$ wit sparse-checkout set src/
+error: The following paths are not in the sparse-checkout:
+  docs/important.md
+
+# Stash or commit changes first
+wit stash
+wit sparse-checkout set src/
+```
+
+### Performance Issues
+
+```bash
+# Check how many objects need fetching
+wit partial-clone status
+
+# Pre-fetch objects for better performance
+wit fetch --prune-objects
+```
+
+## Comparison with Git
+
+| Feature | wit | Git |
+|---------|-----|-----|
+| Partial clone | Yes | Yes (2.19+) |
+| Sparse checkout | Yes | Yes |
+| Cone mode | Default | Optional |
+| On-demand fetch | Automatic | Automatic |
+| Object manifest | Yes | Promisor packs |
+
+## Best Practices
+
+1. **Use sparse checkout** for large repos you only partially need
+2. **Set blob limits** to skip large binaries
+3. **Pre-fetch before offline work** with `wit fetch --path`
+4. **Monitor usage** with `wit partial-clone status`
+
+## Related
+
+- [wit clone](/commands/remotes) - Clone repositories
+- [Large Files](/features/large-files) - Large file handling
+- [Monorepo Scopes](/features/monorepo-scopes) - Scope filtering

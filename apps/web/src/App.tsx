@@ -29,11 +29,15 @@ import { RepoSettingsPage } from './routes/repo/settings';
 import { CollaboratorsPage } from './routes/repo/settings/collaborators';
 import { BranchProtectionPage } from './routes/repo/settings/branches';
 import { WebhooksPage } from './routes/repo/settings/webhooks';
+import { RepoAISettingsPage } from './routes/repo/settings/ai';
 import { ReleasesPage } from './routes/repo/releases';
 import { NewReleasePage } from './routes/repo/releases/new';
 import { ReleaseDetailPage } from './routes/repo/releases/detail';
 import { EditReleasePage } from './routes/repo/releases/edit';
 import { MilestonesPage } from './routes/repo/milestones';
+import { JournalPage } from './routes/repo/journal';
+import { JournalPageDetail } from './routes/repo/journal/page-detail';
+import { NewJournalPage } from './routes/repo/journal/page-new';
 import { SettingsPage } from './routes/settings';
 import { SSHKeysPage } from './routes/settings/keys';
 import { TokensPage } from './routes/settings/tokens';
@@ -43,9 +47,9 @@ import { OrgPage } from './routes/org';
 import { OrgSettingsPage } from './routes/org/settings';
 import { OrgMembersPage } from './routes/org/members';
 import { OrgTeamsPage } from './routes/org/teams';
+import { TeamDetailPage } from './routes/org/team-detail';
 import { SearchPage } from './routes/search';
-import { PullsInboxPage } from './routes/pulls';
-import { IssuesInboxPage } from './routes/issues';
+import { InboxPage } from './routes/inbox';
 
 export function App() {
   return (
@@ -68,14 +72,14 @@ export function App() {
             <Route path="/new" element={<NewRepoPage />} />
             <Route path="/orgs/new" element={<NewOrgPage />} />
             <Route path="/search" element={<SearchPage />} />
-            <Route path="/pulls" element={<PullsInboxPage />} />
-            <Route path="/issues" element={<IssuesInboxPage />} />
+            <Route path="/inbox" element={<InboxPage />} />
 
             {/* Organization routes */}
             <Route path="/org/:slug" element={<OrgPage />} />
             <Route path="/org/:slug/settings" element={<OrgSettingsPage />} />
             <Route path="/org/:slug/members" element={<OrgMembersPage />} />
             <Route path="/org/:slug/teams" element={<OrgTeamsPage />} />
+            <Route path="/org/:slug/teams/:teamId" element={<TeamDetailPage />} />
 
             {/* User/Org profile */}
             <Route path="/:owner" element={<OwnerPage />} />
@@ -115,11 +119,17 @@ export function App() {
             {/* Milestones */}
             <Route path="/:owner/:repo/milestones" element={<MilestonesPage />} />
 
+            {/* Journal (Notion-like docs) */}
+            <Route path="/:owner/:repo/journal" element={<JournalPage />} />
+            <Route path="/:owner/:repo/journal/new" element={<NewJournalPage />} />
+            <Route path="/:owner/:repo/journal/:slug" element={<JournalPageDetail />} />
+
             {/* Repository settings */}
             <Route path="/:owner/:repo/settings" element={<RepoSettingsPage />} />
             <Route path="/:owner/:repo/settings/collaborators" element={<CollaboratorsPage />} />
             <Route path="/:owner/:repo/settings/branches" element={<BranchProtectionPage />} />
             <Route path="/:owner/:repo/settings/webhooks" element={<WebhooksPage />} />
+            <Route path="/:owner/:repo/settings/ai" element={<RepoAISettingsPage />} />
           </Route>
         </Routes>
         <Toaster />

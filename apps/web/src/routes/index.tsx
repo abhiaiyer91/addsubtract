@@ -1,25 +1,21 @@
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import {
   GitBranch,
   Zap,
   Shield,
   Users,
-  Code2,
-  GitPullRequest,
   ArrowRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { isAuthenticated, getUser } from '@/lib/auth';
-import { trpc } from '@/lib/trpc';
-import { RepoListSkeleton } from '@/components/skeleton';
+import { isAuthenticated } from '@/lib/auth';
 
 export function HomePage() {
   const authenticated = isAuthenticated();
-  const user = getUser();
 
-  if (authenticated && user && user.username) {
-    return <DashboardView username={user.username} />;
+  // Redirect authenticated users to inbox
+  if (authenticated) {
+    return <Navigate to="/inbox" replace />;
   }
 
   return <LandingView />;
@@ -60,7 +56,7 @@ function LandingView() {
               </Link>
             </Button>
             <Button size="xl" variant="outline" asChild>
-              <Link to="/explore">Explore repositories</Link>
+              <Link to="/login">Sign in</Link>
             </Button>
           </div>
           
@@ -148,167 +144,11 @@ function LandingView() {
               </Link>
             </Button>
             <Button size="xl" variant="outline" asChild>
-              <Link to="/contact">Request a demo</Link>
+              <Link to="/login">Sign in</Link>
             </Button>
           </div>
         </div>
       </section>
-    </div>
-  );
-}
-
-function DashboardView({ username }: { username: string }) {
-  // Fetch real repositories from tRPC
-  const { data: reposData, isLoading } = trpc.repos.list.useQuery(
-    { owner: username },
-    { enabled: !!username }
-  );
-
-  const recentRepos = reposData?.map(repo => ({
-    owner: username,
-    name: repo.name,
-    description: repo.description,
-    updatedAt: repo.updatedAt,
-  })) || [];
-
-  if (isLoading) {
-    return (
-      <div className="grid md:grid-cols-3 gap-8 py-8">
-        <div className="md:col-span-2 space-y-8">
-          <div>
-            <div className="flex items-center gap-2 mb-5">
-              <div className="h-5 w-5 bg-muted rounded animate-shimmer bg-gradient-to-r from-muted via-muted-foreground/10 to-muted bg-[length:200%_100%]" />
-              <div className="h-6 w-40 bg-muted rounded animate-shimmer bg-gradient-to-r from-muted via-muted-foreground/10 to-muted bg-[length:200%_100%]" />
-            </div>
-            <RepoListSkeleton count={4} />
-          </div>
-        </div>
-        <div className="space-y-6">
-          <div className="rounded-2xl border border-border/40 bg-card/80 p-6 space-y-4">
-            <div className="h-5 w-28 bg-muted rounded animate-shimmer bg-gradient-to-r from-muted via-muted-foreground/10 to-muted bg-[length:200%_100%]" />
-            <div className="space-y-2">
-              <div className="h-10 w-full bg-muted rounded-xl animate-shimmer bg-gradient-to-r from-muted via-muted-foreground/10 to-muted bg-[length:200%_100%]" />
-              <div className="h-10 w-full bg-muted rounded-xl animate-shimmer bg-gradient-to-r from-muted via-muted-foreground/10 to-muted bg-[length:200%_100%]" />
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="grid md:grid-cols-3 gap-8 py-8">
-      {/* Left sidebar - Recent activity */}
-      <div className="md:col-span-2 space-y-8">
-        <div>
-          <h2 className="text-xl font-semibold mb-5 flex items-center gap-2">
-            <Code2 className="h-5 w-5 text-primary" />
-            Recent repositories
-          </h2>
-          {recentRepos.length === 0 ? (
-            <Card className="border-dashed">
-              <CardContent className="p-8 text-center text-muted-foreground">
-                <div className="p-4 rounded-2xl bg-muted/30 w-fit mx-auto mb-4">
-                  <Code2 className="h-10 w-10 text-muted-foreground/50" />
-                </div>
-                <p className="font-medium text-foreground mb-1">No repositories yet</p>
-                <p className="text-sm mb-6">
-                  Create your first repository to get started.
-                </p>
-                <Button asChild>
-                  <Link to="/new">
-                    Create repository
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-3">
-              {recentRepos.map((repo) => (
-                <Card key={`${repo.owner}/${repo.name}`} className="hover:border-primary/30">
-                  <CardContent className="p-5">
-                    <div className="flex items-center gap-4">
-                      <div className="p-2.5 rounded-xl bg-muted/50">
-                        <Code2 className="h-5 w-5 text-primary" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <Link
-                          to={`/${repo.owner}/${repo.name}`}
-                          className="font-medium hover:text-primary transition-colors block truncate"
-                        >
-                          {repo.owner}/{repo.name}
-                        </Link>
-                        {repo.description && (
-                          <p className="text-sm text-muted-foreground truncate mt-0.5">
-                            {repo.description}
-                          </p>
-                        )}
-                      </div>
-                      <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div>
-          <h2 className="text-xl font-semibold mb-5 flex items-center gap-2">
-            <GitPullRequest className="h-5 w-5 text-primary" />
-            Activity feed
-          </h2>
-          <Card className="border-dashed">
-            <CardContent className="p-8 text-center text-muted-foreground">
-              <div className="p-4 rounded-2xl bg-muted/30 w-fit mx-auto mb-4">
-                <GitPullRequest className="h-10 w-10 text-muted-foreground/50" />
-              </div>
-              <p className="font-medium text-foreground mb-1">No recent activity</p>
-              <p className="text-sm">
-                When you contribute to projects, your activity will show up here.
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      {/* Right sidebar */}
-      <div className="space-y-6">
-        <Card>
-          <CardHeader className="pb-4">
-            <CardTitle className="text-lg">Quick actions</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <Button variant="outline" className="w-full justify-start rounded-xl" asChild>
-              <Link to="/new">
-                <Code2 className="mr-3 h-4 w-4 text-primary" />
-                New repository
-              </Link>
-            </Button>
-            <Button variant="outline" className="w-full justify-start rounded-xl" asChild>
-              <Link to="/pulls">
-                <GitPullRequest className="mr-3 h-4 w-4 text-primary" />
-                Your pull requests
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-4">
-            <CardTitle className="text-lg">Explore</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">
-              Discover interesting repositories and projects.
-            </p>
-            <Button variant="secondary" className="w-full rounded-xl" asChild>
-              <Link to="/explore">Browse repositories</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
     </div>
   );
 }
