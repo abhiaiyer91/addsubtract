@@ -1,7 +1,7 @@
 import * as path from 'path';
 import { Repository } from '../core/repository';
 import { TsgitError, Errors } from '../core/errors';
-import { exists } from '../utils/fs';
+import { exists, isDirectory, walkDir, loadIgnorePatterns } from '../utils/fs';
 
 export function add(files: string[]): void {
   try {
@@ -23,6 +23,27 @@ export function add(files: string[]): void {
           continue;
         }
         
+        // Handle directories - add all files in directory
+        if (isDirectory(absolutePath)) {
+          const ignorePatterns = loadIgnorePatterns(repo.workDir);
+          const filesInDir = walkDir(absolutePath, ignorePatterns);
+          
+          for (const fileInDir of filesInDir) {
+            const relativePath = path.relative(repo.workDir, fileInDir);
+            try {
+              repo.add(relativePath);
+              added.push(relativePath);
+            } catch (err) {
+              // Skip files that can't be added (e.g., binary issues)
+              if (err instanceof Error && !err.message.includes('outside')) {
+                continue;
+              }
+              throw err;
+            }
+          }
+          continue;
+        }
+        
         try {
           repo.add(file);
           added.push(file);
@@ -38,8 +59,14 @@ export function add(files: string[]): void {
       }
       
       // Report results
-      for (const file of added) {
-        console.log(`Added: ${file}`);
+      if (added.length > 0) {
+        if (added.length <= 10) {
+          for (const file of added) {
+            console.log(`Added: ${file}`);
+          }
+        } else {
+          console.log(`Added ${added.length} files to staging area`);
+        }
       }
       
       // Report files not found

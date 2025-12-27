@@ -63,9 +63,19 @@ export class Repository {
 
   private config: RepositoryConfig;
 
-  constructor(workDir: string, config: Partial<RepositoryConfig> = {}) {
+  constructor(workDir: string, config: Partial<RepositoryConfig> = {}, gitDirOverride?: string) {
     this.workDir = path.resolve(workDir);
-    this.gitDir = path.join(this.workDir, '.wit');
+    
+    // Determine which git directory to use
+    // Override is used when find() locates a specific directory
+    // For new repos (init), we always use .wit
+    if (gitDirOverride) {
+      this.gitDir = gitDirOverride;
+    } else {
+      // Default to .wit - this is important for Repository.init()
+      // find() handles the .wit vs .git detection separately
+      this.gitDir = path.join(this.workDir, '.wit');
+    }
 
     // Load config from existing repo if it exists
     const loadedConfig = this.loadStoredConfig();
@@ -203,24 +213,52 @@ export class Repository {
 
   /**
    * Find a repository by walking up the directory tree
+   * 
+   * wit can work with both .wit and .git directories. However, for full
+   * functionality with .git repos, wit init should be run to create a .wit
+   * directory (which shares the same object format and can sync with .git).
    */
   static find(startPath: string = process.cwd()): Repository {
     let currentPath = path.resolve(startPath);
+    let foundGitDir: string | null = null;
 
     while (true) {
-      const gitDir = path.join(currentPath, '.wit');
-      // Check for a proper repository by looking for required markers
-      // This distinguishes from ~/.wit which is the platform config directory
-      if (exists(gitDir) && (exists(path.join(gitDir, 'HEAD')) || exists(path.join(gitDir, 'objects')))) {
-        return new Repository(currentPath);
+      // Check for .wit first (native wit repo)
+      const witDir = path.join(currentPath, '.wit');
+      if (exists(witDir) && (exists(path.join(witDir, 'HEAD')) || exists(path.join(witDir, 'objects')))) {
+        return new Repository(currentPath, {}, witDir);
+      }
+      
+      // Note if we find a .git directory (we'll report this in error)
+      const gitDir = path.join(currentPath, '.git');
+      if (!foundGitDir && exists(gitDir) && (exists(path.join(gitDir, 'HEAD')) || exists(path.join(gitDir, 'objects')))) {
+        foundGitDir = currentPath;
       }
 
       const parent = path.dirname(currentPath);
       if (parent === currentPath) {
+        // No .wit found, but if we found .git, give helpful message
+        if (foundGitDir) {
+          throw new Error(
+            `Found git repository at ${foundGitDir}, but no wit repository.\n` +
+            `\nTo use wit with this git repo, run:\n` +
+            `  cd ${foundGitDir}\n` +
+            `  wit init\n` +
+            `\nThis creates a .wit directory alongside .git for wit features.`
+          );
+        }
         throw new Error('Not a wit repository (or any parent up to root)');
       }
       currentPath = parent;
     }
+  }
+  
+  /**
+   * Check if a .git directory exists alongside this .wit directory
+   */
+  hasGitDirectory(): boolean {
+    const gitDir = path.join(this.workDir, '.git');
+    return exists(gitDir) && (exists(path.join(gitDir, 'HEAD')) || exists(path.join(gitDir, 'objects')));
   }
 
   /**
