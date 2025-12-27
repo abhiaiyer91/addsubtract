@@ -5,14 +5,14 @@ description: "Create, switch, and manage branches"
 
 # Branch Commands
 
-tsgit provides intuitive branch management with automatic stashing when switching branches.
+wit provides intuitive branch management with automatic stashing when switching branches.
 
 ## branch
 
 List, create, or delete branches.
 
 ```bash
-tsgit branch [name] [options]
+wit branch [name] [options]
 ```
 
 ### Options
@@ -28,19 +28,19 @@ tsgit branch [name] [options]
 
 ```bash
 # List all branches
-tsgit branch
+wit branch
 
 # Create a new branch
-tsgit branch feature-login
+wit branch feature-login
 
 # Delete a branch
-tsgit branch -d feature-login
+wit branch -d feature-login
 
 # Force delete (unmerged branch)
-tsgit branch -D experimental
+wit branch -D experimental
 
 # Rename a branch
-tsgit branch -m old-name new-name
+wit branch -m old-name new-name
 ```
 
 ### Example Output
@@ -61,7 +61,7 @@ The `*` indicates the current branch.
 Switch to a different branch.
 
 ```bash
-tsgit switch <branch> [options]
+wit switch <branch> [options]
 ```
 
 ### Options
@@ -75,17 +75,17 @@ tsgit switch <branch> [options]
 
 ```bash
 # Switch to existing branch
-tsgit switch develop
+wit switch develop
 
 # Create and switch
-tsgit switch -c feature-new
+wit switch -c feature-new
 
 # Go back to previous branch
-tsgit switch -
+wit switch -
 ```
 
 <Note>
-When you switch branches, tsgit automatically saves your uncommitted changes and restores them when you switch back. No more losing work!
+When you switch branches, wit automatically saves your uncommitted changes and restores them when you switch back. No more losing work!
 </Note>
 
 ---
@@ -95,8 +95,8 @@ When you switch branches, tsgit automatically saves your uncommitted changes and
 Git-compatible alias for switching branches and restoring files.
 
 ```bash
-tsgit checkout <branch>
-tsgit checkout -b <new-branch>
+wit checkout <branch>
+wit checkout -b <new-branch>
 ```
 
 ### Options
@@ -109,58 +109,58 @@ tsgit checkout -b <new-branch>
 
 ```bash
 # Switch to a branch
-tsgit checkout main
+wit checkout main
 
 # Create and switch
-tsgit checkout -b feature-new
+wit checkout -b feature-new
 ```
 
 <Tip>
-We recommend using `tsgit switch` for branches and `tsgit restore` for files, as they make intent clearer. `checkout` is provided for Git compatibility.
+We recommend using `wit switch` for branches and `wit restore` for files, as they make intent clearer. `checkout` is provided for Git compatibility.
 </Tip>
 
 ---
 
 ## Auto-Stash Feature
 
-One of tsgit's best features is automatic stashing when switching branches.
+One of wit's best features is automatic stashing when switching branches.
 
 ### How It Works
 
 1. When you switch branches with uncommitted changes:
-   - tsgit saves your changes to a branch-specific stash
+   - wit saves your changes to a branch-specific stash
    - You switch to the new branch with a clean state
 
 2. When you switch back:
-   - tsgit automatically restores your saved changes
+   - wit automatically restores your saved changes
    - You can continue exactly where you left off
 
 ### Example
 
 ```bash
 # You're on main with uncommitted changes
-tsgit status
+wit status
 # Shows: modified src/feature.ts
 
 # Switch to fix a bug (changes are auto-saved)
-tsgit switch hotfix-branch
+wit switch hotfix-branch
 
 # Work on the hotfix...
-tsgit commit -a -m "Fix critical bug"
+wit commit -a -m "Fix critical bug"
 
 # Switch back (changes are auto-restored)
-tsgit switch main
+wit switch main
 
-tsgit status
+wit status
 # Shows: modified src/feature.ts (your changes are back!)
 ```
 
 ### Configuration
 
-Auto-stash is enabled by default. You can control it in `.tsgit/config`:
+Auto-stash is enabled by default. You can control it in `.wit/config`:
 
 ```ini
-[tsgit]
+[wit]
     autoStashOnSwitch = true
 ```
 
@@ -170,23 +170,23 @@ Auto-stash is enabled by default. You can control it in `.tsgit/config`:
 
 ```bash
 # 1. Start from main
-tsgit switch main
+wit switch main
 
 # 2. Create a feature branch
-tsgit switch -c feature-user-auth
+wit switch -c feature-user-auth
 
 # 3. Work on your feature...
-tsgit add .
-tsgit commit -m "Add login form"
+wit add .
+wit commit -m "Add login form"
 
 # 4. Need to fix something on main?
-tsgit switch main  # Auto-saves any uncommitted work
+wit switch main  # Auto-saves any uncommitted work
 
 # 5. Fix and commit on main
-tsgit commit -a -m "Fix typo"
+wit commit -a -m "Fix typo"
 
 # 6. Go back to feature
-tsgit switch feature-user-auth  # Auto-restores your work
+wit switch feature-user-auth  # Auto-restores your work
 
 # 7. Continue working on feature...
 ```

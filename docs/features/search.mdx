@@ -1,0 +1,375 @@
+---
+title: Semantic Search
+description: "Ask questions about your codebase in natural language"
+---
+
+# Semantic Search
+
+wit's search feature lets you ask questions about your codebase in natural language. Stop grepping - start asking.
+
+## Overview
+
+Traditional code search is keyword-based. You search for "auth" and get every file with "auth" in it. wit's semantic search understands intent:
+
+```bash
+# Old way: grep for keywords, scroll through results
+grep -r "authentication" .
+
+# wit way: ask what you mean
+wit search "where do we handle user login"
+```
+
+## Quick Start
+
+```bash
+# Basic search
+wit search "how are API errors handled"
+
+# Interactive mode
+wit search -i
+
+# Index your repo for faster searches
+wit search index
+```
+
+## Search Modes
+
+### Text Search (Default)
+
+Works immediately, no setup required:
+
+```bash
+wit search "getUserById"
+```
+
+This performs intelligent text search with:
+- File name matching
+- Content matching with context
+- Highlighted results
+
+### Semantic Search
+
+With an OpenAI API key, wit can understand the *meaning* of your query:
+
+```bash
+export OPENAI_API_KEY=sk-your-key
+
+wit search "where is the database connection configured"
+```
+
+Semantic search understands:
+- Synonyms ("db" = "database")
+- Intent ("how do we" = looking for implementation)
+- Concepts ("authentication flow" = login, session, tokens)
+
+## Setup for Semantic Search
+
+### 1. Set API Key
+
+```bash
+export OPENAI_API_KEY=sk-your-key-here
+```
+
+Add to your shell profile for persistence:
+
+```bash
+echo 'export OPENAI_API_KEY=sk-your-key' >> ~/.zshrc
+```
+
+### 2. Index Your Repository
+
+```bash
+wit search index
+```
+
+This creates embeddings for your code, enabling semantic understanding:
+
+```
+Indexing repository...
+
+  Processing files: 847/847
+  Creating embeddings...
+  
+  Index created successfully
+  Files indexed: 847
+  Index size: 12.4 MB
+  
+Use 'wit search "your query"' to search
+```
+
+### 3. Check Status
+
+```bash
+wit search status
+```
+
+```
+Search Status
+
+Mode: Semantic (OpenAI)
+Index: Up to date
+Files indexed: 847
+Last updated: 2 minutes ago
+```
+
+## Usage
+
+### Basic Search
+
+```bash
+wit search "error handling"
+```
+
+Output:
+```
+wit search "error handling"
+Using semantic search (OpenAI embeddings)
+
+Results
+
+  src/core/errors.ts (98% match)
+   Error classes and factory methods for wit
+   Line 15: export class TsgitError extends Error {
+   Line 45: export const Errors = {
+
+  src/commands/checkout.ts (87% match)
+   Handles checkout errors with suggestions
+   Line 23: } catch (error) {
+   Line 24:   if (error instanceof TsgitError) {
+
+  src/api/client.ts (82% match)
+   API error handling and retry logic
+   Line 89: export class ApiError extends Error {
+
+Found 12 results in 0.3s
+```
+
+### Interactive Mode
+
+For exploratory searching:
+
+```bash
+wit search -i
+```
+
+```
+wit search (interactive mode)
+Type a query and press Enter. Type 'exit' to quit.
+
+> where do we validate user input
+Searching...
+
+  src/api/validation.ts (95% match)
+   Input validation middleware
+   
+  src/commands/commit.ts (78% match)
+   Validates commit message format
+
+> how does authentication work
+Searching...
+
+  src/core/auth.ts (96% match)
+   Token-based authentication
+   
+  src/server/middleware/auth.ts (91% match)
+   Request authentication middleware
+
+> exit
+```
+
+### Search with Filters
+
+```bash
+# Search only in specific directories
+wit search "database" --path src/db
+
+# Search specific file types
+wit search "TODO" --ext ts,tsx
+
+# Limit results
+wit search "config" --limit 5
+```
+
+### Search in Files vs Content
+
+```bash
+# Find files by name pattern
+wit search "config" --files
+
+# Search file contents (default)
+wit search "DATABASE_URL"
+```
+
+## Examples
+
+### Finding Implementation Details
+
+```bash
+# How is feature X implemented?
+wit search "how do we handle file uploads"
+
+# Where is config Y defined?
+wit search "where is the API base URL configured"
+
+# What calls function Z?
+wit search "what uses the validateToken function"
+```
+
+### Understanding Code
+
+```bash
+# What does this module do?
+wit search "what is the purpose of the ObjectStore class"
+
+# How do these components interact?
+wit search "how does the CLI invoke commands"
+```
+
+### Finding Problems
+
+```bash
+# Security concerns
+wit search "where do we handle sensitive data"
+
+# Technical debt
+wit search "TODO or FIXME comments"
+
+# Error-prone areas
+wit search "try catch blocks without proper handling"
+```
+
+## Comparison: Text vs Semantic
+
+| Query | Text Search | Semantic Search |
+|-------|-------------|-----------------|
+| "getUserById" | Exact matches | Exact matches |
+| "fetch user data" | Matches "fetch", "user", "data" | Finds getUserById, loadUser, fetchProfile |
+| "authentication" | Matches "authentication" | Finds login, auth, session, jwt, token |
+| "where is X configured" | Keyword matches | Understands you want config files |
+
+## Index Management
+
+### Create/Update Index
+
+```bash
+# Index repository
+wit search index
+
+# Force re-index
+wit search index --force
+```
+
+### Index Status
+
+```bash
+wit search status
+```
+
+### Clear Index
+
+```bash
+wit search clear
+```
+
+## Configuration
+
+### Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `OPENAI_API_KEY` | Required for semantic search | - |
+| `WIT_SEARCH_MODEL` | Embedding model | `text-embedding-3-small` |
+| `WIT_SEARCH_IGNORE` | Patterns to ignore | `node_modules,dist,.git` |
+
+### Ignore Patterns
+
+Create `.witsearchignore` in your repo root:
+
+```
+# Ignore build outputs
+dist/
+build/
+*.min.js
+
+# Ignore dependencies
+node_modules/
+vendor/
+
+# Ignore generated files
+*.generated.ts
+```
+
+## Tips
+
+1. **Ask questions naturally**: "where do we" and "how does" work great
+
+2. **Be specific**: "user authentication in API routes" beats "auth"
+
+3. **Use interactive mode**: When exploring unfamiliar code
+
+4. **Index regularly**: Run `wit search index` after major changes
+
+5. **Combine with AI**: Found something? Ask `wit ai explain` for more context
+
+## Integration with Other Commands
+
+```bash
+# Find something, then ask AI about it
+wit search "error handling"
+wit ai "explain the error handling in src/core/errors.ts"
+
+# Find files to review
+wit search "recently changed auth code"
+wit review --staged
+```
+
+## Privacy
+
+<Note>
+Semantic search sends code snippets to OpenAI for embedding generation.
+- Only indexed portions of code are sent
+- Embeddings are stored locally
+- No code is stored on OpenAI servers
+</Note>
+
+For sensitive codebases, use text-only search (no API key required).
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Semantic search not working">
+    Check your API key:
+    ```bash
+    echo $OPENAI_API_KEY
+    wit search status
+    ```
+    Make sure the key is valid and has embedding permissions.
+  </Accordion>
+  
+  <Accordion title="Results seem outdated">
+    Re-index your repository:
+    ```bash
+    wit search index --force
+    ```
+  </Accordion>
+  
+  <Accordion title="Slow searches">
+    - Index size affects speed
+    - Use `--limit` for faster results
+    - Add large directories to `.witsearchignore`
+  </Accordion>
+  
+  <Accordion title="Too many irrelevant results">
+    - Be more specific in your query
+    - Use path filters: `--path src/`
+    - Update your ignore patterns
+  </Accordion>
+</AccordionGroup>
+
+## Future Improvements
+
+We're working on:
+- Local embedding models (no API key required)
+- Cross-repository search
+- Search history and saved queries
+- IDE integration

@@ -1,0 +1,329 @@
+---
+title: Code Review
+description: "Pre-push AI code review powered by CodeRabbit"
+---
+
+# Code Review
+
+wit includes a powerful code review command powered by [CodeRabbit](https://coderabbit.ai), our AI code review partner. Catch issues before you push.
+
+## Overview
+
+The `wit review` command provides:
+- Pre-push code review to catch issues early
+- Review of uncommitted changes, staged changes, or entire branches
+- CI integration with `--strict` mode
+- Seamless integration with CodeRabbit's AI
+
+## Quick Start
+
+```bash
+# Review your uncommitted changes
+wit review
+
+# Review only staged changes (pre-commit check)
+wit review --staged
+
+# Review all changes on your branch vs main
+wit review --branch
+```
+
+## Setup
+
+### Get a CodeRabbit API Key
+
+1. Sign up at [coderabbit.ai](https://coderabbit.ai)
+2. Get your API key from the dashboard
+3. Configure wit:
+
+```bash
+# Interactive configuration
+wit review --configure
+
+# Or set environment variable
+export CODERABBIT_API_KEY=your-api-key
+```
+
+### Check Configuration
+
+```bash
+wit review --status
+```
+
+Output:
+```
+CodeRabbit Status
+
+API Key:   Configured
+           cr-xxxx...xxxx
+
+Ready to review!
+Try: wit review
+```
+
+## Usage
+
+### Review Uncommitted Changes
+
+Review all changes in your working directory (staged and unstaged):
+
+```bash
+wit review
+```
+
+Output:
+```
+CodeRabbit Review
+   Reviewing: uncommitted changes
+
+Summary:
+Found 2 issues in 3 files reviewed.
+
+Issues:
+  [HIGH] src/auth.ts:42
+   Missing null check before accessing user.email
+   -> Add optional chaining: user?.email
+
+  [MEDIUM] src/utils.ts:15
+   Consider using const instead of let
+
+Suggestions:
+  src/api.ts:78
+   Consider adding rate limiting to this endpoint
+```
+
+### Review Staged Changes Only
+
+Perfect for pre-commit checks:
+
+```bash
+wit review --staged
+```
+
+### Review Branch Changes
+
+Review everything you've changed since branching from main:
+
+```bash
+wit review --branch
+```
+
+This compares your current branch against `main` (or `master` if `main` doesn't exist).
+
+### Review Specific Commits
+
+```bash
+# Review last 3 commits
+wit review --commits HEAD~3..
+
+# Review commits between main and HEAD
+wit review --commits main..HEAD
+
+# Review a specific range
+wit review --commits abc1234..def5678
+```
+
+### Compare Against Different Branch
+
+```bash
+# Review changes vs develop instead of main
+wit review --branch --base develop
+```
+
+## CI Integration
+
+Use `--strict` mode to fail the build if issues are found:
+
+```bash
+wit review --branch --strict
+```
+
+This exits with code 1 if any critical or high severity issues are found.
+
+### Pre-push Hook
+
+Add to `.wit/hooks/pre-push` (or `.git/hooks/pre-push`):
+
+```bash
+#!/bin/sh
+wit review --branch --strict
+```
+
+Make it executable:
+```bash
+chmod +x .wit/hooks/pre-push
+```
+
+Now every push will be reviewed first!
+
+### GitHub Actions
+
+```yaml
+name: Code Review
+
+on: [pull_request]
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for branch comparison
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Install wit
+        run: npm install -g wit
+      
+      - name: Review Changes
+        env:
+          CODERABBIT_API_KEY: ${{ secrets.CODERABBIT_API_KEY }}
+        run: wit review --branch --strict
+```
+
+## Output Formats
+
+### Default (Human-Readable)
+
+```bash
+wit review
+```
+
+### JSON Output
+
+For programmatic use:
+
+```bash
+wit review --json
+```
+
+```json
+{
+  "success": true,
+  "summary": "Found 2 issues in 3 files",
+  "issues": [
+    {
+      "severity": "high",
+      "file": "src/auth.ts",
+      "line": 42,
+      "message": "Missing null check",
+      "suggestion": "Add optional chaining"
+    }
+  ],
+  "suggestions": [],
+  "stats": {
+    "filesReviewed": 3,
+    "issuesFound": 2,
+    "suggestionsCount": 1
+  }
+}
+```
+
+### Verbose Output
+
+Show more detail:
+
+```bash
+wit review --verbose
+```
+
+## Options Reference
+
+| Option | Description |
+|--------|-------------|
+| `--staged` | Review only staged changes |
+| `--branch` | Review all changes since branching from main |
+| `--commits <range>` | Review specific commit range |
+| `--base <branch>` | Compare against specific branch (default: main) |
+| `--json` | Output as JSON |
+| `--verbose` | Show detailed output |
+| `--strict` | Exit with error if critical/high issues found |
+| `--configure` | Set up CodeRabbit API key |
+| `--status` | Show configuration status |
+
+## Comparison with `wit ai review`
+
+wit has two review commands:
+
+| Command | Powered By | Best For |
+|---------|------------|----------|
+| `wit review` | CodeRabbit | Pre-push review, CI integration, production use |
+| `wit ai review` | OpenAI/Anthropic | Quick local review, requires own API key |
+
+`wit review` (CodeRabbit) is recommended for:
+- Team workflows
+- CI/CD pipelines
+- Production code review
+- Consistent review quality
+
+## PR Reviews
+
+For pull request reviews, use the `wit pr review` command:
+
+```bash
+# Review a pull request
+wit pr review 123
+
+# Review local changes in PR context
+wit pr review
+```
+
+See [Pull Requests](/platform/pull-requests) for more details.
+
+## Tips
+
+1. **Review before pushing**: Make `wit review --branch --strict` part of your pre-push workflow
+
+2. **Focus on critical issues**: The `--strict` flag only fails on critical/high severity issues
+
+3. **Use in CI**: Automate reviews on every PR to maintain code quality
+
+4. **Review incrementally**: Use `--staged` to review as you stage changes
+
+5. **Branch-based reviews**: `--branch` gives you the full picture of what you're about to merge
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="API key not configured">
+    Run the configuration wizard:
+    ```bash
+    wit review --configure
+    ```
+    Or set the environment variable:
+    ```bash
+    export CODERABBIT_API_KEY=your-key
+    ```
+  </Accordion>
+  
+  <Accordion title="No changes to review">
+    Make sure you have:
+    - Uncommitted changes (for default mode)
+    - Staged changes (for `--staged` mode)
+    - Commits on your branch (for `--branch` mode)
+    
+    Check with `wit status` first.
+  </Accordion>
+  
+  <Accordion title="Review fails in CI">
+    Ensure:
+    - `CODERABBIT_API_KEY` is set as a secret
+    - Full git history is available (`fetch-depth: 0`)
+    - The base branch exists locally
+  </Accordion>
+</AccordionGroup>
+
+## About CodeRabbit
+
+[CodeRabbit](https://coderabbit.ai) is an AI-powered code review platform that provides:
+
+- Intelligent code analysis
+- Security vulnerability detection
+- Best practices enforcement
+- Consistent review quality across teams
+
+wit's partnership with CodeRabbit brings enterprise-grade code review to the command line.

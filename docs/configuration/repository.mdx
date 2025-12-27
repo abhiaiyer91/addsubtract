@@ -5,7 +5,7 @@ description: "Configure individual repository settings"
 
 # Repository Configuration
 
-Each repository has its own configuration in `.tsgit/config`.
+Each repository has its own configuration in `.wit/config`.
 
 ## Core Settings
 
@@ -16,7 +16,7 @@ Each repository has its own configuration in `.tsgit/config`.
     repositoryformatversion = 1
 ```
 
-The repository format version. tsgit uses version 1 by default.
+The repository format version. wit uses version 1 by default.
 
 ### File Mode
 
@@ -45,28 +45,28 @@ Whether to track file permission changes.
 
 Bare repositories have no working directory (used for servers).
 
-## tsgit-Specific Settings
+## wit-Specific Settings
 
 ### Hash Algorithm
 
 ```ini
-[tsgit]
-    hashAlgorithm = sha256
+[wit]
+    hashAlgorithm = sha1
 ```
 
 | Value | Description |
 |-------|-------------|
-| `sha256` | Secure, modern (default) |
-| `sha1` | Git-compatible, deprecated |
+| `sha1` | Git-compatible (default) - works with GitHub/GitLab |
+| `sha256` | More secure, but no Git remote compatibility |
 
-<Warning>
-SHA-1 is cryptographically broken. Only use for Git compatibility.
-</Warning>
+<Note>
+wit defaults to SHA-1 for full GitHub/GitLab compatibility. SHA-256 is available for wit-to-wit workflows that don't need Git remotes.
+</Note>
 
 ### Auto-Stash on Switch
 
 ```ini
-[tsgit]
+[wit]
     autoStashOnSwitch = true
 ```
 
@@ -77,7 +77,7 @@ When enabled:
 ### Large File Handling
 
 ```ini
-[tsgit]
+[wit]
     largeFileThreshold = 2097152
     chunkSize = 2097152
 ```
@@ -172,7 +172,7 @@ When enabled:
 
 Use with:
 ```bash
-tsgit scope use frontend
+wit scope use frontend
 ```
 
 ## AI Configuration
@@ -209,26 +209,26 @@ tsgit scope use frontend
 
 ```bash
 # View
-tsgit config --list
-tsgit config user.name
+wit config --list
+wit config user.name
 
 # Set
-tsgit config user.name "New Name"
-tsgit config --global user.email "new@email.com"
+wit config user.name "New Name"
+wit config --global user.email "new@email.com"
 
 # Unset
-tsgit config --unset user.name
+wit config --unset user.name
 
 # Edit directly
-tsgit config --edit
+wit config --edit
 ```
 
 ### Manual Editing
 
-Open `.tsgit/config` in your editor:
+Open `.wit/config` in your editor:
 
 ```bash
-code .tsgit/config
+code .wit/config
 ```
 
 ## Example: Complete Configuration
@@ -240,8 +240,8 @@ code .tsgit/config
     bare = false
     ignorecase = false
 
-[tsgit]
-    hashAlgorithm = sha256
+[wit]
+    hashAlgorithm = sha1
     largeFileThreshold = 5242880
     autoStashOnSwitch = true
     chunkSize = 2097152

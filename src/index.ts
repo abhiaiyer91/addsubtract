@@ -57,5 +57,8 @@ export * from './ui';
 // AI Integration
 export * from './ai';
 
+// Primitives
+export * from './primitives';
+
 // Version
 export const VERSION = '2.0.0';

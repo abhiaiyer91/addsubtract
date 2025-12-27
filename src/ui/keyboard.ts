@@ -337,6 +337,13 @@ export function getDefaultShortcuts(callbacks: {
   onSwitchBranch?: () => void;
   onNextPanel?: () => void;
   onPrevPanel?: () => void;
+  // Stack shortcuts
+  onShowStacks?: () => void;
+  onStackCreate?: () => void;
+  onStackPush?: () => void;
+  onStackSync?: () => void;
+  onStackUp?: () => void;
+  onStackDown?: () => void;
 }): Shortcut[] {
   return [
     // Command palette
@@ -490,6 +497,50 @@ export function getDefaultShortcuts(callbacks: {
       description: 'Previous panel',
       category: 'Navigation',
       action: callbacks.onPrevPanel || (() => {}),
+    },
+
+    // Stack shortcuts
+    {
+      id: 'showStacks',
+      keys: [{ key: 't' }],
+      description: 'Show stacks',
+      category: 'Stacks',
+      action: callbacks.onShowStacks || (() => {}),
+    },
+    {
+      id: 'stackCreate',
+      keys: [parseKeyString('Ctrl+Shift+N')],
+      description: 'Create new stack',
+      category: 'Stacks',
+      action: callbacks.onStackCreate || (() => {}),
+    },
+    {
+      id: 'stackPush',
+      keys: [parseKeyString('Ctrl+Shift+B')],
+      description: 'Push branch to stack',
+      category: 'Stacks',
+      action: callbacks.onStackPush || (() => {}),
+    },
+    {
+      id: 'stackSync',
+      keys: [parseKeyString('Ctrl+Shift+Y')],
+      description: 'Sync current stack',
+      category: 'Stacks',
+      action: callbacks.onStackSync || (() => {}),
+    },
+    {
+      id: 'stackUp',
+      keys: [parseKeyString('Alt+ArrowUp')],
+      description: 'Navigate up in stack',
+      category: 'Stacks',
+      action: callbacks.onStackUp || (() => {}),
+    },
+    {
+      id: 'stackDown',
+      keys: [parseKeyString('Alt+ArrowDown')],
+      description: 'Navigate down in stack',
+      category: 'Stacks',
+      action: callbacks.onStackDown || (() => {}),
     },
   ];
 }
