@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   GitPullRequest,
@@ -31,6 +31,7 @@ import { Loading } from '@/components/ui/loading';
 import { formatRelativeTime } from '@/lib/utils';
 import { useSession } from '@/lib/auth-client';
 import { trpc } from '@/lib/trpc';
+import type { InlineCommentData } from '@/components/diff/inline-comment';
 
 
 
@@ -116,6 +117,37 @@ export function PullDetailPage() {
     },
   });
 
+  // Inline comment mutations
+  const addInlineCommentMutation = trpc.pulls.addComment.useMutation({
+    onSuccess: () => {
+      utils.pulls.comments.invalidate({ prId: prData?.id! });
+    },
+  });
+
+  const editCommentMutation = trpc.pulls.updateComment.useMutation({
+    onSuccess: () => {
+      utils.pulls.comments.invalidate({ prId: prData?.id! });
+    },
+  });
+
+  const deleteCommentMutation = trpc.pulls.deleteComment.useMutation({
+    onSuccess: () => {
+      utils.pulls.comments.invalidate({ prId: prData?.id! });
+    },
+  });
+
+  const resolveCommentMutation = trpc.pulls.resolveComment.useMutation({
+    onSuccess: () => {
+      utils.pulls.comments.invalidate({ prId: prData?.id! });
+    },
+  });
+
+  const unresolveCommentMutation = trpc.pulls.unresolveComment.useMutation({
+    onSuccess: () => {
+      utils.pulls.comments.invalidate({ prId: prData?.id! });
+    },
+  });
+
   const isLoading = repoLoading || prLoading;
 
   if (isLoading) {
@@ -144,7 +176,7 @@ export function PullDetailPage() {
   const comments = commentsData || [];
   
   // Transform diff data to match DiffFile type
-  const diff: DiffFile[] = (diffData?.files || []).map(file => ({
+  const diff: DiffFile[] = useMemo(() => (diffData?.files || []).map(file => ({
     path: file.newPath,
     oldPath: file.oldPath !== file.newPath ? file.oldPath : undefined,
     status: file.status,
@@ -160,7 +192,104 @@ export function PullDetailPage() {
         content: line.content,
       })),
     })),
-  }));
+  })), [diffData]);
+
+  // Transform comments for the diff viewer, grouped by file path
+  const commentsByFile = useMemo(() => {
+    const grouped: Record<string, InlineCommentData[]> = {};
+    
+    // Filter only inline comments (those with a path)
+    const inlineComments = comments.filter((c: any) => c.path);
+    
+    inlineComments.forEach((comment: any) => {
+      const filePath = comment.path;
+      if (!grouped[filePath]) {
+        grouped[filePath] = [];
+      }
+      grouped[filePath].push({
+        id: comment.id,
+        body: comment.body,
+        userId: comment.userId,
+        prId: comment.prId,
+        path: comment.path,
+        line: comment.line,
+        side: comment.side,
+        startLine: comment.startLine || null,
+        endLine: comment.endLine || null,
+        isResolved: comment.isResolved || false,
+        resolvedAt: comment.resolvedAt ? new Date(comment.resolvedAt) : null,
+        resolvedById: comment.resolvedById || null,
+        replyToId: comment.replyToId || null,
+        createdAt: new Date(comment.createdAt),
+        updatedAt: new Date(comment.updatedAt),
+        user: comment.user,
+      });
+    });
+    
+    return grouped;
+  }, [comments]);
+
+  // Inline comment handlers
+  const handleAddInlineComment = useCallback(
+    (filePath: string, line: number, side: 'LEFT' | 'RIGHT', body: string) => {
+      if (!prData?.id) return;
+      addInlineCommentMutation.mutate({
+        prId: prData.id,
+        body,
+        path: filePath,
+        line,
+        side,
+        commitSha: prData.headSha,
+      });
+    },
+    [prData, addInlineCommentMutation]
+  );
+
+  const handleReplyComment = useCallback(
+    (commentId: string, body: string) => {
+      if (!prData?.id) return;
+      // Find the parent comment to get context
+      const parentComment = comments.find((c: any) => c.id === commentId);
+      addInlineCommentMutation.mutate({
+        prId: prData.id,
+        body,
+        path: parentComment?.path,
+        line: parentComment?.line,
+        side: parentComment?.side,
+        commitSha: prData.headSha,
+        replyToId: commentId,
+      });
+    },
+    [prData, comments, addInlineCommentMutation]
+  );
+
+  const handleEditComment = useCallback(
+    (commentId: string, body: string) => {
+      editCommentMutation.mutate({ commentId, body });
+    },
+    [editCommentMutation]
+  );
+
+  const handleDeleteComment = useCallback(
+    (commentId: string) => {
+      deleteCommentMutation.mutate({ commentId });
+    },
+    [deleteCommentMutation]
+  );
+
+  const handleResolveComment = useCallback(
+    (commentId: string) => {
+      resolveCommentMutation.mutate({ commentId });
+    },
+    [resolveCommentMutation]
+  );
+
+  const handleUnresolveComment = useCallback(
+    (commentId: string) => {
+      unresolveCommentMutation.mutate({ commentId });
+    },
+    [unresolveCommentMutation]
+  );
   
   const commits = commitsData?.commits || [];
 
@@ -530,7 +659,21 @@ export function PullDetailPage() {
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
           ) : diff.length > 0 ? (
-            <DiffViewer files={diff} />
+            <DiffViewer
+              files={diff}
+              comments={commentsByFile}
+              currentUserId={session?.user?.id}
+              onAddComment={authenticated ? handleAddInlineComment : undefined}
+              onReplyComment={authenticated ? handleReplyComment : undefined}
+              onEditComment={authenticated ? handleEditComment : undefined}
+              onDeleteComment={authenticated ? handleDeleteComment : undefined}
+              onResolveComment={authenticated ? handleResolveComment : undefined}
+              onUnresolveComment={authenticated ? handleUnresolveComment : undefined}
+              isAddingComment={addInlineCommentMutation.isPending}
+              isEditingComment={editCommentMutation.isPending}
+              isDeletingComment={deleteCommentMutation.isPending}
+              isResolvingComment={resolveCommentMutation.isPending || unresolveCommentMutation.isPending}
+            />
           ) : (
             <Card>
               <CardContent className="p-6 text-center text-muted-foreground">

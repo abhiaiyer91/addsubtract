@@ -97,8 +97,22 @@ export interface PrComment {
   path?: string | null;
   line?: number | null;
   side?: 'LEFT' | 'RIGHT' | null;
+  startLine?: number | null;
+  endLine?: number | null;
+  replyToId?: string | null;
+  isResolved?: boolean;
+  resolvedAt?: Date | null;
+  resolvedById?: string | null;
   createdAt: Date;
   updatedAt: Date;
+  user?: {
+    id: string;
+    name: string;
+    email: string;
+    username: string | null;
+    image: string | null;
+    avatarUrl: string | null;
+  };
 }
 
 export interface PrReview {
