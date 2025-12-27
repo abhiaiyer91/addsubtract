@@ -1,0 +1,79 @@
+---
+title: 'Releases API'
+description: 'API reference for release management'
+---
+
+# Releases API
+
+The Releases API provides programmatic access to repository releases.
+
+## Endpoints
+
+### List Releases
+
+```typescript
+const releases = await client.releases.list.query({
+  repoId: 'repo_123',
+});
+```
+
+### Get Release
+
+```typescript
+const release = await client.releases.get.query({
+  repoId: 'repo_123',
+  tag: 'v1.0.0',
+});
+```
+
+### Create Release
+
+```typescript
+const release = await client.releases.create.mutate({
+  repoId: 'repo_123',
+  tag: 'v1.0.0',
+  name: 'Version 1.0.0',
+  body: 'Release notes...',
+  draft: false,
+  prerelease: false,
+});
+```
+
+### Update Release
+
+```typescript
+await client.releases.update.mutate({
+  repoId: 'repo_123',
+  releaseId: 'release_abc',
+  body: 'Updated release notes',
+});
+```
+
+### Delete Release
+
+```typescript
+await client.releases.delete.mutate({
+  repoId: 'repo_123',
+  releaseId: 'release_abc',
+});
+```
+
+## Release Schema
+
+```typescript
+interface Release {
+  id: string;
+  tag: string;
+  name: string;
+  body: string;
+  draft: boolean;
+  prerelease: boolean;
+  author: { id: string; username: string };
+  createdAt: string;
+  publishedAt?: string;
+}
+```
+
+## Related
+
+- [Tags](/commands/tags) - Tag management

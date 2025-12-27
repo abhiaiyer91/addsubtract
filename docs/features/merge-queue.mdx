@@ -1,0 +1,330 @@
+---
+title: 'Merge Queue'
+description: 'Controlled merging with automated testing and batching'
+---
+
+# Merge Queue
+
+The merge queue provides controlled, safe merging of pull requests with automated testing, priority handling, and batch optimization.
+
+## Overview
+
+The merge queue:
+- Tests PRs before merging to prevent broken builds
+- Batches multiple PRs for efficient CI usage
+- Handles priority ordering
+- Auto-rebases PRs to stay up-to-date
+- Provides detailed status and statistics
+
+## Quick Start
+
+```bash
+# Add current PR to merge queue
+wit merge-queue add
+
+# Add specific PR with priority
+wit merge-queue add 123 --priority 50
+
+# Check queue status
+wit merge-queue status
+
+# List all queued PRs
+wit merge-queue list
+```
+
+## Commands
+
+### Add to Queue
+
+```bash
+# Add current branch's PR
+wit merge-queue add
+
+# Add specific PR
+wit merge-queue add 123
+
+# Add with priority (0-100, higher = more urgent)
+wit merge-queue add 123 --priority 50
+```
+
+### Remove from Queue
+
+```bash
+# Remove current branch's PR
+wit merge-queue remove
+
+# Remove specific PR
+wit merge-queue remove 123
+```
+
+### Check Status
+
+```bash
+$ wit merge-queue status
+
+Merge Queue Status for PR #123
+
+  Position: 3 of 5
+  Estimated wait: ~15 minutes
+```
+
+### List Queue
+
+```bash
+$ wit merge-queue list
+
+Merge Queue for myrepo:main
+
+  #1   #125       ready          Implement caching
+  #2   #123       processing     Add authentication
+  #3   #127       pending        Fix database issue
+  #4   #128       pending        Update dependencies
+```
+
+### Queue Statistics
+
+```bash
+$ wit merge-queue stats
+
+Merge Queue Statistics for myrepo:main
+
+  Pending:           3
+  Processing:        1
+  Merged today:      12
+  Failed today:      2
+  Avg merge time:    8 minutes
+```
+
+### Configuration
+
+View or update merge queue settings:
+
+```bash
+# View current config
+$ wit merge-queue config
+
+Merge Queue Configuration for myrepo:main
+
+  Enabled:           yes
+  Strategy:          adaptive
+  Max batch size:    5
+  Min wait (sec):    60
+  Auto rebase:       yes
+  Delete branches:   yes
+  Required checks:   test, build, lint
+
+Update with: wit merge-queue config --strategy <strategy>
+```
+
+```bash
+# Update settings
+wit merge-queue config --strategy adaptive
+wit merge-queue config --batch-size 3
+wit merge-queue config --auto-rebase
+wit merge-queue config --no-delete-branch
+```
+
+### Enable/Disable
+
+```bash
+# Enable for main branch
+wit merge-queue enable
+
+# Enable for specific branch
+wit merge-queue enable --branch production
+
+# Disable
+wit merge-queue disable
+```
+
+## Queue States
+
+PRs in the queue go through these states:
+
+| State | Description |
+|-------|-------------|
+| `pending` | Waiting in queue |
+| `preparing` | Being prepared for testing |
+| `testing` | CI tests running |
+| `ready` | Tests passed, ready to merge |
+| `merging` | Currently being merged |
+| `completed` | Successfully merged |
+| `failed` | Tests failed or merge error |
+| `cancelled` | Removed from queue |
+
+## Strategies
+
+The merge queue supports different strategies:
+
+### Sequential (Default)
+Tests and merges one PR at a time.
+
+```bash
+wit merge-queue config --strategy sequential
+```
+
+### Batch
+Groups multiple PRs together for testing.
+
+```bash
+wit merge-queue config --strategy batch --batch-size 5
+```
+
+### Adaptive
+Adjusts batch size based on CI success rate.
+
+```bash
+wit merge-queue config --strategy adaptive
+```
+
+## Priority System
+
+Higher priority PRs are processed first:
+
+```bash
+# Low priority (default: 0)
+wit merge-queue add 123
+
+# Medium priority
+wit merge-queue add 123 --priority 50
+
+# High priority (urgent fix)
+wit merge-queue add 123 --priority 100
+```
+
+## Configuration Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--strategy` | Merge strategy (sequential, batch, adaptive) | sequential |
+| `--batch-size` | Maximum PRs per batch | 5 |
+| `--min-wait` | Minimum seconds before processing | 60 |
+| `--auto-rebase` | Auto-rebase PRs before testing | true |
+| `--no-auto-rebase` | Disable auto-rebase | - |
+| `--delete-branch` | Delete branch after merge | true |
+| `--no-delete-branch` | Keep branch after merge | - |
+
+## Workflow Example
+
+### Adding PRs to Queue
+
+```bash
+# Create and push a PR
+wit checkout -c feature/new-feature
+# ... make changes ...
+wit commit -m "Add new feature"
+wit push -u origin feature/new-feature
+wit pr create
+
+# Add to merge queue
+wit merge-queue add
+```
+
+### Monitoring Queue Progress
+
+```bash
+# Check your PR's position
+wit merge-queue status
+
+# Watch the full queue
+wit merge-queue list
+
+# Check if there are any issues
+wit merge-queue stats
+```
+
+### Handling Failures
+
+If your PR fails in the queue:
+
+```bash
+# Check status
+$ wit merge-queue status 123
+
+PR #123 is not in the merge queue
+Add it with: wit merge-queue add
+
+# The PR was removed due to failure
+# Fix the issue and re-add
+wit checkout feature/my-branch
+# ... fix the issue ...
+wit commit -m "Fix CI failure"
+wit push
+wit merge-queue add
+```
+
+## JSON Output
+
+For scripting and automation:
+
+```bash
+# Queue status as JSON
+wit merge-queue status --json
+
+# List as JSON
+wit merge-queue list --json
+
+# Stats as JSON
+wit merge-queue stats --json
+```
+
+## Integration with CI/CD
+
+The merge queue integrates with wit's built-in CI:
+
+```yaml
+# .wit/workflows/ci.yml
+name: CI
+on:
+  pull_request:
+  merge_queue:  # Triggered by merge queue
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm test
+      - run: npm run build
+```
+
+## Required Checks
+
+Configure which CI checks must pass:
+
+```bash
+# Set required checks
+wit merge-queue config --required-checks "test,build,lint"
+
+# The merge queue will wait for these checks to pass
+```
+
+## Best Practices
+
+### For Fast Merges
+- Keep PRs small and focused
+- Ensure CI is fast and reliable
+- Use the adaptive strategy for high-volume repos
+
+### For Safety
+- Enable auto-rebase to catch conflicts early
+- Require status checks
+- Use the sequential strategy for critical branches
+
+### For Teams
+- Set clear priority guidelines
+- Monitor queue statistics regularly
+- Consider batch strategy for many small PRs
+
+## Requirements
+
+The merge queue requires:
+- wit server running (`wit serve`)
+- CI/CD configured (optional but recommended)
+- Branch protection enabled (recommended)
+
+## Related
+
+- [wit pr](/platform/pull-requests) - Pull request management
+- [wit ci](/features/ci-cd) - CI/CD configuration
+- [wit protect](/features/branch-protection) - Branch protection
