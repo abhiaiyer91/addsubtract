@@ -34,6 +34,7 @@ import { StacksPage } from './routes/repo/stacks';
 import { StackDetailPage } from './routes/repo/stack-detail';
 import { WorkflowsPage } from './routes/repo/workflows';
 import { WorkflowEditor } from './routes/repo/workflow-editor';
+import { WorkflowRunDetail } from './routes/repo/workflow-run-detail';
 import { RepoSettingsPage } from './routes/repo/settings';
 import { CollaboratorsPage } from './routes/repo/settings/collaborators';
 import { BranchProtectionPage } from './routes/repo/settings/branches';
@@ -144,6 +145,7 @@ export function App() {
             <Route path="/:owner/:repo/actions" element={<WorkflowsPage />} />
             <Route path="/:owner/:repo/actions/new" element={<WorkflowEditor />} />
             <Route path="/:owner/:repo/actions/edit" element={<WorkflowEditor />} />
+            <Route path="/:owner/:repo/actions/runs/:runId" element={<WorkflowRunDetail />} />
 
             {/* Releases */}
             <Route path="/:owner/:repo/releases" element={<ReleasesPage />} />
