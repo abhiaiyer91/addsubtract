@@ -107,3 +107,13 @@ export {
 
 // Repository AI Keys model
 export { repoAiKeyModel, type RepoAiKeyInfo } from './repo-ai-keys';
+
+// Journal models (Notion-like documentation)
+export {
+  journalPageModel,
+  journalCommentModel,
+  journalPageHistoryModel,
+  generateSlug,
+  JOURNAL_PAGE_STATUSES,
+  JOURNAL_STATUS_CONFIG,
+} from './journal';
