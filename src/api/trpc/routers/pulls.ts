@@ -1612,7 +1612,7 @@ export const pullsRouter = router({
     .input(
       z.object({
         prId: z.string().uuid(),
-        reviewerId: z.string().uuid(),
+        reviewerId: z.string(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -1677,7 +1677,7 @@ export const pullsRouter = router({
     .input(
       z.object({
         prId: z.string().uuid(),
-        reviewerId: z.string().uuid(),
+        reviewerId: z.string(),
       })
     )
     .mutation(async ({ input, ctx }) => {

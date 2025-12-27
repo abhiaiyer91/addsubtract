@@ -226,7 +226,7 @@ export const webhooksRouter = router({
         });
       }
 
-      // Hide secret in response
+      // Hide secret in response (only mask if secret exists)
       return {
         ...webhook,
         secret: webhook.secret ? '********' : null,
