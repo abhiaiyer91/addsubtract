@@ -79,9 +79,8 @@ export function Header() {
               <kbd className="kbd hidden sm:inline-flex">
                 {isMac() ? '\u2318' : 'Ctrl'}
               </kbd>
-                <kbd className="kbd hidden sm:inline-flex">K</kbd>
-              </button>
-            </div>
+              <kbd className="kbd hidden sm:inline-flex">K</kbd>
+            </button>
           </div>
 
           {/* Right section - User actions */}
