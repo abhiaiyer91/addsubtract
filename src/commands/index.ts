@@ -81,6 +81,9 @@ export { COMMAND_HELP, formatCommandHelp, printCommandHelp, hasHelpFlag } from '
 export { handlePr, PR_HELP } from './pr';
 export { handleIssue, ISSUE_HELP } from './issue';
 
+// Issue tracking (Linear-inspired) - cycle/sprint management
+export { handleCycle } from './cycle';
+
 // Platform management commands
 export { handleUp, UP_HELP } from './up';
 export { handleDown, DOWN_HELP } from './down';

@@ -73,6 +73,8 @@ import {
   // Platform commands
   handlePr,
   handleIssue,
+  // Issue tracking (Linear-inspired) - also exports handleCycle
+  handleCycle,
   // Platform management
   handleUp,
   handleDown,
@@ -261,6 +263,18 @@ Quality of Life:
   stats                 Repository statistics dashboard
   snapshot              Create/restore quick checkpoints
 
+Issue Tracking (Linear-inspired):
+  issue create "Title"  Create a new issue
+  issue list            List issues (--status, --priority, --assignee)
+  issue show <id>       Show issue details (e.g., WIT-123)
+  issue start <id>      Start working on an issue
+  issue close <id>      Close an issue
+  issue board           Show kanban board view
+  issue stats           Show issue statistics
+  cycle create          Create a new sprint/cycle
+  cycle current         Show active cycle progress
+  cycle add <issue>     Add issue to current cycle
+
 Monorepo Support:
   scope                 Show current repository scope
   scope set <path>...   Limit operations to specific paths
@@ -339,6 +353,15 @@ Examples:
   wit serve --port 3000      # Start Git server
   wit review                 # AI code review before push
   wit review --branch        # Review all branch changes
+
+Issue Tracking:
+  wit issue create "Fix login bug"    # Create issue
+  wit issue list                      # List open issues
+  wit issue start WIT-1               # Start working on issue
+  wit issue board                     # Kanban board view
+  wit commit -m "Fix bug" --closes WIT-1  # Close issue on commit
+  wit cycle create --weeks 2          # Create 2-week sprint
+  wit cycle add WIT-1                 # Add issue to sprint
 `;
 
 const COMMANDS = [
@@ -349,6 +372,8 @@ const COMMANDS = [
   'scope', 'graph',
   'ui', 'web',
   'ai', 'search', 'review',
+  // Issue tracking
+  'issue', 'cycle',
   'cat-file', 'hash-object', 'ls-files', 'ls-tree',
   // Plumbing commands
   'rev-parse', 'update-ref', 'symbolic-ref', 'for-each-ref', 'show-ref', 'fsck',
@@ -923,6 +948,11 @@ function main(): void {
           process.exit(1);
         });
         return; // Exit main() to let async handle complete
+
+      // Issue tracking - cycle commands (Linear-inspired sprints)
+      case 'cycle':
+        handleCycle(rawArgs);
+        break;
 
       // Platform management commands
       case 'up':
