@@ -1,0 +1,257 @@
+---
+title: "GitHub Integration"
+description: "Seamless authentication and workflow with GitHub"
+---
+
+# GitHub Integration
+
+wit provides first-class GitHub integration with OAuth authentication, making it easy to clone, push, and pull from GitHub repositories.
+
+## Authentication
+
+### OAuth Device Flow (Recommended)
+
+The easiest way to authenticate with GitHub:
+
+```bash
+wit github login
+```
+
+This will:
+1. Display a URL and a code
+2. Open your browser to GitHub
+3. You enter the code and authorize wit
+4. wit securely stores your credentials
+
+```
+ℹ Starting GitHub authentication...
+
+Please visit: https://github.com/login/device
+Enter code: ABCD-1234
+
+Waiting for authorization...
+✓ Logged in as username (user@email.com)
+```
+
+### Check Status
+
+See your current authentication status:
+
+```bash
+wit github status
+```
+
+Output:
+```
+✓ Authenticated as username
+  Email: user@email.com
+  Token: ghp_xxxx...xxxx (hidden)
+  Scopes: repo, user:email
+  Authenticated: 2 hours ago
+```
+
+### Logout
+
+Remove stored credentials:
+
+```bash
+wit github logout
+```
+
+### Get Token (For Scripts)
+
+If you need the token for other tools:
+
+```bash
+wit github token
+```
+
+<Warning>
+Be careful with this command - it outputs your token in plain text.
+Only use in secure environments.
+</Warning>
+
+## Environment Variables
+
+You can also authenticate using environment variables:
+
+| Variable | Description |
+|----------|-------------|
+| `GITHUB_TOKEN` | GitHub personal access token |
+| `GH_TOKEN` | Alternative (GitHub CLI compatible) |
+| `WIT_GITHUB_CLIENT_ID` | Custom OAuth App client ID |
+
+```bash
+# Using a personal access token
+export GITHUB_TOKEN=ghp_your_token_here
+
+# Now wit commands work without login
+wit clone https://github.com/user/private-repo.git
+wit push origin main
+```
+
+## Creating a Personal Access Token
+
+If you prefer tokens over OAuth:
+
+1. Go to [GitHub Settings → Developer settings → Personal access tokens](https://github.com/settings/tokens)
+2. Click "Generate new token (classic)"
+3. Select scopes:
+   - `repo` - Full control of private repositories
+   - `user:email` - Read user email (for commits)
+4. Copy the token
+5. Set it in your environment:
+
+```bash
+export GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx
+```
+
+## How Authentication Works
+
+### Priority Order
+
+wit checks for credentials in this order:
+
+1. **Environment variables** (`GITHUB_TOKEN`, `GH_TOKEN`)
+2. **Stored OAuth credentials** (from `wit github login`)
+3. **Git credential helpers** (system keychain)
+
+### Credential Storage
+
+OAuth credentials are stored in:
+- **macOS/Linux**: `~/.wit/github-credentials.json`
+- **Windows**: `%USERPROFILE%\.wit\github-credentials.json`
+
+The file is created with restricted permissions (readable only by you).
+
+### Author Information
+
+When you authenticate with GitHub, wit automatically uses your GitHub profile for commit author information:
+
+```bash
+# Before: commits show as "Anonymous"
+wit commit -m "message"  # Author: Anonymous <anonymous@example.com>
+
+# After wit github login: uses your GitHub info
+wit commit -m "message"  # Author: Your Name <your@email.com>
+```
+
+## Common Workflows
+
+### Clone Private Repository
+
+```bash
+# First, authenticate
+wit github login
+
+# Then clone - authentication is automatic
+wit clone https://github.com/yourcompany/private-repo.git
+```
+
+### Push to GitHub
+
+```bash
+# Make changes
+echo "hello" > file.txt
+wit add file.txt
+wit commit -m "Add file"
+
+# Push (uses stored credentials)
+wit push origin main
+```
+
+### Fork Workflow
+
+```bash
+# Clone your fork
+wit clone https://github.com/you/forked-repo.git
+cd forked-repo
+
+# Add upstream
+wit remote add upstream https://github.com/original/repo.git
+
+# Fetch upstream changes
+wit fetch upstream
+
+# Merge upstream into your branch
+wit checkout main
+wit merge upstream/main
+
+# Push to your fork
+wit push origin main
+```
+
+## Troubleshooting
+
+### "401 Unauthorized"
+
+Your credentials may have expired:
+
+```bash
+wit github logout
+wit github login
+```
+
+### "Permission denied"
+
+Check if you have access to the repository:
+
+```bash
+wit github status
+```
+
+Make sure your token has the `repo` scope for private repositories.
+
+### Token Not Working
+
+If using a personal access token, verify:
+
+1. Token hasn't expired
+2. Token has correct scopes (`repo`, `user:email`)
+3. Token is set correctly:
+
+```bash
+echo $GITHUB_TOKEN  # Should show your token
+```
+
+### OAuth Login Fails
+
+If the device flow fails:
+
+1. Make sure you're entering the code correctly
+2. Try logging out and in again
+3. Check your internet connection
+4. As fallback, use a personal access token
+
+## Security Best Practices
+
+<Tip>
+**Do:**
+- Use OAuth login when possible (tokens are scoped and can be revoked)
+- Set restrictive token scopes
+- Rotate tokens periodically
+- Use `wit github logout` on shared machines
+
+**Don't:**
+- Commit tokens to repositories
+- Share tokens in plain text
+- Use tokens with more permissions than needed
+</Tip>
+
+## Custom OAuth App
+
+For enterprise deployments, you can use your own OAuth App:
+
+1. Create an OAuth App at [github.com/settings/developers](https://github.com/settings/developers)
+2. Set the client ID:
+
+```bash
+export WIT_GITHUB_CLIENT_ID=your_client_id
+wit github login
+```
+
+This is useful for:
+- Enterprise GitHub instances
+- Custom branding
+- Organizational control over OAuth scopes
+

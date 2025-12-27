@@ -1,0 +1,354 @@
+---
+title: "Git Objects"
+description: "Working with blobs, trees, commits, and tags programmatically"
+---
+
+# Git Objects
+
+wit provides classes for working with Git objects directly. This is useful for building tools, analyzing repositories, or understanding Git internals.
+
+## Object Types
+
+| Type | Class | Description |
+|------|-------|-------------|
+| blob | `Blob` | File content |
+| tree | `Tree` | Directory structure |
+| commit | `Commit` | Repository snapshot |
+| tag | `Tag` | Annotated tag |
+
+## Blob
+
+A blob stores file content.
+
+```typescript
+import { Blob } from 'wit/core';
+
+// Create a blob
+const blob = new Blob(Buffer.from('Hello, world!'));
+
+// Get content
+console.log(blob.content.toString()); // "Hello, world!"
+
+// Serialize for storage
+const data = blob.serialize();
+```
+
+### Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `type` | `'blob'` | Object type |
+| `content` | `Buffer` | Raw file content |
+
+### Methods
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `serialize()` | `Buffer` | Serialize for storage |
+| `toString()` | `string` | Content as UTF-8 string |
+
+## Tree
+
+A tree represents a directory, containing references to blobs (files) and other trees (subdirectories).
+
+```typescript
+import { Tree, TreeEntry } from 'wit/core';
+
+// Create a tree
+const entries: TreeEntry[] = [
+  { mode: '100644', name: 'README.md', hash: 'abc123...' },
+  { mode: '100755', name: 'script.sh', hash: 'def456...' },
+  { mode: '40000', name: 'src', hash: '789abc...' },
+];
+
+const tree = new Tree(entries);
+
+// Access entries
+for (const entry of tree.entries) {
+  console.log(`${entry.mode} ${entry.name} ${entry.hash}`);
+}
+
+// Serialize (entries are automatically sorted)
+const data = tree.serialize();
+```
+
+### TreeEntry
+
+```typescript
+interface TreeEntry {
+  mode: string;   // File mode
+  name: string;   // File/directory name
+  hash: string;   // Object hash (blob or tree)
+}
+```
+
+### File Modes
+
+| Mode | Description |
+|------|-------------|
+| `100644` | Regular file |
+| `100755` | Executable file |
+| `120000` | Symbolic link |
+| `40000` | Directory (tree) |
+| `160000` | Submodule (commit) |
+
+### Methods
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `serialize()` | `Buffer` | Serialize for storage |
+| `static deserialize(data)` | `Tree` | Parse from buffer |
+
+## Commit
+
+A commit represents a snapshot of the repository.
+
+```typescript
+import { Commit, Author } from 'wit/core';
+
+const author: Author = {
+  name: 'Alice',
+  email: 'alice@example.com',
+  timestamp: Math.floor(Date.now() / 1000),
+  timezone: '-0800',
+};
+
+const commit = new Commit({
+  tree: 'abc123...',           // Tree hash
+  parents: ['def456...'],      // Parent commit hashes
+  author,
+  committer: author,
+  message: 'Add new feature',
+});
+
+// Access properties
+console.log(commit.tree);      // Tree hash
+console.log(commit.parents);   // Parent hashes
+console.log(commit.message);   // Commit message
+
+// Serialize
+const data = commit.serialize();
+```
+
+### Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `type` | `'commit'` | Object type |
+| `tree` | `string` | Tree object hash |
+| `parents` | `string[]` | Parent commit hashes |
+| `author` | `Author` | Who wrote the changes |
+| `committer` | `Author` | Who created the commit |
+| `message` | `string` | Commit message |
+
+### Author
+
+```typescript
+interface Author {
+  name: string;      // Display name
+  email: string;     // Email address
+  timestamp: number; // Unix timestamp
+  timezone: string;  // Timezone offset (e.g., "-0800")
+}
+```
+
+### Methods
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `serialize()` | `Buffer` | Serialize for storage |
+| `static deserialize(data)` | `Commit` | Parse from buffer |
+
+## Tag
+
+An annotated tag with message and tagger info.
+
+```typescript
+import { Tag, Author } from 'wit/core';
+
+const tagger: Author = {
+  name: 'Bob',
+  email: 'bob@example.com',
+  timestamp: Math.floor(Date.now() / 1000),
+  timezone: '+0000',
+};
+
+const tag = new Tag({
+  object: 'abc123...',   // Tagged object hash
+  type: 'commit',        // Tagged object type
+  name: 'v1.0.0',        // Tag name
+  tagger,
+  message: 'Release version 1.0.0',
+});
+
+// Access properties
+console.log(tag.name);     // "v1.0.0"
+console.log(tag.message);  // "Release version 1.0.0"
+```
+
+### Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `type` | `'tag'` | Object type |
+| `object` | `string` | Tagged object hash |
+| `objectType` | `string` | Tagged object type |
+| `name` | `string` | Tag name |
+| `tagger` | `Author` | Who created the tag |
+| `message` | `string` | Tag message |
+
+## Object Store
+
+The `ObjectStore` class handles reading and writing objects.
+
+```typescript
+import { Repository } from 'wit/core';
+
+const repo = Repository.open('.');
+
+// Write a blob
+const blob = new Blob(Buffer.from('content'));
+const hash = repo.objects.writeObject(blob);
+console.log(`Stored as: ${hash}`);
+
+// Read an object
+const obj = repo.objects.readObject(hash);
+console.log(obj.type);  // 'blob'
+
+// Write raw content as blob
+const blobHash = repo.objects.writeBlob(Buffer.from('content'));
+
+// Check if object exists
+if (repo.objects.hasObject(hash)) {
+  console.log('Object exists');
+}
+
+// Read raw object data
+const { type, content } = repo.objects.readRawObject(hash);
+```
+
+### Methods
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `writeObject(obj)` | `string` | Write object, return hash |
+| `readObject(hash)` | `GitObject` | Read and parse object |
+| `writeBlob(content)` | `string` | Write content as blob |
+| `hasObject(hash)` | `boolean` | Check if object exists |
+| `readRawObject(hash)` | `{type, content}` | Read without parsing |
+| `readBlob(hash)` | `Blob` | Read as blob |
+| `readTree(hash)` | `Tree` | Read as tree |
+| `readCommit(hash)` | `Commit` | Read as commit |
+
+## Hashing
+
+wit supports SHA-1 (Git compatible) and SHA-256 (more secure).
+
+```typescript
+import { hashObject, setHashAlgorithm, getHashAlgorithm } from 'wit/core';
+
+// Check current algorithm
+console.log(getHashAlgorithm());  // 'sha1' or 'sha256'
+
+// Set algorithm (usually done at repo init)
+setHashAlgorithm('sha256');
+
+// Hash an object
+const hash = hashObject('blob', Buffer.from('content'));
+console.log(hash);  // 64-char hex string for SHA-256
+```
+
+## Examples
+
+### Walk a Tree
+
+```typescript
+function walkTree(repo: Repository, treeHash: string, prefix = '') {
+  const tree = repo.objects.readTree(treeHash);
+  
+  for (const entry of tree.entries) {
+    const path = prefix ? `${prefix}/${entry.name}` : entry.name;
+    
+    if (entry.mode === '40000') {
+      // Directory - recurse
+      console.log(`📁 ${path}/`);
+      walkTree(repo, entry.hash, path);
+    } else {
+      // File
+      console.log(`📄 ${path}`);
+    }
+  }
+}
+
+const repo = Repository.open('.');
+const head = repo.refs.resolve('HEAD');
+const commit = repo.objects.readCommit(head);
+walkTree(repo, commit.tree);
+```
+
+### Find All Blobs in a Commit
+
+```typescript
+function findBlobs(repo: Repository, commitHash: string): string[] {
+  const blobs: string[] = [];
+  const commit = repo.objects.readCommit(commitHash);
+  
+  function walkTree(treeHash: string) {
+    const tree = repo.objects.readTree(treeHash);
+    for (const entry of tree.entries) {
+      if (entry.mode === '40000') {
+        walkTree(entry.hash);
+      } else {
+        blobs.push(entry.hash);
+      }
+    }
+  }
+  
+  walkTree(commit.tree);
+  return blobs;
+}
+```
+
+### Create a Commit Programmatically
+
+```typescript
+import { Repository, Blob, Tree, Commit } from 'wit/core';
+
+const repo = Repository.open('.');
+
+// Create a blob
+const blob = new Blob(Buffer.from('Hello, world!'));
+const blobHash = repo.objects.writeObject(blob);
+
+// Create a tree with the blob
+const tree = new Tree([
+  { mode: '100644', name: 'hello.txt', hash: blobHash },
+]);
+const treeHash = repo.objects.writeObject(tree);
+
+// Create a commit
+const commit = new Commit({
+  tree: treeHash,
+  parents: [], // No parents for initial commit
+  author: {
+    name: 'Bot',
+    email: 'bot@example.com',
+    timestamp: Math.floor(Date.now() / 1000),
+    timezone: '+0000',
+  },
+  committer: {
+    name: 'Bot',
+    email: 'bot@example.com',
+    timestamp: Math.floor(Date.now() / 1000),
+    timezone: '+0000',
+  },
+  message: 'Initial commit',
+});
+
+const commitHash = repo.objects.writeObject(commit);
+console.log(`Created commit: ${commitHash}`);
+
+// Update HEAD
+repo.refs.update('refs/heads/main', commitHash);
+```
+

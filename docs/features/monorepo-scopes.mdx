@@ -5,20 +5,20 @@ description: "Limit operations to specific paths in your repository"
 
 # Monorepo Scopes
 
-Scopes let you focus on specific parts of a large repository, making tsgit faster and less noisy.
+Scopes let you focus on specific parts of a large repository, making wit faster and less noisy.
 
 ## Overview
 
-In a monorepo, you often only care about one package or service. Scopes limit all tsgit operations to the paths you specify.
+In a monorepo, you often only care about one package or service. Scopes limit all wit operations to the paths you specify.
 
 ```bash
 # Set scope to frontend package
-tsgit scope set packages/frontend/
+wit scope set packages/frontend/
 
 # Now all commands are scoped
-tsgit status   # Only shows frontend files
-tsgit add .    # Only stages frontend files
-tsgit log      # Only shows frontend commits
+wit status   # Only shows frontend files
+wit add .    # Only stages frontend files
+wit log      # Only shows frontend commits
 ```
 
 ## Commands
@@ -26,7 +26,7 @@ tsgit log      # Only shows frontend commits
 ### View Current Scope
 
 ```bash
-tsgit scope
+wit scope
 ```
 
 Output:
@@ -42,47 +42,47 @@ Current scope: (entire repository)
 ### Set Scope
 
 ```bash
-tsgit scope set <path>
+wit scope set <path>
 ```
 
 **Examples:**
 
 ```bash
 # Scope to a directory
-tsgit scope set packages/frontend/
+wit scope set packages/frontend/
 
 # Scope to multiple paths (comma-separated)
-tsgit scope set packages/frontend/,packages/shared/
+wit scope set packages/frontend/,packages/shared/
 
 # Scope to a pattern
-tsgit scope set "src/**/*.ts"
+wit scope set "src/**/*.ts"
 ```
 
 ### Use Preset
 
 ```bash
-tsgit scope use <preset>
+wit scope use <preset>
 ```
 
 Presets are predefined scopes in your config:
 
 ```bash
-tsgit scope use frontend
-tsgit scope use backend
-tsgit scope use docs
+wit scope use frontend
+wit scope use backend
+wit scope use docs
 ```
 
 ### Clear Scope
 
 ```bash
-tsgit scope clear
+wit scope clear
 ```
 
 Returns to operating on the entire repository.
 
 ## Configuration
 
-Define presets in `.tsgit/config`:
+Define presets in `.wit/config`:
 
 ```ini
 [scope "frontend"]
@@ -130,28 +130,28 @@ my-monorepo/
 
 ```bash
 # Set scope
-tsgit scope set packages/frontend/
+wit scope set packages/frontend/
 
 # Work normally - only frontend files
-tsgit status
-tsgit add src/components/Button.tsx
-tsgit commit -m "Update Button component"
+wit status
+wit add src/components/Button.tsx
+wit commit -m "Update Button component"
 
 # Clear when done
-tsgit scope clear
+wit scope clear
 ```
 
 ### Using Presets
 
 ```bash
 # Quick scope switching
-tsgit scope use frontend
+wit scope use frontend
 # ... work on frontend ...
 
-tsgit scope use backend
+wit scope use backend
 # ... work on backend ...
 
-tsgit scope clear
+wit scope clear
 # ... work on everything ...
 ```
 
@@ -161,10 +161,10 @@ tsgit scope clear
 
 ```bash
 # Focus on what you're working on
-tsgit scope set packages/auth/
+wit scope set packages/auth/
 
 # Less noise in status
-tsgit status
+wit status
 # Only shows auth package files
 ```
 
@@ -172,25 +172,25 @@ tsgit status
 
 ```bash
 # Ensure you only commit frontend changes
-tsgit scope set packages/frontend/
-tsgit add .
-tsgit commit -m "Frontend: Update styles"
+wit scope set packages/frontend/
+wit add .
+wit commit -m "Frontend: Update styles"
 ```
 
 ### Scoped History
 
 ```bash
 # What changed in the API recently?
-tsgit scope set packages/api/
-tsgit log --oneline -n 20
+wit scope set packages/api/
+wit log --oneline -n 20
 ```
 
 ### CI/CD Pipelines
 
 ```bash
 # Only run tests if package changed
-tsgit scope set packages/auth/
-if [ "$(tsgit status --porcelain)" ]; then
+wit scope set packages/auth/
+if [ "$(wit status --porcelain)" ]; then
     npm run test:auth
 fi
 ```
@@ -200,18 +200,18 @@ fi
 <Tip>
 Set scope in your terminal profile for focused work:
 ```bash
-alias fe='tsgit scope use frontend'
-alias be='tsgit scope use backend'
-alias all='tsgit scope clear'
+alias fe='wit scope use frontend'
+alias be='wit scope use backend'
+alias all='wit scope clear'
 ```
 </Tip>
 
 <Tip>
 Use scopes with other commands:
 ```bash
-tsgit scope set packages/frontend/
-tsgit stats  # Stats for frontend only
-tsgit cleanup  # Branches affecting frontend
+wit scope set packages/frontend/
+wit stats  # Stats for frontend only
+wit cleanup  # Branches affecting frontend
 ```
 </Tip>
 

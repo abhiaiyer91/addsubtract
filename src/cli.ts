@@ -49,6 +49,8 @@ import {
   handleFetch,
   handlePull,
   handlePush,
+  // GitHub integration
+  handleGitHub,
   // Plumbing commands
   handleRevParse,
   handleUpdateRef,
@@ -59,10 +61,35 @@ import {
   // Advanced features
   handleReflog,
   handleGC,
+  // Stacked diffs
+  handleStack,
+  // Collaborator management
+  handleCollaborator,
+  // Server command
+  handleServe,
+  // Command help
+  printCommandHelp,
+  hasHelpFlag,
+  // Platform commands
+  handlePr,
+  handleIssue,
+  // Platform management
+  handleUp,
+  handleDown,
+  handlePlatformStatus,
+  // Smart status
+  handleSmartStatus,
+  // Semantic search
+  handleSearch,
+  // Personal access tokens
+  handleToken,
+  // CodeRabbit review
+  handleCodeReview,
 } from './commands';
 import { handleHooks } from './core/hooks';
 import { handleSubmodule } from './core/submodule';
 import { handleWorktree } from './core/worktree';
+import { handleProtect } from './core/branch-protection';
 import { TsgitError, findSimilar } from './core/errors';
 import { Repository } from './core/repository';
 import { launchTUI } from './ui/tui';
@@ -155,12 +182,75 @@ Remote Operations:
   pull [<remote>]       Fetch and integrate with local branch
   push [<remote>]       Update remote refs and objects
 
+GitHub Integration:
+  github login          Authenticate with GitHub (device flow)
+  github logout         Remove stored GitHub credentials
+  github status         Show authentication status
+  github token          Print access token (for scripting)
+
 Advanced Features:
   hooks                 Manage repository hooks
   submodule             Manage submodules
   worktree              Manage multiple working trees
+  protect               Manage branch protection rules
   reflog                Show reference log
   gc                    Run garbage collection
+
+Stacked Diffs:
+  stack create <name>   Start a new stack from current branch
+  stack push [name]     Create a new branch on top of the stack
+  stack list            Show all stacks
+  stack show            Show current stack visualization
+  stack sync            Rebase entire stack when base changes
+  stack submit          Push all stack branches for review
+  stack up/down         Navigate the stack
+  stack pop             Remove top branch from stack
+
+Branch Protection:
+  protect               List all protection rules
+  protect add <pattern> Add protection rule (main, release/*, etc.)
+  protect remove <pat>  Remove a protection rule
+  protect check <br>    Check if operation is allowed on branch
+  protect status <br>   Show protection status for a branch
+
+Collaborator Management:
+  collaborator          List collaborators
+  collaborator add      Invite a collaborator (email, role)
+  collaborator remove   Remove a collaborator
+  collaborator update   Update collaborator role
+  collaborator accept   Accept invitation (token)
+  collaborator team     Manage teams
+
+Server:
+  serve                 Start Git HTTP server for hosting repos
+  serve --port <n>      Start server on specified port
+  serve --repos <path>  Set repository storage directory
+
+Platform Commands:
+  pr create             Create pull request from current branch
+  pr list               List pull requests
+  pr view <number>      View pull request details
+  pr merge <number>     Merge a pull request
+  pr close <number>     Close a pull request
+  pr review [<number>]  AI code review using CodeRabbit
+  pr review-status      Check CodeRabbit configuration
+  
+  issue create <title>  Create new issue
+  issue list            List issues
+  issue view <number>   View issue details
+  issue close <number>  Close an issue
+  issue comment <n>     Add comment to issue
+
+Self-Hosting (run your own GitHub):
+  up                    Start the wit platform (database + server + web UI)
+  down                  Stop all wit services
+  platform-status       Show status of running services
+
+Authentication:
+  token create <name>   Create a personal access token
+  token list            List your tokens
+  token revoke <id>     Revoke a token
+  token scopes          List available scopes
 
 Quality of Life:
   amend                 Quickly fix the last commit
@@ -178,12 +268,23 @@ Monorepo Support:
   scope clear           Clear scope restrictions
 
 AI-Powered Features:
+  search <query>        Semantic code search (the killer feature!)
+  search index          Index repo for semantic search
+  search status         Show index health
+  search -i             Interactive search mode
+  
+  review                Pre-push code review (powered by CodeRabbit)
+  review --staged       Review only staged changes
+  review --branch       Review changes since branching from main
+  review --configure    Set up CodeRabbit API key
+  
   ai <query>            Natural language git commands
   ai commit [-a] [-x]   Generate commit message from changes
-  ai review             AI code review of changes
   ai explain [ref]      Explain a commit
   ai resolve [file]     AI-assisted conflict resolution
   ai status             Show AI configuration
+  
+  pr review [<number>]  AI PR review using CodeRabbit
 
 Plumbing Commands:
   cat-file <hash>       Provide content or type info for objects
@@ -200,6 +301,13 @@ Plumbing Commands:
 Options:
   -h, --help            Show this help message
   -v, --version         Show version number
+
+Environment Variables:
+  GITHUB_TOKEN          GitHub personal access token (recommended)
+  GH_TOKEN              Alternative to GITHUB_TOKEN
+  WIT_GITHUB_CLIENT_ID  OAuth App client ID (for device flow login)
+  WIT_TOKEN             Generic wit authentication token
+  GIT_TOKEN             Generic git authentication token
 
 Examples:
   wit ui                    # Launch terminal UI
@@ -226,6 +334,11 @@ Examples:
   wit fetch origin           # Fetch from origin
   wit pull                   # Pull current branch
   wit push -u origin main    # Push and set upstream
+  wit github login           # Login to GitHub
+  wit github status          # Check GitHub auth status
+  wit serve --port 3000      # Start Git server
+  wit review                 # AI code review before push
+  wit review --branch        # Review all branch changes
 `;
 
 const COMMANDS = [
@@ -235,7 +348,7 @@ const COMMANDS = [
   'amend', 'wip', 'fixup', 'cleanup', 'blame', 'stats', 'snapshot',
   'scope', 'graph',
   'ui', 'web',
-  'ai',
+  'ai', 'search', 'review',
   'cat-file', 'hash-object', 'ls-files', 'ls-tree',
   // Plumbing commands
   'rev-parse', 'update-ref', 'symbolic-ref', 'for-each-ref', 'show-ref', 'fsck',
@@ -245,8 +358,22 @@ const COMMANDS = [
   'cherry-pick', 'rebase', 'revert',
   // Remote commands
   'remote', 'clone', 'fetch', 'pull', 'push',
+  // GitHub integration
+  'github',
   // Advanced features
-  'hooks', 'submodule', 'worktree', 'reflog', 'gc',
+  'hooks', 'submodule', 'worktree', 'protect', 'reflog', 'gc',
+  // Stacked diffs
+  'stack',
+  // Collaborator management
+  'collaborator',
+  // Server
+  'serve',
+  // Platform commands
+  'pr', 'issue',
+  // Platform management
+  'up', 'down', 'platform-status',
+  // Authentication
+  'token',
   'help',
 ];
 
@@ -321,7 +448,10 @@ function main(): void {
   const args = process.argv.slice(2);
 
   if (args.length === 0) {
-    console.log(HELP);
+    handleSmartStatus([]).catch((error: Error) => {
+      console.error(`error: ${error.message}`);
+      process.exit(1);
+    });
     return;
   }
 
@@ -330,7 +460,22 @@ function main(): void {
   // For commands that do their own argument parsing, use raw args after command
   const rawArgs = args.slice(1);
 
+  // Check for --help or -h flag on a specific command first
+  // This handles: wit add --help, wit commit -h, etc.
+  if (command && COMMANDS.includes(command) && command !== 'help' && (options.help || hasHelpFlag(rawArgs))) {
+    if (printCommandHelp(command)) {
+      return;
+    }
+  }
+
+  // Check for general help: wit --help, wit help, wit help <command>
   if (options.help || command === 'help') {
+    // Check if help is requested for a specific command
+    if (command === 'help' && cmdArgs.length > 0) {
+      if (printCommandHelp(cmdArgs[0])) {
+        return;
+      }
+    }
     console.log(HELP);
     return;
   }
@@ -356,18 +501,20 @@ function main(): void {
         break;
 
       case 'commit':
-        // Use new commit handler for full options
-        if (options.all || cmdArgs.length > 0) {
-          handleCommit([...cmdArgs, ...(options.message ? ['-m', options.message as string] : []), ...(options.all ? ['-a'] : [])]);
-        } else {
-          const message = options.message as string;
-          if (!message) {
-            console.error('error: switch `m\' requires a value');
-            process.exit(1);
+        // Use new commit handler for full options (now async for hooks)
+        handleCommit([
+          ...cmdArgs,
+          ...(options.message ? ['-m', options.message as string] : []),
+          ...(options.all ? ['-a'] : []),
+        ]).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
           }
-          commit(message);
-        }
-        break;
+          process.exit(1);
+        });
+        return; // Exit main() to let async handle complete
 
       case 'status':
         status();
@@ -425,8 +572,15 @@ function main(): void {
           options.continue ? ['--continue'] : [],
           options.conflicts ? ['--conflicts'] : [],
           options.message ? ['-m', options.message as string] : []
-        ));
-        break;
+        )).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
+          }
+          process.exit(1);
+        });
+        return; // Exit main() to let async handle complete
 
       case 'undo':
         handleUndo(cmdArgs.concat(
@@ -536,6 +690,27 @@ function main(): void {
           process.exit(1);
         });
         return; // Exit main() to let async handle complete
+
+      case 'search':
+        // Semantic search - the "holy shit" feature
+        handleSearch(rawArgs).catch((error: Error) => {
+          console.error(`error: ${error.message}`);
+          process.exit(1);
+        });
+        return; // Exit main() to let async handle complete
+
+      case 'review':
+        // CodeRabbit-powered code review
+        handleCodeReview(rawArgs).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
+          }
+          process.exit(1);
+        });
+        return; // Exit main() to let async handle complete
+
       // Quality of Life commands
       case 'amend':
         handleAmend(cmdArgs.concat(
@@ -665,6 +840,18 @@ function main(): void {
         handlePush(args.slice(args.indexOf('push') + 1));
         break;
 
+      // GitHub integration
+      case 'github':
+        handleGitHub(args.slice(args.indexOf('github') + 1)).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
+          }
+          process.exit(1);
+        });
+        return; // Exit main() to let async handle complete
+
       // Advanced features
       case 'hooks':
         handleHooks(cmdArgs);
@@ -681,6 +868,10 @@ function main(): void {
         handleWorktree(cmdArgs);
         break;
 
+      case 'protect':
+        handleProtect(rawArgs);
+        break;
+
       case 'reflog':
         handleReflog(cmdArgs);
         break;
@@ -688,6 +879,96 @@ function main(): void {
       case 'gc':
         handleGC(cmdArgs);
         break;
+
+      case 'stack':
+        handleStack(rawArgs);
+        break;
+
+      // Collaborator management
+      case 'collaborator':
+        // Collaborator commands are async due to email sending
+        handleCollaborator(args.slice(args.indexOf('collaborator') + 1)).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
+          }
+          process.exit(1);
+        });
+        return; // Exit main() to let async handle complete
+
+      case 'serve':
+        handleServe(args.slice(args.indexOf('serve') + 1));
+        break;
+
+      // Platform commands
+      case 'pr':
+        handlePr(args.slice(args.indexOf('pr') + 1)).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
+          }
+          process.exit(1);
+        });
+        return; // Exit main() to let async handle complete
+
+      case 'issue':
+        handleIssue(args.slice(args.indexOf('issue') + 1)).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
+          }
+          process.exit(1);
+        });
+        return; // Exit main() to let async handle complete
+
+      // Platform management commands
+      case 'up':
+        handleUp(args.slice(args.indexOf('up') + 1)).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
+          }
+          process.exit(1);
+        });
+        return;
+
+      case 'down':
+        handleDown(args.slice(args.indexOf('down') + 1)).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
+          }
+          process.exit(1);
+        });
+        return;
+
+      case 'platform-status':
+        handlePlatformStatus(args.slice(args.indexOf('platform-status') + 1)).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
+          }
+          process.exit(1);
+        });
+        return;
+
+      // Personal access tokens
+      case 'token':
+        handleToken(args.slice(args.indexOf('token') + 1)).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
+          }
+          process.exit(1);
+        });
+        return;
 
       default: {
         // Provide suggestions for unknown commands

@@ -11,7 +11,6 @@
 import { getTsgitAgent, isAIAvailable, getAIInfo } from '../ai/mastra.js';
 import { Repository } from '../core/repository.js';
 import { diff as computeDiff, createHunks, DiffLine } from '../core/diff.js';
-import { TsgitError, ErrorCode } from '../core/errors.js';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -126,15 +125,33 @@ async function handleChat(args: string[]): Promise<void> {
 }
 
 /**
+ * Flatten a tree into a map of path -> blob hash
+ */
+function flattenTree(repo: Repository, treeHash: string, prefix: string, result: Map<string, string>): void {
+  const tree = repo.objects.readTree(treeHash);
+
+  for (const entry of tree.entries) {
+    const fullPath = prefix ? prefix + '/' + entry.name : entry.name;
+
+    if (entry.mode === '40000') {
+      flattenTree(repo, entry.hash, fullPath, result);
+    } else {
+      result.set(fullPath, entry.hash);
+    }
+  }
+}
+
+/**
  * Generate a commit message using AI
  */
 async function handleAICommit(args: string[]): Promise<void> {
   const repo = Repository.find();
   const status = repo.status();
   
-  // Check for --all flag
+  // Check for flags - default to execute unless --dry-run is specified
   const stageAll = args.includes('-a') || args.includes('--all');
-  const execute = args.includes('--execute') || args.includes('-x');
+  const dryRun = args.includes('--dry-run');
+  const execute = !dryRun; // Execute by default
   
   // If -a flag, stage all modified files first
   if (stageAll) {
@@ -147,8 +164,11 @@ async function handleAICommit(args: string[]): Promise<void> {
     repo.index.save();
   }
   
-  // Get staged files
-  const stagedFiles = stageAll ? [...status.modified, ...status.deleted] : status.staged;
+  // Re-fetch status after staging
+  const updatedStatus = stageAll ? repo.status() : status;
+  
+  // Get staged files from the updated status
+  const stagedFiles = updatedStatus.staged;
   
   if (stagedFiles.length === 0) {
     console.error('No changes staged for commit.');
@@ -156,29 +176,40 @@ async function handleAICommit(args: string[]): Promise<void> {
     process.exit(1);
   }
   
-  // Get the diff of staged changes
+  // Get HEAD tree to compare against (staged diff = HEAD vs index)
+  const headTree = new Map<string, string>();
+  const headHash = repo.refs.resolve('HEAD');
+  if (headHash) {
+    const commit = repo.objects.readCommit(headHash);
+    flattenTree(repo, commit.treeHash, '', headTree);
+  }
+  
+  // Get the diff of staged changes (comparing HEAD to index)
   let diffContent = '';
+  const indexEntries = repo.index.getEntriesMap();
+  
   for (const file of stagedFiles) {
     try {
+      const entry = indexEntries.get(file);
+      if (!entry) continue;
+      
+      // Get old content from HEAD tree
       let oldContent = '';
-      const entry = repo.index.get(file);
-      if (entry) {
-        const headHash = repo.refs.resolve('HEAD');
-        if (headHash) {
-          // Get from HEAD if possible
-          try {
-            const blob = repo.objects.readBlob(entry.hash);
-            oldContent = blob.content.toString('utf8');
-          } catch {
-            // No previous version
-          }
+      const oldHash = headTree.get(file);
+      if (oldHash) {
+        try {
+          const blob = repo.objects.readBlob(oldHash);
+          oldContent = blob.content.toString('utf8');
+        } catch {
+          // No previous version (new file)
         }
       }
       
-      const fullPath = path.join(repo.workDir, file);
+      // Get new content from index (staged version)
       let newContent = '';
       try {
-        newContent = fs.readFileSync(fullPath, 'utf8');
+        const blob = repo.objects.readBlob(entry.hash);
+        newContent = blob.content.toString('utf8');
       } catch {
         // File might be deleted
       }
@@ -191,29 +222,59 @@ async function handleAICommit(args: string[]): Promise<void> {
     }
   }
   
-  console.log('\n🤖 Generating commit message...\n');
+  // Also handle deleted files (in HEAD but not in index)
+  for (const [filePath, oldHash] of headTree) {
+    if (!indexEntries.has(filePath) && stagedFiles.includes(filePath)) {
+      try {
+        const blob = repo.objects.readBlob(oldHash);
+        const oldContent = blob.content.toString('utf8');
+        const diffResult = computeDiff(oldContent, '');
+        diffContent += `\n=== ${filePath} (deleted) ===\n`;
+        diffContent += formatDiffOutput(filePath, diffResult, 3);
+      } catch {
+        // Skip files we can't diff
+      }
+    }
+  }
+  
+  console.log('\nGenerating commit message...\n');
   
   const agent = getTsgitAgent();
   
-  const prompt = `Based on the following diff of staged changes, generate a good commit message.
+  const prompt = `You are a senior software engineer writing a commit message. Based on the following diff of staged changes, generate a clear and descriptive commit message.
 
-The commit message should:
-1. Have a concise subject line (under 72 characters) in imperative mood
-2. Optionally include a body explaining WHY the change was made
-3. Follow conventional commits format if appropriate (feat:, fix:, docs:, etc.)
+## Requirements:
+1. **Subject line**: Under 72 characters, imperative mood (e.g., "Add feature" not "Added feature")
+2. **Format**: Use conventional commits prefix when appropriate:
+   - feat: new feature
+   - fix: bug fix
+   - refactor: code refactoring
+   - docs: documentation changes
+   - test: adding/updating tests
+   - chore: maintenance tasks
+   - perf: performance improvements
+   - style: formatting, whitespace
+3. **Body** (if needed): Explain WHY the change was made, not just what changed
 
-Return ONLY the commit message, nothing else.
+## Output:
+Return ONLY the commit message text. No markdown, no explanations, no quotes around it.
 
+## Context:
 Staged files: ${stagedFiles.join(', ')}
 
-Diff:
+## Diff:
 ${diffContent}`;
 
   try {
     const result = await agent.generate(prompt);
-    const message = result.text.trim();
+    let message = result.text.trim();
     
-    console.log('📝 Suggested commit message:\n');
+    // Clean up any markdown formatting the AI might have added
+    message = message.replace(/^```[\w]*\n?/gm, '').replace(/\n?```$/gm, '');
+    message = message.replace(/^["']|["']$/g, ''); // Remove quotes
+    message = message.trim();
+    
+    console.log('Suggested commit message:\n');
     console.log('─'.repeat(60));
     console.log(message);
     console.log('─'.repeat(60));
@@ -223,12 +284,11 @@ ${diffContent}`;
       const hash = repo.commit(message);
       const shortHash = hash.slice(0, 8);
       const branch = repo.refs.getCurrentBranch();
-      console.log(`\n✅ [${branch} ${shortHash}] ${message.split('\n')[0]}`);
+      console.log(`\n[${branch} ${shortHash}] ${message.split('\n')[0]}`);
     } else {
-      console.log('\nTo use this message, run:');
-      console.log(`  wit commit -m "${message.split('\n')[0]}"`);
-      console.log('\nOr add --execute (-x) to commit directly:');
-      console.log('  wit ai commit -x');
+      console.log('\nDry run mode - commit NOT created.');
+      console.log('\nTo create the commit, run without --dry-run:');
+      console.log('  wit ai commit');
     }
   } catch (error) {
     console.error('Error generating commit message:', error instanceof Error ? error.message : 'Unknown error');
@@ -485,22 +545,23 @@ Usage: wit ai <command> [options]
 
 Commands:
   wit ai <query>              Ask a question or give a natural language command
-  wit ai commit [-a] [-x]     Generate a commit message from staged changes
+  wit ai commit [-a]          Generate commit message and create commit
   wit ai review [--staged]    Review code changes
   wit ai explain [ref]        Explain a commit
   wit ai resolve [file]       Help resolve merge conflicts
   wit ai status               Show AI configuration status
 
 Options:
-  -a, --all        Stage all tracked files before commit message generation
-  -x, --execute    Execute the commit with the generated message
+  -a, --all        Stage all tracked files before commit
+  --dry-run        Preview commit message without creating commit
   --staged         Review only staged changes
 
 Examples:
   wit ai "what files have changed?"
   wit ai "show me the last 5 commits"
   wit ai "create a branch for the login feature"
-  wit ai commit -a -x
+  wit ai commit -a           # Stage all and commit with AI message
+  wit ai commit --dry-run    # Preview message only
   wit ai review --staged
   wit ai resolve src/utils.ts
 
