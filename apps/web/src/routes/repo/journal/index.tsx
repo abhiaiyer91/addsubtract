@@ -1,38 +1,44 @@
 import { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   FileText,
   Plus,
   Search,
   ChevronRight,
-  FolderTree,
-  List,
-  Archive,
-  Eye,
-  Edit3,
+  ChevronDown,
+  MoreHorizontal,
+  Trash2,
+  Copy,
+  Star,
   Clock,
+  GripVertical,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { RepoLayout } from '../components/repo-layout';
 import { useSession } from '@/lib/auth-client';
 import { trpc } from '@/lib/trpc';
-import { formatRelativeTime, cn } from '@/lib/utils';
-
-type ViewMode = 'list' | 'tree';
-
-// Status config
-const STATUS_CONFIG: Record<string, { label: string; color: string; icon: string }> = {
-  draft: { label: 'Draft', color: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300', icon: 'pencil' },
-  published: { label: 'Published', color: 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300', icon: 'eye' },
-  archived: { label: 'Archived', color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300', icon: 'archive' },
-};
+import { cn } from '@/lib/utils';
 
 export function JournalPage() {
   const { owner, repo } = useParams<{ owner: string; repo: string }>();
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
-  const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [isSearching, setIsSearching] = useState(false);
   const { data: session } = useSession();
   const authenticated = !!session?.user;
 
@@ -42,48 +48,51 @@ export function JournalPage() {
     { enabled: !!owner && !!repo }
   );
 
-  // Fetch journal pages (list view - root pages only)
-  const { data: pages, isLoading: pagesLoading } = trpc.journal.list.useQuery(
-    {
-      repoId: repoData?.repo.id!,
-      parentId: null, // Root pages only
-      limit: 50,
-    },
-    { enabled: !!repoData?.repo.id && viewMode === 'list' }
-  );
-
-  // Fetch page tree (tree view)
+  // Fetch page tree
   const { data: tree, isLoading: treeLoading } = trpc.journal.tree.useQuery(
-    { repoId: repoData?.repo.id! },
-    { enabled: !!repoData?.repo.id && viewMode === 'tree' }
-  );
-
-  // Page count
-  const { data: pageCount } = trpc.journal.count.useQuery(
     { repoId: repoData?.repo.id! },
     { enabled: !!repoData?.repo.id }
   );
 
-  const isLoading = repoLoading || (viewMode === 'list' ? pagesLoading : treeLoading);
+  const isLoading = repoLoading || treeLoading;
 
   // Filter pages by search query
-  const filteredPages = (pages || []).filter((page) => {
-    if (!searchQuery) return true;
-    return page.title.toLowerCase().includes(searchQuery.toLowerCase());
-  });
+  const filterTree = (items: typeof tree): typeof tree => {
+    if (!searchQuery || !items) return items;
+    return items
+      .map((item) => ({
+        ...item,
+        children: filterTree(item.children),
+      }))
+      .filter(
+        (item) =>
+          item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (item.children && item.children.length > 0)
+      );
+  };
+
+  const filteredTree = filterTree(tree || []);
+
+  const handleNewPage = () => {
+    navigate(`/${owner}/${repo}/journal/new`);
+  };
 
   if (isLoading) {
     return (
       <RepoLayout owner={owner!} repo={repo!}>
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="h-8 w-48 bg-muted rounded animate-pulse" />
-            <div className="h-9 w-28 bg-muted rounded animate-pulse" />
-          </div>
-          <div className="space-y-3">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="h-16 rounded-lg bg-muted/50 animate-pulse" />
+        <div className="flex h-[calc(100vh-200px)]">
+          {/* Sidebar skeleton */}
+          <div className="w-64 border-r p-3 space-y-2">
+            {[...Array(8)].map((_, i) => (
+              <div key={i} className="h-7 rounded bg-muted/50 animate-pulse" />
             ))}
+          </div>
+          {/* Main content skeleton */}
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center space-y-4">
+              <div className="w-16 h-16 rounded-full bg-muted/50 mx-auto animate-pulse" />
+              <div className="h-6 w-48 bg-muted/50 rounded mx-auto animate-pulse" />
+            </div>
           </div>
         </div>
       </RepoLayout>
@@ -92,310 +101,277 @@ export function JournalPage() {
 
   return (
     <RepoLayout owner={owner!} repo={repo!}>
-      <div className="space-y-4">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <h1 className="text-xl font-semibold flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              Journal
-              {pageCount !== undefined && (
-                <Badge variant="secondary" className="text-xs">
-                  {pageCount} pages
-                </Badge>
+      <div className="flex h-[calc(100vh-200px)] -mx-6 -mt-6">
+        {/* Notion-style sidebar */}
+        <div className="w-64 border-r bg-muted/30 flex flex-col">
+          {/* Search */}
+          <div className="p-2 border-b">
+            <div
+              className={cn(
+                'flex items-center gap-2 px-2 py-1.5 rounded-md transition-all cursor-text',
+                isSearching
+                  ? 'bg-background ring-1 ring-ring'
+                  : 'hover:bg-muted/50'
               )}
-            </h1>
-
-            {/* View toggle */}
-            <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
-              <button
-                onClick={() => setViewMode('list')}
-                className={cn(
-                  'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-colors',
-                  viewMode === 'list'
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                )}
-              >
-                <List className="h-4 w-4" />
-                <span>List</span>
-              </button>
-              <button
-                onClick={() => setViewMode('tree')}
-                className={cn(
-                  'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-colors',
-                  viewMode === 'tree'
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                )}
-              >
-                <FolderTree className="h-4 w-4" />
-                <span>Tree</span>
-              </button>
+              onClick={() => setIsSearching(true)}
+            >
+              <Search className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+              {isSearching ? (
+                <Input
+                  placeholder="Search..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onBlur={() => !searchQuery && setIsSearching(false)}
+                  className="h-6 p-0 border-0 bg-transparent focus-visible:ring-0 text-sm"
+                  autoFocus
+                />
+              ) : (
+                <span className="text-sm text-muted-foreground">Search</span>
+              )}
             </div>
           </div>
 
+          {/* Page tree */}
+          <div className="flex-1 overflow-y-auto p-2">
+            <div className="space-y-0.5">
+              {filteredTree && filteredTree.length > 0 ? (
+                filteredTree.map((item) => (
+                  <PageTreeItem
+                    key={item.id}
+                    item={item}
+                    owner={owner!}
+                    repo={repo!}
+                    level={0}
+                    authenticated={authenticated}
+                  />
+                ))
+              ) : searchQuery ? (
+                <div className="px-2 py-8 text-center">
+                  <p className="text-sm text-muted-foreground">No results</p>
+                </div>
+              ) : (
+                <div className="px-2 py-8 text-center">
+                  <p className="text-sm text-muted-foreground">No pages yet</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* New page button */}
           {authenticated && (
-            <Link to={`/${owner}/${repo}/journal/new`}>
-              <Button size="sm" className="gap-2">
+            <div className="p-2 border-t">
+              <button
+                onClick={handleNewPage}
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors"
+              >
                 <Plus className="h-4 w-4" />
-                New Page
-              </Button>
-            </Link>
+                New page
+              </button>
+            </div>
           )}
         </div>
 
-        {/* Search bar */}
-        <div className="flex items-center gap-3 pb-2 border-b">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search pages..."
-              className="pl-9 h-9 bg-muted/50 border-0 focus-visible:bg-background focus-visible:ring-1"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-        </div>
-
-        {/* Content */}
-        {viewMode === 'tree' ? (
-          <TreeView tree={tree || []} owner={owner!} repo={repo!} authenticated={authenticated} />
-        ) : (
-          <ListView 
-            pages={filteredPages} 
-            owner={owner!} 
-            repo={repo!} 
+        {/* Main content area - empty state */}
+        <div className="flex-1 flex items-center justify-center bg-background">
+          <EmptyStateContent
+            owner={owner!}
+            repo={repo!}
             authenticated={authenticated}
-            searchQuery={searchQuery}
+            hasPages={(tree?.length || 0) > 0}
+            onNewPage={handleNewPage}
           />
-        )}
+        </div>
       </div>
     </RepoLayout>
   );
 }
 
-// List View
-interface ListViewProps {
-  pages: Array<{
+// Page tree item component
+interface PageTreeItemProps {
+  item: {
     id: string;
     title: string;
     slug: string;
     status: string;
     icon?: string | null;
-    updatedAt: string | Date;
-    authorId: string;
-  }>;
-  owner: string;
-  repo: string;
-  authenticated: boolean;
-  searchQuery: string;
-}
-
-function ListView({ pages, owner, repo, authenticated, searchQuery }: ListViewProps) {
-  if (pages.length === 0) {
-    return (
-      <div className="text-center py-16">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-4">
-          <FileText className="h-8 w-8 text-muted-foreground" />
-        </div>
-        <h3 className="text-lg font-medium mb-1">
-          {searchQuery ? 'No pages found' : 'No journal pages yet'}
-        </h3>
-        <p className="text-sm text-muted-foreground mb-4">
-          {searchQuery
-            ? 'Try a different search term'
-            : 'Create your first page to start documenting your project'}
-        </p>
-        {authenticated && !searchQuery && (
-          <Link to={`/${owner}/${repo}/journal/new`}>
-            <Button>Create the first page</Button>
-          </Link>
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <div className="border rounded-lg divide-y">
-      {pages.map((page) => (
-        <PageRow key={page.id} page={page} owner={owner} repo={repo} />
-      ))}
-    </div>
-  );
-}
-
-interface PageRowProps {
-  page: {
-    id: string;
-    title: string;
-    slug: string;
-    status: string;
-    icon?: string | null;
-    updatedAt: string | Date;
+    children: any[];
   };
   owner: string;
   repo: string;
-}
-
-function PageRow({ page, owner, repo }: PageRowProps) {
-  const statusInfo = STATUS_CONFIG[page.status] || STATUS_CONFIG.draft;
-
-  return (
-    <div className="flex items-center gap-4 px-4 py-3 hover:bg-muted/50 transition-colors group">
-      {/* Icon */}
-      <div className="flex-shrink-0 text-2xl">
-        {page.icon || <FileText className="h-5 w-5 text-muted-foreground" />}
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <Link
-            to={`/${owner}/${repo}/journal/${page.slug}`}
-            className="font-medium text-foreground hover:text-primary transition-colors"
-          >
-            {page.title}
-          </Link>
-          <Badge
-            variant="secondary"
-            className={cn('text-xs font-normal px-2 py-0', statusInfo.color)}
-          >
-            {statusInfo.label}
-          </Badge>
-        </div>
-        <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
-          <span className="font-mono text-xs">{page.slug}</span>
-          <span className="text-muted-foreground/50">·</span>
-          <span className="flex items-center gap-1">
-            <Clock className="h-3 w-3" />
-            {formatRelativeTime(page.updatedAt)}
-          </span>
-        </div>
-      </div>
-
-      {/* Actions (visible on hover) */}
-      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        <Link to={`/${owner}/${repo}/journal/${page.slug}`}>
-          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-            <Eye className="h-4 w-4" />
-          </Button>
-        </Link>
-        <Link to={`/${owner}/${repo}/journal/${page.slug}/edit`}>
-          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-            <Edit3 className="h-4 w-4" />
-          </Button>
-        </Link>
-      </div>
-    </div>
-  );
-}
-
-// Tree View
-interface TreeViewProps {
-  tree: Array<{
-    id: string;
-    title: string;
-    slug: string;
-    status: string;
-    icon?: string | null;
-    children: any[];
-  }>;
-  owner: string;
-  repo: string;
+  level: number;
   authenticated: boolean;
 }
 
-function TreeView({ tree, owner, repo, authenticated }: TreeViewProps) {
-  if (tree.length === 0) {
-    return (
-      <div className="text-center py-16">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-4">
-          <FolderTree className="h-8 w-8 text-muted-foreground" />
-        </div>
-        <h3 className="text-lg font-medium mb-1">No journal pages yet</h3>
-        <p className="text-sm text-muted-foreground mb-4">
-          Create your first page to start documenting your project
-        </p>
-        {authenticated && (
-          <Link to={`/${owner}/${repo}/journal/new`}>
-            <Button>Create the first page</Button>
+function PageTreeItem({ item, owner, repo, level, authenticated }: PageTreeItemProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+  const hasChildren = item.children && item.children.length > 0;
+
+  return (
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <div
+        className="group relative"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
+        <div
+          className={cn(
+            'flex items-center gap-1 py-1 px-1 rounded-md transition-colors',
+            'hover:bg-muted/70'
+          )}
+          style={{ paddingLeft: `${level * 12 + 4}px` }}
+        >
+          {/* Expand/collapse button */}
+          <CollapsibleTrigger asChild>
+            <button
+              className={cn(
+                'h-5 w-5 flex items-center justify-center rounded hover:bg-muted transition-colors',
+                !hasChildren && 'invisible'
+              )}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {isOpen ? (
+                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+              ) : (
+                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+              )}
+            </button>
+          </CollapsibleTrigger>
+
+          {/* Page icon */}
+          <span className="flex-shrink-0 w-5 h-5 flex items-center justify-center text-base">
+            {item.icon || (
+              <FileText className="h-4 w-4 text-muted-foreground" />
+            )}
+          </span>
+
+          {/* Page title */}
+          <Link
+            to={`/${owner}/${repo}/journal/${item.slug}`}
+            className="flex-1 truncate text-sm py-0.5 text-foreground/90 hover:text-foreground"
+          >
+            {item.title || 'Untitled'}
           </Link>
-        )}
+
+          {/* Hover actions */}
+          {isHovered && authenticated && (
+            <div className="flex items-center gap-0.5">
+              <TooltipProvider delayDuration={300}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Link to={`/${owner}/${repo}/journal/new?parent=${item.id}`}>
+                      <button className="h-5 w-5 flex items-center justify-center rounded hover:bg-muted-foreground/20">
+                        <Plus className="h-3.5 w-3.5 text-muted-foreground" />
+                      </button>
+                    </Link>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="text-xs">
+                    Add subpage
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="h-5 w-5 flex items-center justify-center rounded hover:bg-muted-foreground/20">
+                    <MoreHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-48">
+                  <DropdownMenuItem>
+                    <Star className="mr-2 h-4 w-4" />
+                    Add to favorites
+                  </DropdownMenuItem>
+                  <DropdownMenuItem>
+                    <Copy className="mr-2 h-4 w-4" />
+                    Duplicate
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem className="text-destructive">
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Children */}
+      {hasChildren && (
+        <CollapsibleContent>
+          {item.children.map((child: any) => (
+            <PageTreeItem
+              key={child.id}
+              item={child}
+              owner={owner}
+              repo={repo}
+              level={level + 1}
+              authenticated={authenticated}
+            />
+          ))}
+        </CollapsibleContent>
+      )}
+    </Collapsible>
+  );
+}
+
+// Empty state component
+interface EmptyStateContentProps {
+  owner: string;
+  repo: string;
+  authenticated: boolean;
+  hasPages: boolean;
+  onNewPage: () => void;
+}
+
+function EmptyStateContent({
+  owner,
+  repo,
+  authenticated,
+  hasPages,
+  onNewPage,
+}: EmptyStateContentProps) {
+  if (hasPages) {
+    return (
+      <div className="text-center max-w-md px-4">
+        <div className="text-6xl mb-6">📄</div>
+        <h2 className="text-xl font-medium text-foreground/90 mb-2">
+          Select a page
+        </h2>
+        <p className="text-muted-foreground">
+          Choose a page from the sidebar, or{' '}
+          {authenticated && (
+            <button
+              onClick={onNewPage}
+              className="text-primary hover:underline"
+            >
+              create a new one
+            </button>
+          )}
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="border rounded-lg p-4">
-      <TreeNode items={tree} owner={owner} repo={repo} level={0} />
+    <div className="text-center max-w-md px-4">
+      <div className="text-6xl mb-6">📝</div>
+      <h2 className="text-xl font-medium text-foreground/90 mb-2">
+        Start writing
+      </h2>
+      <p className="text-muted-foreground mb-6">
+        Journal is where your team documents everything. Create your first page
+        to get started.
+      </p>
+      {authenticated && (
+        <Button onClick={onNewPage} className="gap-2">
+          <Plus className="h-4 w-4" />
+          Create a page
+        </Button>
+      )}
     </div>
-  );
-}
-
-interface TreeNodeProps {
-  items: Array<{
-    id: string;
-    title: string;
-    slug: string;
-    status: string;
-    icon?: string | null;
-    children: any[];
-  }>;
-  owner: string;
-  repo: string;
-  level: number;
-}
-
-function TreeNode({ items, owner, repo, level }: TreeNodeProps) {
-  return (
-    <ul className="space-y-1">
-      {items.map((item) => {
-        const hasChildren = item.children && item.children.length > 0;
-        const statusInfo = STATUS_CONFIG[item.status] || STATUS_CONFIG.draft;
-
-        return (
-          <li key={item.id}>
-            <div
-              className={cn(
-                'flex items-center gap-2 py-1.5 px-2 rounded-md hover:bg-muted/50 transition-colors',
-                level > 0 && 'ml-6'
-              )}
-            >
-              {hasChildren && (
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              )}
-              {!hasChildren && <span className="w-4" />}
-              
-              <span className="text-lg">{item.icon || <FileText className="h-4 w-4 text-muted-foreground" />}</span>
-              
-              <Link
-                to={`/${owner}/${repo}/journal/${item.slug}`}
-                className="flex-1 hover:text-primary transition-colors"
-              >
-                {item.title}
-              </Link>
-              
-              <Badge
-                variant="secondary"
-                className={cn('text-xs font-normal px-2 py-0', statusInfo.color)}
-              >
-                {statusInfo.label}
-              </Badge>
-            </div>
-            
-            {hasChildren && (
-              <TreeNode 
-                items={item.children} 
-                owner={owner} 
-                repo={repo} 
-                level={level + 1} 
-              />
-            )}
-          </li>
-        );
-      })}
-    </ul>
   );
 }
 

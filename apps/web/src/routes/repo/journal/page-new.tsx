@@ -1,20 +1,30 @@
-import { useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, FileText, Smile } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
+import {
+  FileText,
+  Smile,
+  ImagePlus,
+  Trash2,
+  ChevronRight,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
 import { RepoLayout } from '../components/repo-layout';
 import { useSession } from '@/lib/auth-client';
 import { trpc } from '@/lib/trpc';
 import { useToast } from '@/components/ui/use-toast';
+import { cn } from '@/lib/utils';
 
 // Common page icons
-const COMMON_ICONS = ['📄', '📝', '📚', '📖', '🎯', '💡', '🔧', '⚙️', '🚀', '✨', '📌', '🎨'];
+const COMMON_ICONS = [
+  '📄', '📝', '📚', '📖', '🎯', '💡', '🔧', '⚙️', '🚀', '✨', '📌', '🎨',
+  '💼', '📊', '📈', '🗂️', '📁', '🔍', '💻', '🌐', '🔒', '🔑', '⭐', '❤️',
+  '🎉', '🎁', '🏆', '🎪', '🎭', '🎬', '🎮', '🎸', '🎹', '🎺', '🎻', '🥁',
+];
 
 export function NewJournalPage() {
   const { owner, repo } = useParams<{ owner: string; repo: string }>();
+  const [searchParams] = useSearchParams();
+  const parentId = searchParams.get('parent');
   const navigate = useNavigate();
   const { data: session } = useSession();
   const { toast } = useToast();
@@ -24,11 +34,27 @@ export function NewJournalPage() {
   const [content, setContent] = useState('');
   const [icon, setIcon] = useState('');
   const [showIconPicker, setShowIconPicker] = useState(false);
+  const [isHeaderHovered, setIsHeaderHovered] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const titleRef = useRef<HTMLTextAreaElement>(null);
+  const contentRef = useRef<HTMLTextAreaElement>(null);
+
+  // Focus title on mount
+  useEffect(() => {
+    titleRef.current?.focus();
+  }, []);
 
   // Fetch repository data
   const { data: repoData, isLoading: repoLoading } = trpc.repos.get.useQuery(
     { owner: owner!, repo: repo! },
     { enabled: !!owner && !!repo }
+  );
+
+  // Fetch page tree for sidebar
+  const { data: tree } = trpc.journal.tree.useQuery(
+    { repoId: repoData?.repo.id! },
+    { enabled: !!repoData?.repo.id }
   );
 
   // Create mutation
@@ -43,43 +69,66 @@ export function NewJournalPage() {
         description: error.message,
         variant: 'destructive',
       });
+      setIsSaving(false);
     },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-
+  const handleSave = () => {
     if (!title.trim()) {
       toast({
         title: 'Title required',
         description: 'Please enter a title for the page',
         variant: 'destructive',
       });
+      titleRef.current?.focus();
       return;
     }
 
+    setIsSaving(true);
     createMutation.mutate({
       repoId: repoData!.repo.id,
       title: title.trim(),
       content: content.trim() || undefined,
       icon: icon || undefined,
+      parentId: parentId || undefined,
     });
+  };
+
+  // Auto-resize textarea
+  const autoResize = (element: HTMLTextAreaElement) => {
+    element.style.height = 'auto';
+    element.style.height = element.scrollHeight + 'px';
+  };
+
+  const handleTitleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setTitle(e.target.value);
+    autoResize(e.target);
+  };
+
+  const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setContent(e.target.value);
+    autoResize(e.target);
+  };
+
+  const handleIconChange = (newIcon: string) => {
+    setIcon(newIcon);
+    setShowIconPicker(false);
   };
 
   if (!authenticated) {
     return (
       <RepoLayout owner={owner!} repo={repo!}>
-        <div className="text-center py-16">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-4">
-            <FileText className="h-8 w-8 text-muted-foreground" />
+        <div className="flex h-[calc(100vh-200px)] items-center justify-center">
+          <div className="text-center">
+            <div className="text-6xl mb-6">🔒</div>
+            <h2 className="text-xl font-medium mb-2">Sign in required</h2>
+            <p className="text-muted-foreground mb-6">
+              You need to sign in to create journal pages.
+            </p>
+            <Link to="/login">
+              <Button>Sign in</Button>
+            </Link>
           </div>
-          <h3 className="text-lg font-medium mb-1">Sign in required</h3>
-          <p className="text-sm text-muted-foreground mb-4">
-            You need to sign in to create journal pages.
-          </p>
-          <Link to="/login">
-            <Button>Sign in</Button>
-          </Link>
         </div>
       </RepoLayout>
     );
@@ -88,11 +137,14 @@ export function NewJournalPage() {
   if (repoLoading) {
     return (
       <RepoLayout owner={owner!} repo={repo!}>
-        <div className="max-w-2xl mx-auto space-y-6">
-          <div className="h-8 w-48 bg-muted rounded animate-pulse" />
-          <div className="space-y-4">
-            <div className="h-10 bg-muted rounded animate-pulse" />
-            <div className="h-48 bg-muted rounded animate-pulse" />
+        <div className="flex h-[calc(100vh-200px)] -mx-6 -mt-6">
+          <div className="w-64 border-r bg-muted/30 p-2 space-y-2">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="h-7 rounded bg-muted/50 animate-pulse" />
+            ))}
+          </div>
+          <div className="flex-1 flex items-center justify-center">
+            <div className="w-16 h-16 rounded bg-muted/50 animate-pulse" />
           </div>
         </div>
       </RepoLayout>
@@ -101,112 +153,220 @@ export function NewJournalPage() {
 
   return (
     <RepoLayout owner={owner!} repo={repo!}>
-      <div className="max-w-2xl mx-auto">
-        {/* Navigation */}
-        <div className="mb-6">
-          <Link
-            to={`/${owner}/${repo}/journal`}
-            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+      <div className="flex h-[calc(100vh-200px)] -mx-6 -mt-6">
+        {/* Sidebar */}
+        <div className="w-64 border-r bg-muted/30 flex flex-col overflow-y-auto">
+          <div className="p-2 flex-1">
+            <div className="space-y-0.5">
+              {(tree || []).map((item) => (
+                <SidebarItem
+                  key={item.id}
+                  item={item}
+                  owner={owner!}
+                  repo={repo!}
+                  level={0}
+                />
+              ))}
+              {/* New page indicator */}
+              <div
+                className="flex items-center gap-1 py-1 px-1 rounded-md bg-primary/10"
+                style={{ paddingLeft: '4px' }}
+              >
+                <span className="w-5" />
+                <span className="flex-shrink-0 w-5 h-5 flex items-center justify-center text-sm">
+                  {icon || <FileText className="h-4 w-4 text-primary" />}
+                </span>
+                <span className="flex-1 truncate text-sm text-primary font-medium">
+                  {title || 'Untitled'}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Main content */}
+        <div className="flex-1 flex flex-col bg-background overflow-y-auto">
+          {/* Cover area (hover to show add cover button) */}
+          <div
+            className="h-12 group relative"
+            onMouseEnter={() => setIsHeaderHovered(true)}
+            onMouseLeave={() => setIsHeaderHovered(false)}
           >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Journal
-          </Link>
-        </div>
+            {isHeaderHovered && (
+              <div className="absolute top-4 left-16 flex items-center gap-2 text-sm text-muted-foreground">
+                <button className="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-muted transition-colors">
+                  <ImagePlus className="h-4 w-4" />
+                  Add cover
+                </button>
+              </div>
+            )}
+          </div>
 
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold">Create New Page</h1>
-          <p className="text-muted-foreground mt-1">
-            Add documentation, notes, or any content to your repository's journal.
-          </p>
-        </div>
-
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Icon + Title */}
-          <div className="space-y-2">
-            <Label htmlFor="title">Title</Label>
-            <div className="flex gap-2">
-              <div className="relative">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-12 h-10 text-xl p-0"
-                  onClick={() => setShowIconPicker(!showIconPicker)}
-                >
-                  {icon || <Smile className="h-5 w-5 text-muted-foreground" />}
-                </Button>
-                
-                {showIconPicker && (
-                  <div className="absolute top-12 left-0 z-10 bg-popover border rounded-lg shadow-lg p-2 grid grid-cols-6 gap-1">
+          {/* Content area */}
+          <div className="max-w-3xl mx-auto px-16 pb-24 flex-1">
+            {/* Icon */}
+            <div className="relative mb-4">
+              {icon ? (
+                <div className="relative inline-block group">
+                  <span
+                    className="text-7xl cursor-pointer"
+                    onClick={() => setShowIconPicker(true)}
+                  >
+                    {icon}
+                  </span>
+                  <div className="absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
-                      type="button"
-                      className="p-2 hover:bg-muted rounded text-center"
-                      onClick={() => {
-                        setIcon('');
-                        setShowIconPicker(false);
-                      }}
+                      onClick={() => setIcon('')}
+                      className="p-1 bg-background border rounded shadow-sm hover:bg-muted"
                     >
-                      <span className="text-muted-foreground">-</span>
+                      <Trash2 className="h-3 w-3" />
                     </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowIconPicker(true)}
+                  className="flex items-center gap-1.5 px-2 py-1 text-sm text-muted-foreground rounded hover:bg-muted transition-colors"
+                >
+                  <Smile className="h-4 w-4" />
+                  Add icon
+                </button>
+              )}
+
+              {/* Icon picker */}
+              {showIconPicker && (
+                <div className="absolute top-full left-0 z-50 mt-2 p-3 bg-popover border rounded-lg shadow-lg w-72">
+                  <div className="grid grid-cols-6 gap-1">
                     {COMMON_ICONS.map((emoji) => (
                       <button
                         key={emoji}
-                        type="button"
-                        className="p-2 hover:bg-muted rounded text-xl"
-                        onClick={() => {
-                          setIcon(emoji);
-                          setShowIconPicker(false);
-                        }}
+                        onClick={() => handleIconChange(emoji)}
+                        className="p-2 text-2xl hover:bg-muted rounded transition-colors"
                       >
                         {emoji}
                       </button>
                     ))}
                   </div>
-                )}
-              </div>
-              
-              <Input
-                id="title"
-                placeholder="Page title"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="flex-1"
-                autoFocus
-              />
+                  <button
+                    onClick={() => setShowIconPicker(false)}
+                    className="w-full mt-2 text-sm text-muted-foreground hover:text-foreground"
+                  >
+                    Close
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Title */}
+            <textarea
+              ref={titleRef}
+              value={title}
+              onChange={handleTitleChange}
+              placeholder="Untitled"
+              className="w-full text-4xl font-bold bg-transparent border-0 outline-none resize-none placeholder:text-muted-foreground/50 mb-4"
+              rows={1}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  contentRef.current?.focus();
+                }
+              }}
+            />
+
+            {/* Content */}
+            <textarea
+              ref={contentRef}
+              value={content}
+              onChange={handleContentChange}
+              placeholder="Start writing, or press '/' for commands..."
+              className="w-full min-h-[40vh] bg-transparent border-0 outline-none resize-none text-base leading-relaxed placeholder:text-muted-foreground/40"
+            />
+
+            {/* Save bar */}
+            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 px-4 py-2 bg-background border rounded-lg shadow-lg">
+              <Link to={`/${owner}/${repo}/journal`}>
+                <Button variant="ghost" size="sm">
+                  Cancel
+                </Button>
+              </Link>
+              <Button size="sm" onClick={handleSave} disabled={isSaving}>
+                {isSaving ? 'Creating...' : 'Create page'}
+              </Button>
             </div>
           </div>
-
-          {/* Content */}
-          <div className="space-y-2">
-            <Label htmlFor="content">Content</Label>
-            <Textarea
-              id="content"
-              placeholder="Write your content here... (Markdown supported)"
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              rows={15}
-              className="font-mono text-sm"
-            />
-            <p className="text-xs text-muted-foreground">
-              Tip: You can use Markdown for formatting.
-            </p>
-          </div>
-
-          {/* Actions */}
-          <div className="flex items-center justify-end gap-3 pt-4 border-t">
-            <Link to={`/${owner}/${repo}/journal`}>
-              <Button type="button" variant="ghost">
-                Cancel
-              </Button>
-            </Link>
-            <Button type="submit" disabled={createMutation.isPending}>
-              {createMutation.isPending ? 'Creating...' : 'Create Page'}
-            </Button>
-          </div>
-        </form>
+        </div>
       </div>
     </RepoLayout>
+  );
+}
+
+// Sidebar item (simplified version)
+interface SidebarItemProps {
+  item: {
+    id: string;
+    title: string;
+    slug: string;
+    status: string;
+    icon?: string | null;
+    children: any[];
+  };
+  owner: string;
+  repo: string;
+  level: number;
+}
+
+function SidebarItem({ item, owner, repo, level }: SidebarItemProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const hasChildren = item.children && item.children.length > 0;
+
+  return (
+    <div>
+      <div
+        className="flex items-center gap-1 py-1 px-1 rounded-md hover:bg-muted/70 transition-colors"
+        style={{ paddingLeft: `${level * 12 + 4}px` }}
+      >
+        {hasChildren ? (
+          <button
+            onClick={() => setIsOpen(!isOpen)}
+            className="h-5 w-5 flex items-center justify-center rounded hover:bg-muted-foreground/20"
+          >
+            <ChevronRight
+              className={cn(
+                'h-3.5 w-3.5 text-muted-foreground transition-transform',
+                isOpen && 'rotate-90'
+              )}
+            />
+          </button>
+        ) : (
+          <span className="w-5" />
+        )}
+
+        <span className="flex-shrink-0 w-5 h-5 flex items-center justify-center text-sm">
+          {item.icon || <FileText className="h-4 w-4 text-muted-foreground" />}
+        </span>
+
+        <Link
+          to={`/${owner}/${repo}/journal/${item.slug}`}
+          className="flex-1 truncate text-sm text-foreground/80 py-0.5"
+        >
+          {item.title || 'Untitled'}
+        </Link>
+      </div>
+
+      {hasChildren && isOpen && (
+        <div>
+          {item.children.map((child: any) => (
+            <SidebarItem
+              key={child.id}
+              item={child}
+              owner={owner}
+              repo={repo}
+              level={level + 1}
+            />
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
