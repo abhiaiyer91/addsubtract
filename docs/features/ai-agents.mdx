@@ -1,0 +1,394 @@
+---
+title: "AI Agents"
+description: "Specialized AI agents for different workflows - Questions, Code, PM, and Triage"
+---
+
+# AI Agents
+
+wit provides specialized AI agents optimized for different workflows. Each agent has a focused set of capabilities and tools, making it more effective at its specific task.
+
+## Agent Types
+
+| Agent | Purpose | Capabilities |
+|-------|---------|--------------|
+| **Questions** | Understand code | Read-only, search, explain |
+| **Code** | Write code | Read, write, edit, commit, run commands |
+| **PM** | Project management | Issues, PRs, projects, cycles |
+| **Triage** | Categorize issues | Auto-label, prioritize, assign |
+
+## Questions Agent
+
+A **read-only** agent that helps you understand your codebase without making any changes.
+
+### Capabilities
+
+- Read and explain code files
+- Search for patterns and files
+- Explain architecture and structure
+- Answer questions about how things work
+- Help debug by analyzing code
+- Suggest improvements (but not implement them)
+
+### Limitations
+
+- Cannot write or edit files
+- Cannot run commands
+- Cannot create commits or branches
+
+### Use Cases
+
+```bash
+# Ask about code structure
+wit agent --mode questions "How is authentication implemented?"
+
+# Understand a function
+wit agent --mode questions "What does Repository.find() do?"
+
+# Find patterns
+wit agent --mode questions "Where are API endpoints defined?"
+
+# Debug help
+wit agent --mode questions "Why might this function return null?"
+```
+
+### When to Use
+
+- Learning a new codebase
+- Code review preparation
+- Understanding unfamiliar code
+- Debugging without making changes
+- Documentation research
+
+## Code Agent
+
+A **full-featured** coding agent that can read, write, and execute code.
+
+### Capabilities
+
+#### File Operations
+- **readFile**: Read file contents
+- **writeFile**: Create or overwrite files
+- **editFile**: Make targeted search-and-replace edits
+- **listDirectory**: Browse repository structure
+
+#### Git Operations
+- **createBranch**: Create new branches
+- **switchBranch**: Switch between branches
+- **stageFiles**: Stage files for commit
+- **createCommit**: Create commits with messages
+- **getStatus**: Check repository status
+- **getDiff**: View changes
+
+#### Command Execution
+- **runCommand**: Run sandboxed commands (npm, tsc, jest, etc.)
+
+### Allowed Commands
+
+The agent can only run these safe commands:
+- Package managers: `npm`, `npx`, `yarn`, `pnpm`, `bun`
+- Node/TypeScript: `node`, `tsc`, `tsx`, `vite`, `webpack`
+- Testing: `jest`, `vitest`, `mocha`, `pytest`, `cargo`
+- Linting: `eslint`, `prettier`, `biome`
+- Utilities: `cat`, `ls`, `pwd`, `head`, `tail`, `grep`, `find`, `wc`
+- VCS: `git`, `wit`
+
+### Safety Rules
+
+- Cannot modify `.git` or `.wit` directories
+- Path traversal outside repository is blocked
+- Destructive commands are not allowed
+
+### Use Cases
+
+```bash
+# Add a feature
+wit agent "Add input validation to the user creation endpoint"
+
+# Fix a bug
+wit agent "Fix the null pointer exception in handleRequest()"
+
+# Refactor code
+wit agent "Refactor the error handling to use a centralized handler"
+
+# Add tests
+wit agent "Write unit tests for the UserService class"
+
+# Run and fix
+wit agent "Run the tests and fix any failures"
+```
+
+### Workflow Best Practices
+
+1. **Starting Work**
+   - Agent checks current branch and status
+   - Creates a feature branch if needed
+   - Explores codebase structure
+
+2. **Making Changes**
+   - Always reads files before editing
+   - Uses targeted edits for small changes
+   - Runs tests after modifications
+
+3. **Completing Work**
+   - Reviews changes with diff
+   - Stages and commits with good messages
+   - Suggests creating a PR
+
+## PM Agent
+
+A **project management** agent that helps manage issues, PRs, and projects without touching code.
+
+### Capabilities
+
+- **createIssue**: Create issues with title, body, labels, priority
+- **listIssues**: List and filter issues
+- **createPR**: Create pull requests
+- **listPRs**: List and filter pull requests
+- Manage projects and milestones
+- Track cycles and sprints
+- Assign work to team members
+
+### Limitations
+
+- Cannot write or edit code files
+- Cannot run shell commands
+- Cannot access the filesystem
+
+### Use Cases
+
+```bash
+# Create an issue
+wit agent --mode pm "Create an issue for adding dark mode support"
+
+# Plan work
+wit agent --mode pm "List all open bugs assigned to me"
+
+# Create a PR
+wit agent --mode pm "Create a PR from my current branch to main"
+
+# Project management
+wit agent --mode pm "Add issue #42 to the Auth System project"
+```
+
+### When to Use
+
+- Planning sprints
+- Creating issues from discussions
+- Managing project backlogs
+- Creating PRs with good descriptions
+- Reviewing project status
+
+## Triage Agent
+
+An **automated** agent that analyzes new issues and categorizes them.
+
+### Capabilities
+
+- **getLabels**: Get available labels for the repository
+- **getCollaborators**: Get team members for assignment
+- **applyLabels**: Apply labels to issues
+- **setPriority**: Set issue priority
+- **assignUser**: Assign issues to team members
+- **addTriageComment**: Add explanation comments
+
+### Priority Guidelines
+
+The agent uses these guidelines for prioritization:
+
+| Priority | Description |
+|----------|-------------|
+| **Urgent** | Security issues, data loss, production outages |
+| **High** | Important bugs, blocking issues, high-impact features |
+| **Medium** | Regular bugs, standard feature requests |
+| **Low** | Minor improvements, nice-to-haves, cosmetic issues |
+| **None** | Questions, discussions, unclear issues |
+
+### Configuration Options
+
+When running the triage agent, you can configure:
+
+- `autoAssignLabels`: Automatically apply suggested labels
+- `autoAssignUsers`: Automatically assign to team members
+- `autoSetPriority`: Automatically set priority level
+- `addTriageComment`: Add a comment explaining decisions
+- `customPrompt`: Custom instructions for your project
+
+### Use Cases
+
+```bash
+# Triage a specific issue
+wit agent --mode triage --issue 42
+
+# Triage with all automation enabled
+wit agent --mode triage --issue 42 --auto-all
+
+# Triage with custom rules
+wit agent --mode triage --issue 42 --prompt "Security issues should always be urgent"
+```
+
+### Automated Triage
+
+You can set up automated triage in repository settings:
+
+```yaml
+# .wit/config.yaml
+triage:
+  enabled: true
+  autoAssignLabels: true
+  autoSetPriority: true
+  autoAssignUsers: false  # Suggest but don't assign
+  addTriageComment: true
+  customPrompt: |
+    For this repository:
+    - Issues mentioning "API" should get the "api" label
+    - Security issues are always urgent priority
+    - Assign UI issues to the frontend team
+```
+
+### Example Triage Comment
+
+When `addTriageComment` is enabled, the agent adds comments like:
+
+```markdown
+**Triage Agent Analysis**
+
+This issue appears to be a **bug report** related to authentication.
+
+**Labels applied:** `bug`, `auth`, `high-priority`
+
+**Priority:** High - This affects user login which is a critical path.
+
+**Suggested assignee:** @security-team - This involves authentication tokens.
+
+**Reasoning:** The issue describes a scenario where session tokens are not being properly invalidated on logout, which could be a security concern.
+```
+
+## Switching Between Agents
+
+### Command Line
+
+```bash
+# Default (Code agent)
+wit agent "add a test"
+
+# Explicit mode
+wit agent --mode questions "explain this function"
+wit agent --mode code "implement the feature"
+wit agent --mode pm "create an issue"
+```
+
+### In Interactive Session
+
+```bash
+wit agent
+> /mode questions
+Switched to Questions mode (read-only)
+
+> explain the auth flow
+[Agent explains without making changes]
+
+> /mode code
+Switched to Code mode
+
+> now implement the fix
+[Agent can now edit files]
+```
+
+## API Usage
+
+### Using Agents Programmatically
+
+```typescript
+import { 
+  createQuestionsAgent,
+  createCodeAgent,
+  createPMAgent,
+  createTriageAgent,
+  runTriageAgent
+} from 'wit/ai/agents';
+
+// Create context
+const context = {
+  repoId: 'repo-123',
+  repoPath: '/path/to/repo',
+  owner: 'myorg',
+  repoName: 'myproject',
+  userId: 'user-456'
+};
+
+// Questions agent
+const questionsAgent = createQuestionsAgent(context);
+const answer = await questionsAgent.generate('How does auth work?');
+
+// Code agent
+const codeAgent = createCodeAgent(context);
+const result = await codeAgent.generate('Add input validation');
+
+// PM agent
+const pmAgent = createPMAgent(context);
+const issue = await pmAgent.generate('Create a bug report for login issues');
+
+// Triage agent (run on specific issue)
+const triageResult = await runTriageAgent({
+  ...context,
+  issueId: 'issue-789',
+  issueNumber: 42,
+  issueTitle: 'Login not working',
+  issueBody: 'When I try to login, I get a 500 error',
+  autoAssignLabels: true,
+  autoSetPriority: true,
+  autoAssignUsers: false,
+  addTriageComment: true
+});
+```
+
+## Best Practices
+
+### Choose the Right Agent
+
+| Task | Agent |
+|------|-------|
+| "What does this code do?" | Questions |
+| "Fix this bug" | Code |
+| "Create an issue for this" | PM |
+| "Categorize new issues" | Triage |
+
+### Be Specific
+
+```bash
+# Good
+wit agent --mode code "Add null check to UserService.getById() at line 42"
+
+# Less effective
+wit agent "fix the bug"
+```
+
+### Review Before Committing
+
+The Code agent will show changes. Always review:
+
+```bash
+wit agent "implement the feature"
+# Agent makes changes
+
+wit diff  # Review changes
+wit commit -m "Add feature"  # Commit if satisfied
+```
+
+### Use Questions First
+
+When exploring unfamiliar code:
+
+```bash
+# First, understand
+wit agent --mode questions "How does the payment flow work?"
+
+# Then, implement
+wit agent --mode code "Add retry logic to payment processing"
+```
+
+## See Also
+
+- [wit agent](/commands/agent) - Interactive agent command
+- [AI-Powered Features](/features/ai-powered) - AI commit messages and review
+- [Search](/features/search) - Semantic code search

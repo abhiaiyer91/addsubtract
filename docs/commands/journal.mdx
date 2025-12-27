@@ -1,0 +1,288 @@
+---
+title: "Journal"
+description: "Notion-like documentation for your repositories"
+---
+
+# wit journal
+
+Create and manage rich documentation pages for your repository. Journal provides a Notion-like experience for writing docs, READMEs, architecture decisions, onboarding guides, and more.
+
+## Basic Usage
+
+```bash
+# List all pages
+wit journal
+
+# Create a new page
+wit journal create "Getting Started"
+
+# View a page
+wit journal view getting-started
+
+# Show page hierarchy
+wit journal tree
+```
+
+## Commands
+
+### List Pages
+
+```bash
+# List root-level pages
+wit journal
+
+# List pages by status
+wit journal list --status published
+wit journal list --status draft
+wit journal list --status archived
+```
+
+### Create Pages
+
+```bash
+# Create a basic page
+wit journal create "Getting Started"
+
+# Create with content
+wit journal create "API Guide" --content "# API Documentation\n\nWelcome..."
+
+# Create with icon
+wit journal create "Architecture" --icon "🏗️"
+
+# Create nested page (under a parent)
+wit journal create "Authentication" --parent getting-started
+```
+
+### View Pages
+
+```bash
+# View by slug
+wit journal view getting-started
+
+# Shortcut: just use the slug
+wit journal getting-started
+```
+
+### Edit Pages
+
+```bash
+# Update content
+wit journal edit getting-started --content "# Updated Content"
+
+# Update title
+wit journal edit getting-started --title "New Title"
+
+# Update icon
+wit journal edit getting-started --icon "📚"
+```
+
+### Organize Pages
+
+```bash
+# Show page hierarchy as a tree
+wit journal tree
+
+# Move a page to a new parent
+wit journal move api-guide --parent getting-started
+
+# Move to root level
+wit journal move api-guide --parent root
+```
+
+### Page Lifecycle
+
+```bash
+# Publish a draft
+wit journal publish getting-started
+
+# Revert to draft
+wit journal unpublish getting-started
+
+# Archive a page
+wit journal archive old-docs
+```
+
+### Version History
+
+```bash
+# View page history
+wit journal history getting-started
+
+# Restore to a previous version
+wit journal restore getting-started 3
+```
+
+### Search
+
+```bash
+# Search by title or content
+wit journal search "authentication"
+
+# Search within a status
+wit journal search "api" --status published
+```
+
+### Delete Pages
+
+```bash
+# Delete a page (requires --force)
+wit journal delete old-page --force
+```
+
+**Warning**: Deleting a page also deletes all its children.
+
+## Page Status
+
+| Status | Icon | Description |
+|--------|------|-------------|
+| `draft` | `○` | Work in progress, not visible publicly |
+| `published` | `●` | Visible to repository collaborators |
+| `archived` | `◌` | Hidden from listings but preserved |
+
+## Options
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--content` | `-c` | Page content (markdown) |
+| `--icon` | `-i` | Page icon (emoji) |
+| `--parent` | `-p` | Parent page slug |
+| `--status` | `-s` | Filter by status |
+| `--force` | | Confirm destructive operations |
+| `--help` | `-h` | Show help |
+
+## Examples
+
+### Create Documentation Structure
+
+```bash
+# Create main sections
+wit journal create "Getting Started" --icon "🚀"
+wit journal create "Architecture" --icon "🏗️"
+wit journal create "API Reference" --icon "📡"
+wit journal create "Contributing" --icon "🤝"
+
+# Create nested pages
+wit journal create "Installation" --parent getting-started
+wit journal create "Quick Start" --parent getting-started
+wit journal create "Configuration" --parent getting-started
+
+# Publish the main pages
+wit journal publish getting-started
+wit journal publish architecture
+```
+
+### View Page Tree
+
+```bash
+wit journal tree
+```
+
+Output:
+```
+Journal Tree:
+
+├── ● 🚀 Getting Started (getting-started)
+│   ├── ● 📥 Installation (installation)
+│   ├── ● ⚡ Quick Start (quick-start)
+│   └── ○ ⚙️ Configuration (configuration)
+├── ● 🏗️ Architecture (architecture)
+│   └── ● 📊 Database Schema (database-schema)
+├── ● 📡 API Reference (api-reference)
+└── ○ 🤝 Contributing (contributing)
+```
+
+### View a Page
+
+```bash
+wit journal view getting-started
+```
+
+Output:
+```
+🚀 Getting Started
+════════════════════════════════════════════════════════════
+
+Status:    ● published
+Author:    John Doe
+Created:   Dec 1, 2024
+Updated:   Dec 15, 2024
+Published: Dec 5, 2024
+
+────────────────────────────────────────────────────────────
+
+# Getting Started
+
+Welcome to our project! This guide will help you get up and
+running quickly.
+
+## Prerequisites
+
+- Node.js 18+
+- npm or yarn
+...
+```
+
+### Search Documentation
+
+```bash
+wit journal search "database"
+```
+
+Output:
+```
+Search results for "database":
+
+  ● published  📊 Database Schema
+      database-schema
+      Our database uses PostgreSQL with the following schema...
+
+  ○ draft  🔧 Database Migrations
+      database-migrations
+      How to create and run database migrations...
+```
+
+### Restore Previous Version
+
+```bash
+# View history
+wit journal history getting-started
+
+# Output:
+# Page History:
+#
+#   v3 · Dec 15, 2024
+#       Updated installation instructions
+#       by johndoe
+#
+#   v2 · Dec 10, 2024
+#       Added quick start section
+#       by johndoe
+#
+#   v1 · Dec 1, 2024
+#       Initial creation
+#       by johndoe
+
+# Restore to version 2
+wit journal restore getting-started 2
+```
+
+## Web Interface
+
+Journal pages are also accessible through the web interface at:
+```
+https://your-server/owner/repo/journal/page-slug
+```
+
+## Tips
+
+- Use emojis as icons to make pages visually distinct
+- Create a clear hierarchy with parent pages
+- Keep pages focused on single topics
+- Use version history to track changes
+- Archive rather than delete to preserve history
+
+## See Also
+
+- [Platform Overview](/platform/overview) - Learn about the wit platform
+- [Pull Requests](/platform/pull-requests) - Link PRs to documentation
+- [Issues](/platform/issues) - Link issues to documentation

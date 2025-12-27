@@ -1,0 +1,173 @@
+---
+title: "Wrapped"
+description: "Your monthly coding activity summary - Spotify Wrapped style"
+---
+
+# wit wrapped
+
+Get a beautiful, Spotify Wrapped-style summary of your monthly coding activity. See your commits, PRs, reviews, coding patterns, and discover your "coding personality."
+
+## Basic Usage
+
+```bash
+# Show current month's wrapped
+wit wrapped
+
+# Show previous month's wrapped
+wit wrapped --previous
+
+# Show specific month
+wit wrapped 2024 11
+
+# List available periods
+wit wrapped --list
+```
+
+## What's Included
+
+### Activity Stats
+
+- **Commits**: Total commits made
+- **Pull Requests**: PRs opened and merged
+- **Reviews**: Code reviews given
+- **Issues**: Issues opened and closed
+- **Comments**: Discussions participated in
+- **Stars**: Repositories starred
+
+### Coding Personality
+
+Based on your activity patterns, you'll be assigned a personality type:
+
+| Personality | Description |
+|-------------|-------------|
+| Night Owl | Most active late at night (10pm-4am) |
+| Early Bird | Most active in early morning hours |
+| Weekend Warrior | Heavy weekend coding activity |
+| Nine-to-Fiver | Consistent weekday work hours |
+| Code Ninja | High commit frequency |
+| Steady Coder | Consistent daily activity |
+| Ghost Developer | Sporadic but impactful commits |
+
+### Activity Visualizations
+
+**Daily Heatmap**: See your activity intensity across the month
+
+```
+Activity this month:
+░▒▓█░ ▒▓██ ░░▓█ ▒▓██ ░▒▓█
+S M T W T F S
+```
+
+**Hourly Distribution**: See when you code most
+
+```
+Coding hours (24h):
+▁▁▂▃▄▆▇█▇▆▅▄▃▃▄▅▆▇▆▅▄▃▂▁
+0         6        12        18      23
+```
+
+### Streaks
+
+- **Longest streak**: Your best consecutive days of activity
+- **Current streak**: How many days you're currently on
+
+### Fun Facts
+
+- Most active hour of day
+- Favorite day of the week
+- Late night commits count
+- Weekend commit count
+
+### Top Repositories
+
+See which repositories you contributed to most.
+
+### AI Usage (if enabled)
+
+- Agent sessions started
+- Messages exchanged
+- Tokens used
+
+### CI/CD Stats (if available)
+
+- Total workflow runs
+- Success rate
+- Failed runs
+
+## Options
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--list` | `-l` | List all available wrapped periods |
+| `--previous` | `-p` | Show previous month's wrapped |
+| `--help` | `-h` | Show help message |
+
+## Examples
+
+### View Current Month
+
+```bash
+wit wrapped
+```
+
+Output:
+```
+╔═══════════════════════════════════════════════════════════════╗
+║   wit wrapped - December 2024                                 ║
+╚═══════════════════════════════════════════════════════════════╝
+
+  @johndoe - John Doe
+
+  Your coding personality: Night Owl
+
+  ══════════════════════════════════════════════════════════
+
+  142 commits    12 PRs opened    10 merged
+  28 reviews     8 issues opened  6 closed
+  45 comments   15 stars given
+
+  Activity this month:
+  ░▒▓█░ ▒▓██ ░░▓█ ▒▓██ ░▒▓█
+
+  Streaks:
+  Longest streak: 12 days
+  Current streak: 5 days
+
+  Fun facts:
+  Most active at 10 PM
+  Favorite day: Tuesday
+  Late night commits: 23 (10pm-4am)
+  Weekend commits: 18
+```
+
+### List Available Periods
+
+```bash
+wit wrapped --list
+```
+
+Output:
+```
+Available Wrapped periods:
+
+  2024:
+    December (wit wrapped 2024 12)
+    November (wit wrapped 2024 11)
+    October (wit wrapped 2024 10)
+```
+
+### View Specific Month
+
+```bash
+wit wrapped 2024 11
+```
+
+## Requirements
+
+- Must be authenticated with `wit up` or have a valid session
+- Activity data is collected from the wit platform
+
+## See Also
+
+- [wit dashboard](/commands/dashboard) - Real-time activity dashboard
+- [wit stats](/commands/quality-of-life) - Repository statistics

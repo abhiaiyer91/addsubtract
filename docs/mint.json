@@ -88,6 +88,11 @@
         "commands/advanced",
         "commands/agent",
         "commands/inbox",
+        "commands/dashboard",
+        "commands/wrapped",
+        "commands/journal",
+        "commands/project",
+        "commands/cycle",
         "commands/fsck"
       ]
     },
@@ -106,6 +111,7 @@
       "pages": [
         "features/smart-status",
         "features/ai-powered",
+        "features/ai-agents",
         "features/search",
         "features/review"
       ]
@@ -174,6 +180,11 @@
         "api-reference/branch-protection",
         "api-reference/stacks",
         "api-reference/merge-queue",
+        "api-reference/projects",
+        "api-reference/cycles",
+        "api-reference/journal",
+        "api-reference/dashboard",
+        "api-reference/wrapped",
         "api-reference/activity",
         "api-reference/releases"
       ]

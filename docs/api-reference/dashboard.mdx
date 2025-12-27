@@ -1,0 +1,296 @@
+---
+title: "Dashboard API"
+description: "API reference for the user dashboard and activity feeds"
+---
+
+# Dashboard API
+
+The Dashboard API provides access to user-centric views of PRs, issues, repositories, and contribution statistics.
+
+## Overview
+
+The Dashboard API aggregates data across repositories to provide a unified view of a user's work and activity.
+
+## Endpoints
+
+All dashboard endpoints are available via tRPC at `api.dashboard.*`
+
+### Get Full Dashboard Data
+
+```typescript
+api.dashboard.getData(options?: {
+  includeCalendar?: boolean;
+  repoLimit?: number;
+  activityLimit?: number;
+}): Promise<DashboardData>
+```
+
+**Example:**
+```typescript
+const dashboard = await api.dashboard.getData({
+  includeCalendar: true,
+  repoLimit: 5,
+  activityLimit: 10
+});
+```
+
+### Get Summary
+
+```typescript
+api.dashboard.getSummary(): Promise<DashboardSummary>
+```
+
+Returns counts and trends without detailed lists.
+
+**Example:**
+```typescript
+const summary = await api.dashboard.getSummary();
+// {
+//   inbox: {
+//     prsAwaitingReview: 3,
+//     myOpenPrs: 2,
+//     prsParticipated: 5,
+//     issuesAssigned: 4,
+//     issuesCreated: 1,
+//     issuesParticipated: 3
+//   },
+//   recentActivity: 12,
+//   activeRepos: 3,
+//   thisWeekContributions: 24,
+//   lastWeekContributions: 18,
+//   contributionTrend: 'up'
+// }
+```
+
+### Get PRs Awaiting Review
+
+```typescript
+api.dashboard.getPrsAwaitingReview(options?: {
+  limit?: number;
+}): Promise<InboxPullRequest[]>
+```
+
+Returns PRs where the current user is requested as a reviewer.
+
+### Get My Open PRs
+
+```typescript
+api.dashboard.getMyOpenPrs(options?: {
+  limit?: number;
+}): Promise<InboxPullRequest[]>
+```
+
+Returns PRs authored by the current user.
+
+### Get Assigned Issues
+
+```typescript
+api.dashboard.getAssignedIssues(options?: {
+  limit?: number;
+}): Promise<DashboardIssue[]>
+```
+
+### Get Repositories
+
+```typescript
+api.dashboard.getRepositories(
+  limit?: number
+): Promise<DashboardRepo[]>
+```
+
+Returns repositories owned by or collaborated on by the user.
+
+### Get Activity Feed
+
+```typescript
+api.dashboard.getActivityFeed(
+  limit?: number
+): Promise<ActivityFeedItem[]>
+```
+
+Returns recent activity across all repositories.
+
+### Get Contribution Stats
+
+```typescript
+api.dashboard.getContributionStats(): Promise<ContributionStats>
+```
+
+**Example:**
+```typescript
+const stats = await api.dashboard.getContributionStats();
+// {
+//   totalCommits: 142,
+//   totalPullRequests: 28,
+//   totalPullRequestsMerged: 24,
+//   totalIssues: 15,
+//   totalIssuesClosed: 12,
+//   totalReviews: 45,
+//   totalComments: 89,
+//   streak: {
+//     current: 5,
+//     longest: 12,
+//     lastContributionDate: '2024-01-15'
+//   },
+//   contributionsByDayOfWeek: [12, 28, 32, 25, 30, 10, 5],
+//   contributionCalendar: [...]
+// }
+```
+
+## Types
+
+### DashboardData
+
+```typescript
+interface DashboardData {
+  summary: DashboardSummary;
+  repos: DashboardRepo[];
+  activity: ActivityFeedItem[];
+  contributionStats?: ContributionStats;
+}
+```
+
+### DashboardSummary
+
+```typescript
+interface DashboardSummary {
+  inbox: {
+    prsAwaitingReview: number;
+    myOpenPrs: number;
+    prsParticipated: number;
+    issuesAssigned: number;
+    issuesCreated: number;
+    issuesParticipated: number;
+  };
+  recentActivity: number;
+  activeRepos: number;
+  thisWeekContributions: number;
+  lastWeekContributions: number;
+  contributionTrend: 'up' | 'down' | 'stable';
+}
+```
+
+### InboxPullRequest
+
+```typescript
+interface InboxPullRequest {
+  id: string;
+  number: number;
+  title: string;
+  state: 'open' | 'closed' | 'merged';
+  isDraft: boolean;
+  author?: {
+    username?: string;
+    name?: string;
+  };
+  repo: {
+    name: string;
+    owner: string;
+  };
+  labels?: Array<{ name: string; color: string }>;
+  ciStatus?: 'success' | 'failure' | 'pending' | null;
+  reviewState?: 'approved' | 'changes_requested' | 'commented' | 'pending' | null;
+  updatedAt: string;
+}
+```
+
+### DashboardRepo
+
+```typescript
+interface DashboardRepo {
+  id: string;
+  name: string;
+  description?: string;
+  isPrivate: boolean;
+  starsCount: number;
+  openPrs: number;
+  openIssues: number;
+  pushedAt?: string;
+  updatedAt: string;
+}
+```
+
+### ActivityFeedItem
+
+```typescript
+interface ActivityFeedItem {
+  id: string;
+  type: ActivityType;
+  repoName?: string;
+  payload: Record<string, unknown>;
+  createdAt: string;
+}
+
+type ActivityType = 
+  | 'push'
+  | 'pr_opened'
+  | 'pr_merged'
+  | 'pr_closed'
+  | 'pr_review'
+  | 'pr_comment'
+  | 'issue_opened'
+  | 'issue_closed'
+  | 'issue_comment'
+  | 'repo_created'
+  | 'repo_forked'
+  | 'repo_starred';
+```
+
+### ContributionStats
+
+```typescript
+interface ContributionStats {
+  totalCommits: number;
+  totalPullRequests: number;
+  totalPullRequestsMerged: number;
+  totalIssues: number;
+  totalIssuesClosed: number;
+  totalReviews: number;
+  totalComments: number;
+  streak: {
+    current: number;
+    longest: number;
+    lastContributionDate?: string;
+  };
+  contributionsByDayOfWeek: number[];  // [Sun, Mon, ..., Sat]
+  contributionCalendar: Array<{
+    date: string;
+    count: number;
+    level: 0 | 1 | 2 | 3 | 4;  // Intensity level
+  }>;
+}
+```
+
+## CLI Usage
+
+```bash
+# Full dashboard
+wit dashboard
+
+# PRs section
+wit dashboard prs
+
+# Issues section
+wit dashboard issues
+
+# Repositories
+wit dashboard repos
+
+# Activity feed
+wit dashboard activity
+
+# Contribution stats
+wit dashboard stats
+
+# Quick summary
+wit dashboard summary
+
+# JSON output
+wit dashboard --json
+```
+
+## See Also
+
+- [wit dashboard](/commands/dashboard) - CLI documentation
+- [wit wrapped](/commands/wrapped) - Monthly activity summary
+- [Activity API](/api-reference/activity) - Activity feed details

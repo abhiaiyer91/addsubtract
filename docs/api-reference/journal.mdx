@@ -1,0 +1,305 @@
+---
+title: "Journal API"
+description: "API reference for repository documentation (Notion-like pages)"
+---
+
+# Journal API
+
+The Journal API allows you to create and manage Notion-like documentation pages for your repository.
+
+## Overview
+
+Journal provides hierarchical documentation pages with version history, publish workflows, and search capabilities.
+
+## Endpoints
+
+All journal endpoints are available via tRPC at `api.journal.*`
+
+### List Pages
+
+```typescript
+api.journal.list(owner: string, repoName: string, options?: {
+  status?: 'draft' | 'published' | 'archived';
+  parentId?: string | null;  // null for root pages
+}): Promise<JournalPage[]>
+```
+
+**Example:**
+```typescript
+// Get root pages
+const rootPages = await api.journal.list('myorg', 'myrepo', { parentId: null });
+
+// Get published pages only
+const published = await api.journal.list('myorg', 'myrepo', { status: 'published' });
+```
+
+### Get Page
+
+```typescript
+api.journal.get(
+  owner: string, 
+  repoName: string, 
+  slug: string
+): Promise<JournalPage>
+```
+
+**Example:**
+```typescript
+const page = await api.journal.get('myorg', 'myrepo', 'getting-started');
+```
+
+### Create Page
+
+```typescript
+api.journal.create(owner: string, repoName: string, data: {
+  title: string;
+  slug?: string;      // Auto-generated from title if not provided
+  content?: string;   // Markdown content
+  icon?: string;      // Emoji icon
+  parentId?: string;  // Parent page ID for nesting
+}): Promise<JournalPage>
+```
+
+**Example:**
+```typescript
+const page = await api.journal.create('myorg', 'myrepo', {
+  title: 'Getting Started',
+  icon: '🚀',
+  content: '# Welcome\n\nThis guide will help you get started...'
+});
+```
+
+### Update Page
+
+```typescript
+api.journal.update(owner: string, repoName: string, slug: string, data: {
+  title?: string;
+  content?: string;
+  icon?: string | null;
+}): Promise<JournalPage>
+```
+
+Creates a new version in the page history.
+
+### Delete Page
+
+```typescript
+api.journal.delete(
+  owner: string, 
+  repoName: string, 
+  slug: string
+): Promise<void>
+```
+
+**Warning:** Also deletes all child pages.
+
+### Get Page Tree
+
+```typescript
+api.journal.tree(owner: string, repoName: string, options?: {
+  status?: 'draft' | 'published' | 'archived';
+}): Promise<JournalTreeNode[]>
+```
+
+Returns hierarchical tree structure.
+
+**Example:**
+```typescript
+const tree = await api.journal.tree('myorg', 'myrepo');
+// [
+//   {
+//     title: 'Getting Started',
+//     slug: 'getting-started',
+//     status: 'published',
+//     icon: '🚀',
+//     children: [
+//       { title: 'Installation', slug: 'installation', ... },
+//       { title: 'Quick Start', slug: 'quick-start', ... }
+//     ]
+//   },
+//   ...
+// ]
+```
+
+### Search Pages
+
+```typescript
+api.journal.search(owner: string, repoName: string, query: string, options?: {
+  status?: 'draft' | 'published' | 'archived';
+  limit?: number;
+}): Promise<JournalPage[]>
+```
+
+Searches both titles and content.
+
+### Publish Page
+
+```typescript
+api.journal.publish(
+  owner: string, 
+  repoName: string, 
+  slug: string
+): Promise<JournalPage>
+```
+
+Changes status from `draft` to `published` and sets `publishedAt`.
+
+### Unpublish Page
+
+```typescript
+api.journal.unpublish(
+  owner: string, 
+  repoName: string, 
+  slug: string
+): Promise<JournalPage>
+```
+
+Reverts status to `draft`.
+
+### Archive Page
+
+```typescript
+api.journal.archive(
+  owner: string, 
+  repoName: string, 
+  slug: string
+): Promise<JournalPage>
+```
+
+### Move Page
+
+```typescript
+api.journal.move(owner: string, repoName: string, slug: string, data: {
+  newParentId: string | null;  // null for root level
+}): Promise<JournalPage>
+```
+
+### Get Page History
+
+```typescript
+api.journal.history(
+  owner: string, 
+  repoName: string, 
+  slug: string
+): Promise<JournalVersion[]>
+```
+
+**Example:**
+```typescript
+const history = await api.journal.history('myorg', 'myrepo', 'getting-started');
+// [
+//   { version: 3, createdAt: '...', changeDescription: 'Updated installation steps' },
+//   { version: 2, createdAt: '...', changeDescription: 'Added quick start section' },
+//   { version: 1, createdAt: '...', changeDescription: 'Initial creation' }
+// ]
+```
+
+### Restore Version
+
+```typescript
+api.journal.restoreVersion(
+  owner: string, 
+  repoName: string, 
+  slug: string,
+  version: number
+): Promise<JournalPage>
+```
+
+## Types
+
+### JournalPage
+
+```typescript
+interface JournalPage {
+  id: string;
+  repoId: string;
+  slug: string;
+  title: string;
+  content?: string;
+  icon?: string;
+  status: 'draft' | 'published' | 'archived';
+  parentId?: string;
+  author: {
+    id: string;
+    name: string;
+    username?: string;
+  };
+  createdAt: string;
+  updatedAt: string;
+  publishedAt?: string;
+}
+```
+
+### JournalTreeNode
+
+```typescript
+interface JournalTreeNode {
+  title: string;
+  slug: string;
+  status: string;
+  icon?: string;
+  children: JournalTreeNode[];
+}
+```
+
+### JournalVersion
+
+```typescript
+interface JournalVersion {
+  version: number;
+  authorId: string;
+  changeDescription?: string;
+  createdAt: string;
+}
+```
+
+### Page Status
+
+| Status | Description |
+|--------|-------------|
+| `draft` | Work in progress, not publicly visible |
+| `published` | Visible to repository collaborators |
+| `archived` | Hidden from listings but preserved |
+
+## CLI Usage
+
+```bash
+# List pages
+wit journal
+
+# Create page
+wit journal create "Getting Started" --icon "🚀"
+
+# View page
+wit journal view getting-started
+
+# Edit page
+wit journal edit getting-started --content "# Updated Content"
+
+# Show tree
+wit journal tree
+
+# Search
+wit journal search "authentication"
+
+# Publish
+wit journal publish getting-started
+
+# View history
+wit journal history getting-started
+
+# Restore version
+wit journal restore getting-started 2
+```
+
+## Web Access
+
+Journal pages are accessible at:
+```
+https://your-server/{owner}/{repo}/journal/{slug}
+```
+
+## See Also
+
+- [wit journal](/commands/journal) - CLI documentation
+- [Platform Overview](/platform/overview) - Platform features

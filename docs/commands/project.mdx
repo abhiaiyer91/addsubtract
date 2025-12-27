@@ -1,0 +1,266 @@
+---
+title: "Project"
+description: "Linear-style project management from the command line"
+---
+
+# wit project
+
+Manage Linear-style projects directly from your terminal. Projects help you organize related issues, track progress, and plan work across sprints.
+
+## Basic Usage
+
+```bash
+# Create a new project
+wit project create "Auth System"
+
+# List all projects
+wit project list
+
+# View project details
+wit project view "Auth System"
+
+# See project progress
+wit project progress "Auth System"
+```
+
+## Commands
+
+### Create Project
+
+```bash
+# Basic project
+wit project create "Auth System"
+
+# With description
+wit project create "Q1 Features" --description "Features for Q1 2024"
+
+# With timeline
+wit project create "Mobile App" --start 2024-01-01 --target 2024-03-31
+
+# With status
+wit project create "Infrastructure" --status planned
+```
+
+### List Projects
+
+```bash
+# List all projects
+wit project list
+
+# Filter by status
+wit project list --status in_progress
+wit project list --status completed
+```
+
+### View Project
+
+```bash
+wit project view "Auth System"
+```
+
+Shows:
+- Project status
+- Description
+- Project lead
+- Timeline (start/target dates)
+- Progress bar and issue counts
+
+### Update Project
+
+```bash
+# Update status
+wit project update "Auth System" --status in_progress
+
+# Update timeline
+wit project update "Auth System" --target 2024-06-30
+
+# Update description
+wit project update "Auth System" --description "New auth system with OAuth"
+
+# Assign project lead
+wit project update "Auth System" --lead johndoe
+```
+
+### View Issues
+
+```bash
+wit project issues "Auth System"
+```
+
+Lists all issues associated with the project.
+
+### Track Progress
+
+```bash
+wit project progress "Auth System"
+```
+
+Shows:
+- Visual progress bar
+- Completed vs remaining issues
+- Days until target date (or overdue status)
+
+### Complete Project
+
+```bash
+wit project complete "Auth System"
+```
+
+Marks the project as completed and shows a summary.
+
+### Delete Project
+
+```bash
+wit project delete "Auth System" --force
+```
+
+**Warning**: This unassigns all issues from the project.
+
+## Project Status
+
+| Status | Icon | Description |
+|--------|------|-------------|
+| `backlog` | `○` | Not yet started |
+| `planned` | `◐` | Scheduled for future |
+| `in_progress` | `●` | Currently active |
+| `paused` | `◑` | Temporarily on hold |
+| `completed` | `✓` | Finished |
+| `canceled` | `✕` | No longer needed |
+
+## Options
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--description` | `-d` | Project description |
+| `--status` | `-s` | Project status |
+| `--lead` | | Project lead username |
+| `--start` | | Start date (YYYY-MM-DD) |
+| `--target` | | Target completion date |
+| `--color` | | Project color (hex) |
+| `--icon` | | Project icon (emoji) |
+| `--force` | | Confirm destructive operations |
+| `--help` | `-h` | Show help |
+
+## Examples
+
+### Create and Manage a Project
+
+```bash
+# Create the project
+wit project create "User Authentication" \
+  --description "Implement OAuth2 and session management" \
+  --start 2024-01-15 \
+  --target 2024-02-28
+
+# Start working on it
+wit project update "User Authentication" --status in_progress
+
+# Create related issues
+wit issue create "Set up OAuth2 provider" --project "User Authentication"
+wit issue create "Implement session tokens" --project "User Authentication"
+wit issue create "Add logout functionality" --project "User Authentication"
+
+# Check progress
+wit project progress "User Authentication"
+```
+
+### View Project Progress
+
+```bash
+wit project progress "User Authentication"
+```
+
+Output:
+```
+User Authentication - Progress
+──────────────────────────────────────────────────
+
+  [████████████░░░░░░░░░░░░░░░░░░] 40%
+
+  Completed:  4 issues
+  Remaining:  6 issues
+  Total:      10 issues
+
+  Due in:     14 days
+```
+
+### List Projects by Status
+
+```bash
+wit project list --status in_progress
+```
+
+Output:
+```
+Projects:
+
+  ● in progress  User Authentication → Feb 28, 2024
+      Implement OAuth2 and session management...
+
+  ● in progress  Dashboard Redesign → Mar 15, 2024
+      New dashboard with better analytics...
+
+  ● in progress  API v2
+      Breaking changes for API version 2
+```
+
+### View Project Details
+
+```bash
+wit project view "User Authentication"
+```
+
+Output:
+```
+User Authentication
+──────────────────────────────────────────────────
+Status:      ● in progress
+Description: Implement OAuth2 and session management
+Lead:        @johndoe
+Timeline:    Jan 15, 2024 → Feb 28, 2024
+
+Progress:
+  [████████████░░░░░░░░░░░░░░░░░░] 40%
+  4/10 issues completed
+```
+
+### Complete a Project
+
+```bash
+wit project complete "User Authentication"
+```
+
+Output:
+```
+✓ Marked project "User Authentication" as complete
+
+  Summary:
+    Completed:  10 issues
+```
+
+## Linking Issues to Projects
+
+When creating issues, you can associate them with a project:
+
+```bash
+wit issue create "Add password reset" --project "User Authentication"
+```
+
+Or update an existing issue:
+
+```bash
+wit issue update 42 --project "User Authentication"
+```
+
+## Web Interface
+
+Projects are also accessible through the web interface at:
+```
+https://your-server/owner/repo/projects
+```
+
+## See Also
+
+- [wit cycle](/commands/cycle) - Sprint/cycle management
+- [wit issue](/platform/issues) - Issue tracking
+- [Cycles and Projects](/features/cycles-projects) - Feature overview
