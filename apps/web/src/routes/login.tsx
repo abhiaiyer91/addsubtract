@@ -51,8 +51,12 @@ export function LoginPage() {
         return;
       }
 
-      // Redirect to home on success
-      navigate('/');
+      // Redirect to user dashboard on success
+      if (result.data?.user?.username) {
+        navigate(`/${result.data.user.username}`);
+      } else {
+        navigate('/');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
       setIsLoading(false);
