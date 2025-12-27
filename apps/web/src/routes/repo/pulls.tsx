@@ -82,7 +82,7 @@ export function PullsPage() {
           Pull Requests
         </h2>
         {authenticated && (
-          <Link to={`/${owner}/${repo}/compare`}>
+          <Link to={`/${owner}/${repo}/pulls/new`}>
             <Button size="sm" className="gap-2">
               <Plus className="h-4 w-4" />
               New pull request

@@ -15,6 +15,7 @@ import { CommitDetailPage } from './routes/repo/commit-detail';
 import { BranchesPage } from './routes/repo/branches';
 import { PullsPage } from './routes/repo/pulls';
 import { PullDetailPage } from './routes/repo/pull-detail';
+import { NewPullPage } from './routes/repo/pull-new';
 import { IssuesPage } from './routes/repo/issues';
 import { IssueDetailPage } from './routes/repo/issue-detail';
 import { NewIssuePage } from './routes/repo/issue-new';
@@ -48,6 +49,7 @@ export function App() {
 
             {/* Pull requests */}
             <Route path="/:owner/:repo/pulls" element={<PullsPage />} />
+            <Route path="/:owner/:repo/pulls/new" element={<NewPullPage />} />
             <Route path="/:owner/:repo/pull/:number" element={<PullDetailPage />} />
 
             {/* Issues */}

@@ -1,4 +1,4 @@
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   Star,
   GitFork,
@@ -8,6 +8,7 @@ import {
   CircleDot,
   Settings,
   History,
+  Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -23,8 +24,10 @@ interface RepoLayoutProps {
 
 export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
   const location = useLocation();
+  const navigate = useNavigate();
   const { data: session } = useSession();
   const authenticated = !!session?.user;
+  const utils = trpc.useUtils();
 
   // Fetch repository data
   const {
@@ -35,6 +38,86 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
     { owner, repo },
     { enabled: !!owner && !!repo }
   );
+
+  // Check if user has starred/is watching this repo
+  const { data: starredData } = trpc.repos.isStarred.useQuery(
+    { repoId: repoData?.repo.id || '' },
+    { enabled: !!repoData?.repo.id && authenticated }
+  );
+
+  const { data: watchingData } = trpc.repos.isWatching.useQuery(
+    { repoId: repoData?.repo.id || '' },
+    { enabled: !!repoData?.repo.id && authenticated }
+  );
+
+  // Star/unstar mutation
+  const starMutation = trpc.repos.star.useMutation({
+    onSuccess: () => {
+      utils.repos.get.invalidate({ owner, repo });
+      utils.repos.isStarred.invalidate({ repoId: repoData?.repo.id || '' });
+    },
+  });
+
+  const unstarMutation = trpc.repos.unstar.useMutation({
+    onSuccess: () => {
+      utils.repos.get.invalidate({ owner, repo });
+      utils.repos.isStarred.invalidate({ repoId: repoData?.repo.id || '' });
+    },
+  });
+
+  // Watch/unwatch mutation
+  const watchMutation = trpc.repos.watch.useMutation({
+    onSuccess: () => {
+      utils.repos.get.invalidate({ owner, repo });
+      utils.repos.isWatching.invalidate({ repoId: repoData?.repo.id || '' });
+    },
+  });
+
+  const unwatchMutation = trpc.repos.unwatch.useMutation({
+    onSuccess: () => {
+      utils.repos.get.invalidate({ owner, repo });
+      utils.repos.isWatching.invalidate({ repoId: repoData?.repo.id || '' });
+    },
+  });
+
+  // Fork mutation
+  const forkMutation = trpc.repos.fork.useMutation({
+    onSuccess: (data) => {
+      // Navigate to the new fork
+      const newOwner = session?.user?.username || session?.user?.name;
+      navigate(`/${newOwner}/${data.name}`);
+    },
+  });
+
+  const isStarred = starredData?.starred || false;
+  const isWatching = watchingData?.watching || false;
+
+  const handleStar = () => {
+    if (!repoData?.repo.id) return;
+    if (isStarred) {
+      unstarMutation.mutate({ repoId: repoData.repo.id });
+    } else {
+      starMutation.mutate({ repoId: repoData.repo.id });
+    }
+  };
+
+  const handleWatch = () => {
+    if (!repoData?.repo.id) return;
+    if (isWatching) {
+      unwatchMutation.mutate({ repoId: repoData.repo.id });
+    } else {
+      watchMutation.mutate({ repoId: repoData.repo.id });
+    }
+  };
+
+  const handleFork = () => {
+    if (!repoData?.repo.id) return;
+    forkMutation.mutate({ repoId: repoData.repo.id });
+  };
+
+  const isStarLoading = starMutation.isPending || unstarMutation.isPending;
+  const isWatchLoading = watchMutation.isPending || unwatchMutation.isPending;
+  const isForkLoading = forkMutation.isPending;
 
   if (isLoading) {
     return <Loading text="Loading repository..." />;
@@ -105,23 +188,53 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
         <div className="flex items-center gap-2">
           {authenticated && (
             <>
-              <Button variant="outline" size="sm" className="gap-2">
-                <Eye className="h-4 w-4" />
-                Watch
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={handleWatch}
+                disabled={isWatchLoading}
+              >
+                {isWatchLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Eye className={`h-4 w-4 ${isWatching ? 'fill-current' : ''}`} />
+                )}
+                {isWatching ? 'Unwatch' : 'Watch'}
                 <Badge variant="secondary" className="ml-1">
                   {repoInfo.watchersCount}
                 </Badge>
               </Button>
-              <Button variant="outline" size="sm" className="gap-2">
-                <GitFork className="h-4 w-4" />
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={handleFork}
+                disabled={isForkLoading || repoInfo.ownerId === session?.user?.id}
+              >
+                {isForkLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <GitFork className="h-4 w-4" />
+                )}
                 Fork
                 <Badge variant="secondary" className="ml-1">
                   {repoInfo.forksCount}
                 </Badge>
               </Button>
-              <Button variant="outline" size="sm" className="gap-2">
-                <Star className="h-4 w-4" />
-                Star
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={handleStar}
+                disabled={isStarLoading}
+              >
+                {isStarLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Star className={`h-4 w-4 ${isStarred ? 'fill-yellow-400 text-yellow-400' : ''}`} />
+                )}
+                {isStarred ? 'Starred' : 'Star'}
                 <Badge variant="secondary" className="ml-1">
                   {repoInfo.starsCount}
                 </Badge>
