@@ -8,6 +8,8 @@ import {
   prReviewModel,
   prCommentModel,
   prLabelModel,
+  prReviewerModel,
+  inboxModel,
   repoModel,
   collaboratorModel,
   activityHelpers,
@@ -1170,5 +1172,178 @@ export const pullsRouter = router({
         commits,
         totalCommits: commits.length,
       };
+    }),
+
+  // ============ INBOX ENDPOINTS ============
+
+  /**
+   * Get inbox summary - counts for each inbox section
+   */
+  inboxSummary: protectedProcedure.query(async ({ ctx }) => {
+    return inboxModel.getSummary(ctx.user.id);
+  }),
+
+  /**
+   * Get PRs awaiting the user's review
+   * This is the main inbox section for code reviewers
+   */
+  inboxAwaitingReview: protectedProcedure
+    .input(
+      z.object({
+        limit: z.number().min(1).max(100).default(20),
+        offset: z.number().min(0).default(0),
+      }).optional()
+    )
+    .query(async ({ input, ctx }) => {
+      const { limit = 20, offset = 0 } = input ?? {};
+      return inboxModel.getAwaitingReview(ctx.user.id, { limit, offset });
+    }),
+
+  /**
+   * Get the user's own PRs that are open (awaiting reviews from others)
+   */
+  inboxMyPrs: protectedProcedure
+    .input(
+      z.object({
+        limit: z.number().min(1).max(100).default(20),
+        offset: z.number().min(0).default(0),
+      }).optional()
+    )
+    .query(async ({ input, ctx }) => {
+      const { limit = 20, offset = 0 } = input ?? {};
+      return inboxModel.getMyPrsAwaitingReview(ctx.user.id, { limit, offset });
+    }),
+
+  /**
+   * Get PRs where the user has participated (commented or reviewed)
+   */
+  inboxParticipated: protectedProcedure
+    .input(
+      z.object({
+        limit: z.number().min(1).max(100).default(20),
+        offset: z.number().min(0).default(0),
+        state: z.enum(['open', 'closed', 'all']).default('open'),
+      }).optional()
+    )
+    .query(async ({ input, ctx }) => {
+      const { limit = 20, offset = 0, state = 'open' } = input ?? {};
+      return inboxModel.getParticipated(ctx.user.id, { limit, offset, state });
+    }),
+
+  // ============ REVIEWER MANAGEMENT ============
+
+  /**
+   * Request a review from a user
+   */
+  requestReview: protectedProcedure
+    .input(
+      z.object({
+        prId: z.string().uuid(),
+        reviewerId: z.string().uuid(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const pr = await prModel.findById(input.prId);
+
+      if (!pr) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Pull request not found',
+        });
+      }
+
+      if (pr.state !== 'open') {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Can only request reviews on open pull requests',
+        });
+      }
+
+      // Check if user has write access to request reviews
+      const repo = await repoModel.findById(pr.repoId);
+      const isOwner = repo?.ownerId === ctx.user.id;
+      const isAuthor = pr.authorId === ctx.user.id;
+      const canWrite = isOwner || isAuthor || 
+        (await collaboratorModel.hasPermission(pr.repoId, ctx.user.id, 'write'));
+
+      if (!canWrite) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to request reviews',
+        });
+      }
+
+      // Create the review request
+      const reviewer = await prReviewerModel.requestReview(
+        input.prId,
+        input.reviewerId,
+        ctx.user.id
+      );
+
+      // Emit event for notification
+      if (repo) {
+        const repoFullName = `${ctx.user.username || ctx.user.name}/${repo.name}`;
+        await eventBus.emit('pr.review_requested', ctx.user.id, {
+          prId: pr.id,
+          prNumber: pr.number,
+          prTitle: pr.title,
+          repoId: pr.repoId,
+          repoFullName,
+          reviewerId: input.reviewerId,
+          authorId: pr.authorId,
+        });
+      }
+
+      return reviewer;
+    }),
+
+  /**
+   * Remove a review request
+   */
+  removeReviewRequest: protectedProcedure
+    .input(
+      z.object({
+        prId: z.string().uuid(),
+        reviewerId: z.string().uuid(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const pr = await prModel.findById(input.prId);
+
+      if (!pr) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Pull request not found',
+        });
+      }
+
+      // Check if user has write access
+      const repo = await repoModel.findById(pr.repoId);
+      const isOwner = repo?.ownerId === ctx.user.id;
+      const isAuthor = pr.authorId === ctx.user.id;
+      const canWrite = isOwner || isAuthor || 
+        (await collaboratorModel.hasPermission(pr.repoId, ctx.user.id, 'write'));
+
+      if (!canWrite) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to manage review requests',
+        });
+      }
+
+      return prReviewerModel.removeReviewer(input.prId, input.reviewerId);
+    }),
+
+  /**
+   * Get reviewers for a PR
+   */
+  reviewers: publicProcedure
+    .input(
+      z.object({
+        prId: z.string().uuid(),
+      })
+    )
+    .query(async ({ input }) => {
+      return prReviewerModel.listByPr(input.prId);
     }),
 });

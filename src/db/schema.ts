@@ -367,6 +367,37 @@ export const prComments = pgTable('pr_comments', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+// ============ PR REVIEWERS (for inbox) ============
+
+export const reviewRequestStateEnum = pgEnum('review_request_state', [
+  'pending',     // Review requested but not yet provided
+  'completed',   // User has submitted a review
+  'dismissed',   // Review request was dismissed/removed
+]);
+
+/**
+ * PR Reviewers table - tracks who has been requested to review each PR
+ * This is essential for the inbox feature to show "PRs awaiting my review"
+ */
+export const prReviewers = pgTable(
+  'pr_reviewers',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    prId: uuid('pr_id')
+      .notNull()
+      .references(() => pullRequests.id, { onDelete: 'cascade' }),
+    userId: text('user_id').notNull(), // The requested reviewer
+    requestedById: text('requested_by_id').notNull(), // Who requested the review
+    state: reviewRequestStateEnum('state').notNull().default('pending'),
+    requestedAt: timestamp('requested_at', { withTimezone: true }).defaultNow().notNull(),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+  },
+  (table) => ({
+    // Each user can only be requested once per PR
+    uniqueReviewer: unique().on(table.prId, table.userId),
+  })
+);
+
 // ============ ISSUES ============
 
 export const issues = pgTable('issues', {
@@ -752,6 +783,10 @@ export type NewPrReview = typeof prReviews.$inferInsert;
 
 export type PrComment = typeof prComments.$inferSelect;
 export type NewPrComment = typeof prComments.$inferInsert;
+
+export type PrReviewer = typeof prReviewers.$inferSelect;
+export type NewPrReviewer = typeof prReviewers.$inferInsert;
+export type ReviewRequestState = (typeof reviewRequestStateEnum.enumValues)[number];
 
 export type Issue = typeof issues.$inferSelect;
 export type NewIssue = typeof issues.$inferInsert;

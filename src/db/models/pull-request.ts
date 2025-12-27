@@ -1,18 +1,22 @@
-import { eq, and, desc, sql, inArray } from 'drizzle-orm';
+import { eq, and, desc, sql, inArray, or, isNull, ne } from 'drizzle-orm';
 import { getDb } from '../index';
 import {
   pullRequests,
   prReviews,
   prComments,
   prLabels,
+  prReviewers,
   labels,
   repositories,
+  workflowRuns,
   type PullRequest,
   type NewPullRequest,
   type PrReview,
   type NewPrReview,
   type PrComment,
   type NewPrComment,
+  type PrReviewer,
+  type NewPrReviewer,
   type Label,
 } from '../schema';
 import { user } from '../auth-schema';
@@ -549,3 +553,430 @@ export const prLabelModel = {
     }
   },
 };
+
+// ============ PR REVIEWERS MODEL ============
+
+export const prReviewerModel = {
+  /**
+   * Request a review from a user
+   */
+  async requestReview(
+    prId: string,
+    userId: string,
+    requestedById: string
+  ): Promise<PrReviewer> {
+    const db = getDb();
+    const [reviewer] = await db
+      .insert(prReviewers)
+      .values({
+        prId,
+        userId,
+        requestedById,
+        state: 'pending',
+      })
+      .onConflictDoUpdate({
+        target: [prReviewers.prId, prReviewers.userId],
+        set: {
+          state: 'pending',
+          requestedById,
+          requestedAt: new Date(),
+          completedAt: null,
+        },
+      })
+      .returning();
+    return reviewer;
+  },
+
+  /**
+   * Mark a review request as completed
+   */
+  async completeReview(prId: string, userId: string): Promise<PrReviewer | undefined> {
+    const db = getDb();
+    const [reviewer] = await db
+      .update(prReviewers)
+      .set({
+        state: 'completed',
+        completedAt: new Date(),
+      })
+      .where(and(eq(prReviewers.prId, prId), eq(prReviewers.userId, userId)))
+      .returning();
+    return reviewer;
+  },
+
+  /**
+   * Dismiss a review request
+   */
+  async dismissReview(prId: string, userId: string): Promise<boolean> {
+    const db = getDb();
+    const result = await db
+      .update(prReviewers)
+      .set({ state: 'dismissed' })
+      .where(and(eq(prReviewers.prId, prId), eq(prReviewers.userId, userId)))
+      .returning();
+    return result.length > 0;
+  },
+
+  /**
+   * Remove a reviewer from a PR
+   */
+  async removeReviewer(prId: string, userId: string): Promise<boolean> {
+    const db = getDb();
+    const result = await db
+      .delete(prReviewers)
+      .where(and(eq(prReviewers.prId, prId), eq(prReviewers.userId, userId)))
+      .returning();
+    return result.length > 0;
+  },
+
+  /**
+   * List reviewers for a PR
+   */
+  async listByPr(prId: string): Promise<(PrReviewer & { user: Author })[]> {
+    const db = getDb();
+    const result = await db
+      .select()
+      .from(prReviewers)
+      .innerJoin(user, eq(prReviewers.userId, user.id))
+      .where(eq(prReviewers.prId, prId))
+      .orderBy(prReviewers.requestedAt);
+
+    return result.map((r) => ({
+      ...r.pr_reviewers,
+      user: {
+        id: r.user.id,
+        name: r.user.name,
+        email: r.user.email,
+        username: r.user.username,
+        image: r.user.image,
+        avatarUrl: r.user.avatarUrl,
+      },
+    }));
+  },
+
+  /**
+   * Get pending review requests for a user
+   */
+  async getPendingForUser(userId: string): Promise<PrReviewer[]> {
+    const db = getDb();
+    return db
+      .select()
+      .from(prReviewers)
+      .where(and(eq(prReviewers.userId, userId), eq(prReviewers.state, 'pending')));
+  },
+
+  /**
+   * Check if a user has a pending review request for a PR
+   */
+  async hasPendingReview(prId: string, userId: string): Promise<boolean> {
+    const db = getDb();
+    const result = await db
+      .select({ id: prReviewers.id })
+      .from(prReviewers)
+      .where(
+        and(
+          eq(prReviewers.prId, prId),
+          eq(prReviewers.userId, userId),
+          eq(prReviewers.state, 'pending')
+        )
+      )
+      .limit(1);
+    return result.length > 0;
+  },
+};
+
+// ============ INBOX MODEL ============
+
+// Type for inbox PR items with extra context
+export type InboxPr = PullRequest & {
+  repo: { id: string; name: string; ownerId: string };
+  author: Author | null;
+  labels: Label[];
+  reviewState?: 'pending' | 'approved' | 'changes_requested' | 'commented' | null;
+  ciStatus?: 'success' | 'failure' | 'pending' | null;
+  reviewRequestedAt?: Date | null;
+};
+
+export const inboxModel = {
+  /**
+   * Get PRs where the user is requested as a reviewer (awaiting my review)
+   */
+  async getAwaitingReview(
+    userId: string,
+    options: { limit?: number; offset?: number } = {}
+  ): Promise<InboxPr[]> {
+    const db = getDb();
+    const { limit = 50, offset = 0 } = options;
+
+    // Get PRs where user has pending review request and PR is open
+    const result = await db
+      .select({
+        pr: pullRequests,
+        repo: {
+          id: repositories.id,
+          name: repositories.name,
+          ownerId: repositories.ownerId,
+        },
+        reviewer: prReviewers,
+      })
+      .from(prReviewers)
+      .innerJoin(pullRequests, eq(prReviewers.prId, pullRequests.id))
+      .innerJoin(repositories, eq(pullRequests.repoId, repositories.id))
+      .where(
+        and(
+          eq(prReviewers.userId, userId),
+          eq(prReviewers.state, 'pending'),
+          eq(pullRequests.state, 'open')
+        )
+      )
+      .orderBy(desc(prReviewers.requestedAt))
+      .limit(limit)
+      .offset(offset);
+
+    // Enrich with author, labels, and CI status
+    return Promise.all(
+      result.map(async (r) => {
+        const authorResult = await prModel.findWithAuthor(r.pr.id);
+        const labels = await prLabelModel.listByPr(r.pr.id);
+        const ciStatus = await getCiStatus(r.pr.repoId, r.pr.headSha);
+
+        return {
+          ...r.pr,
+          repo: r.repo,
+          author: authorResult?.author ?? null,
+          labels,
+          reviewRequestedAt: r.reviewer.requestedAt,
+          ciStatus,
+        };
+      })
+    );
+  },
+
+  /**
+   * Get PRs authored by the user that are awaiting reviews
+   */
+  async getMyPrsAwaitingReview(
+    userId: string,
+    options: { limit?: number; offset?: number } = {}
+  ): Promise<InboxPr[]> {
+    const db = getDb();
+    const { limit = 50, offset = 0 } = options;
+
+    // Get open PRs by the user
+    const result = await db
+      .select({
+        pr: pullRequests,
+        repo: {
+          id: repositories.id,
+          name: repositories.name,
+          ownerId: repositories.ownerId,
+        },
+      })
+      .from(pullRequests)
+      .innerJoin(repositories, eq(pullRequests.repoId, repositories.id))
+      .where(and(eq(pullRequests.authorId, userId), eq(pullRequests.state, 'open')))
+      .orderBy(desc(pullRequests.updatedAt))
+      .limit(limit)
+      .offset(offset);
+
+    // Enrich with review status, labels, and CI status
+    return Promise.all(
+      result.map(async (r) => {
+        const authorResult = await prModel.findWithAuthor(r.pr.id);
+        const labels = await prLabelModel.listByPr(r.pr.id);
+        const reviewState = await getLatestReviewState(r.pr.id);
+        const ciStatus = await getCiStatus(r.pr.repoId, r.pr.headSha);
+
+        return {
+          ...r.pr,
+          repo: r.repo,
+          author: authorResult?.author ?? null,
+          labels,
+          reviewState,
+          ciStatus,
+        };
+      })
+    );
+  },
+
+  /**
+   * Get PRs where the user has participated (commented or reviewed)
+   */
+  async getParticipated(
+    userId: string,
+    options: { limit?: number; offset?: number; state?: 'open' | 'closed' | 'all' } = {}
+  ): Promise<InboxPr[]> {
+    const db = getDb();
+    const { limit = 50, offset = 0, state = 'open' } = options;
+
+    // Find PRs where user has reviewed or commented (but isn't the author)
+    const reviewedPrIds = db
+      .selectDistinct({ prId: prReviews.prId })
+      .from(prReviews)
+      .where(eq(prReviews.userId, userId));
+
+    const commentedPrIds = db
+      .selectDistinct({ prId: prComments.prId })
+      .from(prComments)
+      .where(eq(prComments.userId, userId));
+
+    // Combine and get PRs
+    const conditions = [
+      ne(pullRequests.authorId, userId), // Exclude user's own PRs
+      or(
+        inArray(pullRequests.id, reviewedPrIds),
+        inArray(pullRequests.id, commentedPrIds)
+      ),
+    ];
+
+    if (state !== 'all') {
+      conditions.push(eq(pullRequests.state, state));
+    }
+
+    const result = await db
+      .select({
+        pr: pullRequests,
+        repo: {
+          id: repositories.id,
+          name: repositories.name,
+          ownerId: repositories.ownerId,
+        },
+      })
+      .from(pullRequests)
+      .innerJoin(repositories, eq(pullRequests.repoId, repositories.id))
+      .where(and(...conditions))
+      .orderBy(desc(pullRequests.updatedAt))
+      .limit(limit)
+      .offset(offset);
+
+    // Enrich with author, labels, and status
+    return Promise.all(
+      result.map(async (r) => {
+        const authorResult = await prModel.findWithAuthor(r.pr.id);
+        const labels = await prLabelModel.listByPr(r.pr.id);
+        const reviewState = await getLatestReviewState(r.pr.id, userId);
+        const ciStatus = await getCiStatus(r.pr.repoId, r.pr.headSha);
+
+        return {
+          ...r.pr,
+          repo: r.repo,
+          author: authorResult?.author ?? null,
+          labels,
+          reviewState,
+          ciStatus,
+        };
+      })
+    );
+  },
+
+  /**
+   * Get inbox summary counts for a user
+   */
+  async getSummary(userId: string): Promise<{
+    awaitingReview: number;
+    myPrsOpen: number;
+    participated: number;
+  }> {
+    const db = getDb();
+
+    // Count PRs awaiting review
+    const awaitingReviewResult = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(prReviewers)
+      .innerJoin(pullRequests, eq(prReviewers.prId, pullRequests.id))
+      .where(
+        and(
+          eq(prReviewers.userId, userId),
+          eq(prReviewers.state, 'pending'),
+          eq(pullRequests.state, 'open')
+        )
+      );
+
+    // Count user's open PRs
+    const myPrsResult = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(pullRequests)
+      .where(and(eq(pullRequests.authorId, userId), eq(pullRequests.state, 'open')));
+
+    // Count participated PRs (rough count - PRs where user reviewed)
+    const participatedResult = await db
+      .select({ count: sql<number>`count(distinct ${prReviews.prId})` })
+      .from(prReviews)
+      .innerJoin(pullRequests, eq(prReviews.prId, pullRequests.id))
+      .where(
+        and(
+          eq(prReviews.userId, userId),
+          eq(pullRequests.state, 'open'),
+          ne(pullRequests.authorId, userId)
+        )
+      );
+
+    return {
+      awaitingReview: Number(awaitingReviewResult[0]?.count ?? 0),
+      myPrsOpen: Number(myPrsResult[0]?.count ?? 0),
+      participated: Number(participatedResult[0]?.count ?? 0),
+    };
+  },
+};
+
+// ============ HELPER FUNCTIONS ============
+
+/**
+ * Get the latest review state for a PR
+ */
+async function getLatestReviewState(
+  prId: string,
+  userId?: string
+): Promise<'approved' | 'changes_requested' | 'commented' | 'pending' | null> {
+  const db = getDb();
+
+  const conditions = [eq(prReviews.prId, prId)];
+  if (userId) {
+    conditions.push(eq(prReviews.userId, userId));
+  }
+
+  const reviews = await db
+    .select({ state: prReviews.state })
+    .from(prReviews)
+    .where(and(...conditions))
+    .orderBy(desc(prReviews.createdAt));
+
+  if (reviews.length === 0) return null;
+
+  // Return the most significant state (approved > changes_requested > commented)
+  const hasApproved = reviews.some((r) => r.state === 'approved');
+  const hasChangesRequested = reviews.some((r) => r.state === 'changes_requested');
+
+  if (hasChangesRequested) return 'changes_requested';
+  if (hasApproved) return 'approved';
+  return 'commented';
+}
+
+/**
+ * Get CI status for a commit
+ */
+async function getCiStatus(
+  repoId: string,
+  commitSha: string
+): Promise<'success' | 'failure' | 'pending' | null> {
+  const db = getDb();
+
+  const runs = await db
+    .select({ state: workflowRuns.state, conclusion: workflowRuns.conclusion })
+    .from(workflowRuns)
+    .where(and(eq(workflowRuns.repoId, repoId), eq(workflowRuns.commitSha, commitSha)))
+    .orderBy(desc(workflowRuns.createdAt))
+    .limit(5);
+
+  if (runs.length === 0) return null;
+
+  // Check if any are still running
+  const hasPending = runs.some((r) => r.state === 'queued' || r.state === 'in_progress');
+  if (hasPending) return 'pending';
+
+  // Check for failures
+  const hasFailed = runs.some((r) => r.conclusion === 'failure');
+  if (hasFailed) return 'failure';
+
+  // All completed successfully
+  return 'success';
+}
