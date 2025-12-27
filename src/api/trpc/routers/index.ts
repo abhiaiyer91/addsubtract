@@ -29,6 +29,7 @@ import { dashboardRouter } from './dashboard';
 import { wrappedRouter } from './wrapped';
 import { triageAgentRouter } from './triage-agent';
 import { ideRouter } from './ide';
+import { completionRouter } from './completion';
 
 /**
  * Main application router
@@ -65,6 +66,7 @@ export const appRouter = router({
   wrapped: wrappedRouter,
   triageAgent: triageAgentRouter,
   ide: ideRouter,
+  completion: completionRouter,
 });
 
 /**
@@ -103,4 +105,5 @@ export {
   wrappedRouter,
   triageAgentRouter,
   ideRouter,
+  completionRouter,
 };
