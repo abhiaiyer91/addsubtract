@@ -79,6 +79,8 @@ import {
   handleSearch,
   // Personal access tokens
   handleToken,
+  // CodeRabbit review
+  handleCodeReview,
 } from './commands';
 import { handleHooks } from './core/hooks';
 import { handleSubmodule } from './core/submodule';
@@ -249,15 +251,18 @@ AI-Powered Features:
   search status         Show index health
   search -i             Interactive search mode
   
+  review                Pre-push code review (powered by CodeRabbit)
+  review --staged       Review only staged changes
+  review --branch       Review changes since branching from main
+  review --configure    Set up CodeRabbit API key
+  
   ai <query>            Natural language git commands
   ai commit [-a] [-x]   Generate commit message from changes
-  ai review             AI code review of local changes (uses LLM)
   ai explain [ref]      Explain a commit
   ai resolve [file]     AI-assisted conflict resolution
   ai status             Show AI configuration
   
   pr review [<number>]  AI PR review using CodeRabbit
-  pr review --configure Set up CodeRabbit API key
 
 Plumbing Commands:
   cat-file <hash>       Provide content or type info for objects
@@ -310,6 +315,8 @@ Examples:
   wit github login           # Login to GitHub
   wit github status          # Check GitHub auth status
   wit serve --port 3000      # Start Git server
+  wit review                 # AI code review before push
+  wit review --branch        # Review all branch changes
 `;
 
 const COMMANDS = [
@@ -319,7 +326,7 @@ const COMMANDS = [
   'amend', 'wip', 'fixup', 'cleanup', 'blame', 'stats', 'snapshot',
   'scope', 'graph',
   'ui', 'web',
-  'ai', 'search',
+  'ai', 'search', 'review',
   'cat-file', 'hash-object', 'ls-files', 'ls-tree',
   // Plumbing commands
   'rev-parse', 'update-ref', 'symbolic-ref', 'for-each-ref', 'show-ref', 'fsck',
@@ -662,6 +669,18 @@ function main(): void {
         // Semantic search - the "holy shit" feature
         handleSearch(rawArgs).catch((error: Error) => {
           console.error(`error: ${error.message}`);
+          process.exit(1);
+        });
+        return; // Exit main() to let async handle complete
+
+      case 'review':
+        // CodeRabbit-powered code review
+        handleCodeReview(rawArgs).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
+          }
           process.exit(1);
         });
         return; // Exit main() to let async handle complete

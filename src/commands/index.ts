@@ -91,3 +91,6 @@ export { handleSearch } from './search';
 
 // Personal access tokens
 export { handleToken } from './token';
+
+// CodeRabbit review command
+export { handleCodeReview, REVIEW_HELP } from './review';

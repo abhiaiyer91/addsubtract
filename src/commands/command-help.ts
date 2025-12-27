@@ -1124,6 +1124,35 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
     ],
     seeAlso: ['clone', 'push', 'fetch'],
   },
+
+  // ============ Code Review ============
+  review: {
+    name: 'review',
+    summary: 'AI-powered code review using CodeRabbit',
+    usage: 'wit review [options]',
+    description: 'Pre-push code review powered by CodeRabbit. Review your changes before pushing to catch issues early.',
+    options: [
+      { flag: '--staged', description: 'Review only staged changes' },
+      { flag: '--branch', description: 'Review all changes since branching from main' },
+      { flag: '--commits <range>', description: 'Review specific commit range (e.g., HEAD~3.., main..HEAD)' },
+      { flag: '--base <branch>', description: 'Compare against specific branch (default: main)' },
+      { flag: '--json', description: 'Output results as JSON' },
+      { flag: '--verbose', description: 'Show detailed output' },
+      { flag: '--strict', description: 'Exit with error if issues found (for CI)' },
+      { flag: '--configure', description: 'Set up CodeRabbit API key' },
+      { flag: '--status', description: 'Show CodeRabbit configuration status' },
+    ],
+    examples: [
+      { command: 'wit review', description: 'Review all uncommitted changes' },
+      { command: 'wit review --staged', description: 'Review only staged changes' },
+      { command: 'wit review --branch', description: 'Review all changes on current branch' },
+      { command: 'wit review --commits HEAD~3..', description: 'Review last 3 commits' },
+      { command: 'wit review --strict', description: 'Fail if issues found (for CI)' },
+      { command: 'wit review --configure', description: 'Set up CodeRabbit API key' },
+      { command: 'wit review --status', description: 'Check configuration status' },
+    ],
+    seeAlso: ['pr', 'ai', 'commit', 'push'],
+  },
 };
 
 /**
