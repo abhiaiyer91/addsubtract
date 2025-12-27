@@ -206,6 +206,15 @@ export interface Label {
   description?: string | null;
 }
 
+export interface InboxPullRequest extends PullRequest {
+  repo: { id: string; name: string; ownerId: string };
+  author: User | null;
+  labels: Label[];
+  reviewState?: 'pending' | 'approved' | 'changes_requested' | 'commented' | null;
+  ciStatus?: 'success' | 'failure' | 'pending' | null;
+  reviewRequestedAt?: Date | null;
+}
+
 // ============================================================================
 // API Client Class
 // ============================================================================
@@ -398,6 +407,87 @@ export class ApiClient {
       return this.request('POST', `/api/repos/${owner}/${repo}/pulls/${number}/comments`, {
         body,
       });
+    },
+  };
+
+  // ============================================================================
+  // Inbox Operations (Graphite-style PR inbox)
+  // ============================================================================
+
+  readonly inbox = {
+    /**
+     * Get inbox summary - counts for each section
+     */
+    summary: async (): Promise<{
+      awaitingReview: number;
+      myPrsOpen: number;
+      participated: number;
+    }> => {
+      return this.request('GET', '/api/inbox/summary');
+    },
+
+    /**
+     * Get PRs awaiting my review
+     */
+    awaitingReview: async (options?: {
+      limit?: number;
+      offset?: number;
+    }): Promise<InboxPullRequest[]> => {
+      const params = new URLSearchParams();
+      if (options?.limit) params.set('limit', options.limit.toString());
+      if (options?.offset) params.set('offset', options.offset.toString());
+      const query = params.toString() ? `?${params.toString()}` : '';
+      return this.request('GET', `/api/inbox/awaiting-review${query}`);
+    },
+
+    /**
+     * Get my open PRs
+     */
+    myPrs: async (options?: {
+      limit?: number;
+      offset?: number;
+    }): Promise<InboxPullRequest[]> => {
+      const params = new URLSearchParams();
+      if (options?.limit) params.set('limit', options.limit.toString());
+      if (options?.offset) params.set('offset', options.offset.toString());
+      const query = params.toString() ? `?${params.toString()}` : '';
+      return this.request('GET', `/api/inbox/my-prs${query}`);
+    },
+
+    /**
+     * Get PRs I've participated in
+     */
+    participated: async (options?: {
+      limit?: number;
+      offset?: number;
+      state?: 'open' | 'closed' | 'all';
+    }): Promise<InboxPullRequest[]> => {
+      const params = new URLSearchParams();
+      if (options?.limit) params.set('limit', options.limit.toString());
+      if (options?.offset) params.set('offset', options.offset.toString());
+      if (options?.state) params.set('state', options.state);
+      const query = params.toString() ? `?${params.toString()}` : '';
+      return this.request('GET', `/api/inbox/participated${query}`);
+    },
+
+    /**
+     * Request a review on a PR
+     */
+    requestReview: async (
+      prId: string,
+      reviewerId: string
+    ): Promise<{ success: boolean }> => {
+      return this.request('POST', `/api/pulls/${prId}/reviewers`, { reviewerId });
+    },
+
+    /**
+     * Remove a review request
+     */
+    removeReviewRequest: async (
+      prId: string,
+      reviewerId: string
+    ): Promise<{ success: boolean }> => {
+      return this.request('DELETE', `/api/pulls/${prId}/reviewers/${reviewerId}`);
     },
   };
 

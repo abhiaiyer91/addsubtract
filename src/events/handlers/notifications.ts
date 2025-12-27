@@ -2,10 +2,11 @@
  * Notification Event Handlers
  * 
  * Listens to events and creates appropriate notifications.
+ * Also handles inbox-related state updates (review requests).
  */
 
 import { eventBus } from '../bus';
-import { notificationModel } from '../../db/models';
+import { notificationModel, prReviewerModel } from '../../db/models';
 import type { 
   PrReviewRequestedEvent,
   PrReviewedEvent,
@@ -27,6 +28,13 @@ export function registerNotificationHandlers(): void {
   eventBus.on('pr.review_requested', async (event: PrReviewRequestedEvent) => {
     const { prId, prNumber, prTitle, repoId, repoFullName, reviewerId, authorId: _authorId } = event.payload;
     
+    // Persist the review request to the database (for inbox feature)
+    try {
+      await prReviewerModel.requestReview(prId, reviewerId, event.actorId);
+    } catch (error) {
+      console.error('[EventBus] Failed to persist review request:', error);
+    }
+    
     // Don't notify if reviewing own PR
     if (reviewerId === event.actorId) return;
     
@@ -45,6 +53,13 @@ export function registerNotificationHandlers(): void {
   // PR Reviewed
   eventBus.on('pr.reviewed', async (event: PrReviewedEvent) => {
     const { prId, prNumber, prTitle, repoId, repoFullName, authorId, reviewState } = event.payload;
+    
+    // Mark the review request as completed (for inbox feature)
+    try {
+      await prReviewerModel.completeReview(prId, event.actorId);
+    } catch (error) {
+      console.error('[EventBus] Failed to complete review request:', error);
+    }
     
     // Don't notify if reviewing own PR
     if (authorId === event.actorId) return;

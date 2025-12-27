@@ -27,6 +27,9 @@ export {
   prReviewModel,
   prCommentModel,
   prLabelModel,
+  prReviewerModel,
+  inboxModel,
+  type InboxPr,
 } from './pull-request';
 
 // Issue models

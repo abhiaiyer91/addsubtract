@@ -74,6 +74,7 @@ import {
   // Platform commands
   handlePr,
   handleIssue,
+  handleInbox,
   // Issue tracking (Linear-inspired) - also exports handleCycle
   handleCycle,
   // Platform management
@@ -240,6 +241,11 @@ Platform Commands:
   pr review [<number>]  AI code review using CodeRabbit
   pr review-status      Check CodeRabbit configuration
   
+  inbox                 PR inbox - stay on top of reviews
+  inbox review          Show PRs awaiting your review
+  inbox mine            Show your open PRs
+  inbox participated    Show PRs you've participated in
+  
   issue create <title>  Create new issue
   issue list            List issues
   issue view <number>   View issue details
@@ -404,7 +410,7 @@ const COMMANDS = [
   // Server
   'serve',
   // Platform commands
-  'pr', 'issue',
+  'pr', 'issue', 'inbox',
   // Platform management
   'up', 'down', 'platform-status',
   // Authentication
@@ -954,6 +960,17 @@ function main(): void {
 
       case 'issue':
         handleIssue(args.slice(args.indexOf('issue') + 1)).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
+          }
+          process.exit(1);
+        });
+        return; // Exit main() to let async handle complete
+
+      case 'inbox':
+        handleInbox(args.slice(args.indexOf('inbox') + 1)).catch((error: Error) => {
           if (error instanceof TsgitError) {
             console.error((error as TsgitError).format());
           } else {
