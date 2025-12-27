@@ -25,9 +25,27 @@ import { NewIssuePage } from './routes/repo/issue-new';
 import { StacksPage } from './routes/repo/stacks';
 import { StackDetailPage } from './routes/repo/stack-detail';
 import { WorkflowsPage } from './routes/repo/workflows';
+import { RepoSettingsPage } from './routes/repo/settings';
+import { CollaboratorsPage } from './routes/repo/settings/collaborators';
+import { BranchProtectionPage } from './routes/repo/settings/branches';
+import { WebhooksPage } from './routes/repo/settings/webhooks';
+import { ReleasesPage } from './routes/repo/releases';
+import { NewReleasePage } from './routes/repo/releases/new';
+import { ReleaseDetailPage } from './routes/repo/releases/detail';
+import { EditReleasePage } from './routes/repo/releases/edit';
+import { MilestonesPage } from './routes/repo/milestones';
 import { SettingsPage } from './routes/settings';
+import { SSHKeysPage } from './routes/settings/keys';
+import { TokensPage } from './routes/settings/tokens';
 import { NewRepoPage } from './routes/new';
+import { NewOrgPage } from './routes/org/new';
+import { OrgPage } from './routes/org';
+import { OrgSettingsPage } from './routes/org/settings';
+import { OrgMembersPage } from './routes/org/members';
+import { OrgTeamsPage } from './routes/org/teams';
 import { SearchPage } from './routes/search';
+import { PullsInboxPage } from './routes/pulls';
+import { IssuesInboxPage } from './routes/issues';
 
 export function App() {
   return (
@@ -45,8 +63,19 @@ export function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/settings/keys" element={<SSHKeysPage />} />
+            <Route path="/settings/tokens" element={<TokensPage />} />
             <Route path="/new" element={<NewRepoPage />} />
+            <Route path="/orgs/new" element={<NewOrgPage />} />
             <Route path="/search" element={<SearchPage />} />
+            <Route path="/pulls" element={<PullsInboxPage />} />
+            <Route path="/issues" element={<IssuesInboxPage />} />
+
+            {/* Organization routes */}
+            <Route path="/org/:slug" element={<OrgPage />} />
+            <Route path="/org/:slug/settings" element={<OrgSettingsPage />} />
+            <Route path="/org/:slug/members" element={<OrgMembersPage />} />
+            <Route path="/org/:slug/teams" element={<OrgTeamsPage />} />
 
             {/* User/Org profile */}
             <Route path="/:owner" element={<OwnerPage />} />
@@ -76,6 +105,21 @@ export function App() {
 
             {/* Workflows / Actions */}
             <Route path="/:owner/:repo/actions" element={<WorkflowsPage />} />
+
+            {/* Releases */}
+            <Route path="/:owner/:repo/releases" element={<ReleasesPage />} />
+            <Route path="/:owner/:repo/releases/new" element={<NewReleasePage />} />
+            <Route path="/:owner/:repo/releases/tag/:tag" element={<ReleaseDetailPage />} />
+            <Route path="/:owner/:repo/releases/edit/:id" element={<EditReleasePage />} />
+
+            {/* Milestones */}
+            <Route path="/:owner/:repo/milestones" element={<MilestonesPage />} />
+
+            {/* Repository settings */}
+            <Route path="/:owner/:repo/settings" element={<RepoSettingsPage />} />
+            <Route path="/:owner/:repo/settings/collaborators" element={<CollaboratorsPage />} />
+            <Route path="/:owner/:repo/settings/branches" element={<BranchProtectionPage />} />
+            <Route path="/:owner/:repo/settings/webhooks" element={<WebhooksPage />} />
           </Route>
         </Routes>
         <Toaster />
