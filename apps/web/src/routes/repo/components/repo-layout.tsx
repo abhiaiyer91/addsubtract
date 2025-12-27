@@ -13,6 +13,7 @@ import {
   Layers,
   MoreHorizontal,
   Sparkles,
+  BookOpen,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -227,6 +228,7 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
     if (path.includes('/issues')) return 'issues';
     if (path.includes('/pulls') || path.includes('/pull/')) return 'pulls';
     if (path.includes('/stacks')) return 'stacks';
+    if (path.includes('/journal')) return 'journal';
     if (path.includes('/settings')) return 'settings';
     return 'code';
   };
@@ -423,6 +425,10 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
           <Link to={`/${owner}/${repo}/stacks`} className={tabClass('stacks')}>
             <Layers className="h-4 w-4" />
             <span className="hidden sm:inline">Stacks</span>
+          </Link>
+          <Link to={`/${owner}/${repo}/journal`} className={tabClass('journal')}>
+            <BookOpen className="h-4 w-4" />
+            <span className="hidden sm:inline">Journal</span>
           </Link>
           {authenticated && (
             <Link to={`/${owner}/${repo}/settings`} className={tabClass('settings')}>
