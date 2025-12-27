@@ -20,17 +20,27 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
   // ============ Core Commands ============
   init: {
     name: 'init',
-    summary: 'Create an empty wit repository',
-    usage: 'wit init [<directory>]',
-    description: 'Initialize a new wit repository in the specified directory, or the current directory if not specified.',
+    summary: 'Create an empty wit repository or migrate from Git',
+    usage: 'wit init [options] [<directory>]',
+    description: 'Initialize a new wit repository in the specified directory. If an existing Git repository (.git) is detected, wit can migrate the full history to wit format with SHA-256 hashing.',
     options: [
       { flag: '<directory>', description: 'Directory to initialize (defaults to current directory)' },
+      { flag: '--migrate-git', description: 'Force migration from existing .git repository' },
+      { flag: '--no-migrate', description: 'Skip migration even if .git exists' },
+      { flag: '--from-git <path>', description: 'Import history from a different Git repository' },
+      { flag: '--hash <algo>', description: 'Hash algorithm: sha1 or sha256 (default: sha256 for migration)' },
+      { flag: '-y, --yes', description: 'Skip confirmation prompt for migration' },
     ],
     examples: [
-      { command: 'wit init', description: 'Initialize in current directory' },
+      { command: 'wit init', description: 'Initialize in current directory (prompts for migration if .git exists)' },
       { command: 'wit init my-project', description: 'Initialize in my-project directory' },
+      { command: 'wit init --migrate-git', description: 'Force migrate from existing Git repository' },
+      { command: 'wit init --no-migrate', description: 'Create fresh wit repo, ignore .git' },
+      { command: 'wit init --from-git ../other-repo', description: 'Import history from another Git repo' },
+      { command: 'wit init --hash sha1', description: 'Use SHA-1 for Git compatibility' },
+      { command: 'wit init -y', description: 'Auto-accept migration without prompt' },
     ],
-    seeAlso: ['clone', 'status'],
+    seeAlso: ['clone', 'status', 'log'],
   },
 
   add: {
