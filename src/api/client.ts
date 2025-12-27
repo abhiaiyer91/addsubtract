@@ -1133,6 +1133,101 @@ export class ApiClient {
   };
 
   // ============================================================================
+  // Dashboard Operations
+  // ============================================================================
+
+  readonly dashboard = {
+    /**
+     * Get complete dashboard data
+     */
+    getData: async (options?: {
+      includeCalendar?: boolean;
+      repoLimit?: number;
+      activityLimit?: number;
+    }): Promise<DashboardData> => {
+      const params = new URLSearchParams();
+      if (options?.includeCalendar) params.set('includeCalendar', 'true');
+      if (options?.repoLimit) params.set('repoLimit', options.repoLimit.toString());
+      if (options?.activityLimit) params.set('activityLimit', options.activityLimit.toString());
+      const query = params.toString() ? `?${params.toString()}` : '';
+      return this.request('GET', `/api/dashboard${query}`);
+    },
+
+    /**
+     * Get dashboard summary with inbox counts
+     */
+    getSummary: async (): Promise<DashboardSummary> => {
+      return this.request('GET', '/api/dashboard/summary');
+    },
+
+    /**
+     * Get contribution statistics
+     */
+    getContributionStats: async (year?: number): Promise<ContributionStats> => {
+      const query = year ? `?year=${year}` : '';
+      return this.request('GET', `/api/dashboard/contributions${query}`);
+    },
+
+    /**
+     * Get user's repositories for dashboard
+     */
+    getRepositories: async (limit?: number): Promise<DashboardRepo[]> => {
+      const query = limit ? `?limit=${limit}` : '';
+      return this.request('GET', `/api/dashboard/repos${query}`);
+    },
+
+    /**
+     * Get activity feed
+     */
+    getActivityFeed: async (limit?: number): Promise<ActivityFeedItem[]> => {
+      const query = limit ? `?limit=${limit}` : '';
+      return this.request('GET', `/api/dashboard/activity${query}`);
+    },
+
+    /**
+     * Get PRs awaiting review
+     */
+    getPrsAwaitingReview: async (options?: {
+      limit?: number;
+      offset?: number;
+    }): Promise<InboxPullRequest[]> => {
+      const params = new URLSearchParams();
+      if (options?.limit) params.set('limit', options.limit.toString());
+      if (options?.offset) params.set('offset', options.offset.toString());
+      const query = params.toString() ? `?${params.toString()}` : '';
+      return this.request('GET', `/api/dashboard/prs/awaiting-review${query}`);
+    },
+
+    /**
+     * Get user's open PRs
+     */
+    getMyOpenPrs: async (options?: {
+      limit?: number;
+      offset?: number;
+    }): Promise<InboxPullRequest[]> => {
+      const params = new URLSearchParams();
+      if (options?.limit) params.set('limit', options.limit.toString());
+      if (options?.offset) params.set('offset', options.offset.toString());
+      const query = params.toString() ? `?${params.toString()}` : '';
+      return this.request('GET', `/api/dashboard/prs/mine${query}`);
+    },
+
+    /**
+     * Get assigned issues
+     */
+    getAssignedIssues: async (options?: {
+      limit?: number;
+      offset?: number;
+    }): Promise<DashboardIssue[]> => {
+      const params = new URLSearchParams();
+      if (options?.limit) params.set('limit', options.limit.toString());
+      if (options?.offset) params.set('offset', options.offset.toString());
+      const query = params.toString() ? `?${params.toString()}` : '';
+      return this.request('GET', `/api/dashboard/issues/assigned${query}`);
+    },
+  };
+
+  // ============================================================================
   // Journal Operations (Notion-like docs)
   // ============================================================================
 
@@ -1479,6 +1574,105 @@ export interface JournalPageHistoryEntry {
   version: number;
   changeDescription?: string;
   createdAt: string;
+}
+
+// ============================================================================
+// Dashboard Types
+// ============================================================================
+
+export interface ContributionDay {
+  date: string;
+  count: number;
+  level: 0 | 1 | 2 | 3 | 4;
+}
+
+export interface ContributionStreak {
+  current: number;
+  longest: number;
+  lastContributionDate: string | null;
+}
+
+export interface ContributionStats {
+  totalCommits: number;
+  totalPullRequests: number;
+  totalPullRequestsMerged: number;
+  totalIssues: number;
+  totalIssuesClosed: number;
+  totalReviews: number;
+  totalComments: number;
+  streak: ContributionStreak;
+  contributionCalendar: ContributionDay[];
+  contributionsByDayOfWeek: number[];
+}
+
+export interface InboxCounts {
+  prsAwaitingReview: number;
+  myOpenPrs: number;
+  prsParticipated: number;
+  issuesAssigned: number;
+  issuesCreated: number;
+  issuesParticipated: number;
+}
+
+export interface DashboardSummary {
+  prsAwaitingReview: number;
+  myOpenPrs: number;
+  prsParticipated: number;
+  issuesAssigned: number;
+  issuesCreated: number;
+  recentActivity: number;
+  activeRepos: number;
+  thisWeekContributions: number;
+  lastWeekContributions: number;
+  contributionTrend: 'up' | 'down' | 'stable';
+  inbox: InboxCounts;
+}
+
+export interface DashboardRepo {
+  id: string;
+  name: string;
+  ownerId: string;
+  ownerName?: string;
+  description: string | null;
+  starsCount: number;
+  isPrivate: boolean;
+  updatedAt: Date;
+  pushedAt: Date | null;
+  recentCommits?: number;
+  openPrs?: number;
+  openIssues?: number;
+}
+
+export interface ActivityFeedItem {
+  id: string;
+  type: string;
+  actorId: string;
+  actorName?: string;
+  actorUsername?: string;
+  repoId: string | null;
+  repoName?: string;
+  payload: Record<string, unknown> | null;
+  createdAt: Date;
+}
+
+export interface DashboardIssue {
+  id: string;
+  number: number;
+  title: string;
+  state: 'open' | 'closed';
+  status?: string;
+  priority?: string;
+  repoId: string;
+  repoName?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface DashboardData {
+  summary: DashboardSummary;
+  repos: DashboardRepo[];
+  activity: ActivityFeedItem[];
+  contributionStats: ContributionStats | null;
 }
 
 // ============================================================================

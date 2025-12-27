@@ -108,6 +108,17 @@ export {
 // Repository AI Keys model
 export { repoAiKeyModel, type RepoAiKeyInfo } from './repo-ai-keys';
 
+// User Stats model (dashboard data)
+export {
+  userStatsModel,
+  type ContributionDay,
+  type ContributionStreak,
+  type UserContributionStats,
+  type DashboardSummary,
+  type DashboardRepo,
+  type ActivityFeedItem,
+} from './user-stats';
+
 // Journal models (Notion-like documentation)
 export {
   journalPageModel,
