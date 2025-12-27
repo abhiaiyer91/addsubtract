@@ -4,31 +4,31 @@
 
 @layer base {
   :root {
-    /* Linear-inspired Light Theme (rarely used, dark is default) */
+    /* Graphite-inspired Light Theme */
     --background: 0 0% 100%;
-    --foreground: 222 47% 11%;
+    --foreground: 240 10% 4%;
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card-foreground: 240 10% 4%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
-    --primary: 262 83% 58%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 220 14% 96%;
-    --secondary-foreground: 222 47% 11%;
-    --muted: 220 14% 96%;
-    --muted-foreground: 220 9% 46%;
-    --accent: 262 83% 58%;
-    --accent-foreground: 0 0% 100%;
+    --popover-foreground: 240 10% 4%;
+    --primary: 160 84% 39%;
+    --primary-foreground: 0 0% 0%;
+    --secondary: 240 5% 96%;
+    --secondary-foreground: 240 6% 10%;
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 4% 46%;
+    --accent: 160 84% 39%;
+    --accent-foreground: 0 0% 0%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 262 83% 58%;
-    --radius: 0.5rem;
+    --border: 240 6% 90%;
+    --input: 240 6% 90%;
+    --ring: 160 84% 39%;
+    --radius: 0.75rem;
 
     /* Semantic colors */
-    --success: 142 76% 36%;
-    --success-foreground: 0 0% 100%;
+    --success: 160 84% 39%;
+    --success-foreground: 0 0% 0%;
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 0%;
     --info: 217 91% 60%;
@@ -36,30 +36,30 @@
   }
 
   .dark {
-    /* Linear-inspired Dark Theme - rich, sophisticated colors */
-    --background: 222 47% 6%;
-    --foreground: 210 40% 98%;
-    --card: 222 47% 8%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222 47% 7%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 262 83% 58%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 222 47% 11%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 222 47% 11%;
-    --muted-foreground: 215 20% 55%;
-    --accent: 262 83% 58%;
-    --accent-foreground: 0 0% 100%;
-    --destructive: 0 72% 51%;
+    /* Graphite-inspired Dark Theme - deep, rich blacks with teal accent */
+    --background: 240 10% 4%;
+    --foreground: 0 0% 95%;
+    --card: 240 10% 6%;
+    --card-foreground: 0 0% 95%;
+    --popover: 240 10% 5%;
+    --popover-foreground: 0 0% 95%;
+    --primary: 160 84% 39%;
+    --primary-foreground: 0 0% 0%;
+    --secondary: 240 6% 10%;
+    --secondary-foreground: 0 0% 95%;
+    --muted: 240 6% 10%;
+    --muted-foreground: 240 5% 55%;
+    --accent: 160 84% 39%;
+    --accent-foreground: 0 0% 0%;
+    --destructive: 0 62% 55%;
     --destructive-foreground: 0 0% 100%;
-    --border: 222 47% 14%;
-    --input: 222 47% 14%;
-    --ring: 262 83% 58%;
+    --border: 240 6% 15%;
+    --input: 240 6% 15%;
+    --ring: 160 84% 39%;
 
     /* Semantic colors - dark mode */
-    --success: 142 71% 45%;
-    --success-foreground: 0 0% 100%;
+    --success: 160 84% 39%;
+    --success-foreground: 0 0% 0%;
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 0%;
     --info: 217 91% 60%;
@@ -97,19 +97,19 @@
 }
 
 @layer components {
-  /* Linear-style glass effect */
+  /* Graphite-style glass effect */
   .glass {
-    @apply bg-card/80 backdrop-blur-xl border border-border/50;
+    @apply bg-card/60 backdrop-blur-2xl border border-border/40;
   }
 
-  /* Gradient text */
+  /* Gradient text - Graphite teal glow */
   .gradient-text {
-    @apply bg-gradient-to-r from-primary via-purple-400 to-primary bg-clip-text text-transparent;
+    @apply bg-gradient-to-r from-primary via-emerald-400 to-primary bg-clip-text text-transparent;
   }
 
   /* Subtle hover card effect */
   .hover-card {
-    @apply transition-all duration-200 hover:bg-muted/50 hover:border-border;
+    @apply transition-all duration-300 hover:bg-muted/40 hover:border-primary/20;
   }
 
   /* Shimmer loading effect */
@@ -125,14 +125,38 @@
     animation: shimmer 1.5s infinite;
   }
 
-  /* Glow effect for primary elements */
+  /* Glow effect for primary elements - Graphite teal glow */
   .glow {
     @apply shadow-glow;
+  }
+
+  .glow-primary {
+    box-shadow: 0 0 40px rgba(16, 185, 129, 0.2), 0 0 80px rgba(16, 185, 129, 0.1);
   }
 
   /* Subtle inset shadow for depth */
   .inset-highlight {
     box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+  }
+
+  /* Graphite-style pill button */
+  .btn-pill {
+    @apply rounded-full px-6 py-2.5 font-medium transition-all duration-300;
+  }
+
+  /* Graphite-style section heading */
+  .section-heading {
+    @apply text-3xl md:text-4xl font-bold tracking-tight;
+  }
+
+  /* Graphite-style subheading */
+  .section-subheading {
+    @apply text-lg text-muted-foreground max-w-2xl;
+  }
+
+  /* Graphite-style feature card */
+  .feature-card {
+    @apply rounded-2xl border border-border/50 bg-card/50 p-6 backdrop-blur-sm transition-all duration-300 hover:border-primary/30 hover:bg-card/70;
   }
 }
 
