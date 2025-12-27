@@ -386,7 +386,8 @@ export class MergeManager {
     for (const filePath of result.added) {
       const blobHash = theirFiles.get(filePath);
       if (blobHash) {
-        const content = this.repo.objects.readBlob(blobHash);
+        const blob = this.repo.objects.readBlob(blobHash);
+        const content = Buffer.isBuffer(blob) ? blob : Buffer.from(blob);
         const workingPath = path.join(this.repo.workDir, filePath);
         mkdirp(path.dirname(workingPath));
         writeFile(workingPath, content);
