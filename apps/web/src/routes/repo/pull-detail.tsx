@@ -15,6 +15,7 @@ import {
   Layers,
   ArrowRight,
   Circle,
+  AlertTriangle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -25,6 +26,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { DiffViewer, type DiffFile } from '@/components/diff/diff-viewer';
 import { PrTimeline } from '@/components/pr/pr-timeline';
 import { MergeButton } from '@/components/pr/merge-button';
+import { ConflictResolver } from '@/components/pr/conflict-resolver';
 import { Markdown } from '@/components/markdown/renderer';
 import { RepoLayout } from './components/repo-layout';
 import { Loading } from '@/components/ui/loading';
@@ -91,6 +93,18 @@ export function PullDetailPage() {
   const { data: aiReviewData, isLoading: aiReviewLoading, refetch: refetchAIReview } = trpc.pulls.getAIReview.useQuery(
     { prId: prData?.id! },
     { enabled: !!prData?.id }
+  );
+
+  // Fetch mergeability status
+  const { data: mergeabilityData } = trpc.pulls.checkMergeability.useQuery(
+    { prId: prData?.id! },
+    { enabled: !!prData?.id && prData?.state === 'open' }
+  );
+
+  // Fetch conflict details if not mergeable
+  const { data: conflictsData, isLoading: conflictsLoading } = trpc.pulls.getConflicts.useQuery(
+    { prId: prData?.id! },
+    { enabled: !!prData?.id && mergeabilityData?.canMerge === false }
   );
 
   // Trigger AI review mutation
@@ -487,6 +501,13 @@ export function PullDetailPage() {
             Files changed
             <Badge variant="secondary">{diff.length}</Badge>
           </TabsTrigger>
+          {mergeabilityData?.canMerge === false && (
+            <TabsTrigger value="conflicts" className="gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-500" />
+              Conflicts
+              <Badge variant="warning">{conflictsData?.conflicts?.length || mergeabilityData?.conflicts?.length || 0}</Badge>
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="conversation" className="mt-6 space-y-6">
@@ -661,6 +682,7 @@ export function PullDetailPage() {
           ) : diff.length > 0 ? (
             <DiffViewer
               files={diff}
+              prId={prData?.id}
               comments={commentsByFile}
               currentUserId={session?.user?.id}
               onAddComment={authenticated ? handleAddInlineComment : undefined}
@@ -683,6 +705,36 @@ export function PullDetailPage() {
             </Card>
           )}
         </TabsContent>
+
+        {mergeabilityData?.canMerge === false && (
+          <TabsContent value="conflicts" className="mt-6">
+            {conflictsLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : conflictsData?.conflicts && conflictsData.conflicts.length > 0 ? (
+              <ConflictResolver
+                prId={prData!.id}
+                conflicts={conflictsData.conflicts}
+                sourceBranch={pr.sourceBranch}
+                targetBranch={pr.targetBranch}
+                onResolved={() => {
+                  utils.pulls.checkMergeability.invalidate({ prId: prData!.id });
+                }}
+              />
+            ) : (
+              <Card>
+                <CardContent className="p-6 text-center text-muted-foreground">
+                  <AlertTriangle className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>Conflict details could not be loaded</p>
+                  {conflictsData?.error && (
+                    <p className="text-sm mt-2">{conflictsData.error}</p>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+        )}
       </Tabs>
     </RepoLayout>
   );

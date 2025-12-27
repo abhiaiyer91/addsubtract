@@ -17,6 +17,7 @@ import {
   stackBranchModel,
 } from '../../../db/models';
 import { mergePullRequest, checkMergeability, getDefaultMergeMessage } from '../../../server/storage/merge';
+import { getConflictDetails } from '../../../server/storage/conflicts';
 import { triggerAsyncReview } from '../../../ai/services/pr-review';
 import { exists } from '../../../utils/fs';
 import { eventBus, extractMentions } from '../../../events';
@@ -1708,5 +1709,57 @@ export const pullsRouter = router({
     )
     .query(async ({ input }) => {
       return prReviewerModel.listByPr(input.prId);
+    }),
+
+  /**
+   * Get detailed conflict information for a PR
+   */
+  getConflicts: publicProcedure
+    .input(
+      z.object({
+        prId: z.string().uuid(),
+      })
+    )
+    .query(async ({ input }) => {
+      const pr = await prModel.findById(input.prId);
+
+      if (!pr) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Pull request not found',
+        });
+      }
+
+      const repo = await repoModel.findById(pr.repoId);
+      if (!repo) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Repository not found',
+        });
+      }
+
+      // Resolve disk path
+      const reposDir = process.env.REPOS_DIR || './repos';
+      const diskPath = path.isAbsolute(repo.diskPath)
+        ? repo.diskPath
+        : path.join(process.cwd(), reposDir, repo.diskPath.replace(/^\/repos\//, ''));
+
+      if (!exists(diskPath)) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Repository not found on disk',
+        });
+      }
+
+      try {
+        const result = await getConflictDetails(diskPath, pr.sourceBranch, pr.targetBranch);
+        return result;
+      } catch (error) {
+        console.error('[pulls.getConflicts] Error:', error);
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to get conflict details',
+        });
+      }
     }),
 });

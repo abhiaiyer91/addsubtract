@@ -10,7 +10,6 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "wit": "*",
     "@radix-ui/react-avatar": "^1.1.2",
     "@radix-ui/react-dialog": "^1.1.4",
     "@radix-ui/react-dropdown-menu": "^2.1.4",
@@ -27,16 +26,20 @@
     "@trpc/server": "^11.8.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "cmdk": "^1.1.1",
     "lucide-react": "^0.468.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-hotkeys-hook": "^5.2.1",
     "react-markdown": "^9.0.1",
     "react-router-dom": "^7.1.0",
     "remark-gfm": "^4.0.0",
     "shiki": "^1.24.2",
     "superjson": "^2.2.6",
     "tailwind-merge": "^2.6.0",
-    "zod": "^3.24.1"
+    "wit": "*",
+    "zod": "^3.24.1",
+    "zustand": "^5.0.9"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",

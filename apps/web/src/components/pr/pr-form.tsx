@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Loader2, GitBranch, ArrowRight } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Loader2, GitBranch, ArrowRight, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,6 +13,13 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { trpc } from '@/lib/trpc';
 
 interface Branch {
   name: string;
@@ -23,6 +30,7 @@ interface Branch {
 interface PRFormProps {
   branches: Branch[];
   defaultBranch: string;
+  repoId?: string;
   onSubmit: (data: {
     title: string;
     body: string;
@@ -34,12 +42,19 @@ interface PRFormProps {
   error?: string | null;
 }
 
-export function PRForm({ branches, defaultBranch, onSubmit, isLoading, error }: PRFormProps) {
+export function PRForm({ branches, defaultBranch, repoId, onSubmit, isLoading, error }: PRFormProps) {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [sourceBranch, setSourceBranch] = useState('');
   const [targetBranch, setTargetBranch] = useState(defaultBranch);
   const [isDraft, setIsDraft] = useState(false);
+
+  // AI generation mutation
+  const generateMutation = trpc.ai.generatePRDescription.useMutation();
+
+  // Check if AI is available
+  const { data: aiStatus } = trpc.ai.status.useQuery();
+  const aiAvailable = aiStatus?.available ?? false;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,6 +70,47 @@ export function PRForm({ branches, defaultBranch, onSubmit, isLoading, error }: 
   const selectedTarget = branches.find(b => b.name === targetBranch);
 
   const canSubmit = title.trim() && sourceBranch && targetBranch && sourceBranch !== targetBranch;
+
+  // Can generate if we have both branches selected and a repoId
+  const canGenerate = repoId && selectedSource && selectedTarget && sourceBranch !== targetBranch;
+
+  const handleGenerateWithAI = async (generateBoth: boolean = true) => {
+    if (!canGenerate || !repoId || !selectedSource || !selectedTarget) return;
+
+    try {
+      const result = await generateMutation.mutateAsync({
+        repoId,
+        sourceBranch,
+        targetBranch,
+        headSha: selectedSource.sha,
+        baseSha: selectedTarget.sha,
+        existingTitle: generateBoth ? undefined : title,
+        existingDescription: generateBoth ? undefined : body,
+      });
+
+      if (generateBoth || !title) {
+        setTitle(result.title);
+      }
+      setBody(result.description);
+    } catch (err) {
+      console.error('Failed to generate PR description:', err);
+    }
+  };
+
+  // Keyboard shortcut: Cmd+Shift+G to generate
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'g') {
+        e.preventDefault();
+        if (canGenerate && aiAvailable) {
+          handleGenerateWithAI(true);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [canGenerate, aiAvailable, repoId, selectedSource, selectedTarget, sourceBranch, targetBranch]);
 
   return (
     <Card>
@@ -139,30 +195,93 @@ export function PRForm({ branches, defaultBranch, onSubmit, isLoading, error }: 
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="title">Title</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="title">Title</Label>
+              {aiAvailable && canGenerate && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 text-xs gap-1"
+                        onClick={() => handleGenerateWithAI(true)}
+                        disabled={isLoading || generateMutation.isPending}
+                      >
+                        {generateMutation.isPending ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Sparkles className="h-3 w-3" />
+                        )}
+                        Generate with AI
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Generate title and description from changes (Cmd+Shift+G)</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </div>
             <Input
               id="title"
               placeholder="Pull request title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               required
-              disabled={isLoading}
+              disabled={isLoading || generateMutation.isPending}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="body">Description</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="body">Description</Label>
+              {aiAvailable && canGenerate && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 text-xs gap-1"
+                        onClick={() => handleGenerateWithAI(false)}
+                        disabled={isLoading || generateMutation.isPending}
+                      >
+                        {generateMutation.isPending ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Sparkles className="h-3 w-3" />
+                        )}
+                        Generate description
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Generate description from changes (keeps existing title)</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </div>
             <Textarea
               id="body"
               placeholder="Describe your changes..."
               value={body}
               onChange={(e) => setBody(e.target.value)}
               rows={10}
-              disabled={isLoading}
+              disabled={isLoading || generateMutation.isPending}
             />
-            <p className="text-xs text-muted-foreground">
-              Supports Markdown formatting
-            </p>
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">
+                Supports Markdown formatting
+              </p>
+              {generateMutation.isError && (
+                <p className="text-xs text-destructive">
+                  Failed to generate. Please try again.
+                </p>
+              )}
+            </div>
           </div>
 
           <div className="flex items-center space-x-2">
