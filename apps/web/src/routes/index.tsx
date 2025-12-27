@@ -8,14 +8,15 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { isAuthenticated } from '@/lib/auth';
+import { isAuthenticated, getUser } from '@/lib/auth';
 
 export function HomePage() {
   const authenticated = isAuthenticated();
+  const user = getUser();
 
-  // Redirect authenticated users to inbox
-  if (authenticated) {
-    return <Navigate to="/inbox" replace />;
+  // Redirect authenticated users to their profile/dashboard
+  if (authenticated && user?.username) {
+    return <Navigate to={`/${user.username}`} replace />;
   }
 
   return <LandingView />;

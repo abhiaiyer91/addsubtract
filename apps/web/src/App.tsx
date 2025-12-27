@@ -9,7 +9,7 @@ import { BranchSwitcher } from './components/branch';
 import { HomePage } from './routes/index';
 import { LoginPage } from './routes/login';
 import { RegisterPage } from './routes/register';
-import { OwnerPage } from './routes/owner';
+import { UserHomePage } from './routes/user-home';
 import { RepoPage } from './routes/repo';
 import { TreePage } from './routes/repo/tree';
 import { BlobPage } from './routes/repo/blob';
@@ -81,8 +81,8 @@ export function App() {
             <Route path="/org/:slug/teams" element={<OrgTeamsPage />} />
             <Route path="/org/:slug/teams/:teamId" element={<TeamDetailPage />} />
 
-            {/* User/Org profile */}
-            <Route path="/:owner" element={<OwnerPage />} />
+            {/* User/Org profile - Unified dashboard */}
+            <Route path="/:owner" element={<UserHomePage />} />
 
             {/* Repository routes */}
             <Route path="/:owner/:repo" element={<RepoPage />} />
