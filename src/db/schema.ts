@@ -79,6 +79,37 @@ export const oauthAccounts = pgTable(
   })
 );
 
+// ============ SSH KEYS ============
+
+export const sshKeys = pgTable('ssh_keys', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  title: text('title').notNull(),
+  publicKey: text('public_key').notNull(),
+  fingerprint: text('fingerprint').notNull().unique(),
+  keyType: text('key_type').notNull(), // ssh-rsa, ssh-ed25519, ecdsa-sha2-nistp256, etc.
+  lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// ============ PERSONAL ACCESS TOKENS ============
+
+export const personalAccessTokens = pgTable('personal_access_tokens', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(), // User-provided name like "CI Token"
+  tokenHash: text('token_hash').notNull(), // SHA256 hash (never store raw!)
+  tokenPrefix: text('token_prefix').notNull(), // First 8 chars: "wit_abc1" for identification
+  scopes: text('scopes').notNull(), // JSON array: ["repo:read", "repo:write"]
+  lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+  expiresAt: timestamp('expires_at', { withTimezone: true }), // null = never expires
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
 // ============ ORGANIZATIONS ============
 
 export const organizations = pgTable('organizations', {
@@ -617,6 +648,12 @@ export type NewSession = typeof sessions.$inferInsert;
 
 export type OAuthAccount = typeof oauthAccounts.$inferSelect;
 export type NewOAuthAccount = typeof oauthAccounts.$inferInsert;
+
+export type SSHKey = typeof sshKeys.$inferSelect;
+export type NewSSHKey = typeof sshKeys.$inferInsert;
+
+export type PersonalAccessToken = typeof personalAccessTokens.$inferSelect;
+export type NewPersonalAccessToken = typeof personalAccessTokens.$inferInsert;
 
 export type Organization = typeof organizations.$inferSelect;
 export type NewOrganization = typeof organizations.$inferInsert;

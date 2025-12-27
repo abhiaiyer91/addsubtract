@@ -77,6 +77,8 @@ import {
   handleSmartStatus,
   // Semantic search
   handleSearch,
+  // Personal access tokens
+  handleToken,
 } from './commands';
 import { handleHooks } from './core/hooks';
 import { handleSubmodule } from './core/submodule';
@@ -220,6 +222,12 @@ Self-Hosting (run your own GitHub):
   down                  Stop all wit services
   platform-status       Show status of running services
 
+Authentication:
+  token create <name>   Create a personal access token
+  token list            List your tokens
+  token revoke <id>     Revoke a token
+  token scopes          List available scopes
+
 Quality of Life:
   amend                 Quickly fix the last commit
   wip                   Quick WIP commit with auto-generated message
@@ -331,6 +339,8 @@ const COMMANDS = [
   'pr', 'issue',
   // Platform management
   'up', 'down', 'platform-status',
+  // Authentication
+  'token',
   'help',
 ];
 
@@ -877,6 +887,18 @@ function main(): void {
 
       case 'platform-status':
         handlePlatformStatus(args.slice(args.indexOf('platform-status') + 1)).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
+          }
+          process.exit(1);
+        });
+        return;
+
+      // Personal access tokens
+      case 'token':
+        handleToken(args.slice(args.indexOf('token') + 1)).catch((error: Error) => {
           if (error instanceof TsgitError) {
             console.error((error as TsgitError).format());
           } else {

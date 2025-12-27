@@ -1,551 +1,601 @@
-# wit Platform - Agent Prompts
+# wit Platform - Agent Task Prompts
 
-## Context
-
-This project is led by Claude (an AI) as technical founder. These prompts reflect the focused vision: **Git that understands your code.**
-
-We're NOT building:
-- CI/CD runner (use external CI)
-- Full GitHub parity features
-- Enterprise features (yet)
-
-We ARE building:
-- AI that's woven into the workflow
-- A CLI developers actually prefer
-- The missing pieces to make it shippable
+Use these prompts to spin up parallel Claude sessions for wit development.
 
 ---
 
-## Phase 1: Make It Real (Current Priority)
+## How to Use
 
-### P1-1: PR Merge Execution
+1. Copy the relevant prompt below
+2. Start a new Claude session (Claude Code CLI or claude.ai)
+3. Paste the prompt
+4. Let the agent build context from the referenced files
+5. Collect the output and merge
 
-**Priority:** SHIP BLOCKER  
-**Effort:** 6-8 hours
+---
 
-**The Problem:** PRs don't actually merge. The database updates but the Git refs don't. This is embarrassing.
-
-**Prompt:**
+## Prompt Template Structure
 
 ```
-Fix PR merge to actually perform the Git merge.
+## Task: [Name]
 
-CONTEXT:
-- PR router at `src/api/trpc/routers/pulls.ts`
-- Repository class at `src/core/repository.ts`
-- Merge logic exists at `src/core/merge.ts`
-- Current merge just updates DB, doesn't touch Git
+### Context Sources (read these first)
+- [File paths and URLs for the agent to read]
 
-TASK:
+### Your Scope
+- Files you OWN (create/modify freely)
+- Files you READ ONLY
 
-1. Create `src/server/storage/merge.ts`:
+### Task Description
+[What to build]
 
-```typescript
-import { Repository } from '../../core/repository';
+### Patterns to Follow
+[Reference files that show the pattern]
 
-export type MergeStrategy = 'merge' | 'squash' | 'rebase';
+### Deliverables
+[What to output when done]
 
-export interface MergeResult {
-  success: boolean;
-  mergeSha?: string;
-  error?: string;
-  conflicts?: string[];
-}
-
-export async function mergePullRequest(
-  repoPath: string,
-  sourceBranch: string,
-  targetBranch: string,
-  strategy: MergeStrategy,
-  options: {
-    authorName: string;
-    authorEmail: string;
-    message?: string;
-  }
-): Promise<MergeResult> {
-  const repo = new Repository(repoPath);
-  
-  // 1. Checkout target branch
-  // 2. Perform merge based on strategy
-  // 3. Return result with merge SHA or conflicts
-}
-```
-
-2. Update the `merge` mutation in `src/api/trpc/routers/pulls.ts`:
-   - Call `mergePullRequest` with the repo disk path
-   - Handle conflicts gracefully
-   - Update PR record with merge SHA
-
-3. Add `checkMergeability` query:
-   - Dry-run merge to detect conflicts
-   - Return mergeable status
-
-ACCEPTANCE CRITERIA:
-- [ ] `git log` shows merge commit after PR merge
-- [ ] Squash merge creates single commit
-- [ ] Conflicts detected and reported
-- [ ] Source branch optionally deleted after merge
-- [ ] Works via API and (if exists) web UI
-
-TEST:
-Create two branches with changes, open PR, merge, verify Git history.
+### Boundaries
+[What NOT to do]
 ```
 
 ---
 
-### P1-2: Basic Branch Protection
-
-**Priority:** P0  
-**Effort:** 4 hours
-
-**The Problem:** Anyone can push to main. We need minimal protection.
-
-**Prompt:**
+## PROMPT A: Personal Access Tokens
 
 ```
-Implement minimal branch protection: require PR to push to protected branches.
+## Task: Implement Personal Access Tokens for wit
 
-CONTEXT:
-- Keep it simple. We don't need GitHub's 20 options.
-- Just: "these branches require a PR to receive changes"
+You're adding PAT (Personal Access Token) support to wit, an open-source GitHub alternative.
 
-TASK:
+### Context Sources (read these first)
 
-1. Add to `src/db/schema.ts`:
+Read these files to understand the project and patterns:
 
+1. `ROADMAP.md` - Project vision and current status
+2. `src/db/schema.ts` - Database schema patterns (add your table after `sshKeys` around line 95)
+3. `src/db/models/ssh-keys.ts` - Model pattern to follow
+4. `src/db/models/index.ts` - How models are exported
+5. `src/api/trpc/routers/ssh-keys.ts` - Router pattern to follow
+6. `src/api/trpc/routers/index.ts` - How routers are registered
+7. `src/commands/stash.ts` - CLI subcommand pattern
+8. `src/commands/index.ts` - How commands are exported
+9. `src/cli.ts` - How commands are registered
+
+Tech stack:
+- TypeScript, Node.js
+- PostgreSQL + Drizzle ORM
+- tRPC for API
+- Commander.js for CLI
+
+Database connection:
+- PostgreSQL on localhost:5432
+- User/pass: wit/wit, Database: wit
+- Push schema: `DATABASE_URL="postgresql://wit:wit@localhost:5432/wit" npx drizzle-kit push --force`
+- Run tests: `DATABASE_URL="postgresql://wit:wit@localhost:5432/wit" npm test`
+
+### Your Scope
+
+**CREATE these files:**
+- `src/db/models/tokens.ts` - Token database model
+- `src/api/trpc/routers/tokens.ts` - Token API router
+- `src/commands/token.ts` - CLI command
+
+**MODIFY these files (specific additions only):**
+- `src/db/schema.ts` - Add `personalAccessTokens` table AFTER sshKeys (~line 95)
+- `src/db/models/index.ts` - Add export for tokenModel
+- `src/api/trpc/routers/index.ts` - Add tokensRouter import and registration
+- `src/commands/index.ts` - Add token command export
+- `src/cli.ts` - Add token command handler in switch statement
+
+### Task Description
+
+Implement Personal Access Tokens for API/CLI authentication.
+
+**Schema (`personalAccessTokens` table):**
 ```typescript
-export const branchProtection = pgTable('branch_protection', {
+export const personalAccessTokens = pgTable('personal_access_tokens', {
   id: uuid('id').primaryKey().defaultRandom(),
-  repoId: uuid('repo_id').notNull().references(() => repositories.id, { onDelete: 'cascade' }),
-  pattern: text('pattern').notNull(),  // 'main', 'release/*'
-  requirePR: boolean('require_pr').notNull().default(true),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),  // User-provided name like "CI Token"
+  tokenHash: text('token_hash').notNull(),  // SHA256 hash (never store raw!)
+  tokenPrefix: text('token_prefix').notNull(),  // First 8 chars: "wit_abc1" for identification
+  scopes: text('scopes').notNull(),  // JSON array: ["repo:read", "repo:write"]
+  lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+  expiresAt: timestamp('expires_at', { withTimezone: true }),  // null = never expires
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 ```
 
-2. Create `src/core/branch-protection.ts`:
+**Token format:** `wit_` + 40 random hex chars (e.g., `wit_a1b2c3d4e5f6...`)
 
-```typescript
-export async function canPushToBranch(
-  repoId: string,
-  branchName: string,
-  isPRMerge: boolean
-): Promise<{ allowed: boolean; reason?: string }> {
-  // Get protection rules for this branch
-  // If protected and not a PR merge, reject
-  // Simple glob matching for patterns
-}
+**Available scopes:**
+- `repo:read` - Clone, pull repositories
+- `repo:write` - Push to repositories
+- `repo:admin` - Manage settings, collaborators, delete repos
+- `user:read` - Read profile information
+- `user:write` - Update profile
+
+**Router endpoints (in tokens.ts):**
+- `list` - Get user's tokens (show prefix + last 4 chars, hide full hash)
+- `create` - Generate new token (return raw token ONCE, then only hash is stored)
+- `delete` - Revoke a token by ID
+- `verify` - Internal: check if token hash is valid, return user + scopes
+
+**CLI command (`wit token`):**
+```bash
+wit token create <name> [--expires <days>] [--scopes <scope1,scope2>]
+wit token list
+wit token revoke <id>
+wit token scopes  # List available scopes
 ```
 
-3. Hook into git-receive-pack:
-   - Before accepting push, check `canPushToBranch`
-   - Reject with clear error message if protected
+### Patterns to Follow
 
-4. Add simple tRPC endpoints:
-   - `protectBranch(repoId, pattern)`
-   - `unprotectBranch(repoId, pattern)`
-   - `listProtectedBranches(repoId)`
+**For the model** - Look at `src/db/models/ssh-keys.ts`:
+- How to structure find/create/delete methods
+- How to use `getDb()` and drizzle queries
 
-ACCEPTANCE CRITERIA:
-- [ ] `git push origin main` rejected if main is protected
-- [ ] PR merge still works on protected branches
-- [ ] Clear error message: "Branch 'main' is protected. Please open a pull request."
-- [ ] Glob patterns work: `release/*` protects `release/1.0`
+**For the router** - Look at `src/api/trpc/routers/ssh-keys.ts`:
+- Input validation with zod schemas
+- Using `protectedProcedure` for auth
+- Error handling with TRPCError
+- Ownership checks
 
-DO NOT BUILD:
-- Required reviewers
-- Required status checks
-- Dismiss stale reviews
-- Any other GitHub features
+**For the CLI** - Look at `src/commands/stash.ts`:
+- Subcommand structure with Commander
+- Colored console output
+- Error handling patterns
 
-Just: protected branches require PRs. That's it.
-```
+### Deliverables
 
----
+When complete, provide:
 
-### P1-3: Getting Started Documentation
+1. **File list** - All files created/modified with approximate line counts
+2. **Schema addition** - The exact code block added to schema.ts (for merge coordination)
+3. **Example outputs** - Show CLI output for each subcommand
+4. **Test commands** - Commands to verify the feature works
+5. **Any issues** - Problems encountered or things that need follow-up
 
-**Priority:** P0  
-**Effort:** 3 hours
+### Boundaries
 
-**The Problem:** Nobody knows how to use this. The README is sparse.
+**DO NOT modify:**
+- Any files not listed in "Your Scope"
+- Existing tests
+- Web UI code
+- Core git operations
 
-**Prompt:**
+**DO NOT implement:**
+- Token refresh/rotation (future feature)
+- OAuth integration
+- Rate limiting per token (use existing rate limiter)
 
-```
-Write documentation that gets someone from zero to using wit.
-
-TASK:
-
-1. Rewrite `README.md`:
-
-Structure:
-- What is wit? (2 sentences)
-- Why wit? (3 bullet points, not 20)
-- Quick start (5 commands to something working)
-- Link to full docs
-
-Tone: Confident, concise, opinionated. Not corporate.
-
-2. Create `docs/getting-started.mdx`:
-
-Cover:
-- Installation (npm, from source)
-- Initialize a repo
-- Basic workflow (add, commit, push)
-- The AI features (wit commit, wit search)
-- Setting up the server (optional)
-
-3. Create `docs/why-wit.mdx`:
-
-The pitch:
-- Git's UX problems (be specific)
-- How wit solves them
-- The AI angle (semantic search, commit messages)
-- What we're NOT (not replacing GitHub entirely, focused tool)
-
-ACCEPTANCE CRITERIA:
-- [ ] New user can go from install to first commit in <5 minutes
-- [ ] AI features are discoverable
-- [ ] Honest about what's ready and what's not
-- [ ] No buzzword soup
-
-TONE EXAMPLE:
-"Git is powerful. It's also hostile. 'Detached HEAD state' tells you nothing. Reflog is archaeology. We fixed this."
-
-NOT:
-"wit is a next-generation AI-powered collaborative development platform leveraging cutting-edge..."
+Run `npm test` at the end to ensure existing tests still pass.
 ```
 
 ---
 
-## Phase 2: AI That Delivers
-
-### P2-1: Automatic AI PR Review
-
-**Priority:** P0  
-**Effort:** 8 hours
-
-**The Vision:** Every PR gets an AI code review. Not a gimmick—actually useful feedback.
-
-**Prompt:**
+## PROMPT B: Branch Protection Server API
 
 ```
-Make AI code review automatic and useful.
+## Task: Implement Branch Protection Server API for wit
 
-CONTEXT:
-- `src/ai/tools/review-pr.ts` exists but isn't integrated
-- We want this to run automatically when a PR is opened
-- The review should be posted as a PR comment
+You're adding server-side branch protection enforcement to wit, an open-source GitHub alternative.
 
-TASK:
+### Context Sources (read these first)
 
-1. Create `src/ai/bot.ts`:
+Read these files to understand the project and patterns:
 
+1. `ROADMAP.md` - Project vision and current status
+2. `src/db/schema.ts` - Database schema (add your table after `teamMembers` around line 140)
+3. `src/db/models/organization.ts` - Model pattern with related entities
+4. `src/db/models/index.ts` - How models are exported
+5. `src/api/trpc/routers/webhooks.ts` - Router with permission checks pattern
+6. `src/api/trpc/routers/index.ts` - How routers are registered
+7. `src/core/branch-protection.ts` - Existing client-side protection (if exists)
+8. `src/server/routes/git.ts` - Git HTTP endpoints (receive-pack)
+
+Tech stack & database: Same as Prompt A (PostgreSQL localhost:5432, wit/wit)
+
+### Your Scope
+
+**CREATE these files:**
+- `src/db/models/branch-protection.ts` - Protection rules model
+- `src/api/trpc/routers/branch-protection.ts` - Protection API router
+
+**MODIFY these files:**
+- `src/db/schema.ts` - Add `branchProtectionRules` table AFTER teamMembers (~line 140)
+- `src/db/models/index.ts` - Add export
+- `src/api/trpc/routers/index.ts` - Add router
+
+### Task Description
+
+Implement server-side branch protection rules.
+
+**Schema (`branchProtectionRules` table):**
 ```typescript
-export class AIReviewBot {
-  async reviewPR(prId: string): Promise<void> {
-    // 1. Get PR diff
-    // 2. Run AI review
-    // 3. Post results as PR comment
-    // 4. Optionally approve/request changes
+export const branchProtectionRules = pgTable('branch_protection_rules', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  repoId: uuid('repo_id').notNull().references(() => repositories.id, { onDelete: 'cascade' }),
+  pattern: text('pattern').notNull(),  // e.g., "main", "release/*"
+  requirePullRequest: boolean('require_pull_request').notNull().default(true),
+  requiredReviewers: integer('required_reviewers').notNull().default(1),
+  requireStatusChecks: boolean('require_status_checks').notNull().default(false),
+  requiredStatusChecks: text('required_status_checks'),  // JSON array of check names
+  allowForcePush: boolean('allow_force_push').notNull().default(false),
+  allowDeletion: boolean('allow_deletion').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+```
+
+**Model methods:**
+- `findByRepoId(repoId)` - Get all rules for a repository
+- `findMatchingRule(repoId, branchName)` - Find rule that matches branch (glob pattern)
+- `create(data)` - Create protection rule
+- `update(id, data)` - Update rule
+- `delete(id)` - Delete rule
+
+**Router endpoints:**
+- `list` - Get protection rules for a repo (requires write permission)
+- `get` - Get specific rule by ID
+- `create` - Add protection rule (requires admin)
+- `update` - Modify rule (requires admin)
+- `delete` - Remove rule (requires admin)
+- `check` - Check if branch is protected: `{ protected: boolean, rule?: Rule }`
+
+**Glob pattern matching:**
+- `main` matches only `main`
+- `release/*` matches `release/1.0`, `release/2.0`
+- `feature/**` matches `feature/foo`, `feature/foo/bar`
+
+Use `minimatch` or implement simple glob matching.
+
+### Patterns to Follow
+
+**For permissions** - Look at `src/api/trpc/routers/webhooks.ts`:
+- The `assertRepoPermission` helper function
+- How to check admin vs write permissions
+
+**For model** - Look at `src/db/models/organization.ts`:
+- Pattern for models with multiple related methods
+
+### Deliverables
+
+1. **File list** with line counts
+2. **Schema addition** - Exact code block for schema.ts
+3. **API examples** - Request/response for each endpoint
+4. **Integration notes** - How this hooks into receive-pack (even if not implemented yet)
+
+### Boundaries
+
+**DO NOT modify:**
+- CLI commands
+- Web UI
+- The actual receive-pack enforcement (that's a separate task)
+- SSH handling
+
+**DO NOT implement:**
+- Required reviewers enforcement (just store the setting)
+- Status check enforcement (just store the setting)
+- Allowed pushers list (keep it simple for now)
+
+Focus on: CRUD API for protection rules + branch matching logic.
+```
+
+---
+
+## PROMPT C: Web UI - Repository Browser
+
+```
+## Task: Build Repository File Browser for wit Web UI
+
+You're building the GitHub-style repository code browser for wit's React web UI.
+
+### Context Sources (read these first)
+
+Read these files to understand the web app:
+
+1. `apps/web/package.json` - Dependencies (React, TailwindCSS, tRPC client)
+2. `apps/web/src/App.tsx` - Router setup and layout
+3. `apps/web/src/pages/` - Existing page patterns
+4. `apps/web/src/components/` - Existing component patterns
+5. `apps/web/src/lib/trpc.ts` - tRPC client setup (if exists)
+6. `src/api/trpc/routers/repos.ts` - Available repository API endpoints
+
+Tech stack:
+- React 18 with TypeScript
+- TailwindCSS for styling
+- React Router v6
+- tRPC client for API calls
+
+### Your Scope
+
+**CREATE these files:**
+- `apps/web/src/pages/Repository.tsx` - Repository layout page
+- `apps/web/src/pages/RepositoryCode.tsx` - File browser view
+- `apps/web/src/pages/RepositoryBlob.tsx` - Single file view
+- `apps/web/src/components/repo/FileTree.tsx` - Directory listing
+- `apps/web/src/components/repo/FileViewer.tsx` - File content with syntax highlighting
+- `apps/web/src/components/repo/BranchSelector.tsx` - Branch dropdown
+- `apps/web/src/components/repo/Breadcrumb.tsx` - Path navigation
+- `apps/web/src/hooks/useRepository.ts` - Repository data hook
+
+**MODIFY:**
+- `apps/web/src/App.tsx` - Add routes for repository pages
+
+### Task Description
+
+Build a code browser similar to GitHub's.
+
+**Routes:**
+- `/:owner/:repo` - Repository home (redirects to code)
+- `/:owner/:repo/tree/:branch` - Root of branch
+- `/:owner/:repo/tree/:branch/*` - Directory view
+- `/:owner/:repo/blob/:branch/*` - File view
+
+**Repository Header (shared across pages):**
+- Owner / Repo name (with links)
+- Description
+- Stars, forks, watchers counts
+- Tabs: Code | Issues | Pull Requests | Settings
+
+**File Browser (`/tree/...`):**
+- Branch selector dropdown (top left)
+- Breadcrumb path: `repo / src / components / Button.tsx`
+- File listing table:
+  - Icon (folder or file type)
+  - Name (linked)
+  - Last commit message (truncated)
+  - Last modified time
+- Click folder → navigate deeper
+- Click file → go to blob view
+
+**File Viewer (`/blob/...`):**
+- Breadcrumb navigation
+- File info: name, size, lines
+- Syntax highlighted code (use Prism or highlight.js)
+- Line numbers (clickable for linking)
+- "Raw" button
+
+**API endpoints you'll need (check if they exist):**
+- `repos.get` - Repository metadata
+- `repos.getTree` or similar - Directory listing
+- `repos.getBlob` or similar - File content
+- `repos.getBranches` - Branch list
+
+If endpoints don't exist, note them in deliverables.
+
+### Patterns to Follow
+
+**For pages** - Look at existing pages in `apps/web/src/pages/`:
+- How they use tRPC queries
+- Loading and error states
+- Layout structure
+
+**For styling** - Use TailwindCSS classes:
+- Match existing component styles
+- Use `bg-gray-900`, `text-gray-100` for dark theme (check existing)
+
+**For syntax highlighting:**
+```bash
+npm install prismjs @types/prismjs
+# or
+npm install highlight.js
+```
+
+### Deliverables
+
+1. **File list** - All components created
+2. **Routes added** - Exact routes added to App.tsx
+3. **Component tree** - How components nest together
+4. **Missing APIs** - Any backend endpoints that don't exist
+5. **Screenshots/descriptions** - What each view looks like
+
+### Boundaries
+
+**DO NOT modify:**
+- Backend/API code
+- CLI code
+- Other pages (Issues, PRs, Settings)
+
+**DO NOT implement:**
+- File editing
+- Commit history view
+- Blame view
+- These are separate features
+
+Focus on: Clean, functional file browser.
+```
+
+---
+
+## PROMPT D: CLI Error Message Audit
+
+```
+## Task: Audit and Improve wit CLI Error Messages
+
+You're improving error messages across all wit CLI commands.
+
+### Context Sources (read these first)
+
+Read these to understand the error handling:
+
+1. `src/cli.ts` - Main entry, global error handling
+2. `src/core/errors.ts` - Error class definitions
+3. `src/commands/*.ts` - All CLI commands (skim all, focus on error handling)
+4. Pick 3-4 commands and trace their error paths
+
+### Your Scope
+
+**MODIFY:**
+- `src/core/errors.ts` - Add/improve error classes as needed
+- `src/cli.ts` - Improve global error handler
+- `src/commands/*.ts` - Improve error handling (as needed)
+
+**You own error handling across the entire CLI.**
+
+### Task Description
+
+Make every error message helpful. Users should know:
+1. WHAT went wrong
+2. WHY it happened (context)
+3. HOW to fix it
+
+**Error format standard:**
+```
+Error: [Short, clear description]
+
+  [Detailed context - what we tried to do]
+  [Why it failed]
+
+  To fix this:
+    [Specific command or action]
+    [Alternative if applicable]
+```
+
+**Example transformations:**
+
+BAD:
+```
+Error: ENOENT: no such file or directory
+```
+
+GOOD:
+```
+Error: Not a wit repository
+
+  Could not find .git directory in /Users/you/project
+  or any parent directory.
+
+  To create a new repository:
+    wit init
+
+  To clone an existing repository:
+    wit clone <url>
+```
+
+BAD:
+```
+Error: Reference not found
+```
+
+GOOD:
+```
+Error: Branch 'feature/foo' not found
+
+  Available branches:
+    - main
+    - feature/bar
+    - develop
+
+  To create this branch:
+    wit checkout -b feature/foo
+```
+
+**Priority commands to audit:**
+1. `wit init` - Repository creation errors
+2. `wit clone` - Network, auth, path errors
+3. `wit checkout` - Branch/file not found
+4. `wit commit` - Nothing to commit, merge conflicts
+5. `wit push` - Auth, remote, rejection errors
+6. `wit pull` - Conflicts, diverged branches
+
+### Patterns to Follow
+
+**Error class structure** (`src/core/errors.ts`):
+```typescript
+export class BranchNotFoundError extends WitError {
+  constructor(branch: string, availableBranches?: string[]) {
+    const suggestions = availableBranches?.length
+      ? `\n\n  Available branches:\n${availableBranches.map(b => `    - ${b}`).join('\n')}`
+      : '';
+    
+    super(
+      `Branch '${branch}' not found${suggestions}\n\n  To create this branch:\n    wit checkout -b ${branch}`
+    );
+    this.name = 'BranchNotFoundError';
   }
 }
 ```
 
-2. Integrate into PR creation flow:
-   - When PR is created, queue AI review
-   - Review runs async (don't block PR creation)
-   - Results posted as comment from "wit-bot" user
-
-3. Create the bot user:
-   - System user for AI actions
-   - Clear visual distinction in UI
-
-4. Make the review useful:
-   - Focus on: bugs, security, logic errors
-   - Ignore: style nitpicks (that's what linters are for)
-   - Be specific: line numbers, suggested fixes
-   - Be concise: no fluff
-
-5. Add repo setting to disable:
-   - Not everyone wants this
-   - Default: enabled
-
-ACCEPTANCE CRITERIA:
-- [ ] Open PR → AI review appears within 30 seconds
-- [ ] Review has inline comments on specific lines
-- [ ] Review catches at least one real issue in test PRs
-- [ ] Can be disabled per-repo
-- [ ] Doesn't review its own bot commits
-
-QUALITY BAR:
-If the review just says "looks good!" on everything, we failed.
-If it's so noisy people disable it, we failed.
-Find the middle ground.
-```
-
----
-
-### P2-2: Codebase Q&A
-
-**Priority:** P0  
-**Effort:** 10 hours
-
-**The Vision:** Ask questions about your codebase in natural language.
-
-**Prompt:**
-
-```
-Build a codebase Q&A interface using our semantic search.
-
-CONTEXT:
-- Semantic search exists in `src/search/`
-- Embeddings and vector store working
-- This is about UX: making it accessible and useful
-
-TASK:
-
-1. Create `wit ask` CLI command:
-
-```bash
-$ wit ask "how does authentication work?"
-
-Based on the codebase, authentication works as follows:
-
-1. Users authenticate via `src/core/auth.ts` using session tokens
-2. Sessions are stored in PostgreSQL (`src/db/schema.ts:sessions`)
-3. The auth middleware (`src/server/middleware/auth.ts`) validates tokens
-
-Relevant files:
-- src/core/auth.ts:45 - Token generation
-- src/server/middleware/auth.ts:12 - Request validation
-- src/api/trpc/routers/auth.ts - Auth API endpoints
-```
-
-2. The flow:
-   - Take natural language question
-   - Use semantic search to find relevant code
-   - Pass code + question to LLM
-   - Format response with file references
-
-3. Create `src/commands/ask.ts`:
-
+**Using errors in commands:**
 ```typescript
-export const askCommand = new Command('ask')
-  .description('Ask a question about the codebase')
-  .argument('<question>', 'Your question')
-  .option('--files <n>', 'Number of files to search', '10')
-  .action(async (question, options) => {
-    // 1. Semantic search for relevant code
-    // 2. Build prompt with code context
-    // 3. Call LLM
-    // 4. Format and display response
-  });
+const branch = await repo.getBranch(name);
+if (!branch) {
+  const available = await repo.listBranches();
+  throw new BranchNotFoundError(name, available.map(b => b.name));
+}
 ```
 
-4. Handle edge cases:
-   - No relevant code found → say so
-   - Codebase not indexed → prompt to index
-   - Very large results → summarize
+### Deliverables
 
-ACCEPTANCE CRITERIA:
-- [ ] `wit ask "where is X"` returns relevant files
-- [ ] Answers include line numbers
-- [ ] Works on medium codebase (10k+ lines)
-- [ ] Response time <10 seconds
-- [ ] Graceful when it doesn't know
+1. **Commands audited** - List of all commands you reviewed
+2. **Errors improved** - Before/after for the 5 worst offenders
+3. **New error classes** - Any added to errors.ts
+4. **Pattern guide** - Short guide for future error handling
 
-EXAMPLE TEST:
-Run `wit ask "how does the diff algorithm work"` on this repo.
-Should reference `src/core/diff.ts` and explain LCS.
+### Boundaries
+
+**DO NOT modify:**
+- Core logic (only error handling)
+- Test assertions (unless they check error messages)
+- Backend API
+- Web UI
+
+**DO NOT:**
+- Add emoji to error messages
+- Make errors overly verbose
+- Change exit codes
+
+Focus on: Clarity and actionability.
 ```
 
 ---
 
-### P2-3: `wit review` - Pre-Push Self Review
+## Coordination Notes
 
-**Priority:** P1  
-**Effort:** 4 hours
+### Avoiding Merge Conflicts
 
-**The Vision:** Review your own changes before pushing, with AI help.
+**Schema changes are coordinated by line number:**
+| Prompt | Table | Location |
+|--------|-------|----------|
+| A (Tokens) | `personalAccessTokens` | After `sshKeys` (~line 95) |
+| B (Branch Protection) | `branchProtectionRules` | After `teamMembers` (~line 140) |
 
-**Prompt:**
+**Index files:** Each agent notes their additions. Merge manually in order.
 
-```
-Add a pre-push review command that shows you what you're about to share.
-
-CONTEXT:
-- Developers push code without reviewing their own diff
-- AI can catch obvious issues before they become PR comments
-
-TASK:
-
-1. Create `src/commands/review.ts`:
+### After Parallel Work
 
 ```bash
-$ wit review
+# 1. Review each agent's output
 
-Reviewing changes on branch 'feature/add-auth' (3 commits, 5 files)
+# 2. Apply changes in order (A, B, C, D)
+#    - Schema changes go in specified locations
+#    - Index exports get combined
 
-src/auth.ts:
-  + Added login function
-  ⚠️  Line 45: Password stored in plain text (security)
-  ⚠️  Line 52: Missing error handling for DB failure
+# 3. Push schema
+DATABASE_URL="postgresql://wit:wit@localhost:5432/wit" npx drizzle-kit push --force
 
-src/routes.ts:
-  + Added /login endpoint
-  ✓ Looks good
+# 4. Run tests
+DATABASE_URL="postgresql://wit:wit@localhost:5432/wit" npm test
 
-Summary:
-  2 potential issues found
-  Would you like to push anyway? [y/N]
+# 5. Commit
+git add -A
+git commit -m "feat: add personal access tokens, branch protection API, repo browser, and improved errors"
 ```
 
-2. Implementation:
-   - Get diff of current branch vs origin
-   - Run AI review on the diff
-   - Display inline in terminal
-   - Prompt before push
+### Quick Reference
 
-3. Options:
-   - `--fix` - Attempt to fix issues automatically
-   - `--push` - Push after review regardless
-   - `--quiet` - Only show issues, not full diff
+| Prompt | Feature | Scope | New Files | Modifies |
+|--------|---------|-------|-----------|----------|
+| A | Personal Access Tokens | Backend + CLI | 3 | 5 |
+| B | Branch Protection API | Backend only | 2 | 3 |
+| C | Repo Browser | Frontend only | 8 | 1 |
+| D | Error Messages | CLI only | 0 | ~10 |
 
-ACCEPTANCE CRITERIA:
-- [ ] Shows diff with AI annotations
-- [ ] Catches at least obvious issues (console.log, TODO, security)
-- [ ] Fast enough to use regularly (<15 seconds)
-- [ ] Non-blocking (can push anyway)
-
-NOT:
-- A replacement for CI
-- A linter
-- Exhaustive (focus on high-signal issues)
-```
+**Parallelizable:** A + B + C + D (all independent domains)
 
 ---
 
-## Phase 3: CLI Polish
-
-### P3-1: CLI Experience Audit
-
-**Priority:** P0  
-**Effort:** 6 hours
-
-**The Vision:** Every command should feel right.
-
-**Prompt:**
-
-```
-Audit and polish the CLI experience.
-
-TASK:
-
-1. Run every command in `src/commands/` and note:
-   - Confusing output
-   - Missing help text
-   - Errors that don't help
-   - Inconsistent formatting
-
-2. Fix the worst offenders:
-   - Error messages should suggest fixes
-   - Help text should have examples
-   - Output should be scannable
-
-3. Add color and formatting:
-   - Status: green for success, red for error, yellow for warning
-   - Diffs: standard diff coloring
-   - Progress: spinners for long operations
-
-4. Add `wit --help` landing page:
-   - Group commands logically
-   - Highlight the good stuff (AI commands)
-   - Link to docs
-
-EXAMPLE - Before:
-```
-$ wit checkout foo
-Error: Reference not found
-```
-
-EXAMPLE - After:
-```
-$ wit checkout foo
-Error: Branch 'foo' not found
-
-Did you mean:
-  - feature/foo
-  - fix/foobar
-
-Create it with: wit checkout -b foo
-```
-
-ACCEPTANCE CRITERIA:
-- [ ] No command exits with unhelpful error
-- [ ] `--help` on every command is useful
-- [ ] Consistent style across all commands
-- [ ] Looks good in terminal
-```
-
----
-
-## What's Already Done (Reference)
-
-### Complete - Don't Touch Unless Broken
-
-**Git Implementation**
-- 57 commands in `src/commands/`
-- Full compatibility with Git
-- Tests in `src/__tests__/`
-
-**AI Tools**
-- 15 tools in `src/ai/tools/`
-- Semantic search in `src/search/`
-- Agent in `src/ai/agent.ts`
-
-**Server**
-- HTTP + SSH protocols
-- Rate limiting
-- tRPC API
-
-**Features**
-- Branch state manager
-- Journal-based undo
-- Rename detection
-- Packed refs
-- CI workflow parser (no runner)
-
----
-
-## Dependencies
-
-```
-P1-1 (PR Merge) → blocks shipping
-P1-2 (Branch Protection) → blocks shipping
-P1-3 (Docs) → blocks shipping
-
-P2-1 (AI Review) → needs PR infrastructure
-P2-2 (Codebase Q&A) → independent
-P2-3 (wit review) → independent
-
-P3-1 (CLI Polish) → independent
-```
-
----
-
-## For Agents
-
-When implementing these prompts:
-
-1. **Read existing code first** - patterns are established
-2. **Keep it simple** - we explicitly defer complexity
-3. **Test your changes** - `npm test`
-4. **Update docs if needed** - especially for user-facing changes
-
-The goal is shipping, not perfection.
-
----
-
-*Prompts maintained by Claude, December 2024*
+*Last updated: December 26, 2024*

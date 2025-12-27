@@ -2,7 +2,6 @@
   "name": "wit",
   "version": "2.0.0",
   "description": "A modern Git implementation in TypeScript with AI-powered features - SHA-256, built-in UI, undo support, AI commit messages, and more",
-  "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
@@ -33,7 +32,8 @@
     "docker:logs": "docker compose logs -f",
     "docker:db": "docker compose up db -d",
     "docker:build": "docker compose build",
-    "serve": "node dist/cli.js serve"
+    "serve": "node dist/cli.js serve",
+    "wit": "npx tsx src/cli.ts"
   },
   "keywords": [
     "git",
@@ -71,14 +71,12 @@
     "vitest": "^4.0.16"
   },
   "dependencies": {
-    "@ai-sdk/openai": "^1.0.0",
     "@hono/node-server": "^1.19.7",
     "@hono/trpc-server": "^0.4.1",
     "@mastra/core": "^1.0.0-beta.17",
     "@trpc/client": "^11.8.1",
     "@trpc/server": "^11.8.1",
     "@types/blessed": "^0.1.27",
-    "ai": "^4.0.0",
     "blessed": "^0.1.81",
     "drizzle-orm": "^0.45.1",
     "hono": "^4.11.3",
@@ -94,5 +92,9 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/abhiaiyer91/wit"
+  },
+  "optionalDependencies": {
+    "@ai-sdk/openai": "^3.0.1",
+    "ai": "^6.0.3"
   }
 }

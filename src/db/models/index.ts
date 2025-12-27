@@ -1,6 +1,12 @@
 // User models
 export { userModel, sessionModel, oauthAccountModel } from './user';
 
+// SSH Keys model
+export { sshKeyModel } from './ssh-keys';
+
+// Personal Access Tokens model
+export { tokenModel, TOKEN_SCOPES, type TokenScope, type TokenWithValue } from './tokens';
+
 // Organization models
 export { orgModel, orgMemberModel, teamModel, teamMemberModel } from './organization';
 

@@ -10,6 +10,8 @@ import { webhooksRouter } from './webhooks';
 import { milestonesRouter } from './milestones';
 import { releasesRouter } from './releases';
 import { organizationsRouter } from './organizations';
+import { sshKeysRouter } from './ssh-keys';
+import { tokensRouter } from './tokens';
 
 /**
  * Main application router
@@ -27,6 +29,8 @@ export const appRouter = router({
   milestones: milestonesRouter,
   releases: releasesRouter,
   organizations: organizationsRouter,
+  sshKeys: sshKeysRouter,
+  tokens: tokensRouter,
 });
 
 /**
@@ -47,4 +51,6 @@ export {
   milestonesRouter,
   releasesRouter,
   organizationsRouter,
+  sshKeysRouter,
+  tokensRouter,
 };

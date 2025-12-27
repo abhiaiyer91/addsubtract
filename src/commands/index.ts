@@ -88,3 +88,6 @@ export { handleSmartStatus } from './smart-status';
 
 // Semantic search - the "holy shit" feature
 export { handleSearch } from './search';
+
+// Personal access tokens
+export { handleToken } from './token';
