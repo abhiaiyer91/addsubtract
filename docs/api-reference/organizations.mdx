@@ -1,0 +1,507 @@
+---
+title: "Organizations API"
+description: "API reference for organization and team management"
+---
+
+# Organizations API
+
+The Organizations API provides endpoints for managing organizations, members, and teams.
+
+## Overview
+
+Organizations allow grouping repositories and users together with shared settings and permissions.
+
+---
+
+## Organization Endpoints
+
+### Get Organization
+
+Get an organization by name.
+
+```typescript
+trpc.organizations.get.query({
+  name: string  // Organization slug
+})
+```
+
+**Response:**
+```typescript
+{
+  id: string;
+  name: string;           // URL-safe slug
+  displayName: string;
+  description?: string;
+  avatarUrl?: string;
+  website?: string;
+  location?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+
+---
+
+### Get Organization by ID
+
+```typescript
+trpc.organizations.getById.query({
+  id: string  // UUID
+})
+```
+
+---
+
+### Search Organizations
+
+Search for organizations by name.
+
+```typescript
+trpc.organizations.search.query({
+  query: string,
+  limit?: number  // Default: 20, max: 100
+})
+```
+
+**Response:**
+```typescript
+{
+  id: string;
+  name: string;
+  displayName: string;
+  avatarUrl?: string;
+}[]
+```
+
+---
+
+### Check Name Availability
+
+Check if an organization name is available.
+
+```typescript
+trpc.organizations.checkName.query({
+  name: string
+})
+```
+
+**Response:**
+```typescript
+{
+  available: boolean;
+}
+```
+
+---
+
+### Create Organization
+
+Create a new organization. Requires authentication.
+
+```typescript
+trpc.organizations.create.mutate({
+  name: string,           // 2-39 chars, alphanumeric with hyphens
+  displayName?: string,   // Up to 100 chars
+  description?: string,   // Up to 500 chars
+  avatarUrl?: string,
+  website?: string,
+  location?: string
+})
+```
+
+**Validation:**
+- `name` must be 2-39 characters
+- `name` must be alphanumeric with hyphens
+- `name` cannot start or end with a hyphen
+
+**Response:** The created organization object.
+
+**Example:**
+```typescript
+const org = await trpc.organizations.create.mutate({
+  name: 'acme-corp',
+  displayName: 'Acme Corporation',
+  description: 'Building the future'
+});
+```
+
+---
+
+### Update Organization
+
+Update organization details. Requires admin permission.
+
+```typescript
+trpc.organizations.update.mutate({
+  orgId: string,
+  displayName?: string,
+  description?: string | null,
+  avatarUrl?: string | null,
+  website?: string | null,
+  location?: string | null
+})
+```
+
+---
+
+### Delete Organization
+
+Delete an organization. Requires owner permission.
+
+```typescript
+trpc.organizations.delete.mutate({
+  orgId: string
+})
+```
+
+**Response:**
+```typescript
+{
+  success: boolean;
+}
+```
+
+---
+
+## Member Endpoints
+
+### List Members
+
+List all members of an organization.
+
+```typescript
+trpc.organizations.listMembers.query({
+  orgId: string
+})
+```
+
+**Response:**
+```typescript
+{
+  userId: string;
+  role: 'owner' | 'admin' | 'member';
+  joinedAt: Date;
+  user: {
+    id: string;
+    username: string;
+    name?: string;
+    avatarUrl?: string;
+  };
+}[]
+```
+
+---
+
+### List User's Organizations
+
+Get organizations the current user belongs to.
+
+```typescript
+trpc.organizations.listForUser.query()
+```
+
+**Response:**
+```typescript
+{
+  orgId: string;
+  role: 'owner' | 'admin' | 'member';
+  joinedAt: Date;
+  org: {
+    id: string;
+    name: string;
+    displayName: string;
+    avatarUrl?: string;
+  };
+}[]
+```
+
+---
+
+### Check Membership
+
+Check if a user is a member of an organization.
+
+```typescript
+trpc.organizations.checkMembership.query({
+  orgId: string,
+  userId: string
+})
+```
+
+**Response:**
+```typescript
+{
+  isMember: boolean;
+  role: 'owner' | 'admin' | 'member' | null;
+}
+```
+
+---
+
+### Add Member
+
+Add a user to an organization. Requires admin permission.
+
+```typescript
+trpc.organizations.addMember.mutate({
+  orgId: string,
+  userId: string,
+  role?: 'owner' | 'admin' | 'member'  // Default: 'member'
+})
+```
+
+---
+
+### Update Member Role
+
+Change a member's role. Requires owner permission.
+
+```typescript
+trpc.organizations.updateMemberRole.mutate({
+  orgId: string,
+  userId: string,
+  role: 'owner' | 'admin' | 'member'
+})
+```
+
+**Note:** Cannot demote the last owner.
+
+---
+
+### Remove Member
+
+Remove a user from an organization. Members can remove themselves; admins can remove others.
+
+```typescript
+trpc.organizations.removeMember.mutate({
+  orgId: string,
+  userId: string
+})
+```
+
+**Note:** Cannot remove the last owner.
+
+---
+
+## Team Endpoints
+
+Teams allow organizing members within an organization.
+
+### List Teams
+
+List all teams in an organization.
+
+```typescript
+trpc.organizations.listTeams.query({
+  orgId: string
+})
+```
+
+**Response:**
+```typescript
+{
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  createdAt: Date;
+}[]
+```
+
+---
+
+### Get Team
+
+Get a team by ID.
+
+```typescript
+trpc.organizations.getTeam.query({
+  teamId: string
+})
+```
+
+---
+
+### Create Team
+
+Create a new team. Requires admin permission.
+
+```typescript
+trpc.organizations.createTeam.mutate({
+  orgId: string,
+  name: string,         // 1-50 chars
+  description?: string  // Up to 500 chars
+})
+```
+
+---
+
+### Update Team
+
+Update team details. Requires admin permission.
+
+```typescript
+trpc.organizations.updateTeam.mutate({
+  teamId: string,
+  name?: string,
+  description?: string | null
+})
+```
+
+---
+
+### Delete Team
+
+Delete a team. Requires admin permission.
+
+```typescript
+trpc.organizations.deleteTeam.mutate({
+  teamId: string
+})
+```
+
+---
+
+### List Team Members
+
+List members of a team.
+
+```typescript
+trpc.organizations.listTeamMembers.query({
+  teamId: string
+})
+```
+
+**Response:**
+```typescript
+{
+  userId: string;
+  joinedAt: Date;
+  user: {
+    id: string;
+    username: string;
+    name?: string;
+    avatarUrl?: string;
+  };
+}[]
+```
+
+---
+
+### Add Team Member
+
+Add a user to a team. User must be an organization member. Requires admin permission.
+
+```typescript
+trpc.organizations.addTeamMember.mutate({
+  teamId: string,
+  userId: string
+})
+```
+
+---
+
+### Remove Team Member
+
+Remove a user from a team. Members can remove themselves; admins can remove others.
+
+```typescript
+trpc.organizations.removeTeamMember.mutate({
+  teamId: string,
+  userId: string
+})
+```
+
+---
+
+## Roles
+
+### Organization Roles
+
+| Role | Permissions |
+|------|-------------|
+| `owner` | Full access, can delete org, transfer ownership |
+| `admin` | Manage members, teams, settings |
+| `member` | View org, access assigned repos |
+
+---
+
+## Error Handling
+
+| Error Code | Description |
+|------------|-------------|
+| `NOT_FOUND` | Organization or team not found |
+| `CONFLICT` | Name already taken, user already member |
+| `FORBIDDEN` | Insufficient permissions |
+| `BAD_REQUEST` | Cannot demote/remove last owner |
+
+---
+
+## Usage Examples
+
+### Create Organization with Team
+
+```typescript
+// Create org
+const org = await trpc.organizations.create.mutate({
+  name: 'acme-corp',
+  displayName: 'Acme Corporation'
+});
+
+// Create a team
+const team = await trpc.organizations.createTeam.mutate({
+  orgId: org.id,
+  name: 'Engineering',
+  description: 'Engineering team'
+});
+
+// Add members
+await trpc.organizations.addMember.mutate({
+  orgId: org.id,
+  userId: 'user-uuid',
+  role: 'member'
+});
+
+await trpc.organizations.addTeamMember.mutate({
+  teamId: team.id,
+  userId: 'user-uuid'
+});
+```
+
+### React Hook Example
+
+```tsx
+import { trpc } from '@/lib/trpc';
+
+function OrganizationSettings({ orgId }: { orgId: string }) {
+  const { data: org } = trpc.organizations.getById.useQuery({ id: orgId });
+  const { data: members } = trpc.organizations.listMembers.useQuery({ orgId });
+  
+  const updateOrg = trpc.organizations.update.useMutation({
+    onSuccess: () => {
+      // Refetch org data
+    }
+  });
+
+  const removeMember = trpc.organizations.removeMember.useMutation();
+
+  return (
+    <div>
+      <h1>{org?.displayName}</h1>
+      
+      <h2>Members</h2>
+      {members?.map(m => (
+        <div key={m.userId}>
+          {m.user.username} ({m.role})
+          <button onClick={() => removeMember.mutate({ 
+            orgId, 
+            userId: m.userId 
+          })}>
+            Remove
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+```
