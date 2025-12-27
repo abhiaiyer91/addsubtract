@@ -1267,4 +1267,134 @@ export const reposRouter = router({
         });
       }
     }),
+
+  /**
+   * Update/create a file in a repository (creates a commit)
+   */
+  updateFile: protectedProcedure
+    .input(
+      z.object({
+        owner: z.string(),
+        repo: z.string(),
+        ref: z.string().default('main'),
+        path: z.string(),
+        content: z.string(),
+        message: z.string(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const result = await repoModel.findByPath(input.owner, input.repo);
+
+      if (!result) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Repository not found',
+        });
+      }
+
+      // Check write access
+      const isOwner = result.repo.ownerId === ctx.user.id;
+      const hasWriteAccess = isOwner || (await collaboratorModel.hasPermission(result.repo.id, ctx.user.id, 'write'));
+
+      if (!hasWriteAccess) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have write access to this repository',
+        });
+      }
+
+      // Get the bare repository
+      const bareRepo = getRepoFromDisk(result.repo.diskPath);
+      if (!bareRepo) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Repository not found on disk',
+        });
+      }
+
+      try {
+        const { execSync } = require('child_process');
+        const fs = require('fs');
+        const os = require('os');
+        
+        // Create a temporary worktree to make the commit
+        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wit-update-'));
+        
+        try {
+          // Clone the repo to a temp directory
+          execSync(`git clone --branch ${input.ref} ${result.repo.diskPath} ${tmpDir}`, {
+            encoding: 'utf-8',
+          });
+
+          // Write the file
+          const filePath = path.join(tmpDir, input.path);
+          const fileDir = path.dirname(filePath);
+          
+          // Create parent directories if needed
+          if (!fs.existsSync(fileDir)) {
+            fs.mkdirSync(fileDir, { recursive: true });
+          }
+          
+          fs.writeFileSync(filePath, input.content, 'utf-8');
+
+          // Configure git user
+          const user = await userModel.findById(ctx.user.id);
+          const authorName = user?.name || user?.username || 'wit user';
+          const authorEmail = user?.email || `${ctx.user.id}@wit.local`;
+          
+          execSync(`git config user.name "${authorName}"`, { cwd: tmpDir });
+          execSync(`git config user.email "${authorEmail}"`, { cwd: tmpDir });
+
+          // Stage and commit
+          execSync(`git add "${input.path}"`, { cwd: tmpDir });
+          execSync(`git commit -m "${input.message.replace(/"/g, '\\"')}"`, { cwd: tmpDir });
+
+          // Push back to the bare repo
+          execSync(`git push origin ${input.ref}`, { cwd: tmpDir });
+
+          // Get the new commit SHA
+          const newSha = execSync('git rev-parse HEAD', { cwd: tmpDir, encoding: 'utf-8' }).trim();
+
+          // Record activity
+          await activityHelpers.recordActivity({
+            type: 'commit',
+            userId: ctx.user.id,
+            repoId: result.repo.id,
+            targetId: newSha,
+            targetType: 'commit',
+            metadata: {
+              message: input.message,
+              path: input.path,
+            },
+          });
+
+          // Emit event
+          eventBus.emit('commit.created', {
+            repo: result.repo,
+            commit: {
+              sha: newSha,
+              message: input.message,
+              author: { name: authorName, email: authorEmail },
+            },
+            branch: input.ref,
+            userId: ctx.user.id,
+          });
+
+          return {
+            sha: newSha,
+            path: input.path,
+            branch: input.ref,
+          };
+        } finally {
+          // Cleanup temp directory
+          fs.rmSync(tmpDir, { recursive: true, force: true });
+        }
+      } catch (error) {
+        console.error('[repos.updateFile] Error:', error);
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to update file',
+        });
+      }
+    }),
 });
