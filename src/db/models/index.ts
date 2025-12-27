@@ -56,3 +56,12 @@ export { releaseModel, releaseAssetModel } from './releases';
 
 // Notification models
 export { notificationModel, notificationHelpers, type NotificationWithActor } from './notification';
+
+// Workflow/CI models
+export {
+  workflowRunModel,
+  jobRunModel,
+  stepRunModel,
+  getWorkflowRunWithDetails,
+  type WorkflowRunWithJobs,
+} from './workflow';

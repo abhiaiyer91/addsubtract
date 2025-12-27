@@ -21,7 +21,7 @@ import { SSHServer, generateHostKey, SSHServerOptions } from './ssh';
 import { SSHKeyManager, FileBasedAccessControl } from './ssh/keys';
 import { Repository } from '../core/repository';
 import { createAuth } from '../lib/auth';
-import { registerNotificationHandlers } from '../events';
+import { registerNotificationHandlers, registerCIHandlers } from '../events';
 
 /**
  * Server configuration options
@@ -176,8 +176,9 @@ export function startServer(options: ServerOptions): WitServer {
       initDatabase(databaseUrl);
       console.log('✓ Database connected');
       
-      // Register event handlers for notifications
+      // Register event handlers for notifications and CI
       registerNotificationHandlers();
+      registerCIHandlers();
       console.log('✓ Event handlers registered');
     } catch (error) {
       console.error('✗ Database connection failed:', error instanceof Error ? error.message : error);

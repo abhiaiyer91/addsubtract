@@ -8,6 +8,7 @@
 export * from './types';
 export { eventBus, createEvent } from './bus';
 export { registerNotificationHandlers } from './handlers/notifications';
+export { registerCIHandlers } from './handlers/ci';
 
 /**
  * Helper to extract @mentions from text

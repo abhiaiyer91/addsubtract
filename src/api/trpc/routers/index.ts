@@ -15,6 +15,7 @@ import { tokensRouter } from './tokens';
 import { branchProtectionRouter } from './branch-protection';
 import { notificationsRouter } from './notifications';
 import { stacksRouter } from './stacks';
+import { workflowsRouter } from './workflows';
 
 /**
  * Main application router
@@ -37,6 +38,7 @@ export const appRouter = router({
   branchProtection: branchProtectionRouter,
   notifications: notificationsRouter,
   stacks: stacksRouter,
+  workflows: workflowsRouter,
 });
 
 /**

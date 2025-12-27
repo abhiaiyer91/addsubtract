@@ -87,6 +87,8 @@ import {
   handleToken,
   // CodeRabbit review
   handleCodeReview,
+  // CI/CD
+  handleCI,
 } from './commands';
 import { handleHooks } from './core/hooks';
 import { handleSubmodule } from './core/submodule';
@@ -254,6 +256,13 @@ Authentication:
   token revoke <id>     Revoke a token
   token scopes          List available scopes
 
+CI/CD:
+  ci list               List available workflows
+  ci run [workflow]     Run a workflow locally
+  ci validate [file]    Validate workflow YAML
+  ci runs               Show recent workflow runs (requires server)
+  ci view <run-id>      View workflow run details (requires server)
+
 Quality of Life:
   amend                 Quickly fix the last commit
   wip                   Quick WIP commit with auto-generated message
@@ -399,6 +408,8 @@ const COMMANDS = [
   'up', 'down', 'platform-status',
   // Authentication
   'token',
+  // CI/CD
+  'ci',
   'help',
 ];
 
@@ -991,6 +1002,18 @@ function main(): void {
       // Personal access tokens
       case 'token':
         handleToken(args.slice(args.indexOf('token') + 1)).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
+          }
+          process.exit(1);
+        });
+        return;
+
+      // CI/CD commands
+      case 'ci':
+        handleCI(args.slice(args.indexOf('ci') + 1)).catch((error: Error) => {
           if (error instanceof TsgitError) {
             console.error((error as TsgitError).format());
           } else {

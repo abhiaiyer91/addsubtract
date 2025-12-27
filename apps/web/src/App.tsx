@@ -21,6 +21,7 @@ import { IssueDetailPage } from './routes/repo/issue-detail';
 import { NewIssuePage } from './routes/repo/issue-new';
 import { StacksPage } from './routes/repo/stacks';
 import { StackDetailPage } from './routes/repo/stack-detail';
+import { WorkflowsPage } from './routes/repo/workflows';
 import { SettingsPage } from './routes/settings';
 import { NewRepoPage } from './routes/new';
 
@@ -62,6 +63,9 @@ export function App() {
             {/* Stacks */}
             <Route path="/:owner/:repo/stacks" element={<StacksPage />} />
             <Route path="/:owner/:repo/stacks/:stackName" element={<StackDetailPage />} />
+
+            {/* Workflows / Actions */}
+            <Route path="/:owner/:repo/actions" element={<WorkflowsPage />} />
           </Route>
         </Routes>
       </BrowserRouter>

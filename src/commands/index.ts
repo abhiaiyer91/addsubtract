@@ -101,6 +101,9 @@ export { handleToken } from './token';
 // CodeRabbit review command
 export { handleCodeReview, REVIEW_HELP } from './review';
 
+// CI/CD commands
+export { handleCI, CI_HELP } from './ci';
+
 // Collaborator management
 export {
   handleCollaborator,
