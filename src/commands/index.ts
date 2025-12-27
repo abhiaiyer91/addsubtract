@@ -80,6 +80,7 @@ export { COMMAND_HELP, formatCommandHelp, printCommandHelp, hasHelpFlag } from '
 // Platform commands (CLI extensions)
 export { handlePr, PR_HELP } from './pr';
 export { handleIssue, ISSUE_HELP } from './issue';
+export { handleInbox, INBOX_HELP } from './inbox';
 
 // Issue tracking (Linear-inspired) - cycle/sprint management
 export { handleCycle } from './cycle';
