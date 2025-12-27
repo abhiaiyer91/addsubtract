@@ -40,7 +40,27 @@ export {
   issueLabelModel,
   issueInboxModel,
   ISSUE_STATUSES,
+  ISSUE_PRIORITIES,
+  PRIORITY_CONFIG,
 } from './issue';
+
+// Issue relations model
+export { issueRelationModel } from './issue-relations';
+
+// Issue activity model
+export { issueActivityModel, type ActivityAction } from './issue-activity';
+
+// Issue template model
+export { issueTemplateModel } from './issue-template';
+
+// Issue view model
+export { issueViewModel, type ViewFilters, type ViewDisplayOptions } from './issue-view';
+
+// Project models
+export { projectModel, projectUpdateModel, PROJECT_STATUSES, PROJECT_HEALTH, PROJECT_STATUS_CONFIG } from './project';
+
+// Cycle model
+export { cycleModel } from './cycle';
 
 // Activity model
 export { activityModel, activityHelpers, type ActivityType, type ActivityPayload } from './activity';

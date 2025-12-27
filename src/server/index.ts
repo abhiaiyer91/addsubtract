@@ -11,6 +11,9 @@ import { logger } from 'hono/logger';
 import { cors } from 'hono/cors';
 import { trpcServer } from '@hono/trpc-server';
 import { createGitRoutes } from './routes/git';
+import { createIssueRoutes } from './routes/issues';
+import { createProjectRoutes } from './routes/projects';
+import { createCycleRoutes } from './routes/cycles';
 import { RepoManager } from './storage/repos';
 import { syncReposToDatabase } from './storage/sync';
 import { appRouter, createContext } from '../api/trpc';
@@ -144,6 +147,15 @@ export function createApp(repoManager: RepoManager, options: { verbose?: boolean
     router: appRouter,
     createContext: (_opts, c) => createContext(c),
   }));
+
+  // REST API routes for issues, projects, cycles
+  const issueRoutes = createIssueRoutes();
+  const projectRoutes = createProjectRoutes();
+  const cycleRoutes = createCycleRoutes();
+  
+  app.route('/api/repos', issueRoutes);
+  app.route('/api/repos', projectRoutes);
+  app.route('/api/repos', cycleRoutes);
 
   // Git Smart HTTP routes
   const gitRoutes = createGitRoutes(repoManager);

@@ -84,7 +84,10 @@ export { handleIssue, ISSUE_HELP } from './issue';
 export { handleInbox, INBOX_HELP } from './inbox';
 
 // Issue tracking (Linear-inspired) - cycle/sprint management
-export { handleCycle } from './cycle';
+export { handleCycle, CYCLE_HELP } from './cycle';
+
+// Project management (Linear-inspired)
+export { handleProject, PROJECT_HELP } from './project';
 
 // Platform management commands
 export { handleUp, UP_HELP } from './up';

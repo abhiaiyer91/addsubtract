@@ -16,12 +16,48 @@ export const ownerTypeEnum = pgEnum('owner_type', ['user', 'organization']);
 export const prStateEnum = pgEnum('pr_state', ['open', 'closed', 'merged']);
 export const issueStateEnum = pgEnum('issue_state', ['open', 'closed']);
 export const issueStatusEnum = pgEnum('issue_status', [
+  'triage',
   'backlog',
   'todo', 
   'in_progress',
   'in_review',
   'done',
   'canceled',
+]);
+
+// Issue priority levels (Linear-style)
+export const issuePriorityEnum = pgEnum('issue_priority', [
+  'none',
+  'low',
+  'medium',
+  'high',
+  'urgent',
+]);
+
+// Issue relation types for dependencies
+export const issueRelationTypeEnum = pgEnum('issue_relation_type', [
+  'blocks',
+  'blocked_by',
+  'relates_to',
+  'duplicates',
+  'duplicated_by',
+]);
+
+// Project status (Linear-style)
+export const projectStatusEnum = pgEnum('project_status', [
+  'backlog',
+  'planned',
+  'in_progress',
+  'paused',
+  'completed',
+  'canceled',
+]);
+
+// Project health for updates
+export const projectHealthEnum = pgEnum('project_health', [
+  'on_track',
+  'at_risk',
+  'off_track',
 ]);
 export const milestoneStateEnum = pgEnum('milestone_state', ['open', 'closed']);
 export const reviewStateEnum = pgEnum('review_state', [
@@ -510,14 +546,32 @@ export const issues = pgTable('issues', {
   
   // Workflow status for Kanban board (Linear-style)
   status: issueStatusEnum('status').notNull().default('backlog'),
+  
+  // Priority (Linear-style: none, low, medium, high, urgent)
+  priority: issuePriorityEnum('priority').notNull().default('none'),
+  
+  // Due date for time-sensitive issues
+  dueDate: timestamp('due_date', { withTimezone: true }),
+  
+  // Estimate in story points or hours
+  estimate: integer('estimate'),
 
   authorId: text('author_id').notNull(), // References better-auth user.id
   assigneeId: text('assignee_id'), // References better-auth user.id
+  
+  // Parent issue for sub-issues hierarchy
+  parentId: uuid('parent_id'),
 
   // Milestone reference
   milestoneId: uuid('milestone_id').references(() => milestones.id, {
     onDelete: 'set null',
   }),
+  
+  // Project reference (Linear-style projects)
+  projectId: uuid('project_id'),
+  
+  // Cycle/Sprint reference
+  cycleId: uuid('cycle_id'),
 
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
@@ -565,6 +619,197 @@ export const issueLabels = pgTable(
     pk: primaryKey({ columns: [table.issueId, table.labelId] }),
   })
 );
+
+// ============ ISSUE RELATIONS ============
+
+/**
+ * Issue relations table - tracks dependencies between issues
+ * Supports: blocks, blocked_by, relates_to, duplicates, duplicated_by
+ */
+export const issueRelations = pgTable(
+  'issue_relations',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    issueId: uuid('issue_id')
+      .notNull()
+      .references(() => issues.id, { onDelete: 'cascade' }),
+    relatedIssueId: uuid('related_issue_id')
+      .notNull()
+      .references(() => issues.id, { onDelete: 'cascade' }),
+    type: issueRelationTypeEnum('type').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    createdById: text('created_by_id').notNull(),
+  },
+  (table) => ({
+    uniqueRelation: unique().on(table.issueId, table.relatedIssueId, table.type),
+  })
+);
+
+// ============ PROJECTS (Linear-style) ============
+
+/**
+ * Projects table - larger units of work containing multiple issues
+ * Similar to Linear projects with status, lead, members, and timeline
+ */
+export const projects = pgTable('projects', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  repoId: uuid('repo_id')
+    .notNull()
+    .references(() => repositories.id, { onDelete: 'cascade' }),
+  
+  name: text('name').notNull(),
+  description: text('description'),
+  icon: text('icon'), // emoji or icon identifier
+  color: text('color').default('888888'),
+  
+  status: projectStatusEnum('status').notNull().default('backlog'),
+  
+  // Project lead
+  leadId: text('lead_id'),
+  
+  // Timeline
+  startDate: timestamp('start_date', { withTimezone: true }),
+  targetDate: timestamp('target_date', { withTimezone: true }),
+  completedAt: timestamp('completed_at', { withTimezone: true }),
+  
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+/**
+ * Project members - users participating in a project
+ */
+export const projectMembers = pgTable(
+  'project_members',
+  {
+    projectId: uuid('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    userId: text('user_id').notNull(),
+    role: text('role').default('member'), // 'lead', 'member'
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.projectId, table.userId] }),
+  })
+);
+
+/**
+ * Project updates/check-ins - status updates for projects
+ */
+export const projectUpdates = pgTable('project_updates', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  projectId: uuid('project_id')
+    .notNull()
+    .references(() => projects.id, { onDelete: 'cascade' }),
+  authorId: text('author_id').notNull(),
+  body: text('body').notNull(),
+  health: projectHealthEnum('health'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// ============ CYCLES/SPRINTS ============
+
+/**
+ * Cycles table - time-boxed iterations (sprints)
+ * Similar to Linear cycles with start/end dates and velocity tracking
+ */
+export const cycles = pgTable('cycles', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  repoId: uuid('repo_id')
+    .notNull()
+    .references(() => repositories.id, { onDelete: 'cascade' }),
+  
+  name: text('name').notNull(), // "Sprint 1", "Cycle 23", etc.
+  number: integer('number').notNull(), // Auto-incrementing per repo
+  description: text('description'),
+  
+  startDate: timestamp('start_date', { withTimezone: true }).notNull(),
+  endDate: timestamp('end_date', { withTimezone: true }).notNull(),
+  
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// ============ ISSUE TEMPLATES ============
+
+/**
+ * Issue templates - reusable templates for creating issues
+ */
+export const issueTemplates = pgTable('issue_templates', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  repoId: uuid('repo_id')
+    .notNull()
+    .references(() => repositories.id, { onDelete: 'cascade' }),
+  
+  name: text('name').notNull(),
+  description: text('description'),
+  
+  titleTemplate: text('title_template'),
+  bodyTemplate: text('body_template'),
+  
+  // Default values (JSON for labels array)
+  defaultLabels: text('default_labels'), // JSON array of label IDs
+  defaultAssigneeId: text('default_assignee_id'),
+  defaultPriority: text('default_priority'),
+  defaultStatus: text('default_status'),
+  
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// ============ SAVED VIEWS ============
+
+/**
+ * Issue views - saved filter configurations
+ */
+export const issueViews = pgTable('issue_views', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  repoId: uuid('repo_id')
+    .notNull()
+    .references(() => repositories.id, { onDelete: 'cascade' }),
+  creatorId: text('creator_id').notNull(),
+  
+  name: text('name').notNull(),
+  description: text('description'),
+  
+  // JSON filter configuration
+  filters: text('filters').notNull(),
+  // JSON: groupBy, sortBy, viewType (list/board/timeline)
+  displayOptions: text('display_options'),
+  
+  isShared: boolean('is_shared').notNull().default(false),
+  
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// ============ ISSUE ACTIVITY LOG ============
+
+/**
+ * Issue activities - audit log for all issue changes
+ */
+export const issueActivities = pgTable('issue_activities', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  issueId: uuid('issue_id')
+    .notNull()
+    .references(() => issues.id, { onDelete: 'cascade' }),
+  actorId: text('actor_id').notNull(),
+  
+  // Action type: 'created', 'updated', 'status_changed', 'assigned', 'labeled', etc.
+  action: text('action').notNull(),
+  
+  // Which field changed (for updates)
+  field: text('field'),
+  oldValue: text('old_value'),
+  newValue: text('new_value'),
+  
+  // Additional context as JSON
+  metadata: text('metadata'),
+  
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
 
 export const prLabels = pgTable(
   'pr_labels',
@@ -1219,7 +1464,41 @@ export type NewWebhook = typeof webhooks.$inferInsert;
 export type MilestoneState = (typeof milestoneStateEnum.enumValues)[number];
 export type IssueState = (typeof issueStateEnum.enumValues)[number];
 export type IssueStatus = (typeof issueStatusEnum.enumValues)[number];
+export type IssuePriority = (typeof issuePriorityEnum.enumValues)[number];
+export type IssueRelationType = (typeof issueRelationTypeEnum.enumValues)[number];
+export type ProjectStatus = (typeof projectStatusEnum.enumValues)[number];
+export type ProjectHealth = (typeof projectHealthEnum.enumValues)[number];
 export type PrState = (typeof prStateEnum.enumValues)[number];
+
+// Issue Relations
+export type IssueRelation = typeof issueRelations.$inferSelect;
+export type NewIssueRelation = typeof issueRelations.$inferInsert;
+
+// Projects
+export type Project = typeof projects.$inferSelect;
+export type NewProject = typeof projects.$inferInsert;
+
+export type ProjectMember = typeof projectMembers.$inferSelect;
+export type NewProjectMember = typeof projectMembers.$inferInsert;
+
+export type ProjectUpdate = typeof projectUpdates.$inferSelect;
+export type NewProjectUpdate = typeof projectUpdates.$inferInsert;
+
+// Cycles
+export type Cycle = typeof cycles.$inferSelect;
+export type NewCycle = typeof cycles.$inferInsert;
+
+// Issue Templates
+export type IssueTemplate = typeof issueTemplates.$inferSelect;
+export type NewIssueTemplate = typeof issueTemplates.$inferInsert;
+
+// Issue Views
+export type IssueView = typeof issueViews.$inferSelect;
+export type NewIssueView = typeof issueViews.$inferInsert;
+
+// Issue Activities
+export type IssueActivity = typeof issueActivities.$inferSelect;
+export type NewIssueActivity = typeof issueActivities.$inferInsert;
 
 // Workflow run types
 export type WorkflowRunState = 'queued' | 'in_progress' | 'completed' | 'failed' | 'cancelled';
