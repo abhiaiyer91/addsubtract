@@ -30,17 +30,20 @@ export function useGlobalShortcuts() {
   }, { enableOnFormTags: false });
 
   // g then h - Go home
-  useHotkeys('g h', () => {
+  useHotkeys('g h', (e) => {
+    e.preventDefault();
     navigate('/');
   }, { enableOnFormTags: false });
 
   // g then n - Go to notifications
-  useHotkeys('g n', () => {
+  useHotkeys('g n', (e) => {
+    e.preventDefault();
     navigate('/notifications');
   }, { enableOnFormTags: false });
 
   // g then s - Go to settings
-  useHotkeys('g s', () => {
+  useHotkeys('g s', (e) => {
+    e.preventDefault();
     navigate('/settings');
   }, { enableOnFormTags: false });
 }
@@ -60,27 +63,32 @@ export function useRepoShortcuts() {
   }, [params.owner, params.repo]);
 
   // g then c - Go to code
-  useHotkeys('g c', () => {
+  useHotkeys('g c', (e) => {
+    e.preventDefault();
     if (repoPath) navigate(repoPath);
   }, { enableOnFormTags: false, enabled: !!repoPath });
 
   // g then i - Go to issues
-  useHotkeys('g i', () => {
+  useHotkeys('g i', (e) => {
+    e.preventDefault();
     if (repoPath) navigate(`${repoPath}/issues`);
   }, { enableOnFormTags: false, enabled: !!repoPath });
 
   // g then p - Go to pull requests
-  useHotkeys('g p', () => {
+  useHotkeys('g p', (e) => {
+    e.preventDefault();
     if (repoPath) navigate(`${repoPath}/pulls`);
   }, { enableOnFormTags: false, enabled: !!repoPath });
 
   // g then a - Go to actions
-  useHotkeys('g a', () => {
+  useHotkeys('g a', (e) => {
+    e.preventDefault();
     if (repoPath) navigate(`${repoPath}/actions`);
   }, { enableOnFormTags: false, enabled: !!repoPath });
 
   // g then b - Go to branches
-  useHotkeys('g b', () => {
+  useHotkeys('g b', (e) => {
+    e.preventDefault();
     if (repoPath) navigate(`${repoPath}/branches`);
   }, { enableOnFormTags: false, enabled: !!repoPath });
 
@@ -100,26 +108,30 @@ export function useListShortcuts(options: {
   const { items, selectedIndex, onSelect, onOpen, onCreate } = options;
 
   // j - Next item
-  useHotkeys('j', () => {
+  useHotkeys('j', (e) => {
+    e.preventDefault();
     const nextIndex = Math.min(selectedIndex + 1, items.length - 1);
     onSelect(nextIndex);
   }, { enableOnFormTags: false });
 
   // k - Previous item
-  useHotkeys('k', () => {
+  useHotkeys('k', (e) => {
+    e.preventDefault();
     const prevIndex = Math.max(selectedIndex - 1, 0);
     onSelect(prevIndex);
   }, { enableOnFormTags: false });
 
   // o or Enter - Open selected
-  useHotkeys('o, enter', () => {
+  useHotkeys('o, enter', (e) => {
+    e.preventDefault();
     if (onOpen && items[selectedIndex]) {
       onOpen(items[selectedIndex]);
     }
   }, { enableOnFormTags: false });
 
   // c - Create new
-  useHotkeys('c', () => {
+  useHotkeys('c', (e) => {
+    e.preventDefault();
     if (onCreate) onCreate();
   }, { enableOnFormTags: false });
 }
