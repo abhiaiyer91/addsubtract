@@ -51,32 +51,34 @@ export function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-14 items-center justify-between">
+    <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur-xl">
+      <div className="container flex h-16 items-center justify-between">
         {/* Left section - Logo + Nav */}
-        <div className="flex items-center gap-6">
-          <Link to="/" className="flex items-center gap-2">
-            <GitBranch className="h-6 w-6 text-primary" />
+        <div className="flex items-center gap-8">
+          <Link to="/" className="flex items-center gap-2.5 group">
+            <div className="p-1.5 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+              <GitBranch className="h-5 w-5 text-primary" />
+            </div>
             <span className="font-bold text-xl tracking-tight">wit</span>
           </Link>
 
           {authenticated && (
-            <nav className="hidden md:flex items-center gap-4">
+            <nav className="hidden md:flex items-center gap-1">
               <Link
                 to="/explore"
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                className="px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-full transition-all duration-200"
               >
                 Explore
               </Link>
               <Link
                 to="/pulls"
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                className="px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-full transition-all duration-200"
               >
                 Pull requests
               </Link>
               <Link
                 to="/issues"
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                className="px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-full transition-all duration-200"
               >
                 Issues
               </Link>
