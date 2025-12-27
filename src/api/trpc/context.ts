@@ -51,22 +51,46 @@ export async function createContext(c: HonoContext): Promise<Context> {
   let user: AuthUser | null = null;
 
   try {
-    // Use better-auth to validate session
-    const auth = createAuth();
-    const session = await auth.api.getSession({
-      headers: req.headers,
-    });
+    // Check for Bearer token first (for API/test usage)
+    const authHeader = req.headers.get('authorization');
+    if (authHeader?.startsWith('Bearer ')) {
+      const token = authHeader.slice(7);
+      
+      // Validate token with better-auth
+      const auth = createAuth();
+      const session = await auth.api.getSession({
+        headers: new Headers({
+          'cookie': `better-auth.session_token=${token}`,
+        }),
+      });
 
-    if (session?.user) {
-      // Cast to SessionUser to access username from the username plugin
-      const sessionUser = session.user as SessionUser;
-      user = {
-        id: sessionUser.id,
-        email: sessionUser.email,
-        name: sessionUser.name,
-        username: sessionUser.username,
-        image: sessionUser.image,
-      };
+      if (session?.user) {
+        const sessionUser = session.user as SessionUser;
+        user = {
+          id: sessionUser.id,
+          email: sessionUser.email,
+          name: sessionUser.name,
+          username: sessionUser.username,
+          image: sessionUser.image,
+        };
+      }
+    } else {
+      // Use better-auth to validate session from cookies
+      const auth = createAuth();
+      const session = await auth.api.getSession({
+        headers: req.headers,
+      });
+
+      if (session?.user) {
+        const sessionUser = session.user as SessionUser;
+        user = {
+          id: sessionUser.id,
+          email: sessionUser.email,
+          name: sessionUser.name,
+          username: sessionUser.username,
+          image: sessionUser.image,
+        };
+      }
     }
   } catch {
     // Session lookup failed, user remains null
