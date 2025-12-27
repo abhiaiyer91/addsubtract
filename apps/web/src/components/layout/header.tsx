@@ -3,22 +3,16 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
   GitBranch,
   Search,
-  Bell,
+  Inbox,
   Plus,
   ChevronDown,
   Settings,
   LogOut,
   User,
   BookOpen,
-  Check,
-  GitPullRequest,
-  CircleDot,
-  MessageSquare,
-  AtSign,
   Menu,
   X,
   Building2,
-  Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -32,7 +26,6 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useSession, signOut } from '@/lib/auth-client';
 import { trpc } from '@/lib/trpc';
-import { formatRelativeTime } from '@/lib/utils';
 import { useCommandPaletteStore } from '@/hooks/useCommandPalette';
 import { isMac } from '@/lib/commands';
 
@@ -79,18 +72,6 @@ export function Header() {
                   className="px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-full transition-all duration-200"
                 >
                   Explore
-                </Link>
-                <Link
-                  to="/pulls"
-                  className="px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-full transition-all duration-200"
-                >
-                  Pull requests
-                </Link>
-                <Link
-                  to="/issues"
-                  className="px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-full transition-all duration-200"
-                >
-                  Issues
                 </Link>
               </nav>
             )}
@@ -151,8 +132,8 @@ export function Header() {
                 {/* Organization Switcher */}
                 <OrganizationSwitcher />
 
-                {/* Notifications */}
-                <NotificationsDropdown />
+                {/* Inbox button */}
+                <InboxButton />
 
                 {/* User menu */}
                 <DropdownMenu>
@@ -251,6 +232,14 @@ export function Header() {
               {authenticated && (
                 <>
                   <Link
+                    to="/inbox"
+                    className="flex items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-lg transition-all"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <Inbox className="h-4 w-4" />
+                    Inbox
+                  </Link>
+                  <Link
                     to="/explore"
                     className="flex items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-lg transition-all"
                     onClick={() => setMobileMenuOpen(false)}
@@ -259,39 +248,23 @@ export function Header() {
                     Explore
                   </Link>
                   <Link
-                    to="/pulls"
+                    to="/new"
                     className="flex items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-lg transition-all"
                     onClick={() => setMobileMenuOpen(false)}
                   >
-                    <GitPullRequest className="h-4 w-4" />
-                    Pull requests
+                    <Plus className="h-4 w-4" />
+                    New repository
                   </Link>
                   <Link
-                    to="/issues"
+                    to="/orgs/new"
                     className="flex items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-lg transition-all"
                     onClick={() => setMobileMenuOpen(false)}
                   >
-                    <CircleDot className="h-4 w-4" />
-                    Issues
+                    <Building2 className="h-4 w-4" />
+                    New organization
                   </Link>
-                    <Link
-                      to="/new"
-                      className="flex items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-lg transition-all"
-                      onClick={() => setMobileMenuOpen(false)}
-                    >
-                      <Plus className="h-4 w-4" />
-                      New repository
-                    </Link>
-                    <Link
-                      to="/orgs/new"
-                      className="flex items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-lg transition-all"
-                      onClick={() => setMobileMenuOpen(false)}
-                    >
-                      <Building2 className="h-4 w-4" />
-                      New organization
-                    </Link>
-                  </>
-                )}
+                </>
+              )}
               {!authenticated && (
                 <>
                   <Link
@@ -371,124 +344,23 @@ function OrganizationSwitcher() {
   );
 }
 
-function NotificationsDropdown() {
+function InboxButton() {
   const navigate = useNavigate();
   const { data: unreadCount } = trpc.notifications.unreadCount.useQuery();
-  const { data: notifications } = trpc.notifications.list.useQuery({ limit: 10 });
-  const utils = trpc.useUtils();
-  
-  const markAsRead = trpc.notifications.markAsRead.useMutation({
-    onSuccess: () => {
-      utils.notifications.unreadCount.invalidate();
-      utils.notifications.list.invalidate();
-    },
-  });
-
-  const markAllAsRead = trpc.notifications.markAllAsRead.useMutation({
-    onSuccess: () => {
-      utils.notifications.unreadCount.invalidate();
-      utils.notifications.list.invalidate();
-    },
-  });
-
-  const getNotificationIcon = (type: string) => {
-    switch (type) {
-      case 'pr_review_requested':
-      case 'pr_reviewed':
-      case 'pr_merged':
-        return <GitPullRequest className="h-4 w-4 text-purple-500" />;
-      case 'pr_comment':
-      case 'issue_comment':
-        return <MessageSquare className="h-4 w-4 text-blue-500" />;
-      case 'issue_assigned':
-        return <CircleDot className="h-4 w-4 text-green-500" />;
-      case 'mention':
-        return <AtSign className="h-4 w-4 text-yellow-500" />;
-      default:
-        return <Bell className="h-4 w-4 text-muted-foreground" />;
-    }
-  };
-
-  const handleNotificationClick = (notification: any) => {
-    if (!notification.read) {
-      markAsRead.mutate({ id: notification.id });
-    }
-    if (notification.url) {
-      navigate(notification.url);
-    }
-  };
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative h-9 w-9">
-          <Bell className="h-4 w-4" />
-          {unreadCount && unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 h-4 w-4 bg-blue-500 rounded-full text-[10px] flex items-center justify-center text-white font-medium">
-              {unreadCount > 9 ? '9+' : unreadCount}
-            </span>
-          )}
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-80">
-        <DropdownMenuLabel className="flex items-center justify-between">
-          <span>Notifications</span>
-          {unreadCount && unreadCount > 0 && (
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="h-auto p-0 text-xs text-muted-foreground hover:text-foreground"
-              onClick={() => markAllAsRead.mutate()}
-            >
-              <Check className="h-3 w-3 mr-1" />
-              Mark all read
-            </Button>
-          )}
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        {!notifications || notifications.length === 0 ? (
-          <div className="p-4 text-center text-sm text-muted-foreground">
-            No notifications
-          </div>
-        ) : (
-          <>
-            {notifications.map((notification) => (
-              <DropdownMenuItem
-                key={notification.id}
-                className={`flex items-start gap-3 p-3 cursor-pointer ${!notification.read ? 'bg-muted/50' : ''}`}
-                onClick={() => handleNotificationClick(notification)}
-              >
-                <div className="mt-0.5">
-                  {getNotificationIcon(notification.type)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className={`text-sm truncate ${!notification.read ? 'font-medium' : ''}`}>
-                    {notification.title}
-                  </p>
-                  {notification.actor && (
-                    <p className="text-xs text-muted-foreground">
-                      {notification.actor.name || notification.actor.username}
-                    </p>
-                  )}
-                  <p className="text-xs text-muted-foreground">
-                    {formatRelativeTime(notification.createdAt)}
-                  </p>
-                </div>
-                {!notification.read && (
-                  <div className="h-2 w-2 bg-blue-500 rounded-full mt-1.5" />
-                )}
-              </DropdownMenuItem>
-            ))}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem 
-              className="text-center text-sm text-primary justify-center"
-              onClick={() => navigate('/notifications')}
-            >
-              View all notifications
-            </DropdownMenuItem>
-          </>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <Button 
+      variant="ghost" 
+      size="icon" 
+      className="relative h-9 w-9"
+      onClick={() => navigate('/inbox')}
+    >
+      <Inbox className="h-4 w-4" />
+      {unreadCount && unreadCount > 0 && (
+        <span className="absolute -top-1 -right-1 h-4 w-4 bg-blue-500 rounded-full text-[10px] flex items-center justify-center text-white font-medium">
+          {unreadCount > 9 ? '9+' : unreadCount}
+        </span>
+      )}
+    </Button>
   );
 }

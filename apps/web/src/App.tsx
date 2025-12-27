@@ -46,8 +46,7 @@ import { OrgMembersPage } from './routes/org/members';
 import { OrgTeamsPage } from './routes/org/teams';
 import { TeamDetailPage } from './routes/org/team-detail';
 import { SearchPage } from './routes/search';
-import { PullsInboxPage } from './routes/pulls';
-import { IssuesInboxPage } from './routes/issues';
+import { InboxPage } from './routes/inbox';
 
 export function App() {
   return (
@@ -71,8 +70,7 @@ export function App() {
             <Route path="/agent" element={<AgentPage />} />
             <Route path="/orgs/new" element={<NewOrgPage />} />
             <Route path="/search" element={<SearchPage />} />
-            <Route path="/pulls" element={<PullsInboxPage />} />
-            <Route path="/issues" element={<IssuesInboxPage />} />
+            <Route path="/inbox" element={<InboxPage />} />
 
             {/* Organization routes */}
             <Route path="/org/:slug" element={<OrgPage />} />
