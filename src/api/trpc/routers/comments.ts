@@ -274,10 +274,14 @@ export const commentsRouter = router({
     .input(
       z.object({
         prId: z.string().uuid(),
-        path: z.string(),
+        path: z.string().optional(),
       })
     )
     .query(async ({ input }) => {
-      return prCommentModel.listByFile(input.prId, input.path);
+      if (input.path) {
+        return prCommentModel.listByFile(input.prId, input.path);
+      }
+      // List all file comments (comments with path defined)
+      return prCommentModel.listFileComments(input.prId);
     }),
 });

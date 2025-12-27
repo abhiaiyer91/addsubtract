@@ -78,16 +78,32 @@ export const authRouter = router({
   login: publicProcedure
     .input(
       z.object({
-        email: z.string().email(),
+        usernameOrEmail: z.string(),
         password: z.string(),
       })
     )
     .mutation(async ({ input }) => {
       const auth = createAuth();
       
+      // Determine if input is email or username
+      const isEmail = input.usernameOrEmail.includes('@');
+      let email = input.usernameOrEmail;
+      
+      // If username provided, look up email
+      if (!isEmail) {
+        const user = await userModel.findByUsername(input.usernameOrEmail);
+        if (!user) {
+          throw new TRPCError({
+            code: 'UNAUTHORIZED',
+            message: 'Invalid credentials',
+          });
+        }
+        email = user.email;
+      }
+      
       const result = await auth.api.signInEmail({
         body: {
-          email: input.email,
+          email,
           password: input.password,
         },
       });
@@ -147,7 +163,7 @@ export const authRouter = router({
     .input(
       z.object({
         name: z.string().max(255).optional(),
-        bio: z.string().max(256).nullable().optional(),
+        bio: z.string().max(500).nullable().optional(),
         location: z.string().max(100).nullable().optional(),
         website: z.string().url().max(255).nullable().optional().or(z.literal('')),
         avatarUrl: z.string().url().max(500).nullable().optional().or(z.literal('')),

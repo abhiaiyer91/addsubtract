@@ -169,7 +169,7 @@ export const usersRouter = router({
     .input(
       z.object({
         name: z.string().max(255).optional(),
-        bio: z.string().max(256).nullable().optional(),
+        bio: z.string().max(500).nullable().optional(),
         location: z.string().max(100).nullable().optional(),
         website: z.string().url().max(255).nullable().optional().or(z.literal('')),
         avatarUrl: z.string().url().max(500).nullable().optional().or(z.literal('')),

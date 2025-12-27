@@ -27,7 +27,8 @@ export const webhookModel = {
       .select()
       .from(webhooks)
       .where(eq(webhooks.id, id));
-    return webhook;
+    if (!webhook) return undefined;
+    return { ...webhook, events: this.parseEvents(webhook) as any };
   },
 
   /**
@@ -35,7 +36,8 @@ export const webhookModel = {
    */
   async listByRepo(repoId: string): Promise<Webhook[]> {
     const db = getDb();
-    return db.select().from(webhooks).where(eq(webhooks.repoId, repoId));
+    const results = await db.select().from(webhooks).where(eq(webhooks.repoId, repoId));
+    return results.map(w => ({ ...w, events: this.parseEvents(w) as any }));
   },
 
   /**
@@ -85,7 +87,7 @@ export const webhookModel = {
         isActive: data.isActive ?? true,
       })
       .returning();
-    return webhook;
+    return { ...webhook, events: data.events as any };
   },
 
   /**
@@ -107,7 +109,7 @@ export const webhookModel = {
     };
 
     if (data.url !== undefined) updateData.url = data.url;
-    if (data.secret !== undefined) updateData.secret = data.secret;
+    if (data.secret !== undefined) updateData.secret = data.secret === null ? null : data.secret;
     if (data.events !== undefined) updateData.events = JSON.stringify(data.events);
     if (data.isActive !== undefined) updateData.isActive = data.isActive;
 
@@ -116,7 +118,8 @@ export const webhookModel = {
       .set(updateData)
       .where(eq(webhooks.id, id))
       .returning();
-    return webhook;
+    if (!webhook) return undefined;
+    return { ...webhook, events: this.parseEvents(webhook) as any };
   },
 
   /**
