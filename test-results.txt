@@ -1,43 +1,10 @@
-⎯⎯⎯⎯ Failed Tests 74 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
-
- FAIL  tests/integration/inbox.test.ts > PR Inbox > PR Creation and Review Requests > requests a review and shows in reviewer's inbox
- FAIL  tests/integration/inbox.test.ts > PR Inbox > Review Request Management > removes a review request
- FAIL  tests/integration/inbox.test.ts > PR Inbox > Inbox Data Enrichment > includes author information in inbox PRs
-TRPCClientError: [
-  {
-    "validation": "uuid",
-    "code": "invalid_string",
-    "message": "Invalid uuid",
-    "path": [
-      "reviewerId"
-    ]
-  }
-]
- ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
- ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/74]⎯
-
- FAIL  tests/integration/inbox.test.ts > PR Inbox > PR Creation and Review Requests > lists reviewers for a PR
-AssertionError: expected 0 to be greater than or equal to 1
- ❯ tests/integration/inbox.test.ts:156:32
-    154|
-    155|       const reviewers = await authorApi.pulls.reviewers.query({ prId });
-    156|       expect(reviewers.length).toBeGreaterThanOrEqual(1);
-       |                                ^
-    157|       expect(reviewers.some(r => r.userId === reviewerId)).toBe(true);
-    158|       expect(reviewers[0].state).toBe('pending');
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/74]⎯
+⎯⎯ Failed Tests 45 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
 
  FAIL  tests/integration/inbox.test.ts > PR Inbox > Review Submission > marks review as completed when review is submitted
-AssertionError: expected undefined to be 'completed' // Object.is equality
+AssertionError: expected 'pending' to be 'completed' // Object.is equality
 
-- Expected:
-"completed"
-
-+ Received:
-undefined
+Expected: "completed"
+Received: "pending"
 
  ❯ tests/integration/inbox.test.ts:181:36
     179|       const reviewers = await authorApi.pulls.reviewers.query({ prId });
@@ -47,247 +14,55 @@ undefined
     182|     });
     183|
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/74]⎯
-
- FAIL  tests/integration/organizations.test.ts > Organizations Flow > Organization CRUD > creates an organization
-TRPCClientError: Failed query: insert into "org_members" ("org_id", "user_id", "role", "created_at") values ($1, $2, $3, default)
-params: ea14cc57-6dc0-45f5-874c-5f9a6c6f46f6,XCRKk0itfEkRIgXWUz3r72rf4nqNLMOa,owner
- ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
- ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/74]⎯
-
- FAIL  tests/integration/organizations.test.ts > Organizations Flow > Organization CRUD > fails to create org with duplicate name
-TRPCClientError: Failed query: insert into "org_members" ("org_id", "user_id", "role", "created_at") values ($1, $2, $3, default)
-params: a62d0126-c55e-41e0-8e6e-5bbee1ee87c5,XCRKk0itfEkRIgXWUz3r72rf4nqNLMOa,owner
- ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
- ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/74]⎯
-
- FAIL  tests/integration/organizations.test.ts > Organizations Flow > Organization CRUD > checks organization name availability
-TRPCClientError: Failed query: insert into "org_members" ("org_id", "user_id", "role", "created_at") values ($1, $2, $3, default)
-params: b4f0237c-e8cf-4f56-8481-76eb2effe4d6,XCRKk0itfEkRIgXWUz3r72rf4nqNLMOa,owner
- ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
- ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/74]⎯
-
- FAIL  tests/integration/organizations.test.ts > Organizations Flow > Organization CRUD > gets organization by name
-TRPCClientError: Failed query: insert into "org_members" ("org_id", "user_id", "role", "created_at") values ($1, $2, $3, default)
-params: 38d6b486-8d3e-4786-8d98-7311e1517828,XCRKk0itfEkRIgXWUz3r72rf4nqNLMOa,owner
- ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
- ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/74]⎯
-
- FAIL  tests/integration/organizations.test.ts > Organizations Flow > Organization CRUD > gets organization by ID
-TRPCClientError: Failed query: insert into "org_members" ("org_id", "user_id", "role", "created_at") values ($1, $2, $3, default)
-params: 3a1b9850-56d0-4200-8215-6554fe966c71,XCRKk0itfEkRIgXWUz3r72rf4nqNLMOa,owner
- ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
- ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/74]⎯
-
- FAIL  tests/integration/organizations.test.ts > Organizations Flow > Organization CRUD > updates organization
-TRPCClientError: Failed query: insert into "org_members" ("org_id", "user_id", "role", "created_at") values ($1, $2, $3, default)
-params: 2aa1eb21-ac50-405a-82a8-6a96af58fd1d,XCRKk0itfEkRIgXWUz3r72rf4nqNLMOa,owner
- ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
- ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/74]⎯
-
- FAIL  tests/integration/organizations.test.ts > Organizations Flow > Organization CRUD > fails to update org without permission
-TRPCClientError: Failed query: insert into "org_members" ("org_id", "user_id", "role", "created_at") values ($1, $2, $3, default)
-params: 9d357351-9de2-417b-854e-2b911683e146,XCRKk0itfEkRIgXWUz3r72rf4nqNLMOa,owner
- ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
- ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/74]⎯
-
- FAIL  tests/integration/organizations.test.ts > Organizations Flow > Organization CRUD > searches organizations
-TRPCClientError: Failed query: insert into "org_members" ("org_id", "user_id", "role", "created_at") values ($1, $2, $3, default)
-params: 46c99174-1838-4d27-bebb-e8b64880f095,XCRKk0itfEkRIgXWUz3r72rf4nqNLMOa,owner
- ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
- ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/74]⎯
-
- FAIL  tests/integration/organizations.test.ts > Organizations Flow > Organization CRUD > deletes organization
-TRPCClientError: Failed query: insert into "org_members" ("org_id", "user_id", "role", "created_at") values ($1, $2, $3, default)
-params: 703cd9fd-016b-48e5-8566-8673864092c3,XCRKk0itfEkRIgXWUz3r72rf4nqNLMOa,owner
- ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
- ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/74]⎯
-
- FAIL  tests/integration/organizations.test.ts > Organizations Flow > Organization CRUD > fails to delete org without owner permission
-TRPCClientError: Failed query: insert into "org_members" ("org_id", "user_id", "role", "created_at") values ($1, $2, $3, default)
-params: 65b10553-5697-4e7a-ac6d-fd1e70d5b107,XCRKk0itfEkRIgXWUz3r72rf4nqNLMOa,owner
- ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
- ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/74]⎯
-
- FAIL  tests/integration/organizations.test.ts > Organizations Flow > Member Management > adds a member to organization
-TRPCClientError: Failed query: insert into "org_members" ("org_id", "user_id", "role", "created_at") values ($1, $2, $3, default)
-params: 866fddbd-6e17-466d-97d6-75a12091cc5a,XCRKk0itfEkRIgXWUz3r72rf4nqNLMOa,owner
- ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
- ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/74]⎯
-
- FAIL  tests/integration/organizations.test.ts > Organizations Flow > Member Management > fails to add duplicate member
-TRPCClientError: Failed query: insert into "org_members" ("org_id", "user_id", "role", "created_at") values ($1, $2, $3, default)
-params: 001f190a-a79b-47a3-a47f-30952f34f6f6,XCRKk0itfEkRIgXWUz3r72rf4nqNLMOa,owner
- ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
- ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/74]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/45]⎯
 
  FAIL  tests/integration/organizations.test.ts > Organizations Flow > Member Management > lists organization members
-TRPCClientError: Failed query: insert into "org_members" ("org_id", "user_id", "role", "created_at") values ($1, $2, $3, default)
-params: 2218edd9-28c6-4add-aa1d-54aa5073a598,XCRKk0itfEkRIgXWUz3r72rf4nqNLMOa,owner
+TRPCClientError: Failed query: select "org_members"."org_id", "org_members"."user_id", "org_members"."role", "org_members"."created_at", "users"."id", "users"."username", "users"."email", "users"."name", "users"."avatar_url", "users"."bio", "users"."location", "users"."website", "users"."password_hash", "users"."created_at", "users"."updated_at" from "org_members" inner join "users" on "org_members"."user_id" = "users"."id" where "org_members"."org_id" = $1
+params: 58826ac3-f361-4d12-9227-435a33ec83ac
  ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
  ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/74]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/45]⎯
 
  FAIL  tests/integration/organizations.test.ts > Organizations Flow > Member Management > updates member role
-TRPCClientError: Failed query: insert into "org_members" ("org_id", "user_id", "role", "created_at") values ($1, $2, $3, default)
-params: 5fa449e8-b377-43d2-8d89-e6df2c140af0,XCRKk0itfEkRIgXWUz3r72rf4nqNLMOa,owner
+TRPCClientError: Failed query: select "org_members"."org_id", "org_members"."user_id", "org_members"."role", "org_members"."created_at", "users"."id", "users"."username", "users"."email", "users"."name", "users"."avatar_url", "users"."bio", "users"."location", "users"."website", "users"."password_hash", "users"."created_at", "users"."updated_at" from "org_members" inner join "users" on "org_members"."user_id" = "users"."id" where ("org_members"."org_id" = $1 and "org_members"."role" = $2)
+params: 3eb6025a-cb93-4a91-8120-30a6241a03ee,owner
  ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
  ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/74]⎯
-
- FAIL  tests/integration/organizations.test.ts > Organizations Flow > Member Management > fails to demote last owner
-TRPCClientError: Failed query: insert into "org_members" ("org_id", "user_id", "role", "created_at") values ($1, $2, $3, default)
-params: c86e8ad0-424e-402b-8768-79aaa6af2322,XCRKk0itfEkRIgXWUz3r72rf4nqNLMOa,owner
- ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
- ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/74]⎯
-
- FAIL  tests/integration/organizations.test.ts > Organizations Flow > Member Management > checks membership
-TRPCClientError: Failed query: insert into "org_members" ("org_id", "user_id", "role", "created_at") values ($1, $2, $3, default)
-params: 511f93bf-8b11-43d9-aa32-34e616e1d3c2,XCRKk0itfEkRIgXWUz3r72rf4nqNLMOa,owner
- ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
- ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[19/74]⎯
-
- FAIL  tests/integration/organizations.test.ts > Organizations Flow > Member Management > removes member from organization
-TRPCClientError: Failed query: insert into "org_members" ("org_id", "user_id", "role", "created_at") values ($1, $2, $3, default)
-params: 6d38726b-4c7b-486d-84e2-b21ba1fc7342,XCRKk0itfEkRIgXWUz3r72rf4nqNLMOa,owner
- ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
- ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[20/74]⎯
-
- FAIL  tests/integration/organizations.test.ts > Organizations Flow > Member Management > member can remove themselves
-TRPCClientError: Failed query: insert into "org_members" ("org_id", "user_id", "role", "created_at") values ($1, $2, $3, default)
-params: 1309650f-40a2-4f11-a8f0-b26846713ed7,XCRKk0itfEkRIgXWUz3r72rf4nqNLMOa,owner
- ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
- ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[21/74]⎯
-
- FAIL  tests/integration/organizations.test.ts > Organizations Flow > Member Management > lists organizations for user
-TRPCClientError: Failed query: insert into "org_members" ("org_id", "user_id", "role", "created_at") values ($1, $2, $3, default)
-params: 5469316b-238b-4b80-aca6-ee6e21f5a77d,XCRKk0itfEkRIgXWUz3r72rf4nqNLMOa,owner
- ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
- ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22/74]⎯
-
- FAIL  tests/integration/organizations.test.ts > Organizations Flow > Team Management > creates a team
-TRPCClientError: Failed query: insert into "org_members" ("org_id", "user_id", "role", "created_at") values ($1, $2, $3, default)
-params: 54b87c29-7df1-4e7f-96c6-ec9283c2e329,XCRKk0itfEkRIgXWUz3r72rf4nqNLMOa,owner
- ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
- ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[23/74]⎯
-
- FAIL  tests/integration/organizations.test.ts > Organizations Flow > Team Management > fails to create duplicate team name
-TRPCClientError: Failed query: insert into "org_members" ("org_id", "user_id", "role", "created_at") values ($1, $2, $3, default)
-params: 799df98a-8d0f-4d9b-916a-66cc6f2617ce,XCRKk0itfEkRIgXWUz3r72rf4nqNLMOa,owner
- ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
- ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[24/74]⎯
-
- FAIL  tests/integration/organizations.test.ts > Organizations Flow > Team Management > lists teams in organization
-TRPCClientError: Failed query: insert into "org_members" ("org_id", "user_id", "role", "created_at") values ($1, $2, $3, default)
-params: 98bcbad0-e083-4e4c-9c12-cc3763b7a921,XCRKk0itfEkRIgXWUz3r72rf4nqNLMOa,owner
- ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
- ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[25/74]⎯
-
- FAIL  tests/integration/organizations.test.ts > Organizations Flow > Team Management > gets team by ID
-TRPCClientError: Failed query: insert into "org_members" ("org_id", "user_id", "role", "created_at") values ($1, $2, $3, default)
-params: 89d3f116-d9a0-4dbd-a48d-3f08aa5f85b4,XCRKk0itfEkRIgXWUz3r72rf4nqNLMOa,owner
- ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
- ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[26/74]⎯
-
- FAIL  tests/integration/organizations.test.ts > Organizations Flow > Team Management > updates a team
-TRPCClientError: Failed query: insert into "org_members" ("org_id", "user_id", "role", "created_at") values ($1, $2, $3, default)
-params: ad20f181-6c82-4b6c-80ca-6407a8f479ab,XCRKk0itfEkRIgXWUz3r72rf4nqNLMOa,owner
- ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
- ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[27/74]⎯
-
- FAIL  tests/integration/organizations.test.ts > Organizations Flow > Team Management > deletes a team
-TRPCClientError: Failed query: insert into "org_members" ("org_id", "user_id", "role", "created_at") values ($1, $2, $3, default)
-params: df87dd7d-6fa8-41f7-85f1-8b37329cfaed,XCRKk0itfEkRIgXWUz3r72rf4nqNLMOa,owner
- ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
- ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[28/74]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/45]⎯
 
  FAIL  tests/integration/organizations.test.ts > Organizations Flow > Team Management > adds member to team
-TRPCClientError: Failed query: insert into "org_members" ("org_id", "user_id", "role", "created_at") values ($1, $2, $3, default)
-params: fc7d1bcc-9d28-4340-befb-2885f1c458f2,XCRKk0itfEkRIgXWUz3r72rf4nqNLMOa,owner
+TRPCClientError: Failed query: select "team_id", "user_id", "created_at" from "team_members" where ("team_members"."team_id" = $1 and "team_members"."user_id" = $2)
+params: fab596d1-5961-4317-874c-44930cc620d3,qqhtPm9iHK41pJtwYhxAdKDOGsm9O6ZZ
  ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
  ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[29/74]⎯
-
- FAIL  tests/integration/organizations.test.ts > Organizations Flow > Team Management > fails to add non-org member to team
-TRPCClientError: Failed query: insert into "org_members" ("org_id", "user_id", "role", "created_at") values ($1, $2, $3, default)
-params: fd1cbee3-e122-44ed-b7a3-bbd60265de71,XCRKk0itfEkRIgXWUz3r72rf4nqNLMOa,owner
- ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
- ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[30/74]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/45]⎯
 
  FAIL  tests/integration/organizations.test.ts > Organizations Flow > Team Management > lists team members
-TRPCClientError: Failed query: insert into "org_members" ("org_id", "user_id", "role", "created_at") values ($1, $2, $3, default)
-params: dfaf3ca6-1092-4483-a505-379e7f3bd2ab,XCRKk0itfEkRIgXWUz3r72rf4nqNLMOa,owner
+TRPCClientError: Failed query: select "team_id", "user_id", "created_at" from "team_members" where ("team_members"."team_id" = $1 and "team_members"."user_id" = $2)
+params: 5db37dcf-dbdb-4340-8142-8c2e8d5758e3,qqhtPm9iHK41pJtwYhxAdKDOGsm9O6ZZ
  ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
  ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[31/74]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/45]⎯
 
  FAIL  tests/integration/organizations.test.ts > Organizations Flow > Team Management > removes member from team
-TRPCClientError: Failed query: insert into "org_members" ("org_id", "user_id", "role", "created_at") values ($1, $2, $3, default)
-params: ad71813f-00a1-4d80-9b9b-f88d0ad36be9,XCRKk0itfEkRIgXWUz3r72rf4nqNLMOa,owner
+TRPCClientError: Failed query: select "team_id", "user_id", "created_at" from "team_members" where ("team_members"."team_id" = $1 and "team_members"."user_id" = $2)
+params: 6c9f48d5-43f0-4c5b-93d6-fa9b5724e6b3,qqhtPm9iHK41pJtwYhxAdKDOGsm9O6ZZ
  ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
  ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[32/74]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/45]⎯
 
  FAIL  tests/integration/organizations.test.ts > Organizations Flow > Team Management > member can remove themselves from team
-TRPCClientError: Failed query: insert into "org_members" ("org_id", "user_id", "role", "created_at") values ($1, $2, $3, default)
-params: 0d65dc15-6d7e-4b23-b928-7b5b57cd6519,XCRKk0itfEkRIgXWUz3r72rf4nqNLMOa,owner
+TRPCClientError: Failed query: select "team_id", "user_id", "created_at" from "team_members" where ("team_members"."team_id" = $1 and "team_members"."user_id" = $2)
+params: f5f1a06d-2b2b-4d45-8e53-803ea75517ed,qqhtPm9iHK41pJtwYhxAdKDOGsm9O6ZZ
  ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
  ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[33/74]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/45]⎯
 
  FAIL  tests/integration/releases.test.ts > Releases Flow > Release CRUD Operations > gets release by ID
  FAIL  tests/integration/releases.test.ts > Releases Flow > Release CRUD Operations > lists releases
@@ -298,28 +73,28 @@ TRPCClientError: Cannot read properties of undefined (reading 'referencedTable')
  ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
  ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[34/74]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/45]⎯
 
  FAIL  tests/integration/repository-advanced.test.ts > Repository Advanced Features > Repository Forking > forks a public repository
-TRPCClientError: Failed to fork repository on disk: Source repository not found: /repos/repoowner-1766863627562-wfxoe0/to-fork-1766863628669-jnk92r.git
+TRPCClientError: Failed to fork repository on disk: Source repository not found: /repos/repoowner-1766864198872-5fjhhr/to-fork-1766864200709-o27rp0.git
  ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
  ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[35/74]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/45]⎯
 
  FAIL  tests/integration/repository-advanced.test.ts > Repository Advanced Features > Repository Forking > forks with custom name
-TRPCClientError: Failed to fork repository on disk: Source repository not found: /repos/repoowner-1766863627562-wfxoe0/fork-custom-1766863628760-kk059n.git
+TRPCClientError: Failed to fork repository on disk: Source repository not found: /repos/repoowner-1766864198872-5fjhhr/fork-custom-1766864200910-3pye07.git
  ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
  ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[36/74]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/45]⎯
 
  FAIL  tests/integration/repository-advanced.test.ts > Repository Advanced Features > Repository Forking > lists forks of a repository
-TRPCClientError: Failed to fork repository on disk: Source repository not found: /repos/repoowner-1766863627562-wfxoe0/list-forks-1766863628980-orn0ip.git
+TRPCClientError: Failed to fork repository on disk: Source repository not found: /repos/repoowner-1766864198872-5fjhhr/list-forks-1766864201250-n92mhv.git
  ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
  ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[37/74]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/45]⎯
 
  FAIL  tests/integration/repository-advanced.test.ts > Repository Advanced Features > Repository Starring > stars a repository
 AssertionError: expected { starred: true } to be true // Object.is equality
@@ -340,7 +115,7 @@ true
     186|     });
     187|
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[38/74]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/45]⎯
 
  FAIL  tests/integration/repository-advanced.test.ts > Repository Advanced Features > Repository Starring > unstars a repository
 AssertionError: expected { starred: false } to be false // Object.is equality
@@ -361,7 +136,7 @@ false
     196|     });
     197|
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[39/74]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/45]⎯
 
  FAIL  tests/integration/repository-advanced.test.ts > Repository Advanced Features > Repository Starring > checks if repository is starred
 AssertionError: expected { starred: false } to be false // Object.is equality
@@ -382,7 +157,7 @@ false
     204|
     205|       // Star it
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[40/74]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/45]⎯
 
  FAIL  tests/integration/repository-advanced.test.ts > Repository Advanced Features > Repository Watching > watches a repository
 AssertionError: expected { watching: true } to be true // Object.is equality
@@ -403,7 +178,7 @@ true
     258|     });
     259|
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[41/74]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/45]⎯
 
  FAIL  tests/integration/repository-advanced.test.ts > Repository Advanced Features > Repository Watching > unwatches a repository
 AssertionError: expected { watching: false } to be false // Object.is equality
@@ -424,7 +199,7 @@ false
     268|     });
     269|
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[42/74]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/45]⎯
 
  FAIL  tests/integration/repository-advanced.test.ts > Repository Advanced Features > Repository Watching > checks if repository is watched
 AssertionError: expected { watching: false } to be false // Object.is equality
@@ -445,7 +220,7 @@ false
     275|
     276|       await userApi.repos.watch.mutate({ repoId: watchRepoId });
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[43/74]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/45]⎯
 
  FAIL  tests/integration/ssh-keys.test.ts > SSH Keys Flow > SSH Key CRUD Operations > adds an SSH key
 AssertionError: expected 'Failed query: select "id", "user_id",…' to contain 'Invalid SSH key'
@@ -455,7 +230,7 @@ AssertionError: expected 'Failed query: select "id", "user_id",…' to contain '
 
 - Invalid SSH key
 + Failed query: select "id", "user_id", "title", "public_key", "fingerprint", "key_type", "last_used_at", "created_at" from "ssh_keys" where "ssh_keys"."user_id" = $1
-+ params: 9ZlZWYLAjfOJEC76FlPCnC93iW6fIIFZ
++ params: 7Wxw9NRtFfyWY6MgLAkgkh4Rlgzajmgp
 
  ❯ tests/integration/ssh-keys.test.ts:80:31
      78|       } catch (error: any) {
@@ -465,7 +240,7 @@ AssertionError: expected 'Failed query: select "id", "user_id",…' to contain '
      81|       }
      82|     });
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[44/74]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/45]⎯
 
  FAIL  tests/integration/ssh-keys.test.ts > SSH Keys Flow > SSH Key CRUD Operations > fails to add invalid SSH key
 AssertionError: expected [Function] to throw error including 'Invalid SSH key' but got 'Failed query: select "id", "user_id",…'
@@ -475,7 +250,7 @@ AssertionError: expected [Function] to throw error including 'Invalid SSH key' b
 
 - Invalid SSH key
 + Failed query: select "id", "user_id", "title", "public_key", "fingerprint", "key_type", "last_used_at", "created_at" from "ssh_keys" where "ssh_keys"."user_id" = $1
-+ params: 9ZlZWYLAjfOJEC76FlPCnC93iW6fIIFZ
++ params: 7Wxw9NRtFfyWY6MgLAkgkh4Rlgzajmgp
 
  ❯ tests/integration/ssh-keys.test.ts:87:7
      85|       const authApi = createAuthenticatedClient(userToken);
@@ -485,7 +260,7 @@ AssertionError: expected [Function] to throw error including 'Invalid SSH key' b
      88|         authApi.sshKeys.add.mutate({
      89|           title: 'Invalid Key',
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[45/74]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[19/45]⎯
 
  FAIL  tests/integration/ssh-keys.test.ts > SSH Keys Flow > SSH Key CRUD Operations > lists SSH keys
  FAIL  tests/integration/ssh-keys.test.ts > SSH Keys Flow > SSH Key CRUD Operations > gets SSH key by ID
@@ -494,19 +269,19 @@ AssertionError: expected [Function] to throw error including 'Invalid SSH key' b
  FAIL  tests/integration/ssh-keys.test.ts > SSH Keys Flow > SSH Key Fingerprint > verifies fingerprint
  FAIL  tests/integration/ssh-keys.test.ts > SSH Keys Flow > SSH Key Limits > enforces maximum key limit per user
 TRPCClientError: Failed query: select "id", "user_id", "title", "public_key", "fingerprint", "key_type", "last_used_at", "created_at" from "ssh_keys" where "ssh_keys"."user_id" = $1
-params: 9ZlZWYLAjfOJEC76FlPCnC93iW6fIIFZ
+params: 7Wxw9NRtFfyWY6MgLAkgkh4Rlgzajmgp
  ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
  ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[46/74]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[20/45]⎯
 
  FAIL  tests/integration/ssh-keys.test.ts > SSH Keys Flow > SSH Key CRUD Operations > fails to get other users SSH key
 TRPCClientError: Failed query: select "id", "user_id", "title", "public_key", "fingerprint", "key_type", "last_used_at", "created_at" from "ssh_keys" where "ssh_keys"."user_id" = $1
-params: bFESvdiuFRKTH7Veo9eVhPCaOWzoCly5
+params: dHkZj1Bq0XZcCFYZaFKKjX1uP41Tj3O1
  ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
  ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[47/74]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[21/45]⎯
 
  FAIL  tests/integration/tokens.test.ts > Tokens Flow > Token CRUD Operations > creates a token
  FAIL  tests/integration/tokens.test.ts > Tokens Flow > Token CRUD Operations > creates token with multiple scopes
@@ -521,19 +296,19 @@ params: bFESvdiuFRKTH7Veo9eVhPCaOWzoCly5
  FAIL  tests/integration/tokens.test.ts > Tokens Flow > Token Security > token prefix is consistent
  FAIL  tests/integration/tokens.test.ts > Tokens Flow > Edge Cases > handles very long token name
 TRPCClientError: Failed query: select "id", "user_id", "name", "token_hash", "token_prefix", "scopes", "last_used_at", "expires_at", "created_at" from "personal_access_tokens" where "personal_access_tokens"."user_id" = $1
-params: iJkNRTzDJGsnbpb9ljfQoPUTxcaLZhrV
+params: vISA0rSAoSWJ1Ep0X4pH2jjDK4o2jBQc
  ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
  ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[48/74]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22/45]⎯
 
  FAIL  tests/integration/tokens.test.ts > Tokens Flow > Token CRUD Operations > fails to get other users token
 TRPCClientError: Failed query: select "id", "user_id", "name", "token_hash", "token_prefix", "scopes", "last_used_at", "expires_at", "created_at" from "personal_access_tokens" where "personal_access_tokens"."user_id" = $1
-params: 7ZLJh27gDV1vGhAECD132VjSBLruxEbM
+params: N4MpPeoQ8h6m8Dd661geCl8Y2FXXcHm2
  ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
  ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[49/74]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[23/45]⎯
 
  FAIL  tests/integration/tokens.test.ts > Tokens Flow > Token Limits > enforces maximum token limit per user
 AssertionError: expected 'Failed query: select "id", "user_id",…' to contain 'Maximum'
@@ -543,7 +318,7 @@ AssertionError: expected 'Failed query: select "id", "user_id",…' to contain '
 
 - Maximum
 + Failed query: select "id", "user_id", "name", "token_hash", "token_prefix", "scopes", "last_used_at", "expires_at", "created_at" from "personal_access_tokens" where "personal_access_tokens"."user_id" = $1
-+ params: puViqRJP5JfyXHo5mY2fqVOmjOJGlXxn
++ params: GCtcHyV5WKNinojilERSoixL4wEsHOVY
 
  ❯ tests/integration/tokens.test.ts:319:31
     317|       } catch (error: any) {
@@ -553,15 +328,7 @@ AssertionError: expected 'Failed query: select "id", "user_id",…' to contain '
     320|       }
     321|
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[50/74]⎯
-
- FAIL  tests/integration/users.test.ts > Users Flow > User Organizations > lists user organizations
-TRPCClientError: Failed query: insert into "org_members" ("org_id", "user_id", "role", "created_at") values ($1, $2, $3, default)
-params: 0e0b9644-2759-4581-a0a7-9e1ca79b7f77,qbEzgMjZ5J3kbotSArQd6Ovchr2QqK5j,owner
- ❯ Function.from node_modules/@trpc/client/dist/TRPCClientError-CjKyS10w.mjs:40:42
- ❯ node_modules/@trpc/client/dist/httpBatchLink-BOe5aCcR.mjs:228:38
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[51/74]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[24/45]⎯
 
  FAIL  tests/integration/webhooks.test.ts > Webhooks Flow > Webhook CRUD Operations > clears webhook secret
 AssertionError: expected '********' to be null
@@ -580,12 +347,12 @@ null
     266|     });
     267|
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[52/74]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[25/45]⎯
 
 
- Test Files  8 failed | 50 passed | 1 skipped (59)
-      Tests  74 failed | 1310 passed | 32 skipped (1416)
-   Start at  20:26:51
-   Duration  166.89s (transform 4.69s, setup 0ms, import 58.44s, tests 92.81s, environment 15ms)
+ Test Files  7 failed | 51 passed | 1 skipped (59)
+      Tests  45 failed | 1339 passed | 32 skipped (1416)
+   Start at  20:36:16
+   Duration  198.32s (transform 4.22s, setup 0ms, import 69.02s, tests 108.94s, environment 20ms)
 
 peteradelodun@Peters-MBP wit %

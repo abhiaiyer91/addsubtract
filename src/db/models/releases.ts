@@ -40,13 +40,15 @@ export const releaseModel = {
    */
   async getByIdWithAssets(id: string): Promise<(Release & { assets: ReleaseAsset[] }) | null> {
     const db = getDb();
-    const release = await db.query.releases.findFirst({
-      where: eq(releases.id, id),
-      with: {
-        assets: true,
-      },
-    });
-    return release ?? null;
+    const release = await this.getById(id);
+    if (!release) return null;
+    
+    const assets = await db
+      .select()
+      .from(releaseAssets)
+      .where(eq(releaseAssets.releaseId, id));
+    
+    return { ...release, assets };
   },
 
   /**
@@ -155,15 +157,26 @@ export const releaseModel = {
       conditions.push(eq(releases.isPrerelease, false));
     }
 
-    return db.query.releases.findMany({
-      where: and(...conditions),
-      with: {
-        assets: true,
-      },
-      orderBy: desc(releases.createdAt),
-      limit,
-      offset,
-    });
+    const releasesList = await db
+      .select()
+      .from(releases)
+      .where(and(...conditions))
+      .orderBy(desc(releases.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    // Fetch assets for each release
+    const releasesWithAssets = await Promise.all(
+      releasesList.map(async (release) => {
+        const assets = await db
+          .select()
+          .from(releaseAssets)
+          .where(eq(releaseAssets.releaseId, release.id));
+        return { ...release, assets };
+      })
+    );
+
+    return releasesWithAssets;
   },
 
   /**
