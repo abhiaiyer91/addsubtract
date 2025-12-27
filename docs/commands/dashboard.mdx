@@ -1,0 +1,233 @@
+---
+title: "Dashboard"
+description: "Your personal activity dashboard for PRs, issues, and contributions"
+---
+
+# wit dashboard
+
+A unified view of your pull requests, issues, repositories, and contribution activity. Think of it as your personal command center for staying on top of your work.
+
+## Basic Usage
+
+```bash
+# Show full dashboard
+wit dashboard
+
+# Show specific section
+wit dashboard prs
+wit dashboard issues
+wit dashboard repos
+wit dashboard activity
+wit dashboard stats
+wit dashboard summary
+```
+
+## Dashboard Sections
+
+### Full Dashboard (Default)
+
+Shows a comprehensive overview including:
+- Quick summary badges (PRs needing review, your PRs, assigned issues)
+- Contribution heatmap
+- PRs awaiting your review
+- Your open PRs
+- Your repositories
+- Recent activity
+
+```bash
+wit dashboard
+```
+
+### Pull Requests
+
+View all PR-related information:
+
+```bash
+wit dashboard prs
+```
+
+Shows:
+- **Review Requested**: PRs waiting for your review
+- **Your PRs**: PRs you've opened
+- **Participated**: PRs you've commented on or reviewed
+
+### Issues
+
+View your issue workload:
+
+```bash
+wit dashboard issues
+```
+
+Shows:
+- **Assigned to You**: Issues you need to work on
+- **Issues Created**: Issues you've opened
+- **Issues Participated**: Issues you've commented on
+
+### Repositories
+
+View your repositories:
+
+```bash
+wit dashboard repos
+```
+
+Shows:
+- Repository name and visibility
+- Star count
+- Open PRs and issues count
+- Last push date
+- Description
+
+### Activity Feed
+
+View recent contribution activity:
+
+```bash
+wit dashboard activity
+```
+
+Shows chronological list of:
+- Pushes and commits
+- PR opens, merges, closes
+- PR reviews and comments
+- Issue opens and closes
+- Repository creation and stars
+
+### Contribution Statistics
+
+View detailed contribution stats:
+
+```bash
+wit dashboard stats
+```
+
+Shows:
+- Contribution heatmap (last 20 weeks)
+- Total commits, PRs, issues, reviews, comments
+- Current and longest streaks
+- Activity breakdown by day of week
+
+### Quick Summary
+
+Get just the counts:
+
+```bash
+wit dashboard summary
+```
+
+Shows:
+- PRs awaiting review count
+- Your open PRs count
+- Assigned issues count
+- Week-over-week trend
+
+## Options
+
+| Option | Description |
+|--------|-------------|
+| `--limit <n>` | Limit number of results (default: 10) |
+| `--all` | Show all results (no limit) |
+| `--json` | Output as JSON |
+| `-h, --help` | Show help message |
+
+## Examples
+
+### Check What Needs Your Attention
+
+```bash
+wit dashboard summary
+```
+
+Output:
+```
+  Dashboard Summary
+  ─────────────────────────────────
+
+  ● PRs awaiting review:  3
+  ● Your open PRs:        2
+  ● PRs participated:     5
+
+  ● Issues assigned:      4
+  ● Issues created:       1
+
+  ● Recent activity:      12 (7 days)
+  ● Active repos:         3 (30 days)
+
+  This week: 24  Last week: 18  Trend: Up
+
+  → 3 PRs awaiting your review
+```
+
+### View Full Dashboard
+
+```bash
+wit dashboard
+```
+
+Output:
+```
+  Dashboard
+  ─────────────────────────────────
+
+  Review 3   PRs 2   Issues 4   Repos 5
+  24 contributions this week
+
+  Contribution Activity
+  ──────────────────────────────────────────────────
+
+  S ░░░▒▓░░░░░▒▓▒░░░░▒
+  M ░░▒▓▓█░░░░▓▓▓░░░░▓
+  T ░░▒▒▓▓░░░░▒▓▒░░░░▒
+  ...
+
+  142 commits  ·  12 PRs merged  ·  5-day streak
+
+  Review Requested (3)
+  ────────────────────────────────────────
+  ● ✓ ○ #42 Add user authentication
+     my-app · johndoe · 2h ago
+
+  Your PRs (2)
+  ────────────────────────────────────────
+  ● ○ ○ #45 Update dashboard styling
+     5h ago
+```
+
+### Export as JSON
+
+```bash
+wit dashboard --json | jq '.summary'
+```
+
+## Status Icons
+
+### PR State
+- `●` Green: Open
+- `●` Magenta: Merged
+- `●` Red: Closed
+
+### CI Status
+- `✓` Green: Success
+- `✗` Red: Failure
+- `○` Yellow: Pending
+- `·` Gray: No CI
+
+### Review Status
+- `✓` Green: Approved
+- `!` Red: Changes requested
+- `●` Yellow: Commented
+- `○` Gray: Pending
+
+### Priority Icons
+- `⚡` Urgent
+- `↑` High
+- `●` Medium
+- `↓` Low
+
+## See Also
+
+- [wit wrapped](/commands/wrapped) - Monthly activity summary
+- [wit inbox](/commands/inbox) - Graphite-style PR inbox
+- [wit pr](/platform/pull-requests) - Pull request management
+- [wit issue](/platform/issues) - Issue management

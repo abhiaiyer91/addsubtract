@@ -1,0 +1,255 @@
+---
+title: "Cycles API"
+description: "API reference for sprint and cycle management"
+---
+
+# Cycles API
+
+The Cycles API allows you to create and manage time-boxed development iterations (sprints).
+
+## Overview
+
+Cycles are time-boxed periods for organizing work. They help teams plan capacity, track velocity, and maintain a sustainable development pace.
+
+## Endpoints
+
+All cycle endpoints are available via tRPC at `api.cycles.*`
+
+### List Cycles
+
+```typescript
+api.cycles.list(owner: string, repoName: string, options?: {
+  filter?: 'past' | 'current' | 'upcoming';
+}): Promise<Cycle[]>
+```
+
+**Example:**
+```typescript
+const cycles = await api.cycles.list('myorg', 'myrepo');
+const activeCycles = await api.cycles.list('myorg', 'myrepo', { filter: 'current' });
+```
+
+### Get Cycle
+
+```typescript
+api.cycles.get(
+  owner: string, 
+  repoName: string, 
+  number: number
+): Promise<Cycle>
+```
+
+**Example:**
+```typescript
+const cycle = await api.cycles.get('myorg', 'myrepo', 3);
+```
+
+### Get Current Cycle
+
+```typescript
+api.cycles.getCurrent(
+  owner: string, 
+  repoName: string
+): Promise<Cycle | null>
+```
+
+Returns the currently active cycle based on date range.
+
+### Create Cycle
+
+```typescript
+api.cycles.create(owner: string, repoName: string, data: {
+  name?: string;
+  description?: string;
+  startDate: string;  // ISO date
+  endDate: string;    // ISO date
+}): Promise<Cycle>
+```
+
+**Example:**
+```typescript
+const cycle = await api.cycles.create('myorg', 'myrepo', {
+  name: 'Sprint 23',
+  startDate: '2024-01-15T00:00:00Z',
+  endDate: '2024-01-29T00:00:00Z'
+});
+```
+
+### Update Cycle
+
+```typescript
+api.cycles.update(owner: string, repoName: string, number: number, data: {
+  name?: string;
+  description?: string;
+  startDate?: string;
+  endDate?: string;
+}): Promise<Cycle>
+```
+
+### Get Cycle Progress
+
+```typescript
+api.cycles.getProgress(
+  owner: string, 
+  repoName: string, 
+  number: number
+): Promise<{
+  total: number;
+  completed: number;
+  inProgress: number;
+  percentage: number;
+  totalEstimate: number;
+  completedEstimate: number;
+}>
+```
+
+**Example:**
+```typescript
+const progress = await api.cycles.getProgress('myorg', 'myrepo', 3);
+// {
+//   total: 15,
+//   completed: 4,
+//   inProgress: 2,
+//   percentage: 27,
+//   totalEstimate: 32,
+//   completedEstimate: 8
+// }
+```
+
+### Get Cycle Issues
+
+```typescript
+api.cycles.getIssues(
+  owner: string, 
+  repoName: string, 
+  number: number
+): Promise<Issue[]>
+```
+
+### Add Issue to Cycle
+
+```typescript
+api.cycles.addIssue(
+  owner: string, 
+  repoName: string, 
+  cycleNumber: number,
+  issueNumber: number
+): Promise<void>
+```
+
+**Example:**
+```typescript
+await api.cycles.addIssue('myorg', 'myrepo', 3, 42);
+```
+
+### Remove Issue from Cycle
+
+```typescript
+api.cycles.removeIssue(
+  owner: string, 
+  repoName: string, 
+  cycleNumber: number,
+  issueNumber: number
+): Promise<void>
+```
+
+### Get Velocity Metrics
+
+```typescript
+api.cycles.getVelocity(
+  owner: string, 
+  repoName: string,
+  count?: number  // Number of cycles to analyze, default 5
+): Promise<{
+  cycles: Array<{
+    number: number;
+    name: string;
+    completedIssues: number;
+    completedPoints: number;
+  }>;
+  averageIssues: number;
+  averagePoints: number;
+}>
+```
+
+**Example:**
+```typescript
+const velocity = await api.cycles.getVelocity('myorg', 'myrepo', 5);
+// {
+//   cycles: [
+//     { number: 1, name: 'Sprint 21', completedIssues: 10, completedPoints: 32 },
+//     { number: 2, name: 'Sprint 22', completedIssues: 12, completedPoints: 28 },
+//     ...
+//   ],
+//   averageIssues: 11,
+//   averagePoints: 30
+// }
+```
+
+## Types
+
+### Cycle
+
+```typescript
+interface Cycle {
+  id: string;
+  repoId: string;
+  number: number;
+  name: string;
+  description?: string;
+  startDate: string;
+  endDate: string;
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+### Cycle Status
+
+Cycle status is derived from dates:
+
+| Status | Condition |
+|--------|-----------|
+| `upcoming` | `now < startDate` |
+| `active` | `startDate <= now <= endDate` |
+| `completed` | `now > endDate` |
+
+## CLI Usage
+
+```bash
+# Create cycle
+wit cycle create "Sprint 23" --weeks 2
+
+# List cycles
+wit cycle list
+
+# Show current cycle
+wit cycle current
+
+# Add issue to cycle
+wit cycle add WIT-42
+
+# View progress
+wit cycle show 3
+
+# View velocity
+wit cycle velocity
+```
+
+## Webhooks
+
+Cycle-related events are emitted:
+
+| Event | Description |
+|-------|-------------|
+| `cycle.created` | New cycle created |
+| `cycle.updated` | Cycle modified |
+| `cycle.completed` | Cycle end date passed |
+| `cycle.issue_added` | Issue added to cycle |
+| `cycle.issue_removed` | Issue removed from cycle |
+
+## See Also
+
+- [wit cycle](/commands/cycle) - CLI documentation
+- [Projects API](/api-reference/projects) - Goal-based projects
+- [Cycles and Projects](/features/cycles-projects) - Feature overview

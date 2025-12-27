@@ -1,0 +1,199 @@
+---
+title: "Projects API"
+description: "API reference for Linear-style project management"
+---
+
+# Projects API
+
+The Projects API allows you to create and manage Linear-style projects for organizing work.
+
+## Overview
+
+Projects help you organize related issues around a goal or theme. Unlike cycles (time-boxed), projects are goal-oriented and can span multiple cycles.
+
+## Endpoints
+
+All project endpoints are available via tRPC at `api.projects.*`
+
+### List Projects
+
+```typescript
+api.projects.list(owner: string, repoName: string, options?: {
+  status?: 'backlog' | 'planned' | 'in_progress' | 'paused' | 'completed' | 'canceled';
+}): Promise<Project[]>
+```
+
+**Example:**
+```typescript
+const projects = await api.projects.list('myorg', 'myrepo', {
+  status: 'in_progress'
+});
+```
+
+### Get Project
+
+```typescript
+api.projects.get(
+  owner: string, 
+  repoName: string, 
+  name: string
+): Promise<Project>
+```
+
+**Example:**
+```typescript
+const project = await api.projects.get('myorg', 'myrepo', 'Auth System');
+```
+
+### Create Project
+
+```typescript
+api.projects.create(owner: string, repoName: string, data: {
+  name: string;
+  description?: string;
+  leadId?: string;
+  startDate?: string;  // ISO date
+  targetDate?: string; // ISO date
+}): Promise<Project>
+```
+
+**Example:**
+```typescript
+const project = await api.projects.create('myorg', 'myrepo', {
+  name: 'Q1 Features',
+  description: 'Feature work for Q1 2024',
+  startDate: '2024-01-01T00:00:00Z',
+  targetDate: '2024-03-31T00:00:00Z'
+});
+```
+
+### Update Project
+
+```typescript
+api.projects.update(owner: string, repoName: string, name: string, data: {
+  name?: string;
+  description?: string;
+  status?: 'backlog' | 'planned' | 'in_progress' | 'paused' | 'completed' | 'canceled';
+  leadId?: string;
+  startDate?: string;
+  targetDate?: string;
+}): Promise<Project>
+```
+
+**Example:**
+```typescript
+const updated = await api.projects.update('myorg', 'myrepo', 'Auth System', {
+  status: 'in_progress'
+});
+```
+
+### Delete Project
+
+```typescript
+api.projects.delete(
+  owner: string, 
+  repoName: string, 
+  name: string
+): Promise<void>
+```
+
+### Get Project Progress
+
+```typescript
+api.projects.getProgress(
+  owner: string, 
+  repoName: string, 
+  name: string
+): Promise<{
+  total: number;
+  completed: number;
+  percentage: number;
+}>
+```
+
+**Example:**
+```typescript
+const progress = await api.projects.getProgress('myorg', 'myrepo', 'Auth System');
+// { total: 10, completed: 4, percentage: 40 }
+```
+
+### Get Project Issues
+
+```typescript
+api.projects.getIssues(
+  owner: string, 
+  repoName: string, 
+  name: string
+): Promise<Issue[]>
+```
+
+### Complete Project
+
+```typescript
+api.projects.complete(
+  owner: string, 
+  repoName: string, 
+  name: string
+): Promise<Project>
+```
+
+Marks the project as completed and sets `completedAt` timestamp.
+
+## Types
+
+### Project
+
+```typescript
+interface Project {
+  id: string;
+  repoId: string;
+  name: string;
+  description?: string;
+  status: 'backlog' | 'planned' | 'in_progress' | 'paused' | 'completed' | 'canceled';
+  leadId?: string;
+  startDate?: string;
+  targetDate?: string;
+  completedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+### Project Status
+
+| Status | Description |
+|--------|-------------|
+| `backlog` | Not yet started |
+| `planned` | Scheduled for future |
+| `in_progress` | Currently active |
+| `paused` | Temporarily on hold |
+| `completed` | Successfully finished |
+| `canceled` | No longer needed |
+
+## CLI Usage
+
+```bash
+# Create project
+wit project create "Auth System"
+
+# List projects
+wit project list
+
+# View project
+wit project view "Auth System"
+
+# Update status
+wit project update "Auth System" --status in_progress
+
+# View progress
+wit project progress "Auth System"
+
+# Complete project
+wit project complete "Auth System"
+```
+
+## See Also
+
+- [wit project](/commands/project) - CLI documentation
+- [Cycles API](/api-reference/cycles) - Time-boxed iterations
+- [Issues](/platform/issues) - Issue tracking

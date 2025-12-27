@@ -1,0 +1,220 @@
+---
+title: "Wrapped API"
+description: "API reference for monthly activity summaries (Spotify Wrapped style)"
+---
+
+# Wrapped API
+
+The Wrapped API provides access to monthly activity summaries with insights about coding patterns and statistics.
+
+## Overview
+
+Wrapped generates Spotify Wrapped-style summaries of a user's monthly activity, including commits, PRs, reviews, coding patterns, and personality analysis.
+
+## Endpoints
+
+All wrapped endpoints are available via tRPC at `api.wrapped.*`
+
+### Get Wrapped Data
+
+```typescript
+api.wrapped.getForUser(
+  userId: string,
+  year: number,
+  month: number  // 1-12
+): Promise<WrappedData | null>
+```
+
+**Example:**
+```typescript
+const wrapped = await api.wrapped.getForUser('user-123', 2024, 12);
+```
+
+### Get Current Month
+
+```typescript
+api.wrapped.getCurrentMonth(
+  userId: string
+): Promise<WrappedData | null>
+```
+
+### Get Previous Month
+
+```typescript
+api.wrapped.getPreviousMonth(
+  userId: string
+): Promise<WrappedData | null>
+```
+
+### Get Available Periods
+
+```typescript
+api.wrapped.getAvailablePeriods(
+  userId: string
+): Promise<Array<{ year: number; month: number }>>
+```
+
+**Example:**
+```typescript
+const periods = await api.wrapped.getAvailablePeriods('user-123');
+// [
+//   { year: 2024, month: 12 },
+//   { year: 2024, month: 11 },
+//   { year: 2024, month: 10 }
+// ]
+```
+
+## Types
+
+### WrappedData
+
+```typescript
+interface WrappedData {
+  // Period info
+  period: {
+    year: number;
+    month: number;
+  };
+  
+  // User info
+  userId: string;
+  username: string;
+  name?: string;
+  
+  // Activity totals
+  totalCommits: number;
+  totalPrsOpened: number;
+  totalPrsMerged: number;
+  totalReviews: number;
+  totalIssuesOpened: number;
+  totalIssuesClosed: number;
+  totalComments: number;
+  totalStarsGiven: number;
+  
+  // Activity patterns
+  totalActiveDays: number;
+  avgCommitsPerActiveDay: number;
+  
+  // Daily breakdown
+  dailyActivity: Array<{
+    date: string;
+    commits: number;
+    prs: number;
+    reviews: number;
+    total: number;
+  }>;
+  
+  // Hourly distribution (24 hours)
+  hourlyDistribution: Array<{
+    hour: number;  // 0-23
+    count: number;
+  }>;
+  
+  // Streaks
+  streaks: {
+    longestStreak: number;
+    currentStreak: number;
+  };
+  
+  // Fun statistics
+  funStats: {
+    personalityType: PersonalityType;
+    mostActiveHour: number;
+    mostActiveHourLabel: string;  // e.g., "10 PM"
+    mostActiveDay: string;        // e.g., "Tuesday"
+    lateNightCommits: number;     // 10pm-4am
+    weekendWarriorCommits: number;
+  };
+  
+  // Top repositories
+  topRepositories: Array<{
+    repoId: string;
+    repoName: string;
+    activityCount: number;
+  }>;
+  
+  // Activity breakdown by type
+  activityBreakdown: Array<{
+    type: string;
+    count: number;
+    percentage: number;
+  }>;
+  
+  // Optional: AI usage stats
+  aiUsage?: {
+    agentSessions: number;
+    totalMessages: number;
+    totalTokens: number;
+  };
+  
+  // Optional: CI stats
+  ciStats?: {
+    totalRuns: number;
+    successRate: number;
+    failedRuns: number;
+  };
+}
+```
+
+### PersonalityType
+
+```typescript
+type PersonalityType = 
+  | 'Night Owl'        // Most active late at night
+  | 'Early Bird'       // Most active early morning
+  | 'Weekend Warrior'  // Heavy weekend activity
+  | 'Nine-to-Fiver'    // Consistent weekday hours
+  | 'Code Ninja'       // High commit frequency
+  | 'Steady Coder'     // Consistent daily activity
+  | 'Ghost Developer'; // Sporadic but impactful
+```
+
+### Personality Assignment Rules
+
+| Personality | Criteria |
+|-------------|----------|
+| Night Owl | Most activity between 10pm-4am |
+| Early Bird | Most activity between 5am-8am |
+| Weekend Warrior | >40% of activity on weekends |
+| Nine-to-Fiver | >70% of activity 9am-5pm weekdays |
+| Code Ninja | >10 commits per active day average |
+| Steady Coder | >20 active days with consistent output |
+| Ghost Developer | <10 active days but high impact |
+
+## CLI Usage
+
+```bash
+# Current month
+wit wrapped
+
+# Previous month
+wit wrapped --previous
+
+# Specific month
+wit wrapped 2024 11
+
+# List available periods
+wit wrapped --list
+```
+
+## Data Generation
+
+Wrapped data is generated from:
+
+1. **Activity logs**: Commits, PRs, reviews, issues, comments
+2. **Timestamps**: For hourly/daily patterns
+3. **Repository associations**: For top repos
+4. **AI session logs**: For AI usage stats (if enabled)
+5. **CI workflow runs**: For CI stats (if enabled)
+
+Data is aggregated monthly and cached for quick retrieval.
+
+## Privacy
+
+Wrapped data is private to each user. Users can only access their own wrapped summaries.
+
+## See Also
+
+- [wit wrapped](/commands/wrapped) - CLI documentation
+- [Dashboard API](/api-reference/dashboard) - Real-time dashboard
+- [Activity API](/api-reference/activity) - Activity feed

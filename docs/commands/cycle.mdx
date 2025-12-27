@@ -1,0 +1,304 @@
+---
+title: "Cycle"
+description: "Sprint and cycle management for agile workflows"
+---
+
+# wit cycle
+
+Manage sprints and cycles for your development workflow. Cycles help you organize work into time-boxed iterations, track velocity, and plan capacity.
+
+## Basic Usage
+
+```bash
+# Create a new 2-week cycle
+wit cycle create
+
+# List all cycles
+wit cycle list
+
+# Show current active cycle
+wit cycle current
+
+# Add issue to current cycle
+wit cycle add WIT-1
+```
+
+## Commands
+
+### Create Cycle
+
+```bash
+# Create with default 2-week duration
+wit cycle create
+
+# Create with custom name
+wit cycle create "Sprint 1"
+
+# Create with custom duration
+wit cycle create --weeks 1
+wit cycle create --weeks 3
+
+# Create with specific dates
+wit cycle create --start 2024-01-15 --end 2024-01-29
+
+# Create with description
+wit cycle create "Sprint 1" --description "Focus on auth features"
+```
+
+### List Cycles
+
+```bash
+# List all cycles
+wit cycle list
+
+# Shortcut
+wit cycle ls
+```
+
+Shows all cycles with:
+- Status (active, upcoming, completed)
+- Date range
+- Progress bar and completion percentage
+
+### Show Cycle Details
+
+```bash
+# Show current cycle
+wit cycle show
+
+# Show specific cycle by number
+wit cycle show 1
+wit cycle 1  # Shortcut
+
+# Show current active cycle
+wit cycle current
+```
+
+### Manage Issues in Cycles
+
+```bash
+# Add issue to current cycle
+wit cycle add WIT-1
+wit cycle add 1      # Just the number works too
+wit cycle add #1     # Hash prefix works too
+
+# Add issue to specific cycle
+wit cycle add WIT-1 2  # Add to cycle 2
+
+# Remove issue from cycle
+wit cycle remove WIT-1
+```
+
+### Complete a Cycle
+
+```bash
+# Complete current cycle
+wit cycle complete
+
+# Complete specific cycle
+wit cycle complete 1
+```
+
+Shows summary of completed vs remaining issues.
+
+### View Velocity
+
+```bash
+# Show velocity metrics
+wit cycle velocity
+
+# Show last N cycles
+wit cycle velocity --count 10
+```
+
+## Cycle Status
+
+Cycles automatically transition through statuses based on dates:
+
+| Status | Description |
+|--------|-------------|
+| `upcoming` | Start date is in the future |
+| `active` | Current date is within the cycle range |
+| `completed` | End date has passed |
+
+## Options
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--weeks` | | Cycle duration in weeks (default: 2) |
+| `--start` | | Start date (YYYY-MM-DD) |
+| `--end` | | End date (YYYY-MM-DD) |
+| `--name` | `-n` | Cycle name |
+| `--description` | `-d` | Cycle description |
+| `--count` | | Number of cycles for velocity (default: 5) |
+| `--help` | `-h` | Show help |
+
+## Examples
+
+### Create a Sprint
+
+```bash
+# Create a new 2-week sprint
+wit cycle create "Sprint 23"
+
+# Output:
+# ✓ Created Sprint 23
+#   Jan 15, 2024 → Jan 29, 2024 (2 weeks)
+```
+
+### View Current Cycle
+
+```bash
+wit cycle current
+```
+
+Output:
+```
+  Sprint 23
+  5 days remaining
+
+  ████████░░░░░░░░░░░░░░░░░░░░░░ 27%
+  4 done · 2 in progress · 9 to do
+```
+
+### List All Cycles
+
+```bash
+wit cycle list
+```
+
+Output:
+```
+  Cycles
+
+  Cycle 3      Sprint 23
+    ● active  Jan 15, 2024 → Jan 29, 2024
+    ████████░░░░░░░░░░░░ 27% (4/15 done)
+
+  Cycle 2      Sprint 22
+    ✓ completed  Jan 1, 2024 → Jan 14, 2024
+    ████████████████████ 100% (12/12 done)
+
+  Cycle 1      Sprint 21
+    ✓ completed  Dec 18, 2023 → Jan 1, 2024
+    ██████████████████░░ 90% (9/10 done)
+```
+
+### Show Cycle Details
+
+```bash
+wit cycle show 3
+```
+
+Output:
+```
+  Sprint 23
+  ● active
+
+  Duration:  Jan 15, 2024 → Jan 29, 2024
+  Remaining: 5 days
+
+  Progress:
+    ████████░░░░░░░░░░░░░░░░░░░░░░ 27%
+
+    Done:        4
+    In Progress: 2
+    To Do:       9
+
+    Points:      8/32
+
+  ─────────────────────────────────────────────────────────
+
+  Issues:
+
+    ● 🟠 #42 Implement OAuth2 login
+    ● 🟡 #43 Add session management
+    ◐ 🟡 #44 Create logout endpoint
+    ○ 🔵 #45 Write auth documentation
+    ○ 🔵 #46 Add password reset
+```
+
+### Track Velocity
+
+```bash
+wit cycle velocity
+```
+
+Output:
+```
+  Velocity
+
+  Points per cycle:
+    Cycle 1    ████████████████████ 32
+    Cycle 2    ██████████████████░░ 28
+    Cycle 3    ████████░░░░░░░░░░░░ 8  (in progress)
+
+  Issues per cycle:
+    Cycle 1    ██████████████████░░ 10
+    Cycle 2    ████████████████████ 12
+    Cycle 3    ████████░░░░░░░░░░░░ 4  (in progress)
+
+  Average: 30.0 points/cycle, 11.0 issues/cycle
+```
+
+### Add Issues to Current Cycle
+
+```bash
+# Add multiple issues
+wit cycle add 1
+wit cycle add 2
+wit cycle add 3
+
+# Check the cycle
+wit cycle current
+```
+
+### Complete a Cycle
+
+```bash
+wit cycle complete
+```
+
+Output:
+```
+✓ Completed Sprint 23
+
+  Summary:
+    Completed:  12 issues
+    Remaining:  3 issues (moved to backlog)
+    Points:     28 completed
+```
+
+## Best Practices
+
+### Planning
+
+1. Create cycles at least a sprint ahead
+2. Set realistic capacity based on velocity
+3. Leave buffer for unexpected work
+
+### During the Cycle
+
+1. Add issues as they come up
+2. Use `wit cycle current` to track progress
+3. Move incomplete work to next cycle
+
+### End of Cycle
+
+1. Review with `wit cycle show`
+2. Complete with `wit cycle complete`
+3. Check velocity trends
+
+## Integration with Projects
+
+Cycles can work alongside projects:
+- **Cycles**: Time-boxed iterations (sprints)
+- **Projects**: Goal-based collections (features, epics)
+
+An issue can belong to both a cycle and a project.
+
+## See Also
+
+- [wit project](/commands/project) - Project management
+- [wit issue](/platform/issues) - Issue tracking
+- [Cycles and Projects](/features/cycles-projects) - Feature overview
