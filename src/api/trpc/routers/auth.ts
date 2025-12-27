@@ -35,6 +35,13 @@ export const authRouter = router({
         });
       }
 
+      // Debug: Log what better-auth returns
+      console.log('[auth.register] better-auth result:', {
+        userId: result.user.id,
+        sessionToken: result.session?.token,
+        sessionId: result.session?.id,
+      });
+
       // Update username (better-auth doesn't have username field by default)
       const user = await userModel.update(result.user.id, {
         username: input.username,

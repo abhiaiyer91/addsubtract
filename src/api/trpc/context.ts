@@ -56,6 +56,8 @@ export async function createContext(c: HonoContext): Promise<Context> {
     if (authHeader?.startsWith('Bearer ')) {
       const token = authHeader.slice(7);
       
+      console.log('[context] Looking up Bearer token:', token.slice(0, 20) + '...');
+      
       // Look up session directly in database by token
       const { session: sessionTable } = await import('../../db/auth-schema');
       const { eq } = await import('drizzle-orm');
@@ -70,6 +72,8 @@ export async function createContext(c: HonoContext): Promise<Context> {
         .innerJoin(userTable, eq(sessionTable.userId, userTable.id))
         .where(eq(sessionTable.token, token))
         .limit(1);
+
+      console.log('[context] Session found:', !!sessionRecord);
 
       if (sessionRecord && sessionRecord.session.expiresAt > new Date()) {
         user = {
