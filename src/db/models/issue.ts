@@ -59,6 +59,40 @@ type Author = {
 
 export const issueModel = {
   /**
+   * Search issues by title or body
+   */
+  async search(
+    query: string,
+    options: { limit?: number; repoId?: string; state?: 'open' | 'closed' } = {}
+  ): Promise<Issue[]> {
+    const db = getDb();
+    const { limit = 20, repoId, state } = options;
+    const lowerQuery = `%${query.toLowerCase()}%`;
+
+    const conditions = [
+      or(
+        sql`LOWER(${issues.title}) LIKE ${lowerQuery}`,
+        sql`LOWER(${issues.body}) LIKE ${lowerQuery}`
+      ),
+    ];
+
+    if (repoId) {
+      conditions.push(eq(issues.repoId, repoId));
+    }
+
+    if (state) {
+      conditions.push(eq(issues.state, state));
+    }
+
+    return db
+      .select()
+      .from(issues)
+      .where(and(...conditions))
+      .orderBy(desc(issues.updatedAt))
+      .limit(limit);
+  },
+
+  /**
    * Find an issue by ID
    */
   async findById(id: string): Promise<Issue | undefined> {

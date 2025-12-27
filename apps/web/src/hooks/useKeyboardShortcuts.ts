@@ -1,26 +1,27 @@
 import { useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useHotkeys } from 'react-hotkeys-hook';
-import { useCommandPaletteStore, useShortcutsModalStore } from './useCommandPalette';
+import { useShortcutsModalStore } from './useCommandPalette';
+import { useSearchModalStore } from '@/components/search';
 
 /**
  * Hook for global keyboard shortcuts that work everywhere
  */
 export function useGlobalShortcuts() {
   const navigate = useNavigate();
-  const { toggle: togglePalette } = useCommandPaletteStore();
+  const { toggle: toggleSearch } = useSearchModalStore();
   const { toggle: toggleShortcuts } = useShortcutsModalStore();
 
-  // Cmd+K - Command palette
+  // Cmd+K - Search modal
   useHotkeys('mod+k', (e) => {
     e.preventDefault();
-    togglePalette();
+    toggleSearch();
   }, { enableOnFormTags: false });
 
-  // / - Quick search (focus command palette)
+  // / - Quick search
   useHotkeys('/', (e) => {
     e.preventDefault();
-    togglePalette();
+    toggleSearch();
   }, { enableOnFormTags: false });
 
   // ? - Shortcuts help

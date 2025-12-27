@@ -26,7 +26,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useSession, signOut } from '@/lib/auth-client';
 import { trpc } from '@/lib/trpc';
-import { useCommandPaletteStore } from '@/hooks/useCommandPalette';
+import { useSearchModalStore } from '@/components/search';
 import { isMac } from '@/lib/commands';
 
 export function Header() {
@@ -35,7 +35,7 @@ export function Header() {
   const user = session?.user;
   const authenticated = !!user;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { open: openCommandPalette } = useCommandPaletteStore();
+  const { open: openSearch } = useSearchModalStore();
 
   const handleLogout = async () => {
     await signOut();
@@ -68,12 +68,12 @@ export function Header() {
             {/* Search bar - right next to logo */}
             <div className="hidden sm:flex flex-1 max-w-md">
               <button
-                onClick={openCommandPalette}
+                onClick={openSearch}
                 className="flex h-10 w-full items-center gap-2 rounded-full border border-border/40 bg-muted/20 px-4 py-2 text-sm transition-all duration-300 hover:border-muted-foreground/30 hover:bg-muted/30 focus:border-primary/50 focus:bg-card focus:outline-none focus:ring-2 focus:ring-primary/20"
               >
                 <Search className="h-4 w-4 text-muted-foreground" />
                 <span className="flex-1 text-left text-muted-foreground/50">
-                  Search or jump to...
+                  Search repositories, issues, PRs...
                 </span>
                 <kbd className="kbd hidden sm:inline-flex">
                   {isMac() ? '\u2318' : 'Ctrl'}
@@ -85,12 +85,12 @@ export function Header() {
 
           {/* Right section - User actions */}
           <div className="flex items-center gap-1 md:gap-2">
-            {/* Search button for mobile - opens command palette */}
+            {/* Search button for mobile - opens search modal */}
             <Button 
               variant="ghost" 
               size="icon" 
               className="sm:hidden h-9 w-9"
-              onClick={openCommandPalette}
+              onClick={openSearch}
             >
               <Search className="h-4 w-4" />
             </Button>
@@ -202,11 +202,11 @@ export function Header() {
           
           {/* Menu panel */}
           <div className="fixed inset-y-0 left-0 w-72 bg-background border-r border-border p-4 pt-20 animate-slide-in-right">
-            {/* Mobile search - opens command palette */}
+            {/* Mobile search - opens search modal */}
             <button
               onClick={() => {
                 setMobileMenuOpen(false);
-                openCommandPalette();
+                openSearch();
               }}
               className="flex h-10 w-full items-center gap-2 rounded-lg border border-border/40 bg-muted/20 px-3 py-2 text-sm mb-6"
             >
