@@ -35,6 +35,9 @@ import { NewReleasePage } from './routes/repo/releases/new';
 import { ReleaseDetailPage } from './routes/repo/releases/detail';
 import { EditReleasePage } from './routes/repo/releases/edit';
 import { MilestonesPage } from './routes/repo/milestones';
+import { JournalPage } from './routes/repo/journal';
+import { JournalPageDetail } from './routes/repo/journal/page-detail';
+import { NewJournalPage } from './routes/repo/journal/page-new';
 import { SettingsPage } from './routes/settings';
 import { SSHKeysPage } from './routes/settings/keys';
 import { TokensPage } from './routes/settings/tokens';
@@ -117,6 +120,11 @@ export function App() {
 
             {/* Milestones */}
             <Route path="/:owner/:repo/milestones" element={<MilestonesPage />} />
+
+            {/* Journal (Notion-like docs) */}
+            <Route path="/:owner/:repo/journal" element={<JournalPage />} />
+            <Route path="/:owner/:repo/journal/new" element={<NewJournalPage />} />
+            <Route path="/:owner/:repo/journal/:slug" element={<JournalPageDetail />} />
 
             {/* Repository settings */}
             <Route path="/:owner/:repo/settings" element={<RepoSettingsPage />} />

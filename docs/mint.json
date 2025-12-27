@@ -85,7 +85,10 @@
         "commands/undo-history",
         "commands/quality-of-life",
         "commands/debugging",
-        "commands/advanced"
+        "commands/advanced",
+        "commands/agent",
+        "commands/inbox",
+        "commands/fsck"
       ]
     },
     {
@@ -94,7 +97,8 @@
         "visual/overview",
         "visual/web-ui",
         "visual/terminal-ui",
-        "visual/graph"
+        "visual/graph",
+        "visual/themes"
       ]
     },
     {
@@ -112,8 +116,10 @@
         "features/stacked-diffs",
         "features/hooks",
         "features/ci-cd",
+        "features/merge-queue",
         "features/monorepo-scopes",
-        "features/worktrees"
+        "features/worktrees",
+        "features/cycles-projects"
       ]
     },
     {
@@ -121,14 +127,17 @@
       "pages": [
         "features/github",
         "features/collaborators",
-        "features/tokens"
+        "features/tokens",
+        "features/branch-protection"
       ]
     },
     {
       "group": "Advanced",
       "pages": [
         "features/large-files",
-        "features/submodules"
+        "features/submodules",
+        "features/partial-clone",
+        "features/git-migration"
       ]
     },
     {
@@ -146,6 +155,7 @@
       "pages": [
         "platform/overview",
         "platform/server",
+        "platform/ssh-server",
         "platform/self-hosting",
         "platform/pull-requests",
         "platform/issues"
@@ -160,13 +170,20 @@
         "api-reference/search",
         "api-reference/notifications",
         "api-reference/organizations",
-        "api-reference/webhooks"
+        "api-reference/webhooks",
+        "api-reference/branch-protection",
+        "api-reference/stacks",
+        "api-reference/merge-queue",
+        "api-reference/activity",
+        "api-reference/releases"
       ]
     },
     {
       "group": "Architecture",
       "pages": [
-        "architecture/overview"
+        "architecture/overview",
+        "architecture/events",
+        "architecture/primitives"
       ]
     }
   ],

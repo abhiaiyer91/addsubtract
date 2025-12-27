@@ -1,0 +1,372 @@
+---
+title: 'Cycles & Projects'
+description: 'Linear-style sprint and project management from the command line'
+---
+
+# Cycles & Projects
+
+wit includes Linear-style project management built right into your Git workflow. Manage sprints (cycles), projects, and issues without leaving the terminal.
+
+## Overview
+
+- **Cycles** - Time-boxed sprints for organizing work
+- **Projects** - Long-running initiatives that span multiple cycles
+- **Issues** - Individual work items that can be assigned to cycles and projects
+
+## Cycles (Sprints)
+
+Cycles are time-boxed periods for organizing work, similar to sprints in agile methodologies.
+
+### Create a Cycle
+
+```bash
+# Create a 2-week cycle (default)
+wit cycle create "Sprint 1"
+
+# Create with specific duration
+wit cycle create "Sprint 2" --weeks 2
+
+# Create with specific dates
+wit cycle create "Q1 Sprint" --start 2024-01-15 --end 2024-01-29
+```
+
+### List Cycles
+
+```bash
+$ wit cycle list
+
+  Cycles
+
+  Cycle 1      Sprint 1
+    ● active  Jan 15, 2024 → Jan 29, 2024
+    [████████████░░░░░░░░] 60% (6/10 done)
+
+  Cycle 2      Sprint 2
+    ○ upcoming  Jan 29, 2024 → Feb 12, 2024
+```
+
+### View Cycle Details
+
+```bash
+$ wit cycle show 1
+
+  Sprint 1
+  ● active
+
+  Duration:  Jan 15, 2024 → Jan 29, 2024
+  Remaining: 5 days
+
+  Progress:
+    [██████████████████████████████] 60%
+
+    Done:        6
+    In Progress: 2
+    To Do:       2
+
+    Points:      24/40
+
+  ──────────────────────────────────────
+
+  Issues:
+
+    ● 🔴 #1 Fix critical bug in auth
+    ● 🟡 #2 Add user profile page
+    ○ 🔵 #3 Update documentation
+```
+
+### Current Cycle
+
+```bash
+$ wit cycle current
+
+  Sprint 1
+  5 days remaining
+
+  [██████████████████████████████] 60%
+  6 done · 2 in progress · 2 to do
+```
+
+### Manage Issues in Cycles
+
+```bash
+# Add issue to current cycle
+wit cycle add WIT-1
+
+# Add issue to specific cycle
+wit cycle add WIT-1 2
+
+# Remove issue from cycle
+wit cycle remove WIT-1
+```
+
+### Complete a Cycle
+
+```bash
+$ wit cycle complete
+
+✓ Completed Sprint 1
+
+  Summary:
+    Completed:  8 issues
+    Remaining:  2 issues (moved to backlog)
+    Points:     32 completed
+```
+
+### Velocity Metrics
+
+Track team performance over time:
+
+```bash
+$ wit cycle velocity
+
+  Velocity
+
+  Points per cycle:
+    Cycle 1    [████████████████████] 32
+    Cycle 2    [██████████████████  ] 28
+    Cycle 3    [████████████████████] 35
+
+  Issues per cycle:
+    Cycle 1    [████████████████████] 10
+    Cycle 2    [██████████████      ] 8
+    Cycle 3    [██████████████████  ] 9
+
+  Average: 31.7 points/cycle, 9.0 issues/cycle
+```
+
+## Projects
+
+Projects are long-running initiatives that organize related work across multiple cycles.
+
+### Create a Project
+
+```bash
+# Simple project
+wit project create "Auth System"
+
+# With options
+wit project create "Q1 Features" \
+  -d "Features for Q1 2024" \
+  --status planned \
+  --lead johndoe \
+  --target 2024-03-31
+```
+
+### List Projects
+
+```bash
+$ wit project list
+
+Projects:
+
+  ● in_progress  Auth System → Mar 31, 2024
+      Implementing new authentication flow
+
+  ◐ planned      Q1 Features → Mar 31, 2024
+      Features for Q1 2024
+
+  ✓ completed    Onboarding Redesign
+```
+
+### View Project Details
+
+```bash
+$ wit project view "Auth System"
+
+Auth System
+──────────────────────────────────────────────────
+Status:      ● in_progress
+Description: Implementing new authentication flow
+Lead:        @johndoe
+Timeline:    Jan 1, 2024 → Mar 31, 2024
+
+Progress:
+  [████████████████░░░░░░░░░░░░░░] 55%
+  11/20 issues completed
+```
+
+### Update Project Status
+
+```bash
+# Update status
+wit project update "Auth System" --status in_progress
+
+# Change target date
+wit project update "Auth System" --target 2024-04-15
+
+# Assign lead
+wit project update "Auth System" --lead janedoe
+```
+
+### Project Status Values
+
+| Status | Description |
+|--------|-------------|
+| `backlog` | Not yet started |
+| `planned` | Scheduled for future work |
+| `in_progress` | Currently being worked on |
+| `paused` | Temporarily on hold |
+| `completed` | Finished |
+| `canceled` | No longer planned |
+
+### View Project Issues
+
+```bash
+$ wit project issues "Auth System"
+
+Issues in "Auth System":
+
+  ● #1 Implement OAuth2 flow 🔴
+    @johndoe · in_progress
+
+  ● #2 Add session management 🟡
+    @janedoe · in_review
+
+  ○ #3 Write auth documentation 🔵
+    · todo
+```
+
+### Project Progress
+
+```bash
+$ wit project progress "Auth System"
+
+Auth System - Progress
+──────────────────────────────────────────────────
+
+  [████████████████░░░░░░░░░░░░░░] 55%
+
+  Completed:  11 issues
+  Remaining:  9 issues
+  Total:      20 issues
+
+  Due in:     45 days
+```
+
+### Complete a Project
+
+```bash
+$ wit project complete "Auth System"
+
+✓ Marked project "Auth System" as complete
+
+  Summary:
+    Completed:  20 issues
+```
+
+### Delete a Project
+
+```bash
+# Requires --force confirmation
+wit project delete "Old Project" --force
+
+✓ Deleted project "Old Project"
+```
+
+## Workflow Example
+
+### Setting Up a Sprint
+
+```bash
+# Create a new cycle
+wit cycle create "Sprint 5" --weeks 2
+
+# Add issues to the cycle
+wit cycle add WIT-10
+wit cycle add WIT-11
+wit cycle add WIT-12
+
+# Check current cycle
+wit cycle current
+```
+
+### Managing Work During Sprint
+
+```bash
+# Check progress
+wit cycle show
+
+# View issues by status
+wit issue list --status in_progress
+
+# Complete an issue
+wit issue close WIT-10
+
+# Check updated progress
+wit cycle current
+```
+
+### End of Sprint
+
+```bash
+# Review velocity
+wit cycle velocity
+
+# Complete the cycle
+wit cycle complete
+
+# Incomplete issues are moved to backlog
+```
+
+### Project Planning
+
+```bash
+# Create a project for a major feature
+wit project create "API v2" \
+  -d "Complete API redesign" \
+  --target 2024-06-01
+
+# Create issues for the project
+wit issue create "Design API schema" --project "API v2"
+wit issue create "Implement endpoints" --project "API v2"
+wit issue create "Write documentation" --project "API v2"
+
+# Track progress
+wit project progress "API v2"
+```
+
+## Options Reference
+
+### Cycle Commands
+
+| Command | Description |
+|---------|-------------|
+| `create [name]` | Create a new cycle |
+| `list` | List all cycles |
+| `show [n]` | Show cycle details |
+| `current` | Show current active cycle |
+| `add <issue> [n]` | Add issue to cycle |
+| `remove <issue>` | Remove issue from cycle |
+| `complete [n]` | Complete a cycle |
+| `velocity` | Show velocity metrics |
+
+### Project Commands
+
+| Command | Description |
+|---------|-------------|
+| `create <name>` | Create a new project |
+| `list` | List all projects |
+| `view <name>` | View project details |
+| `update <name>` | Update a project |
+| `delete <name>` | Delete a project |
+| `issues <name>` | List issues in project |
+| `progress <name>` | Show project progress |
+| `complete <name>` | Mark project as complete |
+
+## Requirements
+
+Cycles and projects require the wit server:
+
+```bash
+# Start the server
+wit serve
+
+# Or use the full platform
+wit up
+```
+
+## Related
+
+- [wit issue](/platform/issues) - Issue tracking
+- [wit pr](/platform/pull-requests) - Pull request management
+- [wit inbox](/commands/inbox) - PR inbox

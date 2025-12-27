@@ -205,19 +205,19 @@ export const repoAiKeyModel = {
 
   /**
    * Get any available API key for a repository
-   * Prefers OpenAI, then Anthropic
+   * Prefers Anthropic (Claude Opus 4.5), then OpenAI (GPT 5.2)
    */
   async getAnyKey(repoId: string): Promise<{ provider: AiProvider; key: string } | null> {
-    // Try OpenAI first
-    const openaiKey = await this.getDecryptedKey(repoId, 'openai');
-    if (openaiKey) {
-      return { provider: 'openai', key: openaiKey };
-    }
-    
-    // Fall back to Anthropic
+    // Try Anthropic first (recommended - Claude Opus 4.5)
     const anthropicKey = await this.getDecryptedKey(repoId, 'anthropic');
     if (anthropicKey) {
       return { provider: 'anthropic', key: anthropicKey };
+    }
+    
+    // Fall back to OpenAI (GPT 5.2)
+    const openaiKey = await this.getDecryptedKey(repoId, 'openai');
+    if (openaiKey) {
+      return { provider: 'openai', key: openaiKey };
     }
     
     return null;

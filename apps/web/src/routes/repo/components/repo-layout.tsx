@@ -23,7 +23,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ChatPanel } from '@/components/ai/chat-panel';
+import { AgentPanel } from '@/components/agent/agent-panel';
 import { useSession } from '@/lib/auth-client';
 import { trpc } from '@/lib/trpc';
 import { toastSuccess, toastError } from '@/components/ui/use-toast';
@@ -264,7 +264,7 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
 
         {/* Action buttons - responsive layout */}
         <div className="flex items-center gap-2 flex-shrink-0">
-          {/* Ask AI button */}
+          {/* Agent button */}
           {authenticated && (
             <Button
               variant="outline"
@@ -273,7 +273,7 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
               onClick={() => setIsChatOpen(true)}
             >
               <Sparkles className="h-4 w-4" />
-              <span className="hidden sm:inline">Ask AI</span>
+              <span className="hidden sm:inline">Agent</span>
             </Button>
           )}
 
@@ -417,9 +417,9 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
       {/* Page content */}
       {children}
 
-      {/* AI Chat Panel */}
+      {/* Agent Panel */}
       {authenticated && (
-        <ChatPanel
+        <AgentPanel
           repoId={repoInfo.id}
           repoName={repoInfo.name}
           owner={owner}

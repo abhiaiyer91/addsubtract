@@ -112,6 +112,9 @@ export { handleCI, CI_HELP } from './ci';
 // Merge Queue commands
 export { handleMergeQueue, MERGE_QUEUE_HELP } from './merge-queue';
 
+// Journal commands (Notion-like docs)
+export { handleJournal, JOURNAL_HELP } from './journal';
+
 // Collaborator management
 export {
   handleCollaborator,

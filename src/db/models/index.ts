@@ -118,3 +118,13 @@ export {
   type DashboardRepo,
   type ActivityFeedItem,
 } from './user-stats';
+
+// Journal models (Notion-like documentation)
+export {
+  journalPageModel,
+  journalCommentModel,
+  journalPageHistoryModel,
+  generateSlug,
+  JOURNAL_PAGE_STATUSES,
+  JOURNAL_STATUS_CONFIG,
+} from './journal';

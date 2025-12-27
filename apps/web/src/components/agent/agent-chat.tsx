@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plus, MessageSquare, Trash2, Bot, AlertCircle } from 'lucide-react';
+import { Plus, MessageSquare, Trash2, Bot, AlertCircle, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ChatMessage } from './chat-message';
 import { ChatInput } from './chat-input';
 import { trpc } from '@/lib/trpc';
 import { cn, formatRelativeTime } from '@/lib/utils';
+import { Link } from 'react-router-dom';
 
 interface Message {
   id: string;
@@ -14,22 +15,28 @@ interface Message {
   createdAt: Date;
 }
 
-interface Session {
-  id: string;
-  title: string | null;
-  status: string;
-  createdAt: Date;
+interface AgentChatProps {
+  repoId?: string;
 }
 
-export function AgentChat() {
+export function AgentChat({ repoId }: AgentChatProps) {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [streamingMessage, setStreamingMessage] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const utils = trpc.useUtils();
 
-  // Check AI status
+  // Check AI status from server
   const { data: aiStatus } = trpc.agent.status.useQuery();
+  
+  // Check repo-level AI keys if we have a repoId
+  const { data: repoAiStatus } = trpc.repoAiKeys.hasKeys.useQuery(
+    { repoId: repoId! },
+    { enabled: !!repoId }
+  );
+  
+  // AI is available if either server has keys OR repo has keys
+  const isAiAvailable = aiStatus?.available || repoAiStatus?.hasKeys;
 
   // List sessions
   const { data: sessions, isLoading: sessionsLoading } = trpc.agent.listSessions.useQuery({
@@ -160,8 +167,8 @@ export function AgentChat() {
 
   const isLoading = chat.isPending || createSession.isPending;
 
-  // AI not available
-  if (aiStatus && !aiStatus.available) {
+  // AI not available - check both server and repo keys
+  if (!isAiAvailable) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center max-w-md p-8">
@@ -170,14 +177,23 @@ export function AgentChat() {
           </div>
           <h2 className="text-xl font-semibold mb-2">AI Not Configured</h2>
           <p className="text-muted-foreground mb-4">
-            The wit agent requires an AI provider to be configured. Set one of the following
-            environment variables on your server:
+            The wit agent requires an AI provider to be configured. You can add your API key in the repository settings.
           </p>
-          <div className="bg-muted rounded-lg p-4 text-left font-mono text-sm">
-            <p>OPENAI_API_KEY=sk-...</p>
-            <p className="text-muted-foreground">or</p>
-            <p>ANTHROPIC_API_KEY=sk-ant-...</p>
-          </div>
+          {repoId && (
+            <Button asChild className="gap-2">
+              <Link to="settings/ai">
+                <Settings className="h-4 w-4" />
+                Configure AI Keys
+              </Link>
+            </Button>
+          )}
+          {!repoId && (
+            <div className="bg-muted rounded-lg p-4 text-left font-mono text-sm">
+              <p>ANTHROPIC_API_KEY=sk-ant-...</p>
+              <p className="text-muted-foreground">or</p>
+              <p>OPENAI_API_KEY=sk-...</p>
+            </div>
+          )}
         </div>
       </div>
     );

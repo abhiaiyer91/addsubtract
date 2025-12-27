@@ -1,0 +1,293 @@
+---
+title: 'Agent'
+description: 'Interactive AI coding assistant for your repository'
+---
+
+# wit agent
+
+The `wit agent` command provides an interactive AI-powered coding assistant that understands your codebase and can help with development tasks.
+
+## Overview
+
+The wit agent is a conversational AI assistant that can:
+- Read and understand code files
+- Edit files with targeted changes
+- Run shell commands (npm, node, etc.)
+- Create branches and commits
+- Open pull requests
+- Explain code and suggest improvements
+
+## Usage
+
+```bash
+# Start interactive chat session
+wit agent
+
+# One-shot query
+wit agent "explain the authentication flow"
+
+# Explicit subcommands
+wit agent chat              # Interactive session
+wit agent ask <query>       # One-shot question
+wit agent status            # Show agent configuration
+wit agent help              # Show help
+```
+
+## Interactive Mode
+
+When you run `wit agent` without arguments, you enter an interactive chat session:
+
+```bash
+$ wit agent
+
+╭─────────────────────────────────────────╮
+│          wit coding agent               │
+╰─────────────────────────────────────────╯
+
+Repository: /path/to/your/repo
+Branch: main
+
+Type your request, or use:
+  help    - Show commands
+  exit    - Exit the agent
+
+>
+```
+
+### Session Commands
+
+Within an interactive session, you can use these commands:
+
+| Command | Description |
+|---------|-------------|
+| `help` | Show available commands |
+| `status` | Show session status |
+| `history` | Show conversation history |
+| `clear` | Clear conversation history |
+| `exit` | Exit the agent |
+
+## One-Shot Mode
+
+For quick questions, use one-shot mode:
+
+```bash
+# Ask about code
+wit agent "what does Repository.find() do?"
+
+# Request changes
+wit agent "add error handling to the API endpoints"
+
+# Explain commits
+wit agent "explain the last 5 commits"
+
+# Using 'ask' subcommand
+wit agent ask "how is authentication implemented?"
+```
+
+## Capabilities
+
+The agent has access to powerful tools for working with your codebase:
+
+### Code Understanding
+- Read any file in the repository
+- List directory contents
+- Semantic search across the codebase
+- Get git status, diff, and history
+
+### Code Modification
+- Write new files
+- Edit existing files with targeted changes
+- Stage files for commit
+- Create commits with messages
+
+### Git Operations
+- Get repository status
+- View diffs and changes
+- Switch branches
+- Create new branches
+- Resolve merge conflicts
+
+### Shell Execution
+- Run npm/yarn commands
+- Execute tests
+- Run build processes
+- Any shell command needed
+
+### Pull Requests
+- Generate PR descriptions
+- Open pull requests
+- Review code changes
+
+## Examples
+
+### Explain Code
+```bash
+$ wit agent "explain the authentication flow in this codebase"
+
+The authentication system works as follows:
+
+1. User credentials are validated in src/core/auth.ts
+2. Sessions are managed using JWT tokens...
+```
+
+### Add a Feature
+```bash
+$ wit agent
+> add a test for the user service
+
+I'll add a test for the user service. Let me first look at the existing 
+test structure...
+
+[Creates test file with appropriate tests]
+
+Done! I've created src/__tests__/user-service.test.ts with tests for:
+- User creation
+- User retrieval
+- User update
+```
+
+### Fix a Bug
+```bash
+$ wit agent "fix the null pointer exception in the API handler"
+
+I found the issue in src/api/handler.ts:42. The problem is that...
+
+[Makes targeted edit to fix the issue]
+```
+
+### Refactor Code
+```bash
+$ wit agent
+> refactor the error handling in the api/ directory
+
+I'll analyze the current error handling patterns and suggest improvements...
+
+[Proposes and implements refactoring]
+```
+
+## Configuration
+
+### Environment Variables
+
+The agent requires an AI API key to function:
+
+```bash
+# OpenAI (GPT models)
+export OPENAI_API_KEY=sk-...
+
+# Anthropic (Claude models)
+export ANTHROPIC_API_KEY=sk-ant-...
+
+# Optional: Override model
+export WIT_AI_MODEL=openai/gpt-4o
+```
+
+### Check Status
+
+Verify your agent configuration:
+
+```bash
+$ wit agent status
+
+wit Agent Status
+
+Available: Yes
+Model: openai/gpt-4o
+Provider: openai
+
+Repository: /path/to/repo
+Branch: main
+```
+
+## Memory and Context
+
+The agent maintains conversation history within a session using persistent memory. This means:
+
+- Context is preserved across messages in a session
+- You can refer back to previous discussions
+- The agent remembers what files it has seen
+- Use `clear` to start fresh
+
+### Thread Management
+
+Each session creates a unique thread for tracking the conversation:
+
+```bash
+> status
+
+Session Status:
+  Repository: /path/to/repo
+  Branch: main
+  Thread ID: abc123...
+  Messages: 12
+  Pending changes: 0
+```
+
+## Best Practices
+
+### Be Specific
+Instead of:
+```bash
+wit agent "fix the bugs"
+```
+
+Try:
+```bash
+wit agent "fix the null reference error in UserService.getById()"
+```
+
+### Provide Context
+```bash
+wit agent "add validation to the user creation endpoint in src/api/users.ts"
+```
+
+### Review Changes
+The agent will show you what changes it makes. Always review before committing:
+
+```bash
+> add input validation to the API
+
+[Agent makes changes]
+
+# Review the changes
+wit diff
+
+# If satisfied, commit
+wit commit -m "Add input validation to API"
+```
+
+## Troubleshooting
+
+### Agent Not Available
+
+If you see "AI features require an API key":
+
+```bash
+# Set your API key
+export OPENAI_API_KEY=sk-your-key-here
+
+# Or use Anthropic
+export ANTHROPIC_API_KEY=sk-ant-your-key-here
+```
+
+### Model Errors
+
+If you encounter model-specific errors:
+
+```bash
+# Try a different model
+export WIT_AI_MODEL=openai/gpt-4o-mini
+```
+
+### Context Limits
+
+For very large codebases:
+- Focus on specific directories or files
+- Use semantic search to find relevant code first
+- Break complex tasks into smaller steps
+
+## Related Commands
+
+- [wit ai](/features/ai-powered) - AI commit messages and explanations
+- [wit search](/features/search) - Semantic code search
+- [wit review](/features/review) - AI-powered code review

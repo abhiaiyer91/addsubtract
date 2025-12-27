@@ -56,9 +56,10 @@ export function getMemory(): Memory {
 
 /**
  * Create and configure a Mastra instance for wit
+ * Default model: Claude Opus 4.5 (anthropic/claude-opus-4.5)
  */
 export function createTsgitMastra(config: AIConfig = {}): Mastra {
-  const model = config.model || process.env.WIT_AI_MODEL || 'openai/gpt-4o';
+  const model = config.model || process.env.WIT_AI_MODEL || 'anthropic/claude-opus-4.5';
   
   const agent = createTsgitAgent(model);
   const memory = getMemory();
@@ -165,6 +166,7 @@ export async function getApiKeyForRepo(
 /**
  * Get any available API key for a repository
  * Prefers repo-level keys, then server-level keys
+ * Prefers Anthropic (Claude Opus 4.5) over OpenAI (GPT 5.2)
  * Returns the provider and key
  */
 export async function getAnyApiKeyForRepo(
@@ -183,12 +185,12 @@ export async function getAnyApiKeyForRepo(
     }
   }
   
-  // Fall back to server-level keys
-  if (process.env.OPENAI_API_KEY) {
-    return { provider: 'openai', key: process.env.OPENAI_API_KEY };
-  }
+  // Fall back to server-level keys - prefer Anthropic (Claude Opus 4.5)
   if (process.env.ANTHROPIC_API_KEY) {
     return { provider: 'anthropic', key: process.env.ANTHROPIC_API_KEY };
+  }
+  if (process.env.OPENAI_API_KEY) {
+    return { provider: 'openai', key: process.env.OPENAI_API_KEY };
   }
   
   return null;
@@ -196,9 +198,10 @@ export async function getAnyApiKeyForRepo(
 
 /**
  * Get information about the configured AI
+ * Default: Claude Opus 4.5
  */
 export function getAIInfo(): { available: boolean; model: string; provider: string } {
-  const model = process.env.WIT_AI_MODEL || 'openai/gpt-4o';
+  const model = process.env.WIT_AI_MODEL || 'anthropic/claude-opus-4.5';
   const [provider] = model.split('/');
   
   return {
@@ -210,6 +213,7 @@ export function getAIInfo(): { available: boolean; model: string; provider: stri
 
 /**
  * Get AI info for a specific repository
+ * Default: Claude Opus 4.5
  */
 export async function getAIInfoForRepo(repoId: string): Promise<{
   available: boolean;
@@ -217,7 +221,7 @@ export async function getAIInfoForRepo(repoId: string): Promise<{
   model: string;
   provider: string;
 }> {
-  const model = process.env.WIT_AI_MODEL || 'openai/gpt-4o';
+  const model = process.env.WIT_AI_MODEL || 'anthropic/claude-opus-4.5';
   const [defaultProvider] = model.split('/');
   
   // Check repo-level keys first

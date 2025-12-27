@@ -1,0 +1,127 @@
+---
+title: 'Stacks API'
+description: 'API reference for stacked diffs management'
+---
+
+# Stacks API
+
+The Stacks API provides programmatic access to wit's stacked diffs functionality for managing dependent branches.
+
+## Endpoints
+
+### List Stacks
+
+Get all stacks in a repository.
+
+```typescript
+const stacks = await client.stacks.list.query({
+  repoId: 'repo_123',
+});
+```
+
+### Get Stack
+
+Get details of a specific stack.
+
+```typescript
+const stack = await client.stacks.get.query({
+  repoId: 'repo_123',
+  stackId: 'stack_abc',
+});
+```
+
+### Create Stack
+
+Create a new stack from current branch.
+
+```typescript
+const stack = await client.stacks.create.mutate({
+  repoId: 'repo_123',
+  name: 'feature-stack',
+  baseBranch: 'main',
+});
+```
+
+### Add Branch to Stack
+
+Add a branch to an existing stack.
+
+```typescript
+await client.stacks.addBranch.mutate({
+  repoId: 'repo_123',
+  stackId: 'stack_abc',
+  branchName: 'feature-part-2',
+  afterBranch: 'feature-part-1', // Position in stack
+});
+```
+
+### Remove Branch from Stack
+
+```typescript
+await client.stacks.removeBranch.mutate({
+  repoId: 'repo_123',
+  stackId: 'stack_abc',
+  branchName: 'feature-part-2',
+});
+```
+
+### Reorder Stack
+
+Change the order of branches in a stack.
+
+```typescript
+await client.stacks.reorder.mutate({
+  repoId: 'repo_123',
+  stackId: 'stack_abc',
+  order: ['feature-part-1', 'feature-part-3', 'feature-part-2'],
+});
+```
+
+### Sync Stack
+
+Rebase all branches in stack onto updated base.
+
+```typescript
+const result = await client.stacks.sync.mutate({
+  repoId: 'repo_123',
+  stackId: 'stack_abc',
+});
+```
+
+### Submit Stack
+
+Create PRs for all branches in stack.
+
+```typescript
+const prs = await client.stacks.submit.mutate({
+  repoId: 'repo_123',
+  stackId: 'stack_abc',
+  draft: false,
+});
+```
+
+## Stack Schema
+
+```typescript
+interface Stack {
+  id: string;
+  name: string;
+  repoId: string;
+  baseBranch: string;
+  branches: StackBranch[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface StackBranch {
+  name: string;
+  position: number;
+  prNumber?: number;
+  prState?: 'open' | 'merged' | 'closed';
+  status: 'synced' | 'needs-rebase' | 'conflict';
+}
+```
+
+## Related
+
+- [Stacked Diffs](/features/stacked-diffs) - CLI documentation

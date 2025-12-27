@@ -1,0 +1,120 @@
+---
+title: 'Merge Queue API'
+description: 'API reference for merge queue management'
+---
+
+# Merge Queue API
+
+The Merge Queue API provides programmatic access to wit's merge queue for controlled PR merging.
+
+## Endpoints
+
+### Add to Queue
+
+Add a PR to the merge queue.
+
+```typescript
+const result = await client.mergeQueue.addToQueue.mutate({
+  prId: 'pr_123',
+  priority: 50, // 0-100
+});
+```
+
+### Remove from Queue
+
+Remove a PR from the queue.
+
+```typescript
+await client.mergeQueue.removeFromQueue.mutate({
+  prId: 'pr_123',
+});
+```
+
+### Get Queue Position
+
+Get a PR's position in the queue.
+
+```typescript
+const position = await client.mergeQueue.getQueuePosition.query({
+  prId: 'pr_123',
+});
+
+// Response
+{
+  inQueue: true,
+  position: 3,
+  totalInQueue: 10,
+  estimatedWaitMinutes: 15
+}
+```
+
+### List Queue
+
+List all PRs in the queue.
+
+```typescript
+const entries = await client.mergeQueue.listQueue.query({
+  repoId: 'repo_123',
+  targetBranch: 'main',
+  includeCompleted: false,
+});
+```
+
+### Get Statistics
+
+Get queue statistics.
+
+```typescript
+const stats = await client.mergeQueue.getStats.query({
+  repoId: 'repo_123',
+  targetBranch: 'main',
+});
+
+// Response
+{
+  pending: 5,
+  processing: 1,
+  completedToday: 12,
+  failedToday: 2,
+  avgMergeTimeMinutes: 8
+}
+```
+
+### Get/Update Config
+
+```typescript
+// Get config
+const config = await client.mergeQueue.getConfig.query({
+  repoId: 'repo_123',
+  targetBranch: 'main',
+});
+
+// Update config
+await client.mergeQueue.updateConfig.mutate({
+  repoId: 'repo_123',
+  targetBranch: 'main',
+  enabled: true,
+  strategy: 'adaptive',
+  maxBatchSize: 5,
+});
+```
+
+## Queue Entry Schema
+
+```typescript
+interface MergeQueueEntry {
+  id: string;
+  prId: string;
+  pr: { number: number; title: string };
+  position: number;
+  priority: number;
+  state: 'pending' | 'testing' | 'ready' | 'merging' | 'completed' | 'failed';
+  errorMessage?: string;
+  addedAt: string;
+  updatedAt: string;
+}
+```
+
+## Related
+
+- [Merge Queue](/features/merge-queue) - CLI documentation
