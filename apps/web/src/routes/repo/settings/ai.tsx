@@ -418,7 +418,7 @@ export function RepoAISettingsPage() {
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground space-y-2">
               <p>
-                AI API keys enable features like intelligent code review, the Ask AI assistant, 
+                AI API keys enable features like intelligent code review, the Agent assistant, 
                 and automated suggestions throughout your repository.
               </p>
               <p>

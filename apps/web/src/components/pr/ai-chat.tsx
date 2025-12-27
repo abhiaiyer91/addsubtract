@@ -149,7 +149,7 @@ export function AiChat({
             <div className="p-1 bg-primary/10 rounded">
               <Bot className="h-4 w-4 text-primary" />
             </div>
-            Ask AI about this PR
+            Agent
           </CardTitle>
           <div className="flex items-center gap-2">
             {messages.length > 0 && (
