@@ -124,7 +124,7 @@ export function ProjectDetailPage() {
 
   const statusConfig = STATUS_CONFIG[project.status] || STATUS_CONFIG.backlog;
   const progressPercent = progress
-    ? Math.round((progress.completed / Math.max(progress.total, 1)) * 100)
+    ? Math.round((progress.completedIssues / Math.max(progress.totalIssues, 1)) * 100)
     : 0;
 
   // Group issues by status for Kanban

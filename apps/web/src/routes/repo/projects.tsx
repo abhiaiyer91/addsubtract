@@ -282,7 +282,7 @@ function ProjectCard({ project, owner, repo }: ProjectCardProps) {
   );
 
   const progressPercent = progress
-    ? Math.round((progress.completed / Math.max(progress.total, 1)) * 100)
+    ? Math.round((progress.completedIssues / Math.max(progress.totalIssues, 1)) * 100)
     : 0;
 
   return (
@@ -341,7 +341,7 @@ function ProjectCard({ project, owner, repo }: ProjectCardProps) {
           <>
             <span className="flex items-center gap-1">
               <Target className="h-3 w-3" />
-              {progress.completed}/{progress.total} issues
+              {progress.completedIssues}/{progress.totalIssues} issues
             </span>
           </>
         )}
