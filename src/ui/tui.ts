@@ -8,6 +8,7 @@ import * as path from 'path';
 import { Repository } from '../core/repository';
 import { Commit } from '../core/object';
 import { diff, DiffLine } from '../core/diff';
+import { StackManager, StackNode } from '../core/stack';
 
 // Type augmentation for blessed
 declare module 'blessed' {
@@ -31,15 +32,18 @@ export class TsgitTUI {
   private logBox!: blessed.Widgets.ListElement;
   private diffBox!: blessed.Widgets.BoxElement;
   private branchBox!: blessed.Widgets.ListElement;
+  private stackBox!: blessed.Widgets.ListElement;
   private helpBox!: blessed.Widgets.BoxElement;
   private commandInput!: blessed.Widgets.TextboxElement;
   private messageBox!: blessed.Widgets.MessageElement;
 
-  private currentView: 'main' | 'log' | 'diff' | 'branches' = 'main';
+  private currentView: 'main' | 'log' | 'diff' | 'branches' | 'stacks' = 'main';
   private selectedFile: string | null = null;
+  private stackManager: StackManager;
 
   constructor(repo: Repository) {
     this.repo = repo;
+    this.stackManager = new StackManager(repo, repo.gitDir);
     this.screen = blessed.screen({
       smartCSR: true,
       title: 'wit - Visual Interface',
@@ -168,7 +172,7 @@ export class TsgitTUI {
       left: 0,
       width: '100%',
       height: 1,
-      content: ' {bold}q{/bold}:quit  {bold}r{/bold}:refresh  {bold}a{/bold}:add  {bold}c{/bold}:commit  {bold}s{/bold}:switch  {bold}p{/bold}:push  {bold}l{/bold}:pull  {bold}?{/bold}:help',
+      content: ' {bold}q{/bold}:quit  {bold}r{/bold}:refresh  {bold}a{/bold}:add  {bold}c{/bold}:commit  {bold}s{/bold}:switch  {bold}t{/bold}:stacks  {bold}p{/bold}:push  {bold}l{/bold}:pull  {bold}?{/bold}:help',
       tags: true,
       style: {
         fg: 'white',
@@ -193,6 +197,26 @@ export class TsgitTUI {
       style: {
         border: { fg: 'cyan' },
         selected: { bg: 'cyan', fg: 'black' },
+      },
+    });
+
+    // Stack list (hidden by default)
+    this.stackBox = blessed.list({
+      parent: this.screen,
+      label: ' Stacked Diffs ',
+      top: 'center',
+      left: 'center',
+      width: '60%',
+      height: '60%',
+      border: { type: 'line' },
+      tags: true,
+      keys: true,
+      vi: true,
+      mouse: true,
+      hidden: true,
+      style: {
+        border: { fg: 'magenta' },
+        selected: { bg: 'magenta', fg: 'black' },
       },
     });
 
@@ -246,6 +270,11 @@ export class TsgitTUI {
       this.showHelp();
     });
 
+    // Stacks
+    this.screen.key(['t'], () => {
+      this.showStackSelector();
+    });
+
     // Tab between panels
     this.screen.key(['tab'], () => {
       this.focusNext();
@@ -277,6 +306,34 @@ export class TsgitTUI {
 
     this.branchBox.key(['escape'], () => {
       this.branchBox.hide();
+      this.screen.render();
+    });
+
+    // Stack selection
+    this.stackBox.on('select', (item) => {
+      if (item) {
+        const content = item.content.replace(/\{[^}]+\}/g, '').trim();
+        // Handle stack actions based on content
+        if (content.startsWith('[CREATE]')) {
+          this.showCreateStackDialog();
+        } else if (content.startsWith('[PUSH]')) {
+          this.pushToStack();
+        } else if (content.startsWith('[SYNC]')) {
+          this.syncCurrentStack();
+        } else if (content.startsWith('[UP]')) {
+          this.stackNavigateUp();
+        } else if (content.startsWith('[DOWN]')) {
+          this.stackNavigateDown();
+        } else {
+          // It's a stack name, show its details
+          const stackName = content.replace(/^\*\s*/, '').split(' ')[0];
+          this.showStackDetails(stackName);
+        }
+      }
+    });
+
+    this.stackBox.key(['escape'], () => {
+      this.stackBox.hide();
       this.screen.render();
     });
   }
@@ -549,6 +606,235 @@ export class TsgitTUI {
   }
 
   /**
+   * Show stack selector
+   */
+  private showStackSelector(): void {
+    try {
+      const stacks = this.stackManager.listStacks();
+      const currentStack = this.stackManager.getCurrentStack();
+      const items: string[] = [];
+
+      // Header
+      items.push('{bold}{magenta-fg}── Stacked Diffs ──{/magenta-fg}{/bold}');
+      items.push('');
+
+      if (stacks.length === 0) {
+        items.push('{gray-fg}No stacks yet{/gray-fg}');
+        items.push('');
+      } else {
+        for (const stackName of stacks) {
+          const stack = this.stackManager.getStack(stackName);
+          if (!stack) continue;
+
+          const isCurrent = currentStack?.name === stackName;
+          const prefix = isCurrent ? '{green-fg}* ' : '  ';
+          const suffix = isCurrent ? '{/green-fg}' : '';
+          const branchCount = stack.branches.length;
+          items.push(`${prefix}${stackName} {gray-fg}(${branchCount} branch${branchCount !== 1 ? 'es' : ''})${suffix}{/gray-fg}`);
+        }
+        items.push('');
+      }
+
+      // Actions
+      items.push('{bold}Actions:{/bold}');
+      items.push('{cyan-fg}[CREATE]{/cyan-fg} Create new stack');
+      
+      if (currentStack) {
+        items.push('{cyan-fg}[PUSH]{/cyan-fg} Push new branch to stack');
+        items.push('{cyan-fg}[SYNC]{/cyan-fg} Sync current stack');
+        items.push('{cyan-fg}[UP]{/cyan-fg} Navigate up in stack');
+        items.push('{cyan-fg}[DOWN]{/cyan-fg} Navigate down in stack');
+      }
+
+      this.stackBox.setItems(items);
+      this.stackBox.show();
+      this.stackBox.focus();
+      this.screen.render();
+    } catch (error) {
+      this.showMessage('Error loading stacks');
+    }
+  }
+
+  /**
+   * Show create stack dialog
+   */
+  private showCreateStackDialog(): void {
+    this.stackBox.hide();
+
+    const prompt = blessed.prompt({
+      parent: this.screen,
+      top: 'center',
+      left: 'center',
+      width: '60%',
+      height: 'shrink',
+      border: { type: 'line' },
+      label: ' Create Stack ',
+      tags: true,
+      style: {
+        border: { fg: 'magenta' },
+        label: { fg: 'magenta', bold: true },
+      },
+    });
+
+    prompt.input('Stack name:', '', (err, value) => {
+      if (!err && value && value.trim()) {
+        try {
+          this.stackManager.create(value.trim());
+          this.showMessage(`Created stack: ${value.trim()}`);
+          this.refresh();
+        } catch (error) {
+          this.showMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      }
+      prompt.destroy();
+      this.screen.render();
+    });
+  }
+
+  /**
+   * Push new branch to current stack
+   */
+  private pushToStack(): void {
+    this.stackBox.hide();
+
+    const prompt = blessed.prompt({
+      parent: this.screen,
+      top: 'center',
+      left: 'center',
+      width: '60%',
+      height: 'shrink',
+      border: { type: 'line' },
+      label: ' Push to Stack ',
+      tags: true,
+      style: {
+        border: { fg: 'magenta' },
+        label: { fg: 'magenta', bold: true },
+      },
+    });
+
+    prompt.input('Branch name (leave empty for auto):', '', (err, value) => {
+      try {
+        const branchName = value && value.trim() ? value.trim() : undefined;
+        const { branch } = this.stackManager.push(branchName);
+        this.showMessage(`Created: ${branch}`);
+        this.refresh();
+      } catch (error) {
+        this.showMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+      prompt.destroy();
+      this.screen.render();
+    });
+  }
+
+  /**
+   * Sync current stack
+   */
+  private syncCurrentStack(): void {
+    this.stackBox.hide();
+    try {
+      const result = this.stackManager.sync();
+      if (result.success) {
+        this.showMessage(`Stack synced: ${result.synced.length} branches updated`);
+      } else {
+        this.showMessage(`Sync failed: ${result.message || 'conflicts detected'}`);
+      }
+      this.refresh();
+    } catch (error) {
+      this.showMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Navigate up in stack
+   */
+  private stackNavigateUp(): void {
+    this.stackBox.hide();
+    try {
+      const branch = this.stackManager.up();
+      this.showMessage(`Switched to: ${branch}`);
+      this.refresh();
+    } catch (error) {
+      this.showMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Navigate down in stack
+   */
+  private stackNavigateDown(): void {
+    this.stackBox.hide();
+    try {
+      const branch = this.stackManager.down();
+      this.showMessage(`Switched to: ${branch}`);
+      this.refresh();
+    } catch (error) {
+      this.showMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Show stack details
+   */
+  private showStackDetails(stackName: string): void {
+    try {
+      const nodes = this.stackManager.visualize(stackName);
+      if (nodes.length === 0) {
+        this.showMessage('Stack not found or empty');
+        return;
+      }
+
+      let content = `{bold}{magenta-fg}Stack: ${stackName}{/magenta-fg}{/bold}\n\n`;
+
+      // Show branches from top to bottom
+      for (let i = nodes.length - 1; i >= 0; i--) {
+        const node = nodes[i];
+        const currentIndicator = node.isCurrent ? '{green-fg}● ' : '  ';
+        const statusColor = node.status === 'synced' ? 'green' : 
+                           node.status === 'behind' ? 'yellow' :
+                           node.status === 'ahead' ? 'cyan' : 'red';
+        const statusIcon = node.status === 'synced' ? '✓' : 
+                          node.status === 'behind' ? '↓' :
+                          node.status === 'ahead' ? '↑' : '↕';
+        
+        content += `${currentIndicator}{${statusColor}-fg}${statusIcon}{/${statusColor}-fg} ${node.branch}`;
+        if (node.isCurrent) content += '{/green-fg}';
+        content += '\n';
+        content += `    {gray-fg}${node.commit} ${node.message.slice(0, 40)}{/gray-fg}\n`;
+        if (i > 0) content += '    │\n';
+      }
+
+      content += '\n{gray-fg}Press any key to close{/gray-fg}';
+
+      const detailBox = blessed.box({
+        parent: this.screen,
+        top: 'center',
+        left: 'center',
+        width: '70%',
+        height: '70%',
+        content: content,
+        tags: true,
+        border: { type: 'line' },
+        scrollable: true,
+        style: {
+          border: { fg: 'magenta' },
+          bg: 'black',
+        },
+      });
+
+      detailBox.key(['escape', 'q', 'enter', 'space'], () => {
+        detailBox.destroy();
+        this.stackBox.hide();
+        this.screen.render();
+      });
+
+      detailBox.focus();
+      this.screen.render();
+    } catch (error) {
+      this.showMessage('Error loading stack details');
+    }
+  }
+
+  /**
    * Show help dialog
    */
   private showHelp(): void {
@@ -564,6 +850,7 @@ export class TsgitTUI {
   a - Add selected file to staging
   c - Create a commit
   s - Switch branch
+  t - Stacked diffs menu
   r - Refresh view
   
 {bold}Other:{/bold}

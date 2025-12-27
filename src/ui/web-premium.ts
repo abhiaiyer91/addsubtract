@@ -8,11 +8,13 @@ import * as http from 'http';
 import * as path from 'path';
 import * as url from 'url';
 import { Repository } from '../core/repository';
+import { StackManager } from '../core/stack';
 import { buildGraph, GraphNode, GraphEdge } from './graph';
 import { renderDiffHTML, getDiffStyles, getWordDiffStyles } from './diff-viewer';
 import { buildFileTree, renderFileTreeHTML, getFileTreeStyles } from './file-tree';
 import { SearchEngine, renderSearchResultsHTML, getSearchStyles } from './search';
 import { getTheme, Theme, getThemeNames } from './themes';
+import { getStackList, getStackVisualization, renderStackListHTML, renderStackVisualizationHTML, getStackStyles } from './stack-view';
 
 const DEFAULT_PORT = 3847;
 
@@ -24,12 +26,14 @@ export class PremiumWebUI {
   private repo: Repository;
   private port: number;
   private searchEngine: SearchEngine;
+  private stackManager: StackManager;
   private currentTheme: Theme;
 
   constructor(repo: Repository, port: number = DEFAULT_PORT) {
     this.repo = repo;
     this.port = port;
     this.searchEngine = new SearchEngine(repo);
+    this.stackManager = new StackManager(repo, repo.gitDir);
     this.currentTheme = getTheme('github-dark');
     this.server = http.createServer((req, res) => this.handleRequest(req, res));
   }
@@ -118,6 +122,65 @@ export class PremiumWebUI {
             const body = await this.readBody(req);
             const { theme } = JSON.parse(body);
             this.currentTheme = getTheme(theme);
+            this.serveJSON(res, { success: true });
+          }
+          break;
+        // Stack (Stacked Diffs) API endpoints
+        case '/api/stacks':
+          this.serveJSON(res, this.getStacks());
+          break;
+        case '/api/stacks/current':
+          this.serveJSON(res, this.getCurrentStack());
+          break;
+        case '/api/stacks/view':
+          const stackName = parsedUrl.query.name as string;
+          this.serveText(res, this.getStackViewHTML(stackName), 'text/html');
+          break;
+        case '/api/stacks/create':
+          if (req.method === 'POST') {
+            const body = await this.readBody(req);
+            const { name, description } = JSON.parse(body);
+            const stack = this.stackManager.create(name, description);
+            this.serveJSON(res, { success: true, stack });
+          }
+          break;
+        case '/api/stacks/push':
+          if (req.method === 'POST') {
+            const body = await this.readBody(req);
+            const { branchName } = JSON.parse(body);
+            const result = this.stackManager.push(branchName);
+            this.serveJSON(res, { success: true, ...result });
+          }
+          break;
+        case '/api/stacks/pop':
+          if (req.method === 'POST') {
+            const result = this.stackManager.pop();
+            this.serveJSON(res, { success: true, ...result });
+          }
+          break;
+        case '/api/stacks/sync':
+          if (req.method === 'POST') {
+            const result = this.stackManager.sync();
+            this.serveJSON(res, result);
+          }
+          break;
+        case '/api/stacks/up':
+          if (req.method === 'POST') {
+            const branch = this.stackManager.up();
+            this.serveJSON(res, { success: true, branch });
+          }
+          break;
+        case '/api/stacks/down':
+          if (req.method === 'POST') {
+            const branch = this.stackManager.down();
+            this.serveJSON(res, { success: true, branch });
+          }
+          break;
+        case '/api/stacks/delete':
+          if (req.method === 'POST') {
+            const body = await this.readBody(req);
+            const { name: deleteName } = JSON.parse(body);
+            this.stackManager.delete(deleteName);
             this.serveJSON(res, { success: true });
           }
           break;
@@ -241,6 +304,33 @@ export class PremiumWebUI {
       description: entry.description,
       timestamp: new Date(entry.timestamp).toISOString(),
     }));
+  }
+
+  private getStacks(): any {
+    return getStackList(this.repo);
+  }
+
+  private getCurrentStack(): any {
+    const stack = this.stackManager.getCurrentStack();
+    if (!stack) return null;
+    return {
+      name: stack.name,
+      description: stack.description,
+      baseBranch: stack.baseBranch,
+      branches: stack.branches,
+      visualization: getStackVisualization(this.repo, stack.name),
+    };
+  }
+
+  private getStackViewHTML(stackName?: string): string {
+    const stacks = getStackList(this.repo);
+    
+    if (stackName) {
+      const branches = getStackVisualization(this.repo, stackName);
+      return renderStackVisualizationHTML(branches, stackName);
+    }
+    
+    return renderStackListHTML(stacks);
   }
 
   private serveHTML(res: http.ServerResponse): void {
@@ -413,6 +503,13 @@ export class PremiumWebUI {
             </svg>
             History
           </button>
+          <button class="panel-tab" data-panel="stacks">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="18" height="6" rx="1"/>
+              <rect x="3" y="11" width="18" height="6" rx="1"/>
+            </svg>
+            Stacks
+          </button>
         </div>
         
         <div class="panel-content" id="panel-graph" style="display: block;">
@@ -439,6 +536,15 @@ export class PremiumWebUI {
             <div class="empty-state">
               <div class="empty-icon">📋</div>
               <p>Loading history...</p>
+            </div>
+          </div>
+        </div>
+        
+        <div class="panel-content" id="panel-stacks" style="display: none;">
+          <div id="stacks-container">
+            <div class="loading-state">
+              <div class="spinner"></div>
+              <p>Loading stacks...</p>
             </div>
           </div>
         </div>
@@ -1501,6 +1607,7 @@ export class PremiumWebUI {
     ${getWordDiffStyles()}
     ${getFileTreeStyles()}
     ${getSearchStyles()}
+    ${getStackStyles()}
     
     /* Override diff styles for premium look */
     .diff-container {
@@ -1593,6 +1700,7 @@ export class PremiumWebUI {
       document.getElementById('panel-' + panel).style.display = 'block';
       
       if (panel === 'history') loadHistory();
+      if (panel === 'stacks') loadStacks();
     }
     
     // Keyboard shortcuts
@@ -1991,6 +2099,129 @@ export class PremiumWebUI {
     function pullChanges() { showToast('Pull not implemented', 'warning'); }
     function pushChanges() { showToast('Push not implemented', 'warning'); }
     function openSettings() { showToast('Settings coming soon', 'warning'); }
+    
+    // ========================================
+    // STACKED DIFFS FUNCTIONALITY
+    // ========================================
+    
+    async function loadStacks() {
+      try {
+        const html = await fetchHTML('/api/stacks/view');
+        document.getElementById('stacks-container').innerHTML = html;
+      } catch (e) {
+        document.getElementById('stacks-container').innerHTML = 
+          '<div class="empty-state"><div class="empty-icon">📊</div><h3>Error loading stacks</h3><p>' + e.message + '</p></div>';
+      }
+    }
+    
+    async function createStack() {
+      const name = prompt('Enter stack name:');
+      if (!name) return;
+      
+      const description = prompt('Enter description (optional):');
+      
+      try {
+        await fetchAPI('/api/stacks/create', { 
+          method: 'POST', 
+          body: JSON.stringify({ name, description }) 
+        });
+        showToast('Created stack: ' + name, 'success');
+        loadStacks();
+      } catch (e) {
+        showToast('Error: ' + e.message, 'error');
+      }
+    }
+    
+    async function viewStack(name) {
+      try {
+        const html = await fetchHTML('/api/stacks/view?name=' + encodeURIComponent(name));
+        document.getElementById('stacks-container').innerHTML = html;
+      } catch (e) {
+        showToast('Error: ' + e.message, 'error');
+      }
+    }
+    
+    async function stackPush(stackName) {
+      const branchName = prompt('Branch name (leave empty for auto):');
+      
+      try {
+        const result = await fetchAPI('/api/stacks/push', { 
+          method: 'POST', 
+          body: JSON.stringify({ branchName: branchName || undefined }) 
+        });
+        showToast('Created branch: ' + result.branch, 'success');
+        loadStatus();
+        loadStacks();
+      } catch (e) {
+        showToast('Error: ' + e.message, 'error');
+      }
+    }
+    
+    async function syncStack(name) {
+      try {
+        const result = await fetchAPI('/api/stacks/sync', { method: 'POST' });
+        if (result.success) {
+          showToast('Stack synced: ' + result.synced.length + ' branches', 'success');
+        } else {
+          showToast('Sync failed: ' + (result.message || 'conflicts'), 'error');
+        }
+        loadStacks();
+      } catch (e) {
+        showToast('Error: ' + e.message, 'error');
+      }
+    }
+    
+    async function deleteStack(name) {
+      if (!confirm('Delete stack "' + name + '"? (Branches will not be deleted)')) return;
+      
+      try {
+        await fetchAPI('/api/stacks/delete', { 
+          method: 'POST', 
+          body: JSON.stringify({ name }) 
+        });
+        showToast('Deleted stack: ' + name, 'success');
+        loadStacks();
+      } catch (e) {
+        showToast('Error: ' + e.message, 'error');
+      }
+    }
+    
+    async function stackUp() {
+      try {
+        const result = await fetchAPI('/api/stacks/up', { method: 'POST' });
+        showToast('Switched to: ' + result.branch, 'success');
+        loadStatus();
+        loadStacks();
+      } catch (e) {
+        showToast('Error: ' + e.message, 'error');
+      }
+    }
+    
+    async function stackDown() {
+      try {
+        const result = await fetchAPI('/api/stacks/down', { method: 'POST' });
+        showToast('Switched to: ' + result.branch, 'success');
+        loadStatus();
+        loadStacks();
+      } catch (e) {
+        showToast('Error: ' + e.message, 'error');
+      }
+    }
+    
+    async function checkoutBranch(branch) {
+      try {
+        await fetchAPI('/api/checkout', { 
+          method: 'POST', 
+          body: JSON.stringify({ branch: branch.replace(' (base)', '') }) 
+        });
+        showToast('Switched to: ' + branch, 'success');
+        loadStatus();
+        loadGraph();
+        loadStacks();
+      } catch (e) {
+        showToast('Error: ' + e.message, 'error');
+      }
+    }
     `;
   }
 

@@ -274,6 +274,13 @@ export function getDefaultCommands(callbacks: {
   onCherry?: () => void;
   onMerge?: () => void;
   onRebase?: () => void;
+  // Stack commands
+  onShowStacks?: () => void;
+  onStackCreate?: () => void;
+  onStackPush?: () => void;
+  onStackSync?: () => void;
+  onStackUp?: () => void;
+  onStackDown?: () => void;
 }): Command[] {
   return [
     // Git commands
@@ -526,6 +533,57 @@ export function getDefaultCommands(callbacks: {
       shortcut: '?',
       icon: '❓',
       action: callbacks.onShowHelp || (() => {}),
+    },
+
+    // Stack (Stacked Diffs) commands
+    {
+      id: 'stack.show',
+      name: 'Stack: Show All Stacks',
+      description: 'Show all stacked diffs',
+      category: 'git',
+      shortcut: 'Ctrl+Shift+T',
+      icon: '📚',
+      action: callbacks.onShowStacks || (() => {}),
+    },
+    {
+      id: 'stack.create',
+      name: 'Stack: Create New',
+      description: 'Create a new stack from current branch',
+      category: 'git',
+      icon: '📚+',
+      action: callbacks.onStackCreate || (() => {}),
+    },
+    {
+      id: 'stack.push',
+      name: 'Stack: Push Branch',
+      description: 'Push a new branch onto the stack',
+      category: 'git',
+      icon: '↑',
+      action: callbacks.onStackPush || (() => {}),
+    },
+    {
+      id: 'stack.sync',
+      name: 'Stack: Sync',
+      description: 'Rebase entire stack onto updated base',
+      category: 'git',
+      icon: '🔄',
+      action: callbacks.onStackSync || (() => {}),
+    },
+    {
+      id: 'stack.up',
+      name: 'Stack: Navigate Up',
+      description: 'Move to child branch in stack',
+      category: 'git',
+      icon: '↑',
+      action: callbacks.onStackUp || (() => {}),
+    },
+    {
+      id: 'stack.down',
+      name: 'Stack: Navigate Down',
+      description: 'Move to parent branch in stack',
+      category: 'git',
+      icon: '↓',
+      action: callbacks.onStackDown || (() => {}),
     },
   ];
 }

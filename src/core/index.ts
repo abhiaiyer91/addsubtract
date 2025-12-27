@@ -206,6 +206,9 @@ export { ScopeManager } from './scope';
 export { PartialCloneManager, SparseCheckoutManager } from './partial-clone';
 export { FileDiff, DiffLine, DiffHunk, diff, createHunks, formatUnifiedDiff, formatColoredDiff, isBinary } from './diff';
 
+// Stacked diffs
+export { StackManager, StackMetadata, SyncResult, SubmitResult, StackNode } from './stack';
+
 // Remote infrastructure
 export { Remote, RemoteManager } from './remote';
 export {

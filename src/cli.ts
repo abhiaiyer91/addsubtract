@@ -59,6 +59,8 @@ import {
   // Advanced features
   handleReflog,
   handleGC,
+  // Stacked diffs
+  handleStack,
 } from './commands';
 import { handleHooks } from './core/hooks';
 import { handleSubmodule } from './core/submodule';
@@ -162,6 +164,16 @@ Advanced Features:
   reflog                Show reference log
   gc                    Run garbage collection
 
+Stacked Diffs:
+  stack create <name>   Start a new stack from current branch
+  stack push [name]     Create a new branch on top of the stack
+  stack list            Show all stacks
+  stack show            Show current stack visualization
+  stack sync            Rebase entire stack when base changes
+  stack submit          Push all stack branches for review
+  stack up/down         Navigate the stack
+  stack pop             Remove top branch from stack
+
 Quality of Life:
   amend                 Quickly fix the last commit
   wip                   Quick WIP commit with auto-generated message
@@ -247,6 +259,8 @@ const COMMANDS = [
   'remote', 'clone', 'fetch', 'pull', 'push',
   // Advanced features
   'hooks', 'submodule', 'worktree', 'reflog', 'gc',
+  // Stacked diffs
+  'stack',
   'help',
 ];
 
@@ -687,6 +701,10 @@ function main(): void {
 
       case 'gc':
         handleGC(cmdArgs);
+        break;
+
+      case 'stack':
+        handleStack(rawArgs);
         break;
 
       default: {
