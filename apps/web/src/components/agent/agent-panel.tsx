@@ -47,6 +47,7 @@ import { ChatInput, type ChatInputRef } from './chat-input';
 import { trpc } from '@/lib/trpc';
 import { cn, formatRelativeTime } from '@/lib/utils';
 import { Link } from 'react-router-dom';
+import { useAgentTools } from '@/lib/use-agent-tools';
 
 interface Message {
   id: string;
@@ -61,6 +62,8 @@ interface AgentPanelProps {
   repoId?: string;
   repoName?: string;
   owner?: string;
+  /** When true, renders inline without fixed positioning (for IDE mode) */
+  embedded?: boolean;
 }
 
 const quickActions = [
@@ -71,7 +74,7 @@ const quickActions = [
   { id: 'explain', icon: Code, label: 'Explain code', prompt: 'Explain this code: ' },
 ];
 
-export function AgentPanel({ isOpen, onClose, repoId, repoName, owner }: AgentPanelProps) {
+export function AgentPanel({ isOpen, onClose, repoId, repoName, owner, embedded = false }: AgentPanelProps) {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [streamingMessage, setStreamingMessage] = useState<string>('');
@@ -126,6 +129,9 @@ export function AgentPanel({ isOpen, onClose, repoId, repoName, owner }: AgentPa
     },
   });
 
+  // Hook for processing agent tool results
+  const { processToolCalls } = useAgentTools();
+
   // Chat mutation
   const chat = trpc.agent.chat.useMutation({
     onSuccess: (result) => {
@@ -146,6 +152,11 @@ export function AgentPanel({ isOpen, onClose, repoId, repoName, owner }: AgentPa
       ]);
       setStreamingMessage('');
       utils.agent.listSessions.invalidate();
+
+      // Process tool calls for IDE integration
+      if (embedded && result.toolCalls) {
+        processToolCalls(result.toolCalls);
+      }
     },
     onError: (error) => {
       setMessages((prev) => [
@@ -195,8 +206,10 @@ export function AgentPanel({ isOpen, onClose, repoId, repoName, owner }: AgentPa
     }
   }, [aiStatus?.defaultProvider, selectedProvider]);
 
-  // Close on escape key
+  // Close on escape key (only when not embedded)
   useEffect(() => {
+    if (embedded) return;
+    
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen) {
         onClose();
@@ -205,7 +218,7 @@ export function AgentPanel({ isOpen, onClose, repoId, repoName, owner }: AgentPa
 
     document.addEventListener('keydown', handleEscape);
     return () => document.removeEventListener('keydown', handleEscape);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, embedded]);
 
   const handleSend = async (message: string) => {
     const provider = selectedProvider as 'anthropic' | 'openai' | undefined;
@@ -251,7 +264,150 @@ export function AgentPanel({ isOpen, onClose, repoId, repoName, owner }: AgentPa
 
   const isLoading = chat.isPending || createSession.isPending;
 
-  if (!isOpen) return null;
+  if (!isOpen && !embedded) return null;
+
+  // Embedded mode: render inline without fixed positioning
+  if (embedded) {
+    return (
+      <div className="flex flex-col h-full bg-background">
+        {/* AI not configured */}
+        {!isAiAvailable ? (
+          <div className="flex-1 flex items-center justify-center p-6">
+            <div className="text-center max-w-xs">
+              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-destructive/10 mb-4">
+                <AlertCircle className="h-6 w-6 text-destructive" />
+              </div>
+              <h3 className="text-base font-semibold mb-2">AI Not Configured</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Add your API key in repository settings to use the agent.
+              </p>
+              {repoId && (
+                <Button asChild size="sm" className="gap-2">
+                  <Link to="settings/ai">
+                    <Settings className="h-4 w-4" />
+                    Configure AI
+                  </Link>
+                </Button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Compact header with session controls */}
+            <div className="flex items-center justify-between px-3 py-1.5 border-b bg-muted/10">
+              <div className="flex items-center gap-1">
+                {sessions && sessions.length > 0 && (
+                  <DropdownMenu open={showHistory} onOpenChange={setShowHistory}>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon-sm" className="h-6 w-6 text-muted-foreground hover:text-foreground">
+                        <History className="h-3.5 w-3.5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="w-64">
+                      <div className="px-2 py-1 text-xs font-medium text-muted-foreground">Sessions</div>
+                      <DropdownMenuSeparator />
+                      <div className="max-h-48 overflow-y-auto">
+                        {sessions.slice(0, 10).map((session) => (
+                          <DropdownMenuItem
+                            key={session.id}
+                            onClick={() => {
+                              setActiveSessionId(session.id);
+                              setShowHistory(false);
+                            }}
+                            className={cn('py-1.5', activeSessionId === session.id && 'bg-accent')}
+                          >
+                            <MessageSquare className="h-3 w-3 mr-2 text-muted-foreground" />
+                            <span className="truncate text-xs">{session.title || 'New conversation'}</span>
+                          </DropdownMenuItem>
+                        ))}
+                      </div>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                  onClick={handleNewSession}
+                  disabled={createSession.isPending}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+              {aiStatus && (
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  <span className="truncate max-w-24">{aiStatus.model?.split(':').pop() || 'AI'}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Messages */}
+            <ScrollArea className="flex-1">
+              <div className="min-h-full">
+                {messagesLoading ? (
+                  <div className="p-4 text-center text-muted-foreground text-xs">Loading...</div>
+                ) : messages.length === 0 ? (
+                  <div className="p-4 space-y-4">
+                    <div className="text-center py-6">
+                      <Bot className="h-8 w-8 mx-auto text-muted-foreground/40 mb-2" />
+                      <p className="text-xs text-muted-foreground">Ask me to write code, create files, or modify the project</p>
+                    </div>
+                    <div className="space-y-1">
+                      {[
+                        'Create a new React component',
+                        'Add a unit test for this file',
+                        'Refactor this function',
+                      ].map((suggestion) => (
+                        <button
+                          key={suggestion}
+                          onClick={() => handleSend(suggestion)}
+                          className="flex items-center gap-1.5 w-full px-2 py-1.5 rounded text-left text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                        >
+                          <ChevronRight className="h-3 w-3" />
+                          <span>{suggestion}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-border/30">
+                    {messages.map((msg) => (
+                      <ChatMessage key={msg.id} role={msg.role} content={msg.content} timestamp={msg.createdAt} compact />
+                    ))}
+                    {streamingMessage && <ChatMessage role="assistant" content={streamingMessage} isStreaming compact />}
+                    {isLoading && !streamingMessage && <ChatMessage role="assistant" content="Thinking..." isStreaming compact />}
+                  </div>
+                )}
+                <div ref={messagesEndRef} />
+              </div>
+            </ScrollArea>
+
+            {/* Input */}
+            <div className="border-t p-2 bg-muted/10">
+              <ChatInput ref={inputRef} onSend={handleSend} isLoading={isLoading} compact />
+            </div>
+          </>
+        )}
+
+        {/* Delete dialog */}
+        <AlertDialog open={!!deleteSessionId} onOpenChange={(open) => !open && setDeleteSessionId(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete conversation?</AlertDialogTitle>
+              <AlertDialogDescription>This will permanently delete this conversation.</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmDeleteSession} className="bg-destructive text-destructive-foreground">
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    );
+  }
 
   return (
     <div
