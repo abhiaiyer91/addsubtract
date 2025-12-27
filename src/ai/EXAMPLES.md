@@ -14,7 +14,7 @@ export OPENAI_API_KEY=sk-your-key-here
 export ANTHROPIC_API_KEY=sk-ant-your-key-here
 
 # Optional: Use a different model
-export WIT_AI_MODEL=anthropic/claude-sonnet-4-20250514
+export WIT_AI_MODEL=anthropic/claude-opus-4-5
 ```
 
 Check your configuration:
@@ -321,14 +321,14 @@ console.log('Committed:', commit.shortHash);
 The AI integration uses `@mastra/core` which supports:
 
 - **OpenAI**: `openai/gpt-4o`, `openai/gpt-4o-mini`, `openai/gpt-4-turbo`
-- **Anthropic**: `anthropic/claude-sonnet-4-20250514`, `anthropic/claude-3-haiku`
+- **Anthropic**: `anthropic/claude-opus-4-5`, `anthropic/claude-3-haiku`
 - **And more** via the Mastra model router
 
 Example:
 
 ```bash
 # Use Claude
-export WIT_AI_MODEL=anthropic/claude-sonnet-4-20250514
+export WIT_AI_MODEL=anthropic/claude-opus-4-5
 export ANTHROPIC_API_KEY=sk-ant-...
 
 # Use GPT-4o-mini (faster, cheaper)

@@ -6,7 +6,7 @@
  * Configuration for AI features
  */
 export interface AIConfig {
-  /** Model to use (e.g., 'openai/gpt-4o', 'anthropic/claude-sonnet-4-20250514') */
+  /** Model to use (e.g., 'openai/gpt-4o', 'anthropic/claude-opus-4-5') */
   model?: string;
   /** API key (defaults to environment variable based on provider) */
   apiKey?: string;
