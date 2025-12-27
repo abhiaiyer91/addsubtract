@@ -38,6 +38,7 @@ import { SettingsPage } from './routes/settings';
 import { SSHKeysPage } from './routes/settings/keys';
 import { TokensPage } from './routes/settings/tokens';
 import { NewRepoPage } from './routes/new';
+import { AgentPage } from './routes/agent';
 import { NewOrgPage } from './routes/org/new';
 import { OrgPage } from './routes/org';
 import { OrgSettingsPage } from './routes/org/settings';
@@ -66,6 +67,7 @@ export function App() {
             <Route path="/settings/keys" element={<SSHKeysPage />} />
             <Route path="/settings/tokens" element={<TokensPage />} />
             <Route path="/new" element={<NewRepoPage />} />
+            <Route path="/agent" element={<AgentPage />} />
             <Route path="/orgs/new" element={<NewOrgPage />} />
             <Route path="/search" element={<SearchPage />} />
             <Route path="/pulls" element={<PullsInboxPage />} />
