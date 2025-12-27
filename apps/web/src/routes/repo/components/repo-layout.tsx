@@ -23,10 +23,17 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { AgentPanel } from '@/components/agent/agent-panel';
 import { useSession } from '@/lib/auth-client';
 import { trpc } from '@/lib/trpc';
 import { toastSuccess, toastError } from '@/components/ui/use-toast';
+import { cn } from '@/lib/utils';
 
 interface RepoLayoutProps {
   owner: string;
@@ -266,15 +273,27 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
         <div className="flex items-center gap-2 flex-shrink-0">
           {/* Agent button */}
           {authenticated && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2 h-9"
-              onClick={() => setIsChatOpen(true)}
-            >
-              <Sparkles className="h-4 w-4" />
-              <span className="hidden sm:inline">Agent</span>
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={isChatOpen ? 'default' : 'outline'}
+                    size="sm"
+                    className={cn(
+                      'gap-2 h-9 transition-all',
+                      isChatOpen && 'bg-primary/90 shadow-glow'
+                    )}
+                    onClick={() => setIsChatOpen(!isChatOpen)}
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    <span className="hidden sm:inline">Agent</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {isChatOpen ? 'Close agent panel' : 'Open AI agent'}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           )}
 
           {authenticated && (
