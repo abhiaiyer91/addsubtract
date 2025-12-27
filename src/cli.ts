@@ -78,7 +78,7 @@ import {
   // Platform commands
   handlePr,
   handleIssue,
-  handleInbox,
+  handleDashboard,
   // Issue tracking (Linear-inspired) - also exports handleCycle
   handleCycle,
   // Project management (Linear-inspired)
@@ -245,6 +245,14 @@ Server:
   serve --repos <path>  Set repository storage directory
 
 Platform Commands:
+  dashboard             Your personal dashboard (PRs, issues, repos, stats)
+  dashboard prs         View all PR sections (awaiting review, yours, participated)
+  dashboard issues      View assigned/created issues
+  dashboard repos       View your repositories
+  dashboard activity    View recent activity feed
+  dashboard stats       View contribution statistics
+  dashboard summary     Quick counts summary
+  
   pr create             Create pull request from current branch
   pr list               List pull requests
   pr view <number>      View pull request details
@@ -252,11 +260,6 @@ Platform Commands:
   pr close <number>     Close a pull request
   pr review [<number>]  AI code review using CodeRabbit
   pr review-status      Check CodeRabbit configuration
-  
-  inbox                 PR inbox - stay on top of reviews
-  inbox review          Show PRs awaiting your review
-  inbox mine            Show your open PRs
-  inbox participated    Show PRs you've participated in
   
   issue create <title>  Create new issue
   issue list            List issues
@@ -461,7 +464,7 @@ const COMMANDS = [
   // Server
   'serve',
   // Platform commands
-  'pr', 'issue', 'inbox',
+  'pr', 'issue', 'dashboard',
   // Platform management
   'up', 'down', 'platform-status',
   // Authentication
@@ -1036,8 +1039,8 @@ function main(): void {
         });
         return; // Exit main() to let async handle complete
 
-      case 'inbox':
-        handleInbox(args.slice(args.indexOf('inbox') + 1)).catch((error: Error) => {
+      case 'dashboard':
+        handleDashboard(args.slice(args.indexOf('dashboard') + 1)).catch((error: Error) => {
           if (error instanceof TsgitError) {
             console.error((error as TsgitError).format());
           } else {
