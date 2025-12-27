@@ -42,18 +42,18 @@ import { trpc } from '@/lib/trpc';
 
 const AI_PROVIDERS = [
   { 
-    value: 'openai', 
-    label: 'OpenAI', 
-    description: 'GPT-4, GPT-3.5 Turbo',
-    placeholder: 'sk-...',
-    prefix: 'sk-',
-  },
-  { 
     value: 'anthropic', 
     label: 'Anthropic', 
-    description: 'Claude 3.5, Claude 3',
+    description: 'Claude Opus 4.5 (Recommended)',
     placeholder: 'sk-ant-...',
     prefix: 'sk-ant-',
+  },
+  { 
+    value: 'openai', 
+    label: 'OpenAI', 
+    description: 'GPT 5.2',
+    placeholder: 'sk-...',
+    prefix: 'sk-',
   },
 ] as const;
 
@@ -65,7 +65,7 @@ export function RepoAISettingsPage() {
   const authenticated = !!session?.user;
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [selectedProvider, setSelectedProvider] = useState<Provider>('openai');
+  const [selectedProvider, setSelectedProvider] = useState<Provider>('anthropic');
   const [apiKey, setApiKey] = useState('');
   const [showKey, setShowKey] = useState(false);
   const [error, setError] = useState<string | null>(null);
