@@ -23,7 +23,7 @@ export function ForgotPasswordPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
+    <div className="flex min-h-screen items-center justify-center p-4 -mt-20">
       <div className="w-full max-w-md">
         <Card>
           {!submitted ? (
