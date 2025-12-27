@@ -1,0 +1,402 @@
+---
+title: "Stacked Diffs"
+description: "Break down large features into smaller, dependent branches with stacked diffs"
+---
+
+# Stacked Diffs
+
+Stacked diffs allow you to break down large features into smaller, dependent branches that build on top of each other. This makes code review easier and allows for incremental merging.
+
+## Overview
+
+Traditional development often leads to large, monolithic pull requests that are hard to review. Stacked diffs solve this by:
+
+- Breaking features into logical, reviewable chunks
+- Maintaining dependencies between branches
+- Automating rebasing when base changes
+- Enabling parallel review of dependent changes
+
+## Quick Start
+
+```bash
+# Start a new stack from main
+wit stack create auth-feature
+
+# Create first branch and make changes
+wit stack push
+wit add . && wit commit -m "Add login form"
+
+# Create next branch building on the first
+wit stack push
+wit add . && wit commit -m "Add logout functionality"
+
+# See the entire stack
+wit stack show
+
+# Sync all branches after main updates
+wit stack sync
+
+# Submit all branches for review
+wit stack submit
+```
+
+---
+
+## Commands
+
+### `wit stack create`
+
+Start a new stack from the current branch.
+
+```bash
+wit stack create <name> [-d <description>]
+```
+
+| Option | Description |
+|--------|-------------|
+| `-d <desc>` | Optional description for the stack |
+
+**Examples:**
+```bash
+wit stack create auth-feature
+wit stack create auth-feature -d "User authentication flow"
+```
+
+After creating a stack, you'll see:
+```
+✓ Created stack 'auth-feature'
+  Base branch: main
+  
+Next steps:
+  wit stack push     # Create first branch in stack
+  wit commit -m "..." # Make your changes
+  wit stack push     # Create next branch
+```
+
+---
+
+### `wit stack push`
+
+Create a new branch on top of the stack.
+
+```bash
+wit stack push [branch-name]
+```
+
+If no branch name is provided, wit automatically generates one based on the stack name (e.g., `auth-feature/part-1`, `auth-feature/part-2`).
+
+**Examples:**
+```bash
+wit stack push                    # Auto-named branch
+wit stack push login-component    # Custom name
+```
+
+---
+
+### `wit stack pop`
+
+Remove the top branch from the stack (keeps the branch itself).
+
+```bash
+wit stack pop
+```
+
+This removes the branch from stack tracking but doesn't delete the Git branch.
+
+---
+
+### `wit stack list`
+
+Show all stacks in the repository.
+
+```bash
+wit stack list
+```
+
+Output:
+```
+Stacks:
+
+* auth-feature
+    Base: main
+    Branches: 3
+    User authentication flow
+
+  api-refactor
+    Base: main
+    Branches: 2
+```
+
+The `*` indicates the current active stack.
+
+---
+
+### `wit stack show`
+
+Show a visualization of the current stack or a specific stack.
+
+```bash
+wit stack show [stack-name]
+```
+
+Output:
+```
+Stack: auth-feature
+
+✓ auth-feature/part-3 ✓
+  abc1234 Add password reset
+
+  │
+✓ auth-feature/part-2 ⬆3
+  def5678 Add logout functionality
+
+  │
+  auth-feature/part-1 ✓
+  ghi9012 Add login form
+
+Legend: ✓ synced | ⬇ behind | ⬆ ahead | ⚠ diverged
+```
+
+---
+
+### `wit stack sync`
+
+Rebase the entire stack when the base branch changes.
+
+```bash
+wit stack sync
+```
+
+This command:
+1. Fetches the latest base branch
+2. Rebases each branch in order from bottom to top
+3. Reports any conflicts that need resolution
+
+**Handling Conflicts:**
+```
+✗ Sync failed
+  Conflicts in:
+    auth-feature/part-2
+      - src/auth/login.ts
+
+Resolve conflicts and run:
+  wit rebase --continue
+  wit stack sync
+```
+
+---
+
+### `wit stack submit`
+
+Push all stack branches to the remote for review.
+
+```bash
+wit stack submit [--force]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--force, -f` | Force push all branches |
+
+This prepares all branches for review by ensuring they're pushed to the remote.
+
+---
+
+### `wit stack delete`
+
+Delete a stack (keeps the branches).
+
+```bash
+wit stack delete <name>
+```
+
+**Example:**
+```bash
+wit stack delete auth-feature
+```
+
+Output:
+```
+✓ Deleted stack 'auth-feature'
+
+The following branches still exist:
+  auth-feature/part-1
+  auth-feature/part-2
+  auth-feature/part-3
+
+Use "wit branch -d <name>" to delete them
+```
+
+---
+
+## Navigation
+
+### `wit stack up`
+
+Move to the child branch (one level up in the stack).
+
+```bash
+wit stack up
+```
+
+### `wit stack down`
+
+Move to the parent branch (one level down in the stack).
+
+```bash
+wit stack down
+```
+
+### `wit stack goto`
+
+Jump to a specific branch in the stack by name or index.
+
+```bash
+wit stack goto <branch|index>
+```
+
+**Examples:**
+```bash
+wit stack goto 2                    # Go to branch at position 2
+wit stack goto auth-feature/part-3  # Go to specific branch
+```
+
+---
+
+## Advanced Operations
+
+### `wit stack reorder`
+
+Reorder branches in the stack.
+
+```bash
+wit stack reorder <branch1> <branch2> ...
+```
+
+**Example:**
+```bash
+wit stack reorder feature/part-2 feature/part-1 feature/part-3
+```
+
+After reordering, run `wit stack sync` to rebase branches to the new order.
+
+---
+
+## Workflow Example
+
+Here's a complete workflow for implementing a user authentication feature:
+
+```bash
+# 1. Start on main and create a stack
+wit checkout main
+wit pull
+wit stack create user-auth -d "Complete user authentication system"
+
+# 2. First PR: Data models
+wit stack push data-models
+# ... make changes ...
+wit add . && wit commit -m "Add User model and migrations"
+
+# 3. Second PR: API endpoints (depends on models)
+wit stack push api-endpoints
+# ... make changes ...
+wit add . && wit commit -m "Add auth API endpoints"
+
+# 4. Third PR: Frontend (depends on API)
+wit stack push frontend
+# ... make changes ...
+wit add . && wit commit -m "Add login/logout UI components"
+
+# 5. View the stack
+wit stack show
+# Stack: user-auth
+#
+# ✓ frontend ✓
+#   │
+# ✓ api-endpoints ✓
+#   │
+#   data-models ✓
+
+# 6. Main was updated - sync the stack
+wit stack sync
+
+# 7. Submit all for review
+wit stack submit
+
+# 8. Navigate between branches for updates
+wit stack goto data-models
+# ... make review fixes ...
+wit amend
+wit stack sync    # Propagate changes up the stack
+wit stack submit
+```
+
+---
+
+## Best Practices
+
+### Keep Branches Small
+
+Each branch in a stack should represent a single logical change. Aim for:
+- 200-400 lines of code changes
+- One clear purpose per branch
+- Easy to review in isolation
+
+### Order by Dependency
+
+Structure your stack so each branch builds on the previous:
+1. Data models / types first
+2. Backend logic second
+3. Frontend / UI last
+
+### Sync Frequently
+
+Run `wit stack sync` after:
+- Pulling updates to base branch
+- Making changes to lower branches
+- Before submitting for review
+
+### Communicate Stack Structure
+
+When creating PRs, mention that they're part of a stack:
+```markdown
+## Stack
+This PR is part of a stack:
+- #101 Add User model (this PR)
+- #102 Add auth API endpoints (depends on this)
+- #103 Add login UI (depends on #102)
+```
+
+---
+
+## Troubleshooting
+
+### Conflict During Sync
+
+If you encounter conflicts during `wit stack sync`:
+
+1. Resolve conflicts in the current branch
+2. Run `wit rebase --continue`
+3. Run `wit stack sync` to continue syncing remaining branches
+
+### Branch Not in Stack
+
+If you get "Not currently on a stacked branch":
+
+```bash
+wit stack list              # See available stacks
+wit stack show <stack-name> # See branches in a stack
+wit checkout <branch>       # Switch to a stack branch
+```
+
+### Recovering from Failed Sync
+
+If sync fails partway through:
+
+```bash
+wit rebase --abort          # Abort current rebase
+wit stack show              # See stack state
+wit checkout <branch>       # Go to the branch that failed
+# Fix the issue
+wit stack sync              # Try again
+```

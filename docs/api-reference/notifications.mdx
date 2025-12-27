@@ -1,0 +1,280 @@
+---
+title: "Notifications API"
+description: "API reference for notification management"
+---
+
+# Notifications API
+
+The Notifications API allows you to manage user notifications for repository events.
+
+## Overview
+
+Notifications are generated for events like:
+- Pull request activity (comments, reviews, merges)
+- Issue updates
+- Mentions
+- Repository access changes
+
+All notification endpoints require authentication.
+
+---
+
+## Endpoints
+
+### List Notifications
+
+Get notifications for the authenticated user.
+
+```typescript
+trpc.notifications.list.query({
+  unreadOnly?: boolean,  // Filter to unread only (default: false)
+  limit?: number,        // Max results (1-100, default: 50)
+  offset?: number        // Pagination offset (default: 0)
+})
+```
+
+**Response:**
+```typescript
+{
+  id: string;
+  type: 'pr_comment' | 'pr_review' | 'pr_merged' | 'issue_comment' | 'mention' | 'access_granted';
+  title: string;
+  message: string;
+  repoId: string;
+  resourceId?: string;    // PR/Issue ID if applicable
+  resourceType?: string;  // 'pull_request' | 'issue'
+  isRead: boolean;
+  createdAt: Date;
+}[]
+```
+
+**Example:**
+```typescript
+const notifications = await trpc.notifications.list.query({
+  unreadOnly: true,
+  limit: 20
+});
+
+for (const n of notifications) {
+  console.log(`${n.isRead ? '○' : '●'} ${n.title}`);
+}
+```
+
+---
+
+### Get Unread Count
+
+Get the count of unread notifications.
+
+```typescript
+trpc.notifications.unreadCount.query()
+```
+
+**Response:**
+```typescript
+{
+  count: number;
+}
+```
+
+**Example:**
+```typescript
+const { count } = await trpc.notifications.unreadCount.query();
+console.log(`You have ${count} unread notifications`);
+```
+
+---
+
+### Mark as Read
+
+Mark a specific notification as read.
+
+```typescript
+trpc.notifications.markAsRead.mutate({
+  id: string  // Notification UUID
+})
+```
+
+**Response:**
+```typescript
+{
+  id: string;
+  isRead: true;
+  readAt: Date;
+}
+```
+
+**Example:**
+```typescript
+await trpc.notifications.markAsRead.mutate({
+  id: 'a1b2c3d4-...'
+});
+```
+
+---
+
+### Mark All as Read
+
+Mark all notifications as read.
+
+```typescript
+trpc.notifications.markAllAsRead.mutate()
+```
+
+**Response:**
+```typescript
+{
+  count: number;  // Number of notifications marked
+}
+```
+
+**Example:**
+```typescript
+const { count } = await trpc.notifications.markAllAsRead.mutate();
+console.log(`Marked ${count} notifications as read`);
+```
+
+---
+
+### Delete Notification
+
+Delete a specific notification.
+
+```typescript
+trpc.notifications.delete.mutate({
+  id: string  // Notification UUID
+})
+```
+
+**Response:**
+```typescript
+{
+  success: boolean;
+}
+```
+
+---
+
+### Delete All Notifications
+
+Delete all notifications for the current user.
+
+```typescript
+trpc.notifications.deleteAll.mutate()
+```
+
+**Response:**
+```typescript
+{
+  count: number;  // Number deleted
+}
+```
+
+---
+
+## Notification Types
+
+| Type | Description |
+|------|-------------|
+| `pr_comment` | Comment on a pull request |
+| `pr_review` | Review submitted on a PR |
+| `pr_merged` | Pull request was merged |
+| `pr_closed` | Pull request was closed |
+| `issue_comment` | Comment on an issue |
+| `issue_closed` | Issue was closed |
+| `mention` | You were @mentioned |
+| `access_granted` | Repository access granted |
+| `access_revoked` | Repository access revoked |
+
+---
+
+## Usage Examples
+
+### React Component
+
+```tsx
+import { trpc } from '@/lib/trpc';
+
+function NotificationBell() {
+  const { data: count } = trpc.notifications.unreadCount.useQuery();
+  const { data: notifications } = trpc.notifications.list.useQuery({
+    unreadOnly: true,
+    limit: 5
+  });
+
+  const markRead = trpc.notifications.markAsRead.useMutation();
+  const markAllRead = trpc.notifications.markAllAsRead.useMutation();
+
+  return (
+    <div>
+      <button>
+        🔔 {count?.count > 0 && <span>{count.count}</span>}
+      </button>
+      
+      <div className="dropdown">
+        {notifications?.map(n => (
+          <div 
+            key={n.id}
+            onClick={() => markRead.mutate({ id: n.id })}
+          >
+            {n.title}
+          </div>
+        ))}
+        
+        <button onClick={() => markAllRead.mutate()}>
+          Mark all as read
+        </button>
+      </div>
+    </div>
+  );
+}
+```
+
+### CLI Integration
+
+```typescript
+import { createTRPCClient } from './api/client';
+
+async function showNotifications() {
+  const client = createTRPCClient();
+  
+  const notifications = await client.notifications.list.query({
+    unreadOnly: true
+  });
+
+  if (notifications.length === 0) {
+    console.log('No unread notifications');
+    return;
+  }
+
+  console.log(`\n📬 ${notifications.length} unread notifications:\n`);
+  
+  for (const n of notifications) {
+    const icon = n.type.startsWith('pr_') ? '🔀' : 
+                 n.type.startsWith('issue_') ? '📋' : '💬';
+    console.log(`  ${icon} ${n.title}`);
+    console.log(`     ${n.message}`);
+    console.log();
+  }
+}
+```
+
+---
+
+## Error Handling
+
+| Error Code | Description |
+|------------|-------------|
+| `UNAUTHORIZED` | Not authenticated |
+| `NOT_FOUND` | Notification not found |
+| `FORBIDDEN` | Cannot access this notification |
+
+```typescript
+try {
+  await trpc.notifications.markAsRead.mutate({ id: 'invalid' });
+} catch (error) {
+  if (error.code === 'NOT_FOUND') {
+    console.log('Notification not found');
+  }
+}
+```

@@ -16,6 +16,7 @@ npm install wit
 ## Quick Start
 
 ```typescript
+// Import from the wit package
 import { Repository } from 'wit';
 
 // Initialize a new repository
@@ -47,8 +48,17 @@ const commits = repo.log({ limit: 10 });
   <Card title="Repository" icon="database" href="/api-reference/repository">
     Main class for repository operations
   </Card>
-  <Card title="SearchEngine" icon="magnifying-glass" href="/api-reference/search">
+  <Card title="Search" icon="magnifying-glass" href="/api-reference/search">
     Search commits, files, and content
+  </Card>
+  <Card title="Notifications" icon="bell" href="/api-reference/notifications">
+    User notification management
+  </Card>
+  <Card title="Organizations" icon="users" href="/api-reference/organizations">
+    Organization and team management
+  </Card>
+  <Card title="Webhooks" icon="webhook" href="/api-reference/webhooks">
+    Webhook configuration and delivery
   </Card>
 </CardGroup>
 
@@ -281,6 +291,14 @@ function preCommitHook() {
 preCommitHook();
 ```
 
+## tRPC API
+
+wit provides a tRPC API for web and programmatic access. See the individual API reference pages for details:
+
+- [Notifications](/api-reference/notifications) - User notification management
+- [Organizations](/api-reference/organizations) - Organization and team management  
+- [Webhooks](/api-reference/webhooks) - Webhook configuration
+
 ## Next Steps
 
 <CardGroup cols={2}>
@@ -288,6 +306,6 @@ preCommitHook();
     Full Repository class reference
   </Card>
   <Card title="Search API" icon="magnifying-glass" href="/api-reference/search">
-    SearchEngine class reference
+    Search and semantic search reference
   </Card>
 </CardGroup>

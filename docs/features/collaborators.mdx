@@ -1,0 +1,474 @@
+---
+title: "Collaborators"
+description: "Manage repository collaborators, teams, and permissions"
+---
+
+# Collaborators
+
+wit provides a comprehensive system for managing repository access through collaborators, teams, and role-based permissions.
+
+## Overview
+
+The collaborator system includes:
+
+- **Role-based access control** with five permission levels
+- **Team management** for organizing collaborators
+- **Email invitations** for adding new collaborators
+- **Activity logging** for audit trails
+
+---
+
+## Quick Start
+
+```bash
+# List current collaborators
+wit collaborator
+
+# Invite a new collaborator
+wit collaborator add alice@example.com --role contributor
+
+# Create a team
+wit collaborator team create "Core Team" --role maintainer
+
+# Add someone to the team
+wit collaborator team add-member core-team alice@example.com
+```
+
+---
+
+## Roles
+
+wit uses five permission levels:
+
+| Role | Description |
+|------|-------------|
+| `owner` | Full access including delete repository |
+| `admin` | Manage settings, collaborators, and branches |
+| `maintainer` | Merge PRs, manage releases, push to protected branches |
+| `contributor` | Push to branches, create PRs |
+| `viewer` | Read-only access |
+
+### Permission Matrix
+
+| Permission | Owner | Admin | Maintainer | Contributor | Viewer |
+|------------|:-----:|:-----:|:----------:|:-----------:|:------:|
+| Read repository | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Push to branches | ✓ | ✓ | ✓ | ✓ | |
+| Create branches | ✓ | ✓ | ✓ | ✓ | |
+| Push to protected | ✓ | ✓ | ✓ | | |
+| Merge PRs | ✓ | ✓ | ✓ | | |
+| Create/manage releases | ✓ | ✓ | ✓ | | |
+| Manage settings | ✓ | ✓ | | | |
+| Manage collaborators | ✓ | ✓ | | | |
+| Delete repository | ✓ | | | | |
+
+---
+
+## Commands
+
+### `wit collaborator`
+
+List all collaborators (default command).
+
+```bash
+wit collaborator
+wit collaborator list
+wit collaborator -v    # Verbose output
+```
+
+Output:
+```
+Active Collaborators
+────────────────────────────────────────────────────────────
+  [owner] You <you@example.com>
+  [maintainer] Alice <alice@example.com>
+  [contributor] Bob <bob@example.com>
+
+Pending Invitations
+────────────────────────────────────────────────────────────
+  [contributor] carol@example.com (pending) 6 days left
+```
+
+---
+
+### `wit collaborator add`
+
+Invite a new collaborator.
+
+```bash
+wit collaborator add <email> [options]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--role <role>` | Permission level (default: contributor) |
+| `--message "..."` | Custom invitation message |
+| `--name <name>` | Display name for the invitee |
+| `--skip-email` | Don't send email notification |
+
+**Examples:**
+```bash
+wit collaborator add alice@example.com
+wit collaborator add bob@example.com --role maintainer
+wit collaborator add carol@example.com --role admin -m "Welcome to the team!"
+```
+
+Output:
+```
+✓ Invited alice@example.com as [contributor]
+  (Email notifications not configured)
+
+Invitation token (share this with the invitee):
+  eyJhbGciOiJIUzI1NiIsInR5cCI6...
+
+They can accept with:
+  wit collaborator accept eyJhbGciOiJIUzI1NiIsInR5cCI6...
+```
+
+---
+
+### `wit collaborator remove`
+
+Remove a collaborator from the repository.
+
+```bash
+wit collaborator remove <email>
+```
+
+**Example:**
+```bash
+wit collaborator remove bob@example.com
+```
+
+---
+
+### `wit collaborator update`
+
+Update a collaborator's role.
+
+```bash
+wit collaborator update <email> --role <role>
+```
+
+**Example:**
+```bash
+wit collaborator update alice@example.com --role maintainer
+```
+
+---
+
+### `wit collaborator show`
+
+Show details for a specific collaborator.
+
+```bash
+wit collaborator show <email>
+```
+
+Output:
+```
+Alice Smith
+alice@example.com
+
+Role:        [maintainer]
+Status:      active
+Invited:     2 weeks ago by you@example.com
+Accepted:    2 weeks ago
+Last active: 3 hours ago
+Teams:       core-team, backend
+
+Permissions
+────────────────────────────────────────
+  ✓ Read
+  ✓ Write
+  ✓ Push
+  ✓ Push Protected
+  ✓ Merge
+  ✓ Create Branch
+  ✓ Delete Branch
+  ✓ Create Tag
+  ✓ Delete Tag
+  ✓ Manage Releases
+  ✗ Manage Settings
+  ✗ Manage Collaborators
+  ✗ Delete Repository
+```
+
+---
+
+### `wit collaborator accept`
+
+Accept an invitation to join a repository.
+
+```bash
+wit collaborator accept <token> [--name "Your Name"]
+```
+
+**Example:**
+```bash
+wit collaborator accept eyJhbGciOiJIUzI1NiIsInR5cCI6...
+```
+
+---
+
+### `wit collaborator revoke`
+
+Revoke a pending invitation.
+
+```bash
+wit collaborator revoke <email>
+```
+
+---
+
+### `wit collaborator invitations`
+
+List all pending invitations.
+
+```bash
+wit collaborator invitations
+```
+
+---
+
+### `wit collaborator activity`
+
+View the activity log.
+
+```bash
+wit collaborator activity [-n <limit>]
+```
+
+Output:
+```
+Recent Activity
+────────────────────────────────────────────────────────────
+  📧 you@example.com invited alice@example.com as contributor
+    2 hours ago
+
+  ✅ alice@example.com accepted invitation
+    1 hour ago
+
+  🔄 you@example.com changed alice@example.com's role from contributor to maintainer
+    30 minutes ago
+```
+
+---
+
+### `wit collaborator stats`
+
+Show collaborator statistics.
+
+```bash
+wit collaborator stats
+```
+
+Output:
+```
+Collaborator Statistics
+────────────────────────────────────────
+  Total:      5
+  Active:     4
+  Pending:    1
+  Teams:      2
+
+By Role
+────────────────────────────────────────
+  [owner] 1
+  [maintainer] 2
+  [contributor] 2
+```
+
+---
+
+## Teams
+
+Teams allow you to organize collaborators and assign permissions to groups.
+
+### `wit collaborator team list`
+
+List all teams.
+
+```bash
+wit collaborator team list
+```
+
+Output:
+```
+Teams
+──────────────────────────────────────────────────────
+  Core Team (core-team)
+    Role: [maintainer]
+    Members: 3
+    Core development team
+
+  Reviewers (reviewers)
+    Role: [contributor]
+    Members: 5
+```
+
+---
+
+### `wit collaborator team create`
+
+Create a new team.
+
+```bash
+wit collaborator team create <name> [options]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--role <role>` | Team permission level (default: contributor) |
+| `--description "..."` | Team description |
+
+**Examples:**
+```bash
+wit collaborator team create "Core Team" --role maintainer
+wit collaborator team create "Reviewers" --role contributor --description "Code reviewers"
+```
+
+---
+
+### `wit collaborator team delete`
+
+Delete a team.
+
+```bash
+wit collaborator team delete <slug>
+```
+
+---
+
+### `wit collaborator team add-member`
+
+Add a collaborator to a team.
+
+```bash
+wit collaborator team add-member <team-slug> <email>
+```
+
+**Example:**
+```bash
+wit collaborator team add-member core-team alice@example.com
+```
+
+---
+
+### `wit collaborator team remove-member`
+
+Remove a collaborator from a team.
+
+```bash
+wit collaborator team remove-member <team-slug> <email>
+```
+
+---
+
+## Configuration
+
+### `wit collaborator config`
+
+View or update collaborator settings.
+
+```bash
+# View current config
+wit collaborator config
+
+# Update settings
+wit collaborator config <key> <value>
+```
+
+### Available Settings
+
+| Key | Description | Default |
+|-----|-------------|---------|
+| `public-access` | Allow public read access | no |
+| `default-role` | Default role for new collaborators | contributor |
+| `invite-expiration` | Days until invitations expire | 7 |
+| `email-enabled` | Enable email notifications | no |
+| `resend-api-key` | Resend API key for emails | - |
+| `email-from` | Sender email address | - |
+| `email-from-name` | Sender display name | - |
+| `repository-name` | Repository display name | - |
+| `repository-url` | Repository URL for emails | - |
+
+**Examples:**
+```bash
+# View config
+wit collaborator config
+
+# Set default role
+wit collaborator config default-role maintainer
+
+# Enable email notifications
+wit collaborator config email-enabled true
+wit collaborator config resend-api-key re_123abc...
+wit collaborator config email-from noreply@example.com
+```
+
+---
+
+## Email Notifications
+
+wit can send email notifications for invitations using [Resend](https://resend.com).
+
+### Setup
+
+1. Get an API key from [resend.com](https://resend.com)
+2. Configure wit:
+
+```bash
+wit collaborator config email-enabled true
+wit collaborator config resend-api-key re_your_api_key
+wit collaborator config email-from invites@yourdomain.com
+wit collaborator config email-from-name "Your Project"
+wit collaborator config repository-name "My Repository"
+wit collaborator config repository-url "https://github.com/org/repo"
+```
+
+Now invitations will be sent via email:
+
+```bash
+wit collaborator add alice@example.com --role contributor
+# ✓ Invited alice@example.com as [contributor]
+#   Email sent to alice@example.com
+```
+
+---
+
+## Best Practices
+
+### Principle of Least Privilege
+
+Assign the minimum role necessary:
+- Use `viewer` for stakeholders who only need to see code
+- Use `contributor` for regular developers
+- Reserve `admin` and `owner` for project leads
+
+### Use Teams
+
+Organize collaborators into teams:
+- Makes role changes easier (change team role, not individual roles)
+- Improves visibility into access patterns
+- Simplifies onboarding/offboarding
+
+### Review Activity Regularly
+
+```bash
+wit collaborator activity -n 50
+```
+
+Check for:
+- Unexpected permission changes
+- Stale pending invitations
+- Inactive collaborators
+
+### Clean Up Stale Access
+
+Periodically review and remove collaborators who no longer need access:
+
+```bash
+wit collaborator -v              # See last active times
+wit collaborator remove old@example.com
+```

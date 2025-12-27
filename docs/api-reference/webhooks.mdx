@@ -1,0 +1,485 @@
+---
+title: "Webhooks API"
+description: "API reference for webhook management"
+---
+
+# Webhooks API
+
+The Webhooks API allows you to create and manage webhooks that receive HTTP callbacks when events occur in your repositories.
+
+## Overview
+
+Webhooks send POST requests to your specified URL when events like pushes, pull requests, or issues occur. Use webhooks to:
+
+- Trigger CI/CD pipelines
+- Update external systems
+- Send notifications to chat platforms
+- Sync data with other services
+
+---
+
+## Events
+
+Webhooks can subscribe to the following events:
+
+| Event | Description |
+|-------|-------------|
+| `push` | Commits pushed to a branch |
+| `pull_request` | PR opened, closed, merged, or updated |
+| `pull_request_review` | Review submitted on a PR |
+| `issue` | Issue created, closed, or updated |
+| `issue_comment` | Comment on an issue or PR |
+| `create` | Branch or tag created |
+| `delete` | Branch or tag deleted |
+| `fork` | Repository forked |
+| `star` | Repository starred |
+
+---
+
+## Endpoints
+
+### List Webhooks
+
+List all webhooks for a repository. Requires write permission.
+
+```typescript
+trpc.webhooks.list.query({
+  repoId: string
+})
+```
+
+**Response:**
+```typescript
+{
+  id: string;
+  url: string;
+  secret: string | null;  // Masked as '********' if set
+  events: string[];
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}[]
+```
+
+---
+
+### Get Webhook
+
+Get a specific webhook. Requires write permission.
+
+```typescript
+trpc.webhooks.get.query({
+  id: string,     // Webhook UUID
+  repoId: string  // Repository UUID
+})
+```
+
+---
+
+### Create Webhook
+
+Create a new webhook. Requires admin permission.
+
+```typescript
+trpc.webhooks.create.mutate({
+  repoId: string,
+  url: string,           // HTTPS URL to receive webhooks
+  secret?: string,       // Optional secret for signature verification
+  events: string[]       // At least one event required
+})
+```
+
+**Example:**
+```typescript
+const webhook = await trpc.webhooks.create.mutate({
+  repoId: 'repo-uuid',
+  url: 'https://example.com/webhooks/git',
+  secret: 'my-webhook-secret',
+  events: ['push', 'pull_request']
+});
+```
+
+---
+
+### Update Webhook
+
+Update an existing webhook. Requires admin permission.
+
+```typescript
+trpc.webhooks.update.mutate({
+  id: string,
+  repoId: string,
+  url?: string,
+  secret?: string | null,   // null to remove secret
+  events?: string[],
+  isActive?: boolean
+})
+```
+
+**Example:**
+```typescript
+// Disable a webhook
+await trpc.webhooks.update.mutate({
+  id: 'webhook-uuid',
+  repoId: 'repo-uuid',
+  isActive: false
+});
+
+// Add new events
+await trpc.webhooks.update.mutate({
+  id: 'webhook-uuid',
+  repoId: 'repo-uuid',
+  events: ['push', 'pull_request', 'issue']
+});
+```
+
+---
+
+### Delete Webhook
+
+Delete a webhook. Requires admin permission.
+
+```typescript
+trpc.webhooks.delete.mutate({
+  id: string,
+  repoId: string
+})
+```
+
+**Response:**
+```typescript
+{
+  success: boolean;
+}
+```
+
+---
+
+### Test Webhook
+
+Send a test ping to the webhook. Requires admin permission.
+
+```typescript
+trpc.webhooks.test.mutate({
+  id: string,
+  repoId: string
+})
+```
+
+**Response:**
+```typescript
+{
+  success: boolean;
+  statusCode: number | null;
+  message: string;
+}
+```
+
+**Example:**
+```typescript
+const result = await trpc.webhooks.test.mutate({
+  id: 'webhook-uuid',
+  repoId: 'repo-uuid'
+});
+
+if (result.success) {
+  console.log('Webhook test successful!');
+} else {
+  console.log(`Failed: ${result.message}`);
+}
+```
+
+---
+
+## Webhook Payloads
+
+### Common Fields
+
+All webhook payloads include:
+
+```typescript
+{
+  action: string;          // Event-specific action
+  repository: {
+    id: string;
+    name: string;
+    owner: string;
+  };
+  sender: {
+    id: string;
+    username: string;
+  };
+  timestamp: string;       // ISO 8601 format
+}
+```
+
+### Push Event
+
+```typescript
+{
+  action: 'push';
+  ref: string;             // e.g., 'refs/heads/main'
+  before: string;          // Previous HEAD SHA
+  after: string;           // New HEAD SHA
+  commits: {
+    id: string;
+    message: string;
+    author: {
+      name: string;
+      email: string;
+    };
+    timestamp: string;
+  }[];
+  pusher: {
+    name: string;
+    email: string;
+  };
+}
+```
+
+### Pull Request Event
+
+```typescript
+{
+  action: 'opened' | 'closed' | 'merged' | 'synchronize' | 'reopened';
+  number: number;
+  pull_request: {
+    id: string;
+    title: string;
+    body: string;
+    state: 'open' | 'closed' | 'merged';
+    head: {
+      ref: string;
+      sha: string;
+    };
+    base: {
+      ref: string;
+      sha: string;
+    };
+    author: {
+      id: string;
+      username: string;
+    };
+    createdAt: string;
+    updatedAt: string;
+    mergedAt?: string;
+  };
+}
+```
+
+### Issue Event
+
+```typescript
+{
+  action: 'opened' | 'closed' | 'reopened' | 'edited';
+  issue: {
+    id: string;
+    number: number;
+    title: string;
+    body: string;
+    state: 'open' | 'closed';
+    author: {
+      id: string;
+      username: string;
+    };
+    labels: string[];
+    createdAt: string;
+    updatedAt: string;
+  };
+}
+```
+
+---
+
+## Signature Verification
+
+If you set a secret, wit signs webhook payloads using HMAC-SHA256.
+
+### Headers
+
+| Header | Description |
+|--------|-------------|
+| `X-Wit-Signature` | HMAC-SHA256 signature |
+| `X-Wit-Event` | Event type |
+| `X-Wit-Delivery` | Unique delivery ID |
+
+### Verifying Signatures
+
+```typescript
+import crypto from 'crypto';
+
+function verifySignature(
+  payload: string, 
+  signature: string, 
+  secret: string
+): boolean {
+  const expected = crypto
+    .createHmac('sha256', secret)
+    .update(payload)
+    .digest('hex');
+  
+  return crypto.timingSafeEqual(
+    Buffer.from(signature),
+    Buffer.from(`sha256=${expected}`)
+  );
+}
+
+// Express middleware example
+app.post('/webhooks', (req, res) => {
+  const signature = req.headers['x-wit-signature'];
+  const payload = JSON.stringify(req.body);
+  
+  if (!verifySignature(payload, signature, process.env.WEBHOOK_SECRET)) {
+    return res.status(401).send('Invalid signature');
+  }
+  
+  // Process webhook
+  const event = req.headers['x-wit-event'];
+  console.log(`Received ${event} event`);
+  
+  res.status(200).send('OK');
+});
+```
+
+---
+
+## Error Handling
+
+| Error Code | Description |
+|------------|-------------|
+| `NOT_FOUND` | Repository or webhook not found |
+| `FORBIDDEN` | Insufficient permissions |
+| `BAD_REQUEST` | Invalid events or URL |
+| `CONFLICT` | Webhook URL already exists |
+
+---
+
+## Usage Examples
+
+### Setting Up CI Webhooks
+
+```typescript
+// Create webhook for CI triggers
+const webhook = await trpc.webhooks.create.mutate({
+  repoId: 'repo-uuid',
+  url: 'https://ci.example.com/hooks/wit',
+  secret: process.env.CI_WEBHOOK_SECRET,
+  events: ['push', 'pull_request']
+});
+
+// Test the webhook
+const test = await trpc.webhooks.test.mutate({
+  id: webhook.id,
+  repoId: 'repo-uuid'
+});
+
+if (!test.success) {
+  console.error('CI webhook failed:', test.message);
+}
+```
+
+### Slack Notifications
+
+```typescript
+// Create webhook for Slack notifications
+await trpc.webhooks.create.mutate({
+  repoId: 'repo-uuid',
+  url: 'https://your-app.com/webhooks/slack',
+  events: ['push', 'pull_request', 'issue']
+});
+
+// Your webhook handler
+app.post('/webhooks/slack', async (req, res) => {
+  const event = req.headers['x-wit-event'];
+  const payload = req.body;
+  
+  let message: string;
+  
+  switch (event) {
+    case 'push':
+      message = `📦 ${payload.pusher.name} pushed ${payload.commits.length} commits to ${payload.ref}`;
+      break;
+    case 'pull_request':
+      message = `🔀 PR #${payload.number}: ${payload.pull_request.title} (${payload.action})`;
+      break;
+    case 'issue':
+      message = `📋 Issue #${payload.issue.number}: ${payload.issue.title} (${payload.action})`;
+      break;
+    default:
+      return res.status(200).send('OK');
+  }
+  
+  await fetch(process.env.SLACK_WEBHOOK_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: message })
+  });
+  
+  res.status(200).send('OK');
+});
+```
+
+### React Management Component
+
+```tsx
+import { trpc } from '@/lib/trpc';
+
+function WebhookSettings({ repoId }: { repoId: string }) {
+  const { data: webhooks, refetch } = trpc.webhooks.list.useQuery({ repoId });
+  
+  const createWebhook = trpc.webhooks.create.useMutation({
+    onSuccess: () => refetch()
+  });
+  
+  const deleteWebhook = trpc.webhooks.delete.useMutation({
+    onSuccess: () => refetch()
+  });
+  
+  const testWebhook = trpc.webhooks.test.useMutation();
+
+  return (
+    <div>
+      <h2>Webhooks</h2>
+      
+      {webhooks?.map(wh => (
+        <div key={wh.id}>
+          <code>{wh.url}</code>
+          <span>{wh.isActive ? '🟢 Active' : '🔴 Inactive'}</span>
+          <button onClick={() => testWebhook.mutate({ id: wh.id, repoId })}>
+            Test
+          </button>
+          <button onClick={() => deleteWebhook.mutate({ id: wh.id, repoId })}>
+            Delete
+          </button>
+        </div>
+      ))}
+      
+      <button onClick={() => createWebhook.mutate({
+        repoId,
+        url: 'https://example.com/webhook',
+        events: ['push']
+      })}>
+        Add Webhook
+      </button>
+    </div>
+  );
+}
+```
+
+---
+
+## Best Practices
+
+### Security
+
+1. **Always use HTTPS URLs** for webhook endpoints
+2. **Set a secret** and verify signatures
+3. **Validate the event type** before processing
+4. **Use unique delivery IDs** to prevent replay attacks
+
+### Reliability
+
+1. **Respond quickly** (within 10 seconds) to avoid timeouts
+2. **Process asynchronously** for heavy operations
+3. **Implement idempotency** to handle duplicate deliveries
+4. **Log delivery IDs** for debugging

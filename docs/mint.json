@@ -72,12 +72,14 @@
       "group": "Commands",
       "pages": [
         "commands/overview",
+        "commands/smart-status",
         "commands/reference",
         "commands/basic-workflow",
         "commands/branches",
         "commands/remotes",
         "commands/stash",
         "commands/merge",
+        "commands/stacked-diffs",
         "commands/history-rewriting",
         "commands/tags",
         "commands/undo-history",
@@ -102,6 +104,7 @@
         "features/ai-powered",
         "features/search",
         "features/review",
+        "features/collaborators",
         "features/tokens",
         "features/ci-cd",
         "features/monorepo-scopes",
@@ -117,7 +120,8 @@
         "configuration/overview",
         "configuration/repository",
         "configuration/directory-structure",
-        "configuration/shell-integration"
+        "configuration/shell-integration",
+        "configuration/environment-variables"
       ]
     },
     {
@@ -125,6 +129,7 @@
       "pages": [
         "platform/overview",
         "platform/server",
+        "platform/self-hosting",
         "platform/pull-requests",
         "platform/issues"
       ]
@@ -143,7 +148,10 @@
         "api-reference/overview",
         "api-reference/repository",
         "api-reference/objects",
-        "api-reference/search"
+        "api-reference/search",
+        "api-reference/notifications",
+        "api-reference/organizations",
+        "api-reference/webhooks"
       ]
     },
     {

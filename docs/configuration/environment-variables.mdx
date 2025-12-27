@@ -1,0 +1,289 @@
+---
+title: "Environment Variables"
+description: "Complete reference for wit environment variables"
+---
+
+# Environment Variables
+
+This page documents all environment variables used by wit for configuration.
+
+## AI Features
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `OPENAI_API_KEY` | OpenAI API key for AI features | For AI |
+| `ANTHROPIC_API_KEY` | Anthropic API key (alternative to OpenAI) | For AI |
+| `WIT_AI_MODEL` | AI model to use (default: gpt-4) | No |
+
+### Usage
+
+```bash
+# Use OpenAI
+export OPENAI_API_KEY="sk-..."
+
+# Or use Anthropic
+export ANTHROPIC_API_KEY="sk-ant-..."
+
+# Specify model
+export WIT_AI_MODEL="gpt-4-turbo"
+```
+
+---
+
+## Semantic Search
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `WIT_SEARCH_MODEL` | Embedding model for search | text-embedding-3-small |
+| `WIT_SEARCH_IGNORE` | Patterns to ignore (comma-separated) | node_modules,dist,.git |
+
+### Usage
+
+```bash
+export WIT_SEARCH_MODEL="text-embedding-3-large"
+export WIT_SEARCH_IGNORE="node_modules,dist,build,.git,vendor"
+```
+
+---
+
+## Server & Platform
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `PORT` | API server port | 3000 |
+| `HOST` | Hostname to bind | 0.0.0.0 |
+| `DATABASE_URL` | PostgreSQL connection string | Required for server |
+| `REPOS_DIR` | Repository storage path | ./repos |
+| `JWT_SECRET` | Secret for JWT token signing | Required for auth |
+| `NODE_ENV` | Environment mode | development |
+
+### Usage
+
+```bash
+# Database connection
+export DATABASE_URL="postgresql://user:password@localhost:5432/wit"
+
+# Server configuration
+export PORT=3000
+export HOST="0.0.0.0"
+export REPOS_DIR="/var/lib/wit/repos"
+
+# Security
+export JWT_SECRET="your-secure-secret-key"
+export NODE_ENV="production"
+```
+
+---
+
+## Git Configuration
+
+| Variable | Description | Used For |
+|----------|-------------|----------|
+| `WIT_AUTHOR_NAME` | Default commit author name | Commits |
+| `WIT_AUTHOR_EMAIL` | Default commit author email | Commits |
+| `GIT_AUTHOR_NAME` | Fallback author name | Commits |
+| `GIT_AUTHOR_EMAIL` | Fallback author email | Commits |
+
+wit checks `WIT_*` variables first, then falls back to `GIT_*` variables.
+
+### Usage
+
+```bash
+export WIT_AUTHOR_NAME="Your Name"
+export WIT_AUTHOR_EMAIL="you@example.com"
+```
+
+---
+
+## Code Review
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `CODERABBIT_API_KEY` | CodeRabbit API key | For CodeRabbit reviews |
+
+### Usage
+
+```bash
+export CODERABBIT_API_KEY="your-coderabbit-key"
+wit review --coderabbit
+```
+
+---
+
+## Email Notifications
+
+Email configuration for collaborator invitations.
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `RESEND_API_KEY` | Resend API key | - |
+| `EMAIL_FROM_ADDRESS` | Sender email address | noreply@wit.dev |
+| `EMAIL_FROM_NAME` | Sender display name | wit |
+
+### Usage
+
+```bash
+export RESEND_API_KEY="re_..."
+export EMAIL_FROM_ADDRESS="noreply@yourcompany.com"
+export EMAIL_FROM_NAME="Your Company Git"
+```
+
+---
+
+## GitHub Integration
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `GITHUB_TOKEN` | GitHub personal access token | For GitHub features |
+| `GITHUB_CLIENT_ID` | OAuth app client ID | For OAuth |
+| `GITHUB_CLIENT_SECRET` | OAuth app client secret | For OAuth |
+
+### Usage
+
+```bash
+# Personal access token for CLI
+export GITHUB_TOKEN="ghp_..."
+
+# OAuth for web app
+export GITHUB_CLIENT_ID="your-client-id"
+export GITHUB_CLIENT_SECRET="your-client-secret"
+```
+
+---
+
+## SSH Configuration
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `SSH_PORT` | SSH server port | 22 |
+| `SSH_HOST_KEY` | Path to host key | ~/.wit/ssh/host_key |
+
+---
+
+## Development & Debugging
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DEBUG` | Enable debug logging | false |
+| `WIT_VERBOSE` | Verbose output | false |
+| `LOG_LEVEL` | Log level (debug, info, warn, error) | info |
+
+### Usage
+
+```bash
+# Enable debug mode
+export DEBUG=true
+export LOG_LEVEL="debug"
+export WIT_VERBOSE=true
+```
+
+---
+
+## Rate Limiting
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `RATE_LIMIT_WINDOW` | Rate limit window (ms) | 60000 |
+| `RATE_LIMIT_MAX` | Max requests per window | 100 |
+| `RATE_LIMIT_ENABLED` | Enable rate limiting | true |
+
+---
+
+## Example Configuration
+
+### Development Environment
+
+```bash
+# .env.development
+OPENAI_API_KEY="sk-dev-key"
+DATABASE_URL="postgresql://wit:wit@localhost:5432/wit"
+PORT=3000
+NODE_ENV="development"
+DEBUG=true
+LOG_LEVEL="debug"
+```
+
+### Production Environment
+
+```bash
+# .env.production
+OPENAI_API_KEY="sk-prod-key"
+DATABASE_URL="postgresql://wit:secure-password@db.example.com:5432/wit"
+PORT=3000
+NODE_ENV="production"
+JWT_SECRET="your-very-secure-secret"
+REPOS_DIR="/var/lib/wit/repos"
+
+# Email
+RESEND_API_KEY="re_..."
+EMAIL_FROM_ADDRESS="git@yourcompany.com"
+
+# Rate limiting
+RATE_LIMIT_ENABLED=true
+RATE_LIMIT_MAX=100
+```
+
+### CI/CD Environment
+
+```bash
+# For CI pipelines
+WIT_AUTHOR_NAME="CI Bot"
+WIT_AUTHOR_EMAIL="ci@yourcompany.com"
+GITHUB_TOKEN="${GITHUB_TOKEN}"
+```
+
+---
+
+## Loading Environment Variables
+
+### Using .env Files
+
+wit supports `.env` files in your project root:
+
+```bash
+# Create .env file
+cat > .env << EOF
+OPENAI_API_KEY=sk-...
+DATABASE_URL=postgresql://...
+EOF
+
+# wit automatically loads .env
+wit ai commit
+```
+
+### Using direnv
+
+For project-specific configuration:
+
+```bash
+# .envrc
+export OPENAI_API_KEY="sk-..."
+export WIT_AUTHOR_EMAIL="work@company.com"
+```
+
+### Shell Configuration
+
+Add to your shell profile (`~/.bashrc`, `~/.zshrc`):
+
+```bash
+# wit configuration
+export OPENAI_API_KEY="sk-..."
+export WIT_AUTHOR_NAME="Your Name"
+export WIT_AUTHOR_EMAIL="you@example.com"
+```
+
+---
+
+## Security Best Practices
+
+1. **Never commit secrets** - Use `.env` files and add them to `.gitignore`
+2. **Use different keys per environment** - Dev, staging, production
+3. **Rotate secrets regularly** - Especially for production
+4. **Use secret managers** - AWS Secrets Manager, HashiCorp Vault, etc.
+
+```bash
+# .gitignore
+.env
+.env.local
+.env.*.local
+```

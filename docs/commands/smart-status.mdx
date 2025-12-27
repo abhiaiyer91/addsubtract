@@ -1,0 +1,233 @@
+---
+title: "Smart Status"
+description: "The intelligent default command that understands your workflow"
+---
+
+# Smart Status
+
+When you run `wit` with no arguments, you get an intelligent status display that understands what you're working on.
+
+## Overview
+
+Smart Status provides:
+
+- **Context awareness** - Infers what you're working on from branch names and changes
+- **Grouped changes** - Organizes files by purpose (tests, docs, API, etc.)
+- **Quick actions** - Suggests next steps based on current state
+- **AI integration** - Optional interactive mode to ask questions about your code
+
+---
+
+## Basic Usage
+
+```bash
+wit
+```
+
+This shows a concise, intelligent view of your repository:
+
+```
+  wit · my-project
+  You're working on: feature: user authentication
+
+  ● Ready to commit (3 files)
+    API: auth.ts, login.ts
+    Tests: auth.test.ts
+
+  ● Modified (2 files)
+    Components: LoginForm.tsx, Header.tsx
+
+  ──────────────────────────────────────────────────────
+
+  wit commit     · commit staged changes
+  wit ai commit  · commit with AI-generated message
+  wit ai "..."   · ask anything about this codebase
+```
+
+---
+
+## Context Detection
+
+wit infers what you're working on from:
+
+### Branch Names
+
+| Pattern | Detected Context |
+|---------|------------------|
+| `feature/user-auth` | feature: user auth |
+| `fix/login-bug` | fixing: login bug |
+| `refactor/api-cleanup` | refactoring: api cleanup |
+| `docs/readme-update` | documentation: readme update |
+| `JIRA-123/add-feature` | ticket JIRA-123: add feature |
+
+### Changed Files
+
+If branch name isn't descriptive, wit looks at your changes:
+
+```
+  You're working on: changes in src/api
+```
+
+or
+
+```
+  You're working on: changes across components, api, tests
+```
+
+---
+
+## File Grouping
+
+Changes are automatically grouped by purpose:
+
+| Category | Files Matched |
+|----------|---------------|
+| **Tests** | `*.test.ts`, `*.spec.ts`, files in `test/` |
+| **Documentation** | `*.md`, `README`, `docs/` |
+| **Configuration** | `*.json`, `*.yaml`, `*.yml`, config files |
+| **API** | `src/api/`, routes, endpoints |
+| **Components** | `*.tsx`, `*.jsx`, component files |
+| **Styles** | `*.css`, `*.scss`, style files |
+| **Utilities** | `utils/`, `helpers/`, `lib/` |
+| **Source** | Everything else |
+
+### Example Output
+
+```
+  ● Ready to commit (5 files)
+    API: auth.ts, users.ts
+    Components: LoginForm.tsx
+    Tests: auth.test.ts, users.test.ts
+
+  ● Modified (3 files)
+    Configuration: package.json
+    Styles: globals.css, theme.css
+```
+
+---
+
+## Quick Actions
+
+Based on your current state, wit suggests relevant next steps:
+
+### When you have staged changes:
+
+```
+  wit commit     · commit staged changes
+  wit ai commit  · commit with AI-generated message
+```
+
+### When you have unstaged changes:
+
+```
+  wit add .      · stage all changes
+  wit wip        · quick save work-in-progress
+```
+
+### Always available:
+
+```
+  wit ai "..."   · ask anything about this codebase
+```
+
+---
+
+## Interactive Mode
+
+Enter interactive mode to ask questions about your codebase:
+
+```bash
+wit -i
+# or
+wit --interactive
+```
+
+This starts a conversation:
+
+```
+  Ask me anything about this codebase (or press Enter to exit)
+
+  → how does authentication work?
+
+  The authentication system uses JWT tokens stored in...
+  
+  → where are API routes defined?
+
+  API routes are defined in src/api/routes/...
+
+  →
+```
+
+Interactive mode requires an AI API key (`OPENAI_API_KEY` or `ANTHROPIC_API_KEY`).
+
+---
+
+## Semantic Search Indexing
+
+When you run `wit`, it automatically:
+
+1. Checks if the repository is indexed for semantic search
+2. Starts background indexing if needed
+3. Re-indexes if the index is stale (>24 hours old)
+
+You'll see:
+
+```
+  Indexing repository for semantic search...
+```
+
+This enables instant semantic code search with `wit search` and powers the AI assistant's understanding of your codebase.
+
+---
+
+## Not in a Repository
+
+If you run `wit` outside a repository:
+
+```
+  wit · Git that understands your code
+
+  Not in a repository.
+
+  wit init        · create a new repository here
+  wit clone <url> · clone an existing repository
+```
+
+---
+
+## Customization
+
+### Disable Background Indexing
+
+If you don't want automatic indexing:
+
+```bash
+# No AI key = no indexing
+unset OPENAI_API_KEY
+wit
+```
+
+### Traditional Status
+
+For traditional git-style status output:
+
+```bash
+wit status
+# or
+wit status -s  # short format
+```
+
+---
+
+## Comparison with `wit status`
+
+| Feature | `wit` (Smart Status) | `wit status` |
+|---------|---------------------|--------------|
+| Context inference | Yes | No |
+| File grouping | By purpose | By state |
+| Quick actions | Yes | No |
+| Interactive mode | Yes | No |
+| Background indexing | Yes | No |
+| Output style | Clean, minimal | Git-compatible |
+
+Use `wit` for day-to-day work. Use `wit status` when you need traditional output or for scripting.

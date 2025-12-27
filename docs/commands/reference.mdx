@@ -838,3 +838,194 @@ wit issue close 15
 wit issue comment 15 "Fixed in commit abc123"
 ```
 
+---
+
+### `wit up`
+
+Start the wit platform with all services.
+
+```bash
+wit up [options]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--port <port>` | Server port (default: 3000) |
+| `--db-port <port>` | Database port (default: 5432) |
+| `--no-web` | Don't start the web UI |
+| `--no-db` | Use external database (requires DATABASE_URL) |
+| `--data-dir <dir>` | Data directory (default: ~/.wit) |
+
+**Examples:**
+```bash
+wit up                        # Start everything
+wit up --port 8080            # Custom server port
+wit up --no-web               # API only, no web UI
+```
+
+---
+
+### `wit down`
+
+Stop the wit platform.
+
+```bash
+wit down [options]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--keep-db` | Don't stop the database |
+| `--remove-data` | Remove all data (destructive) |
+
+**Examples:**
+```bash
+wit down                  # Stop all services
+wit down --keep-db        # Keep database running
+wit down --remove-data    # Stop and delete all data
+```
+
+---
+
+### `wit stack`
+
+Manage stacked diffs for breaking large features into reviewable pieces.
+
+```bash
+wit stack <command> [options]
+```
+
+| Command | Description |
+|---------|-------------|
+| `create <name>` | Start a new stack from current branch |
+| `push [name]` | Create new branch on top of stack |
+| `pop` | Remove top branch from stack |
+| `list` | Show all stacks |
+| `show [name]` | Show stack visualization |
+| `sync` | Rebase entire stack when base changes |
+| `submit` | Push all branches for review |
+| `delete <name>` | Delete a stack (keeps branches) |
+| `up` | Move to child branch |
+| `down` | Move to parent branch |
+| `goto <n\|branch>` | Jump to specific branch |
+
+**Examples:**
+```bash
+wit stack create feature          # Start a stack
+wit stack push                    # Add branch to stack
+wit stack show                    # View the stack
+wit stack sync                    # Rebase after main updates
+wit stack submit                  # Push all for review
+wit stack up                      # Move up in stack
+wit stack down                    # Move down in stack
+```
+
+---
+
+### `wit collaborator`
+
+Manage repository collaborators and teams.
+
+```bash
+wit collaborator <command> [options]
+```
+
+| Command | Description |
+|---------|-------------|
+| (none)/`list` | List collaborators |
+| `add <email>` | Invite a collaborator |
+| `remove <email>` | Remove a collaborator |
+| `update <email>` | Update role |
+| `show <email>` | Show details |
+| `accept <token>` | Accept invitation |
+| `revoke <email>` | Revoke pending invitation |
+| `invitations` | List pending invitations |
+| `activity` | Show activity log |
+| `stats` | Show statistics |
+| `config` | Configure settings |
+| `team list` | List teams |
+| `team create` | Create a team |
+| `team delete` | Delete a team |
+| `team add-member` | Add team member |
+| `team remove-member` | Remove team member |
+
+**Examples:**
+```bash
+wit collaborator                              # List all
+wit collaborator add alice@example.com --role maintainer
+wit collaborator remove bob@example.com
+wit collaborator team create "Core Team" --role admin
+wit collaborator team add-member core-team alice@example.com
+```
+
+---
+
+### `wit search`
+
+Semantic code search using AI embeddings.
+
+```bash
+wit search <query> [options]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--limit <n>` | Maximum results (default: 10) |
+| `--threshold <n>` | Similarity threshold (0-1) |
+| `--index` | Re-index the repository |
+
+**Examples:**
+```bash
+wit search "authentication logic"
+wit search "error handling" --limit 20
+wit search --index                    # Re-index repository
+```
+
+---
+
+### `wit review`
+
+AI-powered code review.
+
+```bash
+wit review [options]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--staged` | Review only staged changes |
+| `--branch <name>` | Review specific branch |
+| `--pr <number>` | Review pull request |
+| `--coderabbit` | Use CodeRabbit for review |
+
+**Examples:**
+```bash
+wit review                    # Review current changes
+wit review --staged           # Review staged only
+wit review --pr 42            # Review PR #42
+wit review --coderabbit       # Use CodeRabbit
+```
+
+---
+
+### `wit token`
+
+Manage personal access tokens.
+
+```bash
+wit token <command> [options]
+```
+
+| Command | Description |
+|---------|-------------|
+| `create <name>` | Create a token |
+| `list` | List tokens |
+| `revoke <name>` | Revoke a token |
+
+**Examples:**
+```bash
+wit token create ci-token --scope read,write
+wit token list
+wit token revoke ci-token
+```
+

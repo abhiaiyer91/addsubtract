@@ -1,0 +1,363 @@
+---
+title: "Self-Hosting"
+description: "Run the complete wit platform locally with a single command"
+---
+
+# Self-Hosting
+
+wit includes a complete self-hosted platform that provides Git hosting, pull requests, issues, and a web UI. Start everything with a single command.
+
+## Quick Start
+
+```bash
+# Start the entire platform
+wit up
+
+# Stop everything
+wit down
+```
+
+That's it. wit handles database setup, migrations, and all services.
+
+---
+
+## `wit up`
+
+Start the wit platform with all services.
+
+```bash
+wit up [options]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--port <port>` | API server port (default: 3000) |
+| `--db-port <port>` | Database port (default: 5432) |
+| `--no-web` | Don't start the web UI |
+| `--no-db` | Use external database (requires `DATABASE_URL`) |
+| `--data-dir <dir>` | Data directory (default: `~/.wit`) |
+| `-h, --help` | Show help message |
+
+### What `wit up` Does
+
+1. **Starts PostgreSQL** via Docker (or connects to external DB)
+2. **Runs database migrations** automatically
+3. **Starts the API server** for Git operations and tRPC API
+4. **Starts the web UI** (Vite dev server)
+
+### Examples
+
+```bash
+# Start everything on default ports
+wit up
+
+# Start server on port 8080
+wit up --port 8080
+
+# Start without web UI (API only)
+wit up --no-web
+
+# Use custom data directory
+wit up --data-dir ./my-wit-data
+
+# Use external database
+DATABASE_URL="postgresql://user:pass@host:5432/wit" wit up --no-db
+```
+
+### Output
+
+When successfully started:
+
+```
+🚀 Starting wit platform...
+
+  Starting database...
+  ✓ Database started
+  Running migrations...
+  ✓ Migrations complete
+  Starting API server...
+  ✓ API server started
+  Starting web UI...
+  ✓ Web UI started
+
+✓ wit is running!
+
+  Services:
+    API:      http://localhost:3000
+    Web UI:   http://localhost:5173
+    Database: localhost:5432
+
+  Stop with: wit down
+  Logs at:   ~/.wit/logs
+```
+
+---
+
+## `wit down`
+
+Stop the wit platform.
+
+```bash
+wit down [options]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--keep-db` | Don't stop the database |
+| `--remove-data` | Remove all data (DESTRUCTIVE) |
+| `-h, --help` | Show help message |
+
+### Examples
+
+```bash
+# Stop all services
+wit down
+
+# Stop but keep database running
+wit down --keep-db
+
+# Stop and delete all data
+wit down --remove-data
+```
+
+---
+
+## `wit platform-status`
+
+Check the status of running services.
+
+```bash
+wit platform-status
+```
+
+Shows which services are running and their health.
+
+---
+
+## Data Directory
+
+All platform data is stored in `~/.wit` by default:
+
+```
+~/.wit/
+├── repos/          # Git repositories
+├── db/             # PostgreSQL data
+├── logs/           # Service logs
+│   ├── server.log
+│   └── web.log
+└── wit.pid         # Process IDs
+```
+
+### Custom Data Directory
+
+Use `--data-dir` to specify a different location:
+
+```bash
+wit up --data-dir /var/lib/wit
+```
+
+---
+
+## Requirements
+
+### Docker
+
+wit uses Docker to run PostgreSQL. Install Docker from [docker.com](https://docker.com).
+
+Check if Docker is installed:
+```bash
+docker --version
+```
+
+### External Database (Optional)
+
+If you prefer to use an existing PostgreSQL database:
+
+```bash
+export DATABASE_URL="postgresql://user:password@localhost:5432/wit"
+wit up --no-db
+```
+
+The database must be PostgreSQL 14 or later.
+
+---
+
+## Configuration
+
+### Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DATABASE_URL` | PostgreSQL connection string | Auto-configured |
+| `PORT` | API server port | 3000 |
+| `REPOS_DIR` | Repository storage path | `~/.wit/repos` |
+| `JWT_SECRET` | Secret for JWT tokens | Auto-generated |
+| `NODE_ENV` | Environment mode | `production` |
+
+### Using with External Services
+
+To integrate with external services, set the appropriate environment variables before running `wit up`:
+
+```bash
+# Use external database
+export DATABASE_URL="postgresql://user:pass@db.example.com:5432/wit"
+
+# Use custom JWT secret
+export JWT_SECRET="your-secret-key-here"
+
+# Start with external database
+wit up --no-db
+```
+
+---
+
+## Production Deployment
+
+For production deployments, consider:
+
+### Using Docker Compose
+
+Create a `docker-compose.yml`:
+
+```yaml
+version: '3.8'
+
+services:
+  wit-server:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://wit:wit@db:5432/wit
+      - JWT_SECRET=${JWT_SECRET}
+      - NODE_ENV=production
+    volumes:
+      - wit-repos:/app/repos
+    depends_on:
+      - db
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=wit
+      - POSTGRES_PASSWORD=wit
+      - POSTGRES_DB=wit
+    volumes:
+      - wit-db:/var/lib/postgresql/data
+
+  web:
+    build: ./apps/web
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://wit-server:3000/trpc
+
+volumes:
+  wit-repos:
+  wit-db:
+```
+
+Run with:
+```bash
+docker-compose up -d
+```
+
+### Nginx Reverse Proxy
+
+For production with HTTPS:
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name git.example.com;
+
+    ssl_certificate /etc/letsencrypt/live/git.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/git.example.com/privkey.pem;
+
+    # Git operations
+    location ~ ^/([^/]+)/([^/]+)\.git {
+        proxy_pass http://localhost:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        
+        # Required for Git operations
+        proxy_buffering off;
+        client_max_body_size 0;
+    }
+
+    # API
+    location /trpc {
+        proxy_pass http://localhost:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    # Web UI
+    location / {
+        proxy_pass http://localhost:5173;
+        proxy_set_header Host $host;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}
+```
+
+---
+
+## Troubleshooting
+
+### Port Already in Use
+
+```
+Error: Server failed to start on port 3000
+```
+
+Either stop the existing service or use a different port:
+```bash
+wit up --port 8080
+```
+
+### Docker Not Found
+
+```
+Error: Docker is required to run the database
+```
+
+Install Docker or use an external database:
+```bash
+DATABASE_URL="postgresql://..." wit up --no-db
+```
+
+### Database Connection Failed
+
+Check the logs:
+```bash
+cat ~/.wit/logs/server.log
+```
+
+Verify PostgreSQL is running:
+```bash
+docker ps | grep wit-postgres
+```
+
+### Checking Logs
+
+Service logs are stored in `~/.wit/logs/`:
+
+```bash
+# API server logs
+tail -f ~/.wit/logs/server.log
+
+# Web UI logs
+tail -f ~/.wit/logs/web.log
+```
+
+### Cleaning Up
+
+To completely reset the platform:
+
+```bash
+wit down --remove-data
+```
+
+This removes all data including repositories and database content.

@@ -7,6 +7,56 @@ description: "Power user commands for advanced workflows"
 
 These commands provide powerful capabilities for advanced workflows.
 
+## Stacked Diffs
+
+Break down large features into smaller, reviewable branches that build on each other.
+
+```bash
+wit stack <command> [options]
+```
+
+<Info>
+For a complete guide, see [Stacked Diffs](/commands/stacked-diffs).
+</Info>
+
+### Quick Start
+
+```bash
+# Create a stack from main
+wit stack create auth-feature
+
+# Create branches as you work
+wit stack push                    # Creates auth-feature/part-1
+wit add . && wit commit -m "Add login"
+
+wit stack push                    # Creates auth-feature/part-2  
+wit add . && wit commit -m "Add logout"
+
+# View the stack
+wit stack show
+
+# Sync after main updates
+wit stack sync
+
+# Submit all for review
+wit stack submit
+```
+
+### Commands
+
+| Command | Description |
+|---------|-------------|
+| `create <name>` | Start a new stack from current branch |
+| `push [name]` | Add a new branch to the stack |
+| `pop` | Remove top branch from stack |
+| `show` | Visualize the stack |
+| `sync` | Rebase entire stack |
+| `submit` | Push all branches for review |
+| `up` / `down` | Navigate branches |
+| `goto <n>` | Jump to specific branch |
+
+---
+
 ## History Rewriting
 
 ### cherry-pick
