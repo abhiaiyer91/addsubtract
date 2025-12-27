@@ -15,6 +15,7 @@ import { RemoteManager } from './remote';
 import { setHashAlgorithm, getHashAlgorithm, HashAlgorithm } from '../utils/hash';
 import { HookManager } from './hooks';
 import { BranchProtectionEngine } from './branch-protection';
+import { CollaboratorManager } from './collaborators';
 
 /**
  * Repository configuration
@@ -60,6 +61,7 @@ export class Repository {
   readonly hooks: HookManager;
   readonly remotes: RemoteManager;
   readonly branchProtection: BranchProtectionEngine;
+  readonly collaborators: CollaboratorManager;
 
   private config: RepositoryConfig;
 
@@ -100,6 +102,7 @@ export class Repository {
     this.hooks = new HookManager(this.gitDir, this.workDir);
     this.remotes = new RemoteManager(this.gitDir);
     this.branchProtection = new BranchProtectionEngine(this.gitDir);
+    this.collaborators = new CollaboratorManager(this.gitDir);
   }
 
   /**
@@ -205,6 +208,7 @@ export class Repository {
     repo.hooks.init();
     repo.remotes.init();
     repo.branchProtection.getManager().init();
+    repo.collaborators.init();
 
     console.log(`Initialized wit repository with ${hashAlgo} hashing`);
 

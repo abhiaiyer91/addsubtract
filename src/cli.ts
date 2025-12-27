@@ -61,6 +61,8 @@ import {
   // Advanced features
   handleReflog,
   handleGC,
+  // Collaborator management
+  handleCollaborator,
   // Server command
   handleServe,
   // Command help
@@ -198,6 +200,14 @@ Branch Protection:
   protect remove <pat>  Remove a protection rule
   protect check <br>    Check if operation is allowed on branch
   protect status <br>   Show protection status for a branch
+
+Collaborator Management:
+  collaborator          List collaborators
+  collaborator add      Invite a collaborator (email, role)
+  collaborator remove   Remove a collaborator
+  collaborator update   Update collaborator role
+  collaborator accept   Accept invitation (token)
+  collaborator team     Manage teams
 
 Server:
   serve                 Start Git HTTP server for hosting repos
@@ -340,6 +350,8 @@ const COMMANDS = [
   'github',
   // Advanced features
   'hooks', 'submodule', 'worktree', 'protect', 'reflog', 'gc',
+  // Collaborator management
+  'collaborator',
   // Server
   'serve',
   // Platform commands
@@ -854,6 +866,19 @@ function main(): void {
         handleGC(cmdArgs);
         break;
 
+      // Collaborator management
+      case 'collaborator':
+        // Collaborator commands are async due to email sending
+        handleCollaborator(args.slice(args.indexOf('collaborator') + 1)).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
+          }
+          process.exit(1);
+        });
+        return; // Exit main() to let async handle complete
+
       case 'serve':
         handleServe(args.slice(args.indexOf('serve') + 1));
         break;
@@ -926,7 +951,6 @@ function main(): void {
           process.exit(1);
         });
         return;
-
       default: {
         // Provide suggestions for unknown commands
         const similar = findSimilar(command, COMMANDS);

@@ -94,3 +94,23 @@ export { handleToken } from './token';
 
 // CodeRabbit review command
 export { handleCodeReview, REVIEW_HELP } from './review';
+
+// Collaborator management
+export {
+  handleCollaborator,
+  listCollaborators,
+  addCollaborator,
+  removeCollaborator,
+  updateCollaboratorRole,
+  showCollaborator,
+  acceptInvitation,
+  revokeInvitation,
+  listInvitations,
+  showActivityLog,
+  showStats as showCollaboratorStats,
+  listTeams,
+  createTeam,
+  deleteTeam,
+  addTeamMember,
+  removeTeamMember,
+} from './collaborator';

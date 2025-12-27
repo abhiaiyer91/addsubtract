@@ -246,5 +246,28 @@ export {
   getCredentialManager,
 } from './auth';
 
+// Collaborator management
+export {
+  CollaboratorManager,
+  CollaboratorRole,
+  Collaborator,
+  CollaboratorPermissions,
+  Team,
+  Invitation,
+  InvitationStatus,
+  CollaboratorActivity,
+  CollaboratorConfig,
+  ROLE_PERMISSIONS,
+  ROLE_HIERARCHY,
+} from './collaborators';
+
+// Email service
+export {
+  EmailService,
+  EmailConfig,
+  EmailResult,
+  createEmailService,
+} from './email';
+
 // Protocol exports
 export * as protocol from './protocol';

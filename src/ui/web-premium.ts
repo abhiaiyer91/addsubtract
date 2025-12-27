@@ -13,6 +13,14 @@ import { renderDiffHTML, getDiffStyles, getWordDiffStyles } from './diff-viewer'
 import { buildFileTree, renderFileTreeHTML, getFileTreeStyles } from './file-tree';
 import { SearchEngine, renderSearchResultsHTML, getSearchStyles } from './search';
 import { getTheme, Theme, getThemeNames } from './themes';
+import { 
+  CollaboratorManager, 
+  CollaboratorRole, 
+  Collaborator, 
+  Team,
+  ROLE_PERMISSIONS,
+  ROLE_HIERARCHY 
+} from '../core/collaborators';
 
 const DEFAULT_PORT = 3847;
 
@@ -122,6 +130,88 @@ export class PremiumWebUI {
           }
           break;
         
+        // Collaborator API endpoints
+        case '/api/collaborators':
+          if (req.method === 'GET') {
+            this.serveJSON(res, this.getCollaborators());
+          } else if (req.method === 'POST') {
+            const body = await this.readBody(req);
+            const result = await this.inviteCollaborator(JSON.parse(body));
+            this.serveJSON(res, result);
+          }
+          break;
+        case '/api/collaborators/remove':
+          if (req.method === 'POST') {
+            const body = await this.readBody(req);
+            const { email } = JSON.parse(body);
+            this.removeCollaborator(email);
+            this.serveJSON(res, { success: true });
+          }
+          break;
+        case '/api/collaborators/update-role':
+          if (req.method === 'POST') {
+            const body = await this.readBody(req);
+            const { email, role } = JSON.parse(body);
+            const result = this.updateCollaboratorRole(email, role);
+            this.serveJSON(res, result);
+          }
+          break;
+        case '/api/collaborators/revoke':
+          if (req.method === 'POST') {
+            const body = await this.readBody(req);
+            const { email } = JSON.parse(body);
+            this.revokeCollaboratorInvitation(email);
+            this.serveJSON(res, { success: true });
+          }
+          break;
+        case '/api/collaborators/teams':
+          if (req.method === 'GET') {
+            this.serveJSON(res, this.getTeams());
+          } else if (req.method === 'POST') {
+            const body = await this.readBody(req);
+            const result = this.createTeam(JSON.parse(body));
+            this.serveJSON(res, result);
+          }
+          break;
+        case '/api/collaborators/teams/delete':
+          if (req.method === 'POST') {
+            const body = await this.readBody(req);
+            const { slug } = JSON.parse(body);
+            this.deleteTeam(slug);
+            this.serveJSON(res, { success: true });
+          }
+          break;
+        case '/api/collaborators/teams/add-member':
+          if (req.method === 'POST') {
+            const body = await this.readBody(req);
+            const { teamSlug, email } = JSON.parse(body);
+            const result = this.addTeamMember(teamSlug, email);
+            this.serveJSON(res, result);
+          }
+          break;
+        case '/api/collaborators/teams/remove-member':
+          if (req.method === 'POST') {
+            const body = await this.readBody(req);
+            const { teamSlug, email } = JSON.parse(body);
+            const result = this.removeTeamMember(teamSlug, email);
+            this.serveJSON(res, result);
+          }
+          break;
+        case '/api/collaborators/activity':
+          this.serveJSON(res, this.getCollaboratorActivity());
+          break;
+        case '/api/collaborators/stats':
+          this.serveJSON(res, this.getCollaboratorStats());
+          break;
+        case '/api/collaborators/config':
+          if (req.method === 'GET') {
+            this.serveJSON(res, this.getCollaboratorConfig());
+          } else if (req.method === 'POST') {
+            const body = await this.readBody(req);
+            this.updateCollaboratorConfig(JSON.parse(body));
+            this.serveJSON(res, { success: true });
+          }
+          break;
         // ===== BRANCH OPERATIONS =====
         case '/api/branch/create':
           if (req.method === 'POST') {
@@ -558,6 +648,193 @@ export class PremiumWebUI {
     }));
   }
 
+  // ==================== COLLABORATOR METHODS ====================
+
+  private getCollaboratorManager(): CollaboratorManager {
+    const manager = new CollaboratorManager(this.repo.gitDir);
+    manager.init();
+    return manager;
+  }
+
+  private getCurrentUserEmail(): string {
+    return process.env.WIT_AUTHOR_EMAIL || 
+           process.env.GIT_AUTHOR_EMAIL || 
+           'unknown@example.com';
+  }
+
+  private getCollaborators(): any {
+    const manager = this.getCollaboratorManager();
+    const collaborators = manager.list();
+    const stats = manager.getStats();
+    
+    return {
+      collaborators: collaborators.map(c => ({
+        id: c.id,
+        email: c.email,
+        name: c.name,
+        role: c.role,
+        status: c.status,
+        invitedAt: c.invitedAt,
+        invitedBy: c.invitedBy,
+        acceptedAt: c.acceptedAt,
+        lastActiveAt: c.lastActiveAt,
+        teams: c.teams,
+        permissions: c.permissions,
+      })),
+      stats,
+    };
+  }
+
+  private async inviteCollaborator(data: { email: string; role: CollaboratorRole; message?: string; name?: string }): Promise<any> {
+    const manager = this.getCollaboratorManager();
+    const inviterEmail = this.getCurrentUserEmail();
+    
+    try {
+      const { collaborator, invitation } = manager.invite(
+        data.email,
+        data.role,
+        inviterEmail,
+        { message: data.message, name: data.name }
+      );
+      
+      return {
+        success: true,
+        collaborator: {
+          id: collaborator.id,
+          email: collaborator.email,
+          role: collaborator.role,
+          status: collaborator.status,
+        },
+        inviteToken: invitation.token,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to invite collaborator',
+      };
+    }
+  }
+
+  private removeCollaborator(email: string): void {
+    const manager = this.getCollaboratorManager();
+    const removerEmail = this.getCurrentUserEmail();
+    manager.remove(email, removerEmail);
+  }
+
+  private updateCollaboratorRole(email: string, role: CollaboratorRole): any {
+    const manager = this.getCollaboratorManager();
+    const updaterEmail = this.getCurrentUserEmail();
+    
+    try {
+      const collaborator = manager.updateRole(email, role, updaterEmail);
+      return {
+        success: true,
+        collaborator: {
+          id: collaborator.id,
+          email: collaborator.email,
+          role: collaborator.role,
+        },
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to update role',
+      };
+    }
+  }
+
+  private revokeCollaboratorInvitation(email: string): void {
+    const manager = this.getCollaboratorManager();
+    const revokerEmail = this.getCurrentUserEmail();
+    manager.revokeInvitation(email, revokerEmail);
+  }
+
+  private getTeams(): any {
+    const manager = this.getCollaboratorManager();
+    return manager.listTeams().map(t => ({
+      id: t.id,
+      name: t.name,
+      slug: t.slug,
+      description: t.description,
+      role: t.role,
+      memberCount: t.members.length,
+      members: t.members,
+      createdAt: t.createdAt,
+    }));
+  }
+
+  private createTeam(data: { name: string; role: CollaboratorRole; description?: string }): any {
+    const manager = this.getCollaboratorManager();
+    const creatorEmail = this.getCurrentUserEmail();
+    
+    try {
+      const team = manager.createTeam(data.name, data.role, creatorEmail, { description: data.description });
+      return {
+        success: true,
+        team: {
+          id: team.id,
+          name: team.name,
+          slug: team.slug,
+          role: team.role,
+        },
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to create team',
+      };
+    }
+  }
+
+  private deleteTeam(slug: string): void {
+    const manager = this.getCollaboratorManager();
+    manager.deleteTeam(slug);
+  }
+
+  private addTeamMember(teamSlug: string, email: string): any {
+    const manager = this.getCollaboratorManager();
+    
+    try {
+      const team = manager.addTeamMember(teamSlug, email);
+      return { success: true, team: { name: team.name, memberCount: team.members.length } };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to add member' };
+    }
+  }
+
+  private removeTeamMember(teamSlug: string, email: string): any {
+    const manager = this.getCollaboratorManager();
+    
+    try {
+      const team = manager.removeTeamMember(teamSlug, email);
+      return { success: true, team: { name: team.name, memberCount: team.members.length } };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to remove member' };
+    }
+  }
+
+  private getCollaboratorActivity(): any {
+    const manager = this.getCollaboratorManager();
+    return manager.getActivityLog(50);
+  }
+
+  private getCollaboratorStats(): any {
+    const manager = this.getCollaboratorManager();
+    return manager.getStats();
+  }
+
+  private getCollaboratorConfig(): any {
+    const manager = this.getCollaboratorManager();
+    return manager.getConfig();
+  }
+
+  private updateCollaboratorConfig(config: any): void {
+    const manager = this.getCollaboratorManager();
+    manager.updateConfig(config);
+  }
+
+  // ==================== UTILITY METHODS FROM MAIN ====================
+
   private getStashList(): any {
     try {
       // Use branch state - check if there's saved state for current branch
@@ -970,6 +1247,82 @@ export class PremiumWebUI {
     </div>
   </div>
   
+  <!-- Settings Modal -->
+  <div class="modal-overlay" id="settings-modal">
+    <div class="modal settings-modal">
+      <div class="settings-header">
+        <h2>Settings</h2>
+        <button class="modal-close" onclick="closeModals()">&times;</button>
+      </div>
+      <div class="settings-content">
+        <div class="settings-sidebar">
+          <button class="settings-tab active" data-settings-tab="collaborators" onclick="switchSettingsTab('collaborators')">
+            <svg viewBox="0 0 16 16" fill="currentColor">
+              <path d="M5.5 3.5a2 2 0 100 4 2 2 0 000-4zM2 5.5a3.5 3.5 0 115.898 2.549 5.507 5.507 0 013.034 4.084.75.75 0 11-1.482.235 4.001 4.001 0 00-7.9 0 .75.75 0 01-1.482-.236A5.507 5.507 0 013.102 8.05 3.49 3.49 0 012 5.5zM11 4a.75.75 0 100 1.5 1.5 1.5 0 01.666 2.844.75.75 0 00-.416.672v.352a.75.75 0 00.574.73c1.2.289 2.162 1.2 2.522 2.372a.75.75 0 101.434-.44 5.01 5.01 0 00-2.56-3.012A3 3 0 0011 4z"/>
+            </svg>
+            Collaborators
+          </button>
+          <button class="settings-tab" data-settings-tab="teams" onclick="switchSettingsTab('teams')">
+            <svg viewBox="0 0 16 16" fill="currentColor">
+              <path d="M2 2.5A2.5 2.5 0 014.5 0h8.75a.75.75 0 01.75.75v12.5a.75.75 0 01-.75.75h-2.5a.75.75 0 110-1.5h1.75v-2h-8a1 1 0 00-.714 1.7.75.75 0 01-1.072 1.05A2.495 2.495 0 012 11.5v-9z"/>
+            </svg>
+            Teams
+          </button>
+          <button class="settings-tab" data-settings-tab="activity" onclick="switchSettingsTab('activity')">
+            <svg viewBox="0 0 16 16" fill="currentColor">
+              <path d="M1.5 8a6.5 6.5 0 1113 0 6.5 6.5 0 01-13 0zM8 0a8 8 0 100 16A8 8 0 008 0zm.5 4.75a.75.75 0 00-1.5 0v3.5a.75.75 0 00.471.696l2.5 1a.75.75 0 00.557-1.392L8.5 7.742V4.75z"/>
+            </svg>
+            Activity
+          </button>
+        </div>
+        <div class="settings-main">
+          <!-- Collaborators Tab -->
+          <div class="settings-panel active" id="settings-collaborators">
+            <div class="settings-panel-header">
+              <h3>Collaborators</h3>
+              <button class="btn btn-primary btn-sm" onclick="openInviteModal()">
+                <svg viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M8 4a.75.75 0 01.75.75v2.5h2.5a.75.75 0 010 1.5h-2.5v2.5a.75.75 0 01-1.5 0v-2.5h-2.5a.75.75 0 010-1.5h2.5v-2.5A.75.75 0 018 4z"/>
+                </svg>
+                Invite
+              </button>
+            </div>
+            <div class="collaborator-stats" id="collaborator-stats"></div>
+            <div class="collaborator-list" id="collaborator-list">
+              <div class="loading-state"><div class="spinner"></div><p>Loading collaborators...</p></div>
+            </div>
+          </div>
+          
+          <!-- Teams Tab -->
+          <div class="settings-panel" id="settings-teams">
+            <div class="settings-panel-header">
+              <h3>Teams</h3>
+              <button class="btn btn-primary btn-sm" onclick="openCreateTeamModal()">
+                <svg viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M8 4a.75.75 0 01.75.75v2.5h2.5a.75.75 0 010 1.5h-2.5v2.5a.75.75 0 01-1.5 0v-2.5h-2.5a.75.75 0 010-1.5h2.5v-2.5A.75.75 0 018 4z"/>
+                </svg>
+                Create Team
+              </button>
+            </div>
+            <div class="team-list" id="team-list">
+              <div class="loading-state"><div class="spinner"></div><p>Loading teams...</p></div>
+            </div>
+          </div>
+          
+          <!-- Activity Tab -->
+          <div class="settings-panel" id="settings-activity">
+            <div class="settings-panel-header">
+              <h3>Activity Log</h3>
+            </div>
+            <div class="activity-list" id="activity-list">
+              <div class="loading-state"><div class="spinner"></div><p>Loading activity...</p></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
   <!-- Command Palette Modal -->
   <div class="modal-overlay" id="command-palette-modal">
     <div class="modal command-palette-modal">
@@ -988,7 +1341,7 @@ export class PremiumWebUI {
   <div class="modal-overlay" id="create-branch-modal">
     <div class="modal form-modal">
       <div class="modal-header">
-        <h3>🌿 Create New Branch</h3>
+        <h3>Create New Branch</h3>
         <button class="close-btn" onclick="closeModal('create-branch')">&times;</button>
       </div>
       <div class="modal-body">
@@ -1016,7 +1369,7 @@ export class PremiumWebUI {
   <div class="modal-overlay" id="create-stash-modal">
     <div class="modal form-modal">
       <div class="modal-header">
-        <h3>📦 Stash Changes</h3>
+        <h3>Stash Changes</h3>
         <button class="close-btn" onclick="closeModal('create-stash')">&times;</button>
       </div>
       <div class="modal-body">
@@ -1040,7 +1393,7 @@ export class PremiumWebUI {
   <div class="modal-overlay" id="create-tag-modal">
     <div class="modal form-modal">
       <div class="modal-header">
-        <h3>🏷 Create Tag</h3>
+        <h3>Create Tag</h3>
         <button class="close-btn" onclick="closeModal('create-tag')">&times;</button>
       </div>
       <div class="modal-body">
@@ -1072,7 +1425,7 @@ export class PremiumWebUI {
   <div class="modal-overlay" id="add-remote-modal">
     <div class="modal form-modal">
       <div class="modal-header">
-        <h3>🌐 Add Remote</h3>
+        <h3>Add Remote</h3>
         <button class="close-btn" onclick="closeModal('add-remote')">&times;</button>
       </div>
       <div class="modal-body">
@@ -1096,7 +1449,7 @@ export class PremiumWebUI {
   <div class="modal-overlay" id="commit-options-modal">
     <div class="modal form-modal">
       <div class="modal-header">
-        <h3>⚙️ Commit Options</h3>
+        <h3>Commit Options</h3>
         <button class="close-btn" onclick="closeModal('commit-options')">&times;</button>
       </div>
       <div class="modal-body">
@@ -1127,11 +1480,78 @@ export class PremiumWebUI {
     </div>
   </div>
   
+  <!-- Invite Collaborator Modal -->
+  <div class="modal-overlay" id="invite-modal">
+    <div class="modal invite-modal">
+      <div class="settings-header">
+        <h2>Invite Collaborator</h2>
+        <button class="modal-close" onclick="closeModals()">&times;</button>
+      </div>
+      <div class="invite-form">
+        <div class="form-group">
+          <label>Email address</label>
+          <input type="email" id="invite-email" placeholder="collaborator@example.com">
+        </div>
+        <div class="form-group">
+          <label>Role</label>
+          <select id="invite-role">
+            <option value="viewer">Viewer - Read-only access</option>
+            <option value="contributor" selected>Contributor - Can push to branches</option>
+            <option value="maintainer">Maintainer - Can manage branches & releases</option>
+            <option value="admin">Admin - Full access except deletion</option>
+            <option value="owner">Owner - Full access</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Message (optional)</label>
+          <textarea id="invite-message" placeholder="Add a personal note..."></textarea>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-secondary" onclick="closeModals()">Cancel</button>
+          <button class="btn btn-primary" onclick="sendInvitation()">Send Invitation</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Create Team Modal (Collaborator) -->
+  <div class="modal-overlay" id="create-team-modal">
+    <div class="modal invite-modal">
+      <div class="settings-header">
+        <h2>Create Team</h2>
+        <button class="modal-close" onclick="closeModals()">&times;</button>
+      </div>
+      <div class="invite-form">
+        <div class="form-group">
+          <label>Team name</label>
+          <input type="text" id="collab-team-name" placeholder="e.g., Frontend Team">
+        </div>
+        <div class="form-group">
+          <label>Default role for members</label>
+          <select id="collab-team-role">
+            <option value="viewer">Viewer</option>
+            <option value="contributor" selected>Contributor</option>
+            <option value="maintainer">Maintainer</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Description (optional)</label>
+          <textarea id="collab-team-description" placeholder="What does this team do?"></textarea>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-secondary" onclick="closeModals()">Cancel</button>
+          <button class="btn btn-primary" onclick="createNewTeam()">Create Team</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
   <!-- Reset Modal -->
   <div class="modal-overlay" id="reset-modal">
     <div class="modal form-modal">
       <div class="modal-header">
-        <h3>⏪ Reset</h3>
+        <h3>Reset</h3>
         <button class="close-btn" onclick="closeModal('reset')">&times;</button>
       </div>
       <div class="modal-body">
@@ -1160,7 +1580,7 @@ export class PremiumWebUI {
               <input type="radio" name="reset-mode" value="hard">
               <div>
                 <strong>Hard</strong>
-                <span>⚠️ Discard all changes</span>
+                <span>Discard all changes</span>
               </div>
             </label>
           </div>
@@ -1177,7 +1597,7 @@ export class PremiumWebUI {
   <div class="modal-overlay" id="merge-modal">
     <div class="modal form-modal">
       <div class="modal-header">
-        <h3>🔀 Merge Branch</h3>
+        <h3>Merge Branch</h3>
         <button class="close-btn" onclick="closeModal('merge')">&times;</button>
       </div>
       <div class="modal-body">
@@ -1204,7 +1624,7 @@ export class PremiumWebUI {
   <div class="modal-overlay" id="cherry-pick-modal">
     <div class="modal form-modal">
       <div class="modal-header">
-        <h3>🍒 Cherry Pick</h3>
+        <h3>Cherry Pick</h3>
         <button class="close-btn" onclick="closeModal('cherry-pick')">&times;</button>
       </div>
       <div class="modal-body">
@@ -1225,7 +1645,7 @@ export class PremiumWebUI {
   <div class="modal-overlay" id="revert-modal">
     <div class="modal form-modal">
       <div class="modal-header">
-        <h3>↩️ Revert Commit</h3>
+        <h3>Revert Commit</h3>
         <button class="close-btn" onclick="closeModal('revert')">&times;</button>
       </div>
       <div class="modal-body">
@@ -1246,7 +1666,7 @@ export class PremiumWebUI {
   <div class="modal-overlay" id="blame-modal">
     <div class="modal blame-modal">
       <div class="modal-header">
-        <h3>👤 Blame: <span id="blame-filename"></span></h3>
+        <h3>Blame: <span id="blame-filename"></span></h3>
         <button class="close-btn" onclick="closeModal('blame')">&times;</button>
       </div>
       <div class="modal-body">
@@ -1259,7 +1679,7 @@ export class PremiumWebUI {
   <div class="modal-overlay" id="reflog-modal">
     <div class="modal reflog-modal">
       <div class="modal-header">
-        <h3>📋 Reference Log</h3>
+        <h3>Reference Log</h3>
         <button class="close-btn" onclick="closeModal('reflog')">&times;</button>
       </div>
       <div class="modal-body">
@@ -1272,11 +1692,11 @@ export class PremiumWebUI {
   <div class="modal-overlay" id="clean-modal">
     <div class="modal form-modal">
       <div class="modal-header">
-        <h3>🧹 Clean Working Directory</h3>
+        <h3>Clean Working Directory</h3>
         <button class="close-btn" onclick="closeModal('clean')">&times;</button>
       </div>
       <div class="modal-body">
-        <p class="warning-text">⚠️ This will permanently remove untracked files!</p>
+        <p class="warning-text">This will permanently remove untracked files!</p>
         <div class="form-check">
           <input type="checkbox" id="clean-directories">
           <label for="clean-directories">Include directories</label>
@@ -1299,7 +1719,6 @@ export class PremiumWebUI {
   <div class="context-menu" id="context-menu">
     <div class="context-menu-items" id="context-menu-items"></div>
   </div>
-  
   <!-- Toast Container -->
   <div class="toast-container" id="toast-container"></div>
   
@@ -2968,6 +3387,434 @@ export class PremiumWebUI {
         width: 220px;
       }
     }
+    
+    /* ========================================
+       SETTINGS MODAL
+       ======================================== */
+    .settings-modal {
+      width: 900px;
+      max-width: 95vw;
+      max-height: 80vh;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .settings-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--spacing-lg) var(--spacing-xl);
+      border-bottom: 1px solid var(--border-default);
+    }
+    
+    .settings-header h2 {
+      margin: 0;
+      font-size: var(--font-size-xl);
+      font-weight: 600;
+    }
+    
+    .modal-close {
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      border: none;
+      border-radius: var(--radius-md);
+      font-size: 24px;
+      color: var(--text-tertiary);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+    
+    .modal-close:hover {
+      background: var(--bg-hover);
+      color: var(--text-primary);
+    }
+    
+    .settings-content {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+    
+    .settings-sidebar {
+      width: 200px;
+      padding: var(--spacing-md);
+      background: var(--bg-surface);
+      border-right: 1px solid var(--border-default);
+      flex-shrink: 0;
+    }
+    
+    .settings-tab {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-sm);
+      width: 100%;
+      padding: var(--spacing-sm) var(--spacing-md);
+      background: transparent;
+      border: none;
+      border-radius: var(--radius-md);
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      text-align: left;
+    }
+    
+    .settings-tab svg {
+      width: 16px;
+      height: 16px;
+    }
+    
+    .settings-tab:hover {
+      background: var(--bg-hover);
+      color: var(--text-primary);
+    }
+    
+    .settings-tab.active {
+      background: var(--accent-primary);
+      color: white;
+    }
+    
+    .settings-main {
+      flex: 1;
+      padding: var(--spacing-xl);
+      overflow-y: auto;
+    }
+    
+    .settings-panel {
+      display: none;
+    }
+    
+    .settings-panel.active {
+      display: block;
+    }
+    
+    .settings-panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--spacing-lg);
+    }
+    
+    .settings-panel-header h3 {
+      margin: 0;
+      font-size: var(--font-size-lg);
+      font-weight: 600;
+    }
+    
+    .btn-sm {
+      padding: var(--spacing-xs) var(--spacing-md);
+      font-size: var(--font-size-sm);
+    }
+    
+    .btn-sm svg {
+      width: 12px;
+      height: 12px;
+    }
+    
+    /* Collaborator Stats */
+    .collaborator-stats {
+      display: flex;
+      gap: var(--spacing-md);
+      margin-bottom: var(--spacing-lg);
+    }
+    
+    .stat-card {
+      flex: 1;
+      padding: var(--spacing-md);
+      background: var(--bg-surface);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-lg);
+      text-align: center;
+    }
+    
+    .stat-value {
+      font-size: var(--font-size-xxl);
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+    
+    .stat-label {
+      font-size: var(--font-size-xs);
+      color: var(--text-tertiary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    /* Collaborator List */
+    .collaborator-list {
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing-sm);
+    }
+    
+    .collaborator-item {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-md);
+      padding: var(--spacing-md);
+      background: var(--bg-surface);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-lg);
+      transition: all var(--transition-fast);
+    }
+    
+    .collaborator-item:hover {
+      border-color: var(--border-focus);
+    }
+    
+    .collaborator-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: var(--radius-full);
+      background: linear-gradient(135deg, var(--accent-primary) 0%, #8b5cf6 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: var(--font-size-sm);
+      font-weight: 600;
+      color: white;
+      flex-shrink: 0;
+    }
+    
+    .collaborator-info {
+      flex: 1;
+      min-width: 0;
+    }
+    
+    .collaborator-name {
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+    
+    .collaborator-email {
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+    }
+    
+    .collaborator-meta {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-sm);
+    }
+    
+    .role-badge {
+      padding: 2px 8px;
+      border-radius: var(--radius-full);
+      font-size: var(--font-size-xs);
+      font-weight: 500;
+    }
+    
+    .role-badge.owner { background: rgba(236, 72, 153, 0.2); color: #f472b6; }
+    .role-badge.admin { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+    .role-badge.maintainer { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+    .role-badge.contributor { background: rgba(34, 197, 94, 0.2); color: #4ade80; }
+    .role-badge.viewer { background: rgba(107, 114, 128, 0.2); color: #9ca3af; }
+    
+    .status-badge {
+      padding: 2px 8px;
+      border-radius: var(--radius-full);
+      font-size: var(--font-size-xs);
+      font-weight: 500;
+    }
+    
+    .status-badge.pending { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+    .status-badge.accepted { background: rgba(34, 197, 94, 0.2); color: #4ade80; }
+    
+    .collaborator-actions {
+      display: flex;
+      gap: var(--spacing-xs);
+      opacity: 0;
+      transition: opacity var(--transition-fast);
+    }
+    
+    .collaborator-item:hover .collaborator-actions {
+      opacity: 1;
+    }
+    
+    .action-icon-btn {
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-md);
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+    
+    .action-icon-btn svg {
+      width: 14px;
+      height: 14px;
+    }
+    
+    .action-icon-btn:hover {
+      background: var(--bg-hover);
+      color: var(--text-primary);
+    }
+    
+    .action-icon-btn.danger:hover {
+      background: var(--accent-danger-muted);
+      color: var(--accent-danger);
+      border-color: var(--accent-danger);
+    }
+    
+    /* Team List */
+    .team-list {
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing-sm);
+    }
+    
+    .team-item {
+      padding: var(--spacing-md);
+      background: var(--bg-surface);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-lg);
+    }
+    
+    .team-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--spacing-sm);
+    }
+    
+    .team-name {
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    
+    .team-description {
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+      margin-bottom: var(--spacing-sm);
+    }
+    
+    .team-meta {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-md);
+      font-size: var(--font-size-sm);
+      color: var(--text-tertiary);
+    }
+    
+    /* Activity List */
+    .activity-list {
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .activity-item {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--spacing-md);
+      padding: var(--spacing-md) 0;
+      border-bottom: 1px solid var(--border-muted);
+    }
+    
+    .activity-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: var(--radius-full);
+      background: var(--bg-overlay);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+    
+    .activity-content {
+      flex: 1;
+    }
+    
+    .activity-text {
+      font-size: var(--font-size-sm);
+      color: var(--text-primary);
+    }
+    
+    .activity-time {
+      font-size: var(--font-size-xs);
+      color: var(--text-tertiary);
+      margin-top: var(--spacing-xs);
+    }
+    
+    /* Invite Modal */
+    .invite-modal {
+      width: 480px;
+      max-width: 95vw;
+    }
+    
+    .invite-form {
+      padding: var(--spacing-xl);
+    }
+    
+    .form-group {
+      margin-bottom: var(--spacing-lg);
+    }
+    
+    .form-group label {
+      display: block;
+      font-size: var(--font-size-sm);
+      font-weight: 500;
+      color: var(--text-secondary);
+      margin-bottom: var(--spacing-sm);
+    }
+    
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      width: 100%;
+      padding: var(--spacing-sm) var(--spacing-md);
+      background: var(--bg-base);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-md);
+      color: var(--text-primary);
+      font-size: var(--font-size-sm);
+      font-family: var(--font-family);
+      transition: all var(--transition-fast);
+    }
+    
+    .form-group textarea {
+      min-height: 80px;
+      resize: vertical;
+    }
+    
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+      outline: none;
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.15);
+    }
+    
+    .form-actions {
+      display: flex;
+      gap: var(--spacing-sm);
+      justify-content: flex-end;
+      margin-top: var(--spacing-xl);
+    }
+    
+    /* Empty state for collaborators */
+    .collaborator-empty {
+      text-align: center;
+      padding: var(--spacing-xxl);
+      color: var(--text-tertiary);
+    }
+    
+    .collaborator-empty svg {
+      width: 48px;
+      height: 48px;
+      margin-bottom: var(--spacing-md);
+      opacity: 0.5;
+    }
     `;
   }
 
@@ -3405,6 +4252,372 @@ export class PremiumWebUI {
       showToast('Copied to clipboard', 'success');
     }
     
+    // ==================== SETTINGS & COLLABORATORS ====================
+    
+    function openSettings() {
+      document.getElementById('settings-modal').classList.add('open');
+      loadCollaborators();
+    }
+    
+    function switchSettingsTab(tab) {
+      document.querySelectorAll('.settings-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.settings-panel').forEach(p => p.classList.remove('active'));
+      document.querySelector(\`[data-settings-tab="\${tab}"]\`).classList.add('active');
+      document.getElementById('settings-' + tab).classList.add('active');
+      
+      if (tab === 'collaborators') loadCollaborators();
+      if (tab === 'teams') loadTeams();
+      if (tab === 'activity') loadActivity();
+    }
+    
+    // Load collaborators
+    async function loadCollaborators() {
+      try {
+        const data = await fetchAPI('/api/collaborators');
+        renderCollaboratorStats(data.stats);
+        renderCollaboratorList(data.collaborators);
+      } catch (e) {
+        document.getElementById('collaborator-list').innerHTML = 
+          '<div class="empty-state"><p>Failed to load collaborators</p></div>';
+      }
+    }
+    
+    function renderCollaboratorStats(stats) {
+      const container = document.getElementById('collaborator-stats');
+      container.innerHTML = \`
+        <div class="stat-card">
+          <div class="stat-value">\${stats.total}</div>
+          <div class="stat-label">Total</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" style="color: var(--accent-success);">\${stats.active}</div>
+          <div class="stat-label">Active</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" style="color: var(--accent-warning);">\${stats.pending}</div>
+          <div class="stat-label">Pending</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" style="color: var(--accent-info);">\${stats.teams}</div>
+          <div class="stat-label">Teams</div>
+        </div>
+      \`;
+    }
+    
+    function renderCollaboratorList(collaborators) {
+      const container = document.getElementById('collaborator-list');
+      
+      if (collaborators.length === 0) {
+        container.innerHTML = \`
+          <div class="collaborator-empty">
+            <svg viewBox="0 0 16 16" fill="currentColor">
+              <path d="M5.5 3.5a2 2 0 100 4 2 2 0 000-4zM2 5.5a3.5 3.5 0 115.898 2.549 5.507 5.507 0 013.034 4.084.75.75 0 11-1.482.235 4.001 4.001 0 00-7.9 0 .75.75 0 01-1.482-.236A5.507 5.507 0 013.102 8.05 3.49 3.49 0 012 5.5z"/>
+            </svg>
+            <p>No collaborators yet</p>
+            <p style="font-size: 12px;">Invite someone to get started</p>
+          </div>
+        \`;
+        return;
+      }
+      
+      container.innerHTML = collaborators.map(c => {
+        const initials = (c.name || c.email).split(/[@\\s]/).filter(Boolean).map(n => n[0]).join('').toUpperCase().slice(0, 2);
+        const displayName = c.name || c.email.split('@')[0];
+        
+        return \`
+          <div class="collaborator-item" data-email="\${escapeHtml(c.email)}">
+            <div class="collaborator-avatar">\${initials}</div>
+            <div class="collaborator-info">
+              <div class="collaborator-name">\${escapeHtml(displayName)}</div>
+              <div class="collaborator-email">\${escapeHtml(c.email)}</div>
+            </div>
+            <div class="collaborator-meta">
+              <span class="role-badge \${c.role}">\${c.role}</span>
+              \${c.status === 'pending' ? '<span class="status-badge pending">pending</span>' : ''}
+            </div>
+            <div class="collaborator-actions">
+              <button class="action-icon-btn" onclick="editCollaboratorRole('\${escapeHtml(c.email)}', '\${c.role}')" title="Change role">
+                <svg viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M11.013 1.427a1.75 1.75 0 012.474 0l1.086 1.086a1.75 1.75 0 010 2.474l-8.61 8.61c-.21.21-.47.364-.756.445l-3.251.93a.75.75 0 01-.927-.928l.929-3.25a1.75 1.75 0 01.445-.758l8.61-8.61zm1.414 1.06a.25.25 0 00-.354 0L10.811 3.75l1.439 1.44 1.263-1.263a.25.25 0 000-.354l-1.086-1.086zM11.189 6.25L9.75 4.81l-6.286 6.287a.25.25 0 00-.064.108l-.558 1.953 1.953-.558a.249.249 0 00.108-.064l6.286-6.286z"/>
+                </svg>
+              </button>
+              \${c.status === 'pending' ? \`
+                <button class="action-icon-btn danger" onclick="revokeInvite('\${escapeHtml(c.email)}')" title="Revoke invitation">
+                  <svg viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M3.72 3.72a.75.75 0 011.06 0L8 6.94l3.22-3.22a.75.75 0 111.06 1.06L9.06 8l3.22 3.22a.75.75 0 11-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 01-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 010-1.06z"/>
+                  </svg>
+                </button>
+              \` : \`
+                <button class="action-icon-btn danger" onclick="removeCollab('\${escapeHtml(c.email)}')" title="Remove collaborator">
+                  <svg viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M6.5 1.75a.25.25 0 01.25-.25h2.5a.25.25 0 01.25.25V3h-3V1.75zm4.5 0V3h2.25a.75.75 0 010 1.5H2.75a.75.75 0 010-1.5H5V1.75C5 .784 5.784 0 6.75 0h2.5C10.216 0 11 .784 11 1.75zM4.496 6.675a.75.75 0 10-1.492.15l.66 6.6A1.75 1.75 0 005.405 15h5.19c.9 0 1.652-.681 1.741-1.576l.66-6.6a.75.75 0 00-1.492-.149l-.66 6.6a.25.25 0 01-.249.225h-5.19a.25.25 0 01-.249-.225l-.66-6.6z"/>
+                  </svg>
+                </button>
+              \`}
+            </div>
+          </div>
+        \`;
+      }).join('');
+    }
+    
+    // Load teams
+    async function loadTeams() {
+      try {
+        const teams = await fetchAPI('/api/collaborators/teams');
+        renderTeamList(teams);
+      } catch (e) {
+        document.getElementById('team-list').innerHTML = 
+          '<div class="empty-state"><p>Failed to load teams</p></div>';
+      }
+    }
+    
+    function renderTeamList(teams) {
+      const container = document.getElementById('team-list');
+      
+      if (teams.length === 0) {
+        container.innerHTML = \`
+          <div class="collaborator-empty">
+            <svg viewBox="0 0 16 16" fill="currentColor">
+              <path d="M2 2.5A2.5 2.5 0 014.5 0h8.75a.75.75 0 01.75.75v12.5a.75.75 0 01-.75.75h-2.5a.75.75 0 110-1.5h1.75v-2h-8a1 1 0 00-.714 1.7.75.75 0 01-1.072 1.05A2.495 2.495 0 012 11.5v-9z"/>
+            </svg>
+            <p>No teams yet</p>
+            <p style="font-size: 12px;">Create a team to group collaborators</p>
+          </div>
+        \`;
+        return;
+      }
+      
+      container.innerHTML = teams.map(t => \`
+        <div class="team-item">
+          <div class="team-header">
+            <span class="team-name">\${escapeHtml(t.name)}</span>
+            <div>
+              <span class="role-badge \${t.role}">\${t.role}</span>
+              <button class="action-icon-btn danger" onclick="deleteTeamConfirm('\${escapeHtml(t.slug)}')" title="Delete team" style="margin-left: 8px;">
+                <svg viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M6.5 1.75a.25.25 0 01.25-.25h2.5a.25.25 0 01.25.25V3h-3V1.75zm4.5 0V3h2.25a.75.75 0 010 1.5H2.75a.75.75 0 010-1.5H5V1.75C5 .784 5.784 0 6.75 0h2.5C10.216 0 11 .784 11 1.75z"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+          \${t.description ? \`<div class="team-description">\${escapeHtml(t.description)}</div>\` : ''}
+          <div class="team-meta">
+            <span>\${t.memberCount} member\${t.memberCount !== 1 ? 's' : ''}</span>
+          </div>
+        </div>
+      \`).join('');
+    }
+    
+    // Load activity
+    async function loadActivity() {
+      try {
+        const activities = await fetchAPI('/api/collaborators/activity');
+        renderActivityList(activities);
+      } catch (e) {
+        document.getElementById('activity-list').innerHTML = 
+          '<div class="empty-state"><p>Failed to load activity</p></div>';
+      }
+    }
+    
+    function renderActivityList(activities) {
+      const container = document.getElementById('activity-list');
+      
+      if (activities.length === 0) {
+        container.innerHTML = '<div class="empty-state"><p>No activity yet</p></div>';
+        return;
+      }
+      
+      const icons = {
+        invited: '📧',
+        accepted: '✅',
+        removed: '🚫',
+        role_changed: '🔄',
+        permissions_updated: '🔐',
+        revoked: '❌'
+      };
+      
+      container.innerHTML = activities.map(a => \`
+        <div class="activity-item">
+          <div class="activity-icon">\${icons[a.type] || '•'}</div>
+          <div class="activity-content">
+            <div class="activity-text">\${formatActivityText(a)}</div>
+            <div class="activity-time">\${formatDate(new Date(a.performedAt))}</div>
+          </div>
+        </div>
+      \`).join('');
+    }
+    
+    function formatActivityText(activity) {
+      switch (activity.type) {
+        case 'invited':
+          return \`<strong>\${escapeHtml(activity.performedBy)}</strong> invited <strong>\${escapeHtml(activity.collaboratorEmail)}</strong>\`;
+        case 'accepted':
+          return \`<strong>\${escapeHtml(activity.collaboratorEmail)}</strong> accepted the invitation\`;
+        case 'removed':
+          return \`<strong>\${escapeHtml(activity.performedBy)}</strong> removed <strong>\${escapeHtml(activity.collaboratorEmail)}</strong>\`;
+        case 'role_changed':
+          return \`<strong>\${escapeHtml(activity.performedBy)}</strong> changed <strong>\${escapeHtml(activity.collaboratorEmail)}</strong>'s role\`;
+        case 'revoked':
+          return \`<strong>\${escapeHtml(activity.performedBy)}</strong> revoked invitation for <strong>\${escapeHtml(activity.collaboratorEmail)}</strong>\`;
+        default:
+          return activity.type;
+      }
+    }
+    
+    // Invite modal
+    function openInviteModal() {
+      closeModals();
+      document.getElementById('invite-modal').classList.add('open');
+      document.getElementById('invite-email').value = '';
+      document.getElementById('invite-role').value = 'contributor';
+      document.getElementById('invite-message').value = '';
+      document.getElementById('invite-email').focus();
+    }
+    
+    async function sendInvitation() {
+      const email = document.getElementById('invite-email').value.trim();
+      const role = document.getElementById('invite-role').value;
+      const message = document.getElementById('invite-message').value.trim();
+      
+      if (!email) {
+        showToast('Please enter an email address', 'warning');
+        return;
+      }
+      
+      try {
+        const result = await fetchAPI('/api/collaborators', {
+          method: 'POST',
+          body: JSON.stringify({ email, role, message })
+        });
+        
+        if (result.success) {
+          showToast(\`Invited \${email} as \${role}\`, 'success');
+          closeModals();
+          openSettings();
+        } else {
+          showToast(result.error || 'Failed to send invitation', 'error');
+        }
+      } catch (e) {
+        showToast('Failed to send invitation', 'error');
+      }
+    }
+    
+    // Edit role
+    function editCollaboratorRole(email, currentRole) {
+      const newRole = prompt(\`Change role for \${email}\\n\\nAvailable roles: owner, admin, maintainer, contributor, viewer\\n\\nCurrent role: \${currentRole}\\n\\nEnter new role:\`);
+      
+      if (newRole && ['owner', 'admin', 'maintainer', 'contributor', 'viewer'].includes(newRole)) {
+        updateRole(email, newRole);
+      } else if (newRole) {
+        showToast('Invalid role', 'error');
+      }
+    }
+    
+    async function updateRole(email, role) {
+      try {
+        const result = await fetchAPI('/api/collaborators/update-role', {
+          method: 'POST',
+          body: JSON.stringify({ email, role })
+        });
+        
+        if (result.success) {
+          showToast(\`Updated \${email} to \${role}\`, 'success');
+          loadCollaborators();
+        } else {
+          showToast(result.error || 'Failed to update role', 'error');
+        }
+      } catch (e) {
+        showToast('Failed to update role', 'error');
+      }
+    }
+    
+    // Remove collaborator
+    async function removeCollab(email) {
+      if (!confirm(\`Remove \${email} from this repository?\`)) return;
+      
+      try {
+        await fetchAPI('/api/collaborators/remove', {
+          method: 'POST',
+          body: JSON.stringify({ email })
+        });
+        showToast(\`Removed \${email}\`, 'success');
+        loadCollaborators();
+      } catch (e) {
+        showToast('Failed to remove collaborator', 'error');
+      }
+    }
+    
+    // Revoke invitation
+    async function revokeInvite(email) {
+      if (!confirm(\`Revoke invitation for \${email}?\`)) return;
+      
+      try {
+        await fetchAPI('/api/collaborators/revoke', {
+          method: 'POST',
+          body: JSON.stringify({ email })
+        });
+        showToast(\`Revoked invitation for \${email}\`, 'success');
+        loadCollaborators();
+      } catch (e) {
+        showToast('Failed to revoke invitation', 'error');
+      }
+    }
+    
+    // Create team modal
+    function openCreateTeamModal() {
+      closeModals();
+      document.getElementById('create-team-modal').classList.add('open');
+      document.getElementById('collab-team-name').value = '';
+      document.getElementById('collab-team-role').value = 'contributor';
+      document.getElementById('collab-team-description').value = '';
+      document.getElementById('collab-team-name').focus();
+    }
+    
+    async function createNewTeam() {
+      const name = document.getElementById('collab-team-name').value.trim();
+      const role = document.getElementById('collab-team-role').value;
+      const description = document.getElementById('collab-team-description').value.trim();
+      
+      if (!name) {
+        showToast('Please enter a team name', 'warning');
+        return;
+      }
+      
+      try {
+        const result = await fetchAPI('/api/collaborators/teams', {
+          method: 'POST',
+          body: JSON.stringify({ name, role, description })
+        });
+        
+        if (result.success) {
+          showToast(\`Created team "\${name}"\`, 'success');
+          closeModals();
+          document.getElementById('settings-modal').classList.add('open');
+          switchSettingsTab('teams');
+        } else {
+          showToast(result.error || 'Failed to create team', 'error');
+        }
+      } catch (e) {
+        showToast('Failed to create team', 'error');
+      }
+    }
+    
+    // Delete team
+    async function deleteTeamConfirm(slug) {
+      if (!confirm(\`Delete this team? This cannot be undone.\`)) return;
+      
+      try {
+        await fetchAPI('/api/collaborators/teams/delete', {
+          method: 'POST',
+          body: JSON.stringify({ slug })
+        });
+        showToast('Team deleted', 'success');
+        loadTeams();
+      } catch (e) {
+        showToast('Failed to delete team', 'error');
+      }
+    }
+
     // ========================================
     // SIDEBAR TAB SWITCHING
     // ========================================
