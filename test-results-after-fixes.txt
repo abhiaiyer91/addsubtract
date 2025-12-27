@@ -1,0 +1,241 @@
+
+> wit@2.0.0 test
+> vitest run
+
+
+[1m[46m RUN [49m[22m [36mv4.0.16 [39m[90m/Users/peteradelodun/Documents/python-projects/wit[39m
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration
+[22m[39m
+╔══════════════════════════════════════════════════════════════╗
+║                                                              ║
+║   🚀 wit server is running!                                  ║
+║                                                              ║
+║   HTTP URL: http://localhost:3456                               ║
+║   tRPC API: http://localhost:3456/trpc                          ║
+║   Repositories: /tmp/wit-test-repos                      ║
+║                                                              ║
+║   Clone: wit clone http://localhost:3456/owner/repo.git      ║
+║   Push:  wit push origin main                                ║
+║                                                              ║
+║   Press Ctrl+C to stop                                       ║
+║                                                              ║
+╚══════════════════════════════════════════════════════════════╝
+
+
+[90mstderr[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration
+[22m[39m⚠ DATABASE_URL not set - running without database
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mUser Flow[2m > [22m[2mregisters a new user
+[22m[39m[auth.register] Sign-in response: { status: [33m200[39m, hasToken: [33mtrue[39m, hasSession: [33mfalse[39m }
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mUser Flow[2m > [22m[2mfails to register with duplicate username
+[22m[39m[auth.register] Sign-in response: { status: [33m200[39m, hasToken: [33mtrue[39m, hasSession: [33mfalse[39m }
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mUser Flow[2m > [22m[2mlogs in with valid credentials
+[22m[39m[auth.register] Sign-in response: { status: [33m200[39m, hasToken: [33mtrue[39m, hasSession: [33mfalse[39m }
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mUser Flow[2m > [22m[2mfails to login with invalid credentials
+[22m[39m[auth.register] Sign-in response: { status: [33m200[39m, hasToken: [33mtrue[39m, hasSession: [33mfalse[39m }
+
+[90mstderr[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mUser Flow[2m > [22m[2mfails to login with invalid credentials
+[22m[39m[2m2025-12-27T19:23:18.507Z[0m [31mERROR[0m [1m[Better Auth]:[0m Invalid password
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mUser Flow[2m > [22m[2mgets current user when authenticated
+[22m[39m[auth.register] Sign-in response: { status: [33m200[39m, hasToken: [33mtrue[39m, hasSession: [33mfalse[39m }
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mUser Flow[2m > [22m[2mgets current user when authenticated
+[22m[39m[context] Looking up Bearer token: 3xL8xJGqxHzVWuZBq97u...
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mUser Flow[2m > [22m[2mgets current user when authenticated
+[22m[39m[context] Session found: [33mtrue[39m
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mRepository Flow
+[22m[39m[auth.register] Sign-in response: { status: [33m200[39m, hasToken: [33mtrue[39m, hasSession: [33mfalse[39m }
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mRepository Flow[2m > [22m[2mcreates a public repository
+[22m[39m[context] Looking up Bearer token: T7Gpg5WkgxfAgxdjfRtn...
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mRepository Flow[2m > [22m[2mcreates a public repository
+[22m[39m[context] Session found: [33mtrue[39m
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mRepository Flow[2m > [22m[2mcreates a private repository
+[22m[39m[context] Looking up Bearer token: T7Gpg5WkgxfAgxdjfRtn...
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mRepository Flow[2m > [22m[2mcreates a private repository
+[22m[39m[context] Session found: [33mtrue[39m
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mRepository Flow[2m > [22m[2mgets repository by owner and name
+[22m[39m[context] Looking up Bearer token: T7Gpg5WkgxfAgxdjfRtn...
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mRepository Flow[2m > [22m[2mgets repository by owner and name
+[22m[39m[context] Session found: [33mtrue[39m
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mRepository Flow[2m > [22m[2mgets repository by owner and name
+[22m[39m[context] Looking up Bearer token: T7Gpg5WkgxfAgxdjfRtn...
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mRepository Flow[2m > [22m[2mgets repository by owner and name
+[22m[39m[context] Session found: [33mtrue[39m
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mRepository Flow[2m > [22m[2mlists repositories by owner
+[22m[39m[context] Looking up Bearer token: T7Gpg5WkgxfAgxdjfRtn...
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mRepository Flow[2m > [22m[2mlists repositories by owner
+[22m[39m[context] Session found: [33mtrue[39m
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mRepository Flow[2m > [22m[2mlists repositories by owner
+[22m[39m[context] Looking up Bearer token: T7Gpg5WkgxfAgxdjfRtn...
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mRepository Flow[2m > [22m[2mlists repositories by owner
+[22m[39m[context] Session found: [33mtrue[39m
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mRepository Flow[2m > [22m[2mupdates repository
+[22m[39m[context] Looking up Bearer token: T7Gpg5WkgxfAgxdjfRtn...
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mRepository Flow[2m > [22m[2mupdates repository
+[22m[39m[context] Session found: [33mtrue[39m
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mRepository Flow[2m > [22m[2mupdates repository
+[22m[39m[context] Looking up Bearer token: T7Gpg5WkgxfAgxdjfRtn...
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mRepository Flow[2m > [22m[2mupdates repository
+[22m[39m[context] Session found: [33mtrue[39m
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mRepository Flow[2m > [22m[2mdeletes repository
+[22m[39m[context] Looking up Bearer token: T7Gpg5WkgxfAgxdjfRtn...
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mRepository Flow[2m > [22m[2mdeletes repository
+[22m[39m[context] Session found: [33mtrue[39m
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mRepository Flow[2m > [22m[2mdeletes repository
+[22m[39m[context] Looking up Bearer token: T7Gpg5WkgxfAgxdjfRtn...
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mRepository Flow[2m > [22m[2mdeletes repository
+[22m[39m[context] Session found: [33mtrue[39m
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mRepository Flow[2m > [22m[2mdeletes repository
+[22m[39m[context] Looking up Bearer token: T7Gpg5WkgxfAgxdjfRtn...
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mRepository Flow[2m > [22m[2mdeletes repository
+[22m[39m[context] Session found: [33mtrue[39m
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mIssue Flow
+[22m[39m[auth.register] Sign-in response: { status: [33m200[39m, hasToken: [33mtrue[39m, hasSession: [33mfalse[39m }
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mIssue Flow
+[22m[39m[context] Looking up Bearer token: SGgmMoqUbSepxqUrsLRv...
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mIssue Flow
+[22m[39m[context] Session found: [33mtrue[39m
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mIssue Flow[2m > [22m[2mcreates an issue
+[22m[39m[context] Looking up Bearer token: SGgmMoqUbSepxqUrsLRv...
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mIssue Flow[2m > [22m[2mcreates an issue
+[22m[39m[context] Session found: [33mtrue[39m
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mIssue Flow[2m > [22m[2mupdates an issue
+[22m[39m[context] Looking up Bearer token: SGgmMoqUbSepxqUrsLRv...
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mIssue Flow[2m > [22m[2mupdates an issue
+[22m[39m[context] Session found: [33mtrue[39m
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mIssue Flow[2m > [22m[2mcloses an issue
+[22m[39m[context] Looking up Bearer token: SGgmMoqUbSepxqUrsLRv...
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mIssue Flow[2m > [22m[2mcloses an issue
+[22m[39m[context] Session found: [33mtrue[39m
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mIssue Flow[2m > [22m[2mreopens an issue
+[22m[39m[context] Looking up Bearer token: SGgmMoqUbSepxqUrsLRv...
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mIssue Flow[2m > [22m[2mreopens an issue
+[22m[39m[context] Session found: [33mtrue[39m
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mIssue Flow[2m > [22m[2madds a comment to an issue
+[22m[39m[context] Looking up Bearer token: SGgmMoqUbSepxqUrsLRv...
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mIssue Flow[2m > [22m[2madds a comment to an issue
+[22m[39m[context] Session found: [33mtrue[39m
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mPull Request Flow
+[22m[39m[auth.register] Sign-in response: { status: [33m200[39m, hasToken: [33mtrue[39m, hasSession: [33mfalse[39m }
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mPull Request Flow
+[22m[39m[context] Looking up Bearer token: yr1UcvreD4ASrgboWjba...
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mPull Request Flow
+[22m[39m[context] Session found: [33mtrue[39m
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mPull Request Flow[2m > [22m[2mcreates a pull request
+[22m[39m[context] Looking up Bearer token: yr1UcvreD4ASrgboWjba...
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mPull Request Flow[2m > [22m[2mcreates a pull request
+[22m[39m[context] Session found: [33mtrue[39m
+
+[90mstderr[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mPull Request Flow[2m > [22m[2mlists pull requests for a repository
+[22m[39m[AI Review] Repo not found on disk: /repos/pruser-1766863400747-vhco9m/pr-test-1766863401340-7mrcmj.git
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mPull Request Flow[2m > [22m[2mupdates a pull request
+[22m[39m[context] Looking up Bearer token: yr1UcvreD4ASrgboWjba...
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mPull Request Flow[2m > [22m[2mupdates a pull request
+[22m[39m[context] Session found: [33mtrue[39m
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mPull Request Flow[2m > [22m[2madds a review to a pull request
+[22m[39m[context] Looking up Bearer token: yr1UcvreD4ASrgboWjba...
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mPull Request Flow[2m > [22m[2madds a review to a pull request
+[22m[39m[context] Session found: [33mtrue[39m
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mPull Request Flow[2m > [22m[2madds a comment to a pull request
+[22m[39m[context] Looking up Bearer token: yr1UcvreD4ASrgboWjba...
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mPull Request Flow[2m > [22m[2madds a comment to a pull request
+[22m[39m[context] Session found: [33mtrue[39m
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mPull Request Flow[2m > [22m[2mcloses a pull request
+[22m[39m[context] Looking up Bearer token: yr1UcvreD4ASrgboWjba...
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mPull Request Flow[2m > [22m[2mcloses a pull request
+[22m[39m[context] Session found: [33mtrue[39m
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mPull Request Flow[2m > [22m[2mreopens a pull request
+[22m[39m[context] Looking up Bearer token: yr1UcvreD4ASrgboWjba...
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mPull Request Flow[2m > [22m[2mreopens a pull request
+[22m[39m[context] Session found: [33mtrue[39m
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mActivity Flow
+[22m[39m[auth.register] Sign-in response: { status: [33m200[39m, hasToken: [33mtrue[39m, hasSession: [33mfalse[39m }
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mActivity Flow
+[22m[39m[context] Looking up Bearer token: A0FblxJ44BjwHWDSeAF6...
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mActivity Flow
+[22m[39m[context] Session found: [33mtrue[39m
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mActivity Flow[2m > [22m[2mlists activity feed
+[22m[39m[context] Looking up Bearer token: A0FblxJ44BjwHWDSeAF6...
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mActivity Flow[2m > [22m[2mlists activity feed
+[22m[39m[context] Session found: [33mtrue[39m
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mSearch
+[22m[39m[auth.register] Sign-in response: { status: [33m200[39m, hasToken: [33mtrue[39m, hasSession: [33mfalse[39m }
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mSearch
+[22m[39m[context] Looking up Bearer token: MODXWonp6F5RoDJubtz9...
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration[2m > [22m[2mSearch
+[22m[39m[context] Session found: [33mtrue[39m
+
+[90mstdout[2m | tests/integration/full-flow.test.ts[2m > [22m[2mE2E Integration
+[22m[39m[server] HTTP server stopped
+
+ [32m✓[39m tests/integration/full-flow.test.ts [2m([22m[2m35 tests[22m[2m)[22m[33m 6826[2mms[22m[39m
+       [33m[2m✓[22m[39m registers a new user [33m 494[2mms[22m[39m
+       [33m[2m✓[22m[39m fails to register with duplicate username [33m 575[2mms[22m[39m
+       [33m[2m✓[22m[39m logs in with valid credentials [33m 629[2mms[22m[39m
+       [33m[2m✓[22m[39m fails to login with invalid credentials [33m 773[2mms[22m[39m
+       [33m[2m✓[22m[39m gets current user when authenticated [33m 455[2mms[22m[39m

@@ -18,6 +18,7 @@ import { stacksRouter } from './stacks';
 import { workflowsRouter } from './workflows';
 import { aiRouter } from './ai';
 import { searchRouter } from './search';
+import { collaboratorsRouter } from './collaborators';
 
 /**
  * Main application router
@@ -43,6 +44,7 @@ export const appRouter = router({
   workflows: workflowsRouter,
   ai: aiRouter,
   search: searchRouter,
+  collaborators: collaboratorsRouter,
 });
 
 /**
@@ -70,4 +72,5 @@ export {
   stacksRouter,
   aiRouter,
   searchRouter,
+  collaboratorsRouter,
 };
