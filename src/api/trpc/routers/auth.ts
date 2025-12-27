@@ -17,7 +17,7 @@ export const authRouter = router({
         name: z.string().optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const auth = createAuth();
       
       // Register the user
@@ -41,22 +41,34 @@ export const authRouter = router({
         username: input.username,
       });
 
-      // better-auth signUpEmail doesn't create a session, so sign in to get one
-      const signInResult = await auth.api.signInEmail({
-        body: {
+      // Create a session manually by signing in
+      // We need to create a proper Request object for better-auth
+      const signInRequest = new Request('http://localhost/api/auth/sign-in/email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           email: input.email,
           password: input.password,
-        },
+        }),
       });
 
-      console.log('[auth.register] After sign-in:', {
-        userId: signInResult?.user?.id,
-        sessionToken: signInResult?.session?.token,
+      const signInResponse = await auth.handler(signInRequest);
+      const signInData = await signInResponse.json();
+
+      console.log('[auth.register] Sign-in response:', {
+        status: signInResponse.status,
+        hasToken: !!signInData.token,
+        hasSession: !!signInData.session,
       });
+
+      // Extract session token from response
+      const sessionToken = signInData.token || signInData.session?.token || '';
 
       return {
         user,
-        sessionId: signInResult?.session?.token || '',
+        sessionId: sessionToken,
       };
     }),
 
