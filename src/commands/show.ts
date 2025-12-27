@@ -474,6 +474,7 @@ function createFileDiff(
     isBinary: false,
     isNew,
     isDeleted,
+    isRename: false,
   };
 }
 

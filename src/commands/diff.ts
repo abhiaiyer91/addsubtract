@@ -1,19 +1,30 @@
 import * as path from 'path';
 import { Repository } from '../core/repository';
-import { diff, createHunks, formatColoredDiff, isBinary, FileDiff } from '../core/diff';
+import { diff, createHunks, formatColoredDiff, isBinary, FileDiff, detectRenames, RenameDetectionOptions } from '../core/diff';
 import { readFile, walkDir, exists } from '../utils/fs';
 
-export function diffCommand(options: { staged?: boolean; cached?: boolean } = {}): void {
+export interface DiffCommandOptions {
+  staged?: boolean;
+  cached?: boolean;
+  findRenames?: boolean;
+  renameThreshold?: number;
+}
+
+export function diffCommand(options: DiffCommandOptions = {}): void {
   try {
     const repo = Repository.find();
     const showStaged = options.staged || options.cached;
+    const detectRenamesEnabled = options.findRenames !== false; // Default to true
+    const renameOptions: RenameDetectionOptions = {
+      threshold: options.renameThreshold ?? 50,
+    };
 
     if (showStaged) {
       // Diff between HEAD and index
-      showStagedDiff(repo);
+      showStagedDiff(repo, detectRenamesEnabled, renameOptions);
     } else {
       // Diff between index and working directory
-      showWorkingDiff(repo);
+      showWorkingDiff(repo, detectRenamesEnabled, renameOptions);
     }
   } catch (error) {
     if (error instanceof Error) {
@@ -23,7 +34,11 @@ export function diffCommand(options: { staged?: boolean; cached?: boolean } = {}
   }
 }
 
-function showStagedDiff(repo: Repository): void {
+function showStagedDiff(
+  repo: Repository,
+  detectRenamesEnabled: boolean,
+  renameOptions: RenameDetectionOptions
+): void {
   const headHash = repo.refs.resolve('HEAD');
   const indexEntries = repo.index.getEntriesMap();
 
@@ -34,15 +49,20 @@ function showStagedDiff(repo: Repository): void {
     flattenTree(repo, commit.treeHash, '', headTree);
   }
 
+  const fileDiffs: FileDiff[] = [];
+  const deletedFiles: { path: string; content: string; hash: string }[] = [];
+  const addedFiles: { path: string; content: string; hash: string }[] = [];
+
   // Find new/modified files in index compared to HEAD
   for (const [filePath, entry] of indexEntries) {
     const oldHash = headTree.get(filePath);
     
     if (!oldHash) {
-      // New file
+      // New file - potential rename target
       const newBlob = repo.objects.readBlob(entry.hash);
-      const fileDiff = createFileDiff(filePath, '', newBlob.content.toString('utf8'), true, false);
-      console.log(formatColoredDiff(fileDiff));
+      const content = newBlob.content.toString('utf8');
+      addedFiles.push({ path: filePath, content, hash: entry.hash });
+      fileDiffs.push(createFileDiff(filePath, '', content, true, false));
     } else if (oldHash !== entry.hash) {
       // Modified file
       const oldBlob = repo.objects.readBlob(oldHash);
@@ -54,31 +74,83 @@ function showStagedDiff(repo: Repository): void {
         false,
         false
       );
-      console.log(formatColoredDiff(fileDiff));
+      fileDiffs.push(fileDiff);
     }
   }
 
-  // Find deleted files
-  for (const [filePath] of headTree) {
+  // Find deleted files - potential rename sources
+  for (const [filePath, hash] of headTree) {
     if (!indexEntries.has(filePath)) {
-      const oldBlob = repo.objects.readBlob(headTree.get(filePath)!);
-      const fileDiff = createFileDiff(filePath, oldBlob.content.toString('utf8'), '', false, true);
+      const oldBlob = repo.objects.readBlob(hash);
+      const content = oldBlob.content.toString('utf8');
+      deletedFiles.push({ path: filePath, content, hash });
+      fileDiffs.push(createFileDiff(filePath, content, '', false, true));
+    }
+  }
+
+  // Detect renames if enabled
+  if (detectRenamesEnabled && deletedFiles.length > 0 && addedFiles.length > 0) {
+    const renames = detectRenames(deletedFiles, addedFiles, renameOptions);
+    
+    // Track which files are part of renames
+    const renamedOldPaths = new Set(renames.map(r => r.oldPath));
+    const renamedNewPaths = new Set(renames.map(r => r.newPath));
+
+    // Output renames first
+    for (const rename of renames) {
+      const oldContent = deletedFiles.find(f => f.path === rename.oldPath)!.content;
+      const newContent = addedFiles.find(f => f.path === rename.newPath)!.content;
+      
+      const diffLines = diff(oldContent, newContent);
+      const hunks = createHunks(diffLines);
+
+      const renameDiff: FileDiff = {
+        oldPath: rename.oldPath,
+        newPath: rename.newPath,
+        hunks,
+        isBinary: false,
+        isNew: false,
+        isDeleted: false,
+        isRename: true,
+        similarity: rename.similarity,
+      };
+      console.log(formatColoredDiff(renameDiff));
+    }
+
+    // Output remaining diffs (excluding those that were part of renames)
+    for (const fileDiff of fileDiffs) {
+      if (fileDiff.isDeleted && renamedOldPaths.has(fileDiff.oldPath)) continue;
+      if (fileDiff.isNew && renamedNewPaths.has(fileDiff.newPath)) continue;
+      console.log(formatColoredDiff(fileDiff));
+    }
+  } else {
+    // No rename detection, output all diffs
+    for (const fileDiff of fileDiffs) {
       console.log(formatColoredDiff(fileDiff));
     }
   }
 }
 
-function showWorkingDiff(repo: Repository): void {
+function showWorkingDiff(
+  repo: Repository,
+  detectRenamesEnabled: boolean,
+  renameOptions: RenameDetectionOptions
+): void {
   const indexEntries = repo.index.getEntriesMap();
+  const fileDiffs: FileDiff[] = [];
+  const deletedFiles: { path: string; content: string }[] = [];
+  const addedFiles: { path: string; content: string }[] = [];
 
+  // Check for deleted and modified files in working directory
   for (const [filePath, entry] of indexEntries) {
     const fullPath = path.join(repo.workDir, filePath);
     
     if (!exists(fullPath)) {
-      // File deleted in working directory
+      // File deleted in working directory - potential rename source
       const oldBlob = repo.objects.readBlob(entry.hash);
-      const fileDiff = createFileDiff(filePath, oldBlob.content.toString('utf8'), '', false, true);
-      console.log(formatColoredDiff(fileDiff));
+      const content = oldBlob.content.toString('utf8');
+      deletedFiles.push({ path: filePath, content });
+      fileDiffs.push(createFileDiff(filePath, content, '', false, true));
       continue;
     }
 
@@ -94,6 +166,51 @@ function showWorkingDiff(repo: Repository): void {
 
     if (oldContent !== newContent) {
       const fileDiff = createFileDiff(filePath, oldContent, newContent, false, false);
+      fileDiffs.push(fileDiff);
+    }
+  }
+
+  // Check for untracked files that might be rename targets
+  // (This is more complex as we need to scan the working directory)
+  // For simplicity, we only detect renames among tracked files here
+
+  // Detect renames if enabled
+  if (detectRenamesEnabled && deletedFiles.length > 0 && addedFiles.length > 0) {
+    const renames = detectRenames(deletedFiles, addedFiles, renameOptions);
+    
+    const renamedOldPaths = new Set(renames.map(r => r.oldPath));
+    const renamedNewPaths = new Set(renames.map(r => r.newPath));
+
+    // Output renames first
+    for (const rename of renames) {
+      const oldContent = deletedFiles.find(f => f.path === rename.oldPath)!.content;
+      const newContent = addedFiles.find(f => f.path === rename.newPath)!.content;
+      
+      const diffLines = diff(oldContent, newContent);
+      const hunks = createHunks(diffLines);
+
+      const renameDiff: FileDiff = {
+        oldPath: rename.oldPath,
+        newPath: rename.newPath,
+        hunks,
+        isBinary: false,
+        isNew: false,
+        isDeleted: false,
+        isRename: true,
+        similarity: rename.similarity,
+      };
+      console.log(formatColoredDiff(renameDiff));
+    }
+
+    // Output remaining diffs
+    for (const fileDiff of fileDiffs) {
+      if (fileDiff.isDeleted && renamedOldPaths.has(fileDiff.oldPath)) continue;
+      if (fileDiff.isNew && renamedNewPaths.has(fileDiff.newPath)) continue;
+      console.log(formatColoredDiff(fileDiff));
+    }
+  } else {
+    // No rename detection, output all diffs
+    for (const fileDiff of fileDiffs) {
       console.log(formatColoredDiff(fileDiff));
     }
   }
@@ -116,6 +233,7 @@ function createFileDiff(
     isBinary: false,
     isNew,
     isDeleted,
+    isRename: false,
   };
 }
 

@@ -1,0 +1,264 @@
+---
+title: Tags
+description: Create, list, and manage tags for releases and milestones
+---
+
+# Tags
+
+Tags mark specific points in your repository's history, typically used for releases and milestones. wit supports both lightweight and annotated tags.
+
+## Quick Reference
+
+```bash
+wit tag                      # List all tags
+wit tag v1.0.0               # Create lightweight tag
+wit tag -a v1.0.0 -m "msg"   # Create annotated tag
+wit tag -d v1.0.0            # Delete tag
+wit tag -l "v1.*"            # List tags matching pattern
+wit tag -v v1.0.0            # Show tag details
+```
+
+## Tag Types
+
+### Lightweight Tags
+
+Simple pointers to a commit. Best for temporary or private markers.
+
+```bash
+# Create lightweight tag at HEAD
+wit tag v1.0.0
+
+# Create at specific commit
+wit tag v1.0.0 abc1234
+
+# Output:
+# ✓ Created tag 'v1.0.0'
+#   Points to: abc1234
+```
+
+### Annotated Tags
+
+Full objects stored in the database with tagger info, date, and message. Recommended for releases.
+
+```bash
+# Create annotated tag
+wit tag -a v1.0.0 -m "Release version 1.0.0"
+
+# Output:
+# ✓ Created annotated tag 'v1.0.0'
+#   Object: def5678
+```
+
+## Listing Tags
+
+```bash
+# List all tags
+wit tag
+# v0.1.0
+# v0.2.0
+# v1.0.0
+# v1.0.1
+
+# List tags matching pattern
+wit tag -l "v1.*"
+# v1.0.0
+# v1.0.1
+
+# List with release candidates
+wit tag -l "*-rc*"
+# v2.0.0-rc1
+# v2.0.0-rc2
+```
+
+## Viewing Tag Details
+
+```bash
+# Show tag information
+wit tag -v v1.0.0
+
+# Output for annotated tag:
+# tag v1.0.0
+# Target: abc1234
+# Type: annotated
+# Tagger: Jane Doe <jane@example.com>
+# Date: 3/15/2024, 2:30:00 PM
+#
+# Release version 1.0.0
+#
+# Features:
+# - New dashboard UI
+# - Improved performance
+
+# Output for lightweight tag:
+# tag v0.1.0
+# Target: def5678
+# Type: lightweight
+```
+
+You can also use `wit show` to view the tag and its associated commit:
+
+```bash
+wit show v1.0.0
+```
+
+## Deleting Tags
+
+```bash
+# Delete a local tag
+wit tag -d v1.0.0
+# ✓ Deleted tag 'v1.0.0'
+
+# Delete multiple tags
+wit tag -d v0.1.0 v0.2.0
+```
+
+## Tagging Options
+
+| Option | Description |
+|--------|-------------|
+| `-a, --annotate` | Create an annotated tag |
+| `-m, --message <msg>` | Tag message (implies -a) |
+| `-d, --delete` | Delete a tag |
+| `-l, --list [pattern]` | List tags (optionally matching pattern) |
+| `-v, --verify` | Show tag details |
+| `-f, --force` | Replace existing tag |
+
+## Working with Remote Tags
+
+```bash
+# Push a specific tag
+wit push origin v1.0.0
+
+# Push all tags
+wit push --tags
+
+# Delete a remote tag
+wit push --delete origin v1.0.0
+```
+
+## Tagging Best Practices
+
+### Semantic Versioning
+
+Follow semantic versioning (semver) for release tags:
+
+```
+v<major>.<minor>.<patch>[-<prerelease>]
+
+Examples:
+v1.0.0        # Initial release
+v1.0.1        # Patch release (bug fixes)
+v1.1.0        # Minor release (new features, backward compatible)
+v2.0.0        # Major release (breaking changes)
+v2.0.0-rc1    # Release candidate
+v2.0.0-beta.1 # Beta release
+```
+
+### Release Workflow
+
+```bash
+# 1. Ensure you're on the release commit
+wit switch main
+wit pull
+
+# 2. Create an annotated tag with release notes
+wit tag -a v1.0.0 -m "Release v1.0.0
+
+Features:
+- New user dashboard
+- API improvements
+- Performance optimizations
+
+Bug fixes:
+- Fixed login timeout issue
+- Corrected date formatting"
+
+# 3. Push the tag
+wit push origin v1.0.0
+
+# Or push all tags
+wit push --tags
+```
+
+### Tagging Past Commits
+
+```bash
+# Tag a specific commit
+wit tag -a v0.9.0 abc1234 -m "Retroactive tag for v0.9.0"
+
+# Find the commit you want to tag
+wit log --oneline
+# def5678 Add feature X
+# abc1234 Prepare for release  <- tag this one
+# 111222 Fix bug
+```
+
+## Examples
+
+### Create Release Tags
+
+```bash
+# Major release
+wit tag -a v2.0.0 -m "Version 2.0.0 - Complete rewrite
+
+Breaking changes:
+- New API endpoints
+- Removed deprecated functions
+
+Migration guide: https://docs.example.com/migrate-v2"
+
+# Patch release
+wit tag -a v1.0.1 -m "Hotfix for authentication bug"
+
+# Pre-release
+wit tag -a v2.0.0-rc1 -m "Release candidate 1 for v2.0.0"
+```
+
+### Find Tags
+
+```bash
+# Find which tag contains a commit
+wit tag --contains abc1234
+
+# List tags in version order
+wit tag -l "v*" | sort -V
+
+# Get the latest tag
+wit describe --tags --abbrev=0
+```
+
+### Replace a Tag
+
+```bash
+# If you need to move a tag to a different commit
+wit tag -d v1.0.0
+wit tag -a v1.0.0 <new-commit> -m "Release v1.0.0"
+
+# Or force replace
+wit tag -f v1.0.0 <new-commit>
+```
+
+<Warning>
+Moving published tags is discouraged as it can confuse users who have already referenced the old tag.
+</Warning>
+
+## Comparison: Lightweight vs Annotated
+
+| Aspect | Lightweight | Annotated |
+|--------|-------------|-----------|
+| Tagger info | No | Yes |
+| Date | No | Yes |
+| Message | No | Yes |
+| GPG signing | No | Possible |
+| Use case | Temporary markers | Releases |
+| Storage | Just a ref | Full object |
+
+<Tip>
+Use annotated tags for anything you'll share publicly (releases, milestones). Use lightweight tags for private bookmarks or temporary markers.
+</Tip>
+
+## Related Commands
+
+- [`wit show`](/commands/show) - View tag and commit details
+- [`wit push --tags`](/commands/remotes#push) - Push tags to remote
+- [`wit describe`](/commands/advanced) - Describe a commit using tags

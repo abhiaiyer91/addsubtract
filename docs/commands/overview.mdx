@@ -1,11 +1,11 @@
 ---
 title: Commands Overview
-description: "Complete reference of all tsgit commands"
+description: "Complete reference of all wit commands"
 ---
 
 # Commands Overview
 
-tsgit provides a comprehensive set of commands organized by functionality. Many commands are familiar from Git, while others are unique improvements.
+wit provides a comprehensive set of commands organized by functionality. Many commands are familiar from Git, while others are unique improvements.
 
 ## Command Categories
 
@@ -16,17 +16,32 @@ tsgit provides a comprehensive set of commands organized by functionality. Many 
   <Card title="Branches" icon="code-branch" href="/commands/branches">
     Branch management: branch, switch, checkout
   </Card>
-  <Card title="Undo & History" icon="rotate-left" href="/commands/undo-history">
-    Powerful undo capabilities: undo, history, restore, uncommit
+  <Card title="Remote Operations" icon="cloud" href="/commands/remotes">
+    Work with remotes: clone, fetch, pull, push, remote
   </Card>
-  <Card title="Quality of Life" icon="wand-magic-sparkles" href="/commands/quality-of-life">
-    Productivity boosters: wip, amend, fixup, snapshot, cleanup, stats
+  <Card title="Stash" icon="box-archive" href="/commands/stash">
+    Temporarily save changes: stash, pop, apply
   </Card>
   <Card title="Merge" icon="code-merge" href="/commands/merge">
     Merging and conflict resolution
   </Card>
+  <Card title="History Rewriting" icon="clock-rotate-left" href="/commands/history-rewriting">
+    Modify history: reset, revert, cherry-pick, rebase
+  </Card>
+  <Card title="Tags" icon="tag" href="/commands/tags">
+    Release management: tag, lightweight, annotated
+  </Card>
+  <Card title="Undo & History" icon="rotate-left" href="/commands/undo-history">
+    Powerful undo capabilities: undo, history, restore, uncommit, reset
+  </Card>
+  <Card title="Quality of Life" icon="wand-magic-sparkles" href="/commands/quality-of-life">
+    Productivity boosters: wip, amend, fixup, snapshot, cleanup, stats, blame
+  </Card>
+  <Card title="Debugging" icon="bug" href="/commands/debugging">
+    Find bugs: bisect, show, clean
+  </Card>
   <Card title="Advanced" icon="gear" href="/commands/advanced">
-    Hooks, submodules, worktrees, reflog, garbage collection
+    Hooks, submodules, worktrees, reflog, garbage collection, plumbing
   </Card>
 </CardGroup>
 
@@ -36,35 +51,70 @@ tsgit provides a comprehensive set of commands organized by functionality. Many 
 
 | Command | Description |
 |---------|-------------|
-| `tsgit init` | Create a new repository |
-| `tsgit add <files>` | Stage files for commit |
-| `tsgit commit -m "msg"` | Create a commit |
-| `tsgit status` | Show working tree status |
-| `tsgit log` | Show commit history |
-| `tsgit switch <branch>` | Switch branches |
-| `tsgit undo` | Undo the last operation |
-| `tsgit wip` | Quick WIP commit |
+| `wit init` | Create a new repository |
+| `wit clone <url>` | Clone a repository |
+| `wit add <files>` | Stage files for commit |
+| `wit commit -m "msg"` | Create a commit |
+| `wit status` | Show working tree status |
+| `wit log` | Show commit history |
+| `wit switch <branch>` | Switch branches |
+| `wit pull` | Fetch and merge changes |
+| `wit push` | Push changes to remote |
+| `wit stash` | Temporarily save changes |
+| `wit undo` | Undo the last operation |
+| `wit wip` | Quick WIP commit |
+| `wit ai commit` | AI-generated commit message |
 
-### tsgit-Exclusive Commands
+### wit-Exclusive Commands
 
-These commands are unique to tsgit and don't exist in Git:
+These commands are unique to wit and don't exist in Git:
 
 | Command | Description |
 |---------|-------------|
-| `tsgit undo` | Undo any operation (commit, branch, merge, etc.) |
-| `tsgit wip` | Create WIP commit with auto-generated message |
-| `tsgit amend` | Simpler interface for amending commits |
-| `tsgit uncommit` | Undo commits, keep changes staged |
-| `tsgit cleanup` | Find and remove merged/stale branches |
-| `tsgit stats` | Repository statistics and insights |
-| `tsgit snapshot` | Quick checkpoints without full commits |
-| `tsgit scope` | Limit operations to specific paths (monorepo) |
-| `tsgit history` | Show operation history (what undo uses) |
+| `wit undo` | Undo any operation (commit, branch, merge, etc.) |
+| `wit wip` | Create WIP commit with auto-generated message |
+| `wit amend` | Simpler interface for amending commits |
+| `wit uncommit` | Undo commits, keep changes staged |
+| `wit cleanup` | Find and remove merged/stale branches |
+| `wit stats` | Repository statistics and insights |
+| `wit snapshot` | Quick checkpoints without full commits |
+| `wit scope` | Limit operations to specific paths (monorepo) |
+| `wit history` | Show operation history (what undo uses) |
+| `wit ai <query>` | Natural language git commands |
+| `wit ai commit` | AI-generated commit messages |
+| `wit ai review` | AI code review |
+
+### History Rewriting Commands
+
+| Command | Description |
+|---------|-------------|
+| `wit cherry-pick <commit>` | Apply changes from specific commits |
+| `wit rebase <branch>` | Rebase current branch onto another |
+| `wit revert <commit>` | Create commit that undoes changes |
+
+### Remote Operations
+
+| Command | Description |
+|---------|-------------|
+| `wit remote` | List or manage remotes |
+| `wit clone <url>` | Clone a repository |
+| `wit fetch` | Download objects from remote |
+| `wit pull` | Fetch and merge |
+| `wit push` | Push to remote |
+
+### Debugging & Inspection
+
+| Command | Description |
+|---------|-------------|
+| `wit show <commit>` | Show commit details and diff |
+| `wit bisect` | Binary search for bug introduction |
+| `wit clean` | Remove untracked files |
+| `wit fsck` | Verify repository integrity |
 
 ## Command Syntax
 
 ```bash
-tsgit <command> [options] [arguments]
+wit <command> [options] [arguments]
 ```
 
 ### Common Options
@@ -74,28 +124,77 @@ Most commands support these options:
 | Option | Description |
 |--------|-------------|
 | `--help`, `-h` | Show help for a command |
-| `--version`, `-v` | Show tsgit version |
+| `--version`, `-v` | Show wit version |
 
 ### Getting Help
 
 ```bash
 # General help
-tsgit --help
+wit --help
 
 # Help for specific command
-tsgit commit --help
-tsgit undo --help
+wit commit --help
+wit undo --help
+wit ai --help
 ```
 
 ## Differences from Git
 
-tsgit aims to be more intuitive than Git:
+wit aims to be more intuitive than Git:
 
-| Git | tsgit | Improvement |
-|-----|-------|-------------|
-| `git checkout <branch>` | `tsgit switch <branch>` | Clear intent |
-| `git checkout -- <file>` | `tsgit restore <file>` | Clear intent |
-| `git commit --amend` | `tsgit amend` | Simpler syntax |
-| `git reset HEAD~1` | `tsgit uncommit` | Clear intent |
+| Git | wit | Improvement |
+|-----|-----|-------------|
+| `git checkout <branch>` | `wit switch <branch>` | Clear intent |
+| `git checkout -- <file>` | `wit restore <file>` | Clear intent |
+| `git commit --amend` | `wit amend` | Simpler syntax |
+| `git reset HEAD~1` | `wit uncommit` | Clear intent |
 | `git stash` (manual) | Auto-stash on switch | Automatic |
-| `git reflog` (cryptic) | `tsgit undo` | Simple undo |
+| `git reflog` (cryptic) | `wit undo` | Simple undo |
+| No AI | `wit ai commit` | AI assistance |
+| Complex merge conflicts | Structured JSON conflicts | Easier resolution |
+| Git LFS required | Built-in large file handling | No setup needed |
+
+## Full Command List
+
+### Core
+- `init`, `add`, `commit`, `status`, `log`, `diff`
+
+### Branches
+- `branch`, `switch`, `checkout`, `restore`
+
+### Merge
+- `merge`
+
+### History
+- `undo`, `history`, `uncommit`, `reset`, `stash`
+
+### Tags
+- `tag`
+
+### History Rewriting
+- `cherry-pick`, `rebase`, `revert`
+
+### Remote
+- `remote`, `clone`, `fetch`, `pull`, `push`
+
+### Quality of Life
+- `wip`, `amend`, `fixup`, `cleanup`, `stats`, `blame`, `snapshot`
+
+### Advanced
+- `hooks`, `submodule`, `worktree`, `reflog`, `gc`
+
+### Debugging
+- `show`, `bisect`, `clean`, `fsck`
+
+### Monorepo
+- `scope`
+
+### AI
+- `ai` (natural language, commit, review, explain, resolve)
+
+### Visual
+- `ui`, `web`, `graph`
+
+### Plumbing
+- `cat-file`, `hash-object`, `ls-files`, `ls-tree`
+- `rev-parse`, `update-ref`, `symbolic-ref`, `for-each-ref`, `show-ref`

@@ -1,0 +1,279 @@
+---
+title: Stash
+description: Temporarily save changes without committing
+---
+
+# Stash
+
+The stash command saves your uncommitted changes temporarily, allowing you to switch contexts and come back to your work later. Unlike Git's cryptic stash, wit provides clear, intuitive stash management.
+
+## Quick Reference
+
+```bash
+wit stash                 # Save changes with auto-generated message
+wit stash save "message"  # Save with custom message
+wit stash list            # List all stashes
+wit stash show [n]        # Show stash contents
+wit stash pop [n]         # Apply and remove stash
+wit stash apply [n]       # Apply stash (keep in list)
+wit stash drop [n]        # Remove a stash
+wit stash clear           # Remove all stashes
+```
+
+## Saving Changes
+
+### Basic Stash
+
+```bash
+# Stash all modified and staged files
+wit stash
+
+# Output:
+# ✓ Saved working directory and index state
+#   stash@{0}: On main: WIP: 3 modified, 1 staged
+```
+
+### Stash with Message
+
+```bash
+# Stash with a descriptive message
+wit stash save "work in progress on login feature"
+
+# Or use the -m flag
+wit stash -m "debugging API issue"
+```
+
+### What Gets Stashed
+
+| File State | Stashed? |
+|------------|----------|
+| Staged changes | Yes |
+| Modified tracked files | Yes |
+| Untracked files | Yes |
+| Deleted files | Yes |
+| Ignored files | No |
+
+## Viewing Stashes
+
+### List All Stashes
+
+```bash
+wit stash list
+
+# Output:
+# stash@{0} on main: WIP: 3 modified (2 minutes ago)
+# stash@{1} on feature-x: Login form styling (3 hours ago)
+# stash@{2} on main: API integration WIP (yesterday)
+```
+
+### Show Stash Contents
+
+```bash
+# Show latest stash
+wit stash show
+
+# Show specific stash
+wit stash show 1
+
+# Output:
+# stash@{1}: Login form styling
+# Branch: feature-x
+# Date: 3/15/2024, 2:30:00 PM
+#
+# Staged changes:
+#   src/components/Login.tsx
+# Modified files:
+#   src/styles/login.css
+#   src/utils/auth.ts
+```
+
+## Applying Stashes
+
+### Pop (Apply and Remove)
+
+```bash
+# Apply latest stash and remove it from the list
+wit stash pop
+
+# Apply specific stash
+wit stash pop 2
+
+# Output:
+# ✓ Applied and removed stash@{0}
+#   WIP: 3 modified
+```
+
+### Apply (Keep Stash)
+
+```bash
+# Apply latest stash but keep it in the list
+wit stash apply
+
+# Apply specific stash
+wit stash apply 1
+
+# Output:
+# ✓ Applied stash@{1}
+#   Login form styling
+# Stash kept. Use "wit stash drop" to remove it.
+```
+
+<Info>
+Use `apply` when you want to apply the same stash to multiple branches, or when you're not sure if the application will succeed.
+</Info>
+
+## Removing Stashes
+
+### Drop Specific Stash
+
+```bash
+# Remove a specific stash
+wit stash drop 0
+
+# Output:
+# ✓ Dropped stash@{0}
+```
+
+### Clear All Stashes
+
+```bash
+# Remove all stashes
+wit stash clear
+
+# Output:
+# ✓ Cleared 3 stash(es)
+```
+
+<Warning>
+`wit stash clear` is irreversible. The stashed changes will be permanently deleted.
+</Warning>
+
+## Common Workflows
+
+### Quick Context Switch
+
+```bash
+# You're working on feature-x but need to fix a bug on main
+wit stash
+wit switch main
+
+# Fix the bug
+wit commit -m "Fix critical bug"
+
+# Return to your feature work
+wit switch feature-x
+wit stash pop
+```
+
+### Apply Stash to Different Branch
+
+```bash
+# Stash changes on current branch
+wit stash
+
+# Switch and apply to different branch
+wit switch other-branch
+wit stash apply
+
+# If it worked, clean up
+wit stash drop
+```
+
+### Preview Before Applying
+
+```bash
+# See what's in the stash before applying
+wit stash show 0
+
+# Check if current branch is clean
+wit status
+
+# Apply the stash
+wit stash pop
+```
+
+### Stash Specific Files
+
+While wit stashes all changes by default, you can stage specific files first:
+
+```bash
+# Only stash certain files
+wit add file1.txt file2.txt
+wit stash
+
+# The stash will preserve which files were staged vs modified
+```
+
+## How wit Stash Differs from Git
+
+| Aspect | Git | wit |
+|--------|-----|-----|
+| Default message | Generic "WIP on branch" | Auto-generated with counts |
+| Time display | None in list | Shows relative time |
+| Apply feedback | Minimal | Clear success/failure messages |
+| Show command | Requires flags for details | Shows all relevant info |
+| Staged preservation | Requires --keep-index | Automatic |
+
+## Stash Internals
+
+wit stores stashes in `.wit/stash/stash.json` as compressed JSON, containing:
+
+- File contents (base64 encoded)
+- File permissions
+- Staged vs. unstaged status
+- Branch name at stash time
+- Base commit hash
+
+This means stashes are portable and can be inspected directly if needed.
+
+## Tips
+
+<AccordionGroup>
+  <Accordion title="Name your stashes">
+    Always use descriptive messages with `wit stash save "message"` to remember what each stash contains.
+  </Accordion>
+  
+  <Accordion title="Check stash contents first">
+    Use `wit stash show` before popping to ensure you're applying the right stash.
+  </Accordion>
+  
+  <Accordion title="Don't let stashes pile up">
+    Regularly review and clean up your stash list. Old stashes often become irrelevant.
+  </Accordion>
+  
+  <Accordion title="Prefer commits for longer pauses">
+    If you're stepping away for more than a few hours, consider using `wit wip` to create a WIP commit instead of stashing.
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Stash apply conflicts">
+    If applying a stash causes conflicts, resolve them manually and then drop the stash:
+    ```bash
+    wit stash apply
+    # Resolve conflicts in files
+    wit add .
+    wit stash drop
+    ```
+  </Accordion>
+  
+  <Accordion title="Wrong stash applied">
+    If you applied the wrong stash, you can undo:
+    ```bash
+    wit checkout .  # Discard the applied changes
+    wit stash apply <correct-number>
+    ```
+  </Accordion>
+  
+  <Accordion title="Recovering cleared stashes">
+    Unfortunately, `wit stash clear` is permanent. Consider using `wit snapshot` for more persistent checkpoints.
+  </Accordion>
+</AccordionGroup>
+
+## Related Commands
+
+- [`wit wip`](/commands/quality-of-life#wip) - Create a quick WIP commit instead of stashing
+- [`wit snapshot`](/commands/quality-of-life#snapshot) - Create named checkpoints
+- [`wit switch`](/commands/branches#switch) - Switch branches (auto-stashes by default)

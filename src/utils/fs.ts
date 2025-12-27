@@ -130,7 +130,13 @@ export function walkDir(dir: string, ignorePatterns: string[] = []): string[] {
   }
 
   function walk(currentDir: string): void {
-    const entries = fs.readdirSync(currentDir, { withFileTypes: true });
+    let entries;
+    try {
+      entries = fs.readdirSync(currentDir, { withFileTypes: true });
+    } catch {
+      // Skip directories we can't read (permission denied, etc.)
+      return;
+    }
     
     for (const entry of entries) {
       const fullPath = path.join(currentDir, entry.name);

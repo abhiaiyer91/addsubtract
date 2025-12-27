@@ -5,14 +5,14 @@ description: "Powerful undo capabilities for any operation"
 
 # Undo & History Commands
 
-tsgit provides the most powerful undo capabilities of any version control system. Made a mistake? Just undo it.
+wit provides the most powerful undo capabilities of any version control system. Made a mistake? Just undo it.
 
 ## undo
 
-Undo the last operation(s). This is tsgit's superpower.
+Undo the last operation(s). This is wit's superpower.
 
 ```bash
-tsgit undo [options]
+wit undo [options]
 ```
 
 ### Options
@@ -34,34 +34,34 @@ tsgit undo [options]
 
 ```bash
 # Undo the last operation
-tsgit undo
+wit undo
 
 # Undo the last 3 operations
-tsgit undo --steps 3
+wit undo --steps 3
 
 # Preview what would be undone
-tsgit undo --dry-run
+wit undo --dry-run
 ```
 
 ### Example Scenarios
 
 **Undo an accidental commit:**
 ```bash
-tsgit commit -m "Wrong message"
-tsgit undo  # Commit is undone, changes are back
+wit commit -m "Wrong message"
+wit undo  # Commit is undone, changes are back
 ```
 
 **Undo branch creation:**
 ```bash
-tsgit branch wrong-name
-tsgit undo  # Branch is deleted
+wit branch wrong-name
+wit undo  # Branch is deleted
 ```
 
 **Undo a merge:**
 ```bash
-tsgit merge feature
+wit merge feature
 # Realized you merged the wrong branch
-tsgit undo  # Merge is reverted
+wit undo  # Merge is reverted
 ```
 
 ---
@@ -71,7 +71,7 @@ tsgit undo  # Merge is reverted
 Show the operation history (what undo uses).
 
 ```bash
-tsgit history [options]
+wit history [options]
 ```
 
 ### Options
@@ -84,10 +84,10 @@ tsgit history [options]
 
 ```bash
 # Show operation history
-tsgit history
+wit history
 
 # Show last 5 operations
-tsgit history -n 5
+wit history -n 5
 ```
 
 ### Example Output
@@ -107,7 +107,7 @@ tsgit history -n 5
 Restore files from the index or a commit.
 
 ```bash
-tsgit restore <file> [options]
+wit restore <file> [options]
 ```
 
 ### Options
@@ -121,21 +121,21 @@ tsgit restore <file> [options]
 
 ```bash
 # Discard changes to a file (restore from index)
-tsgit restore src/index.ts
+wit restore src/index.ts
 
 # Unstage a file
-tsgit restore --staged src/index.ts
+wit restore --staged src/index.ts
 
 # Restore file from a specific commit
-tsgit restore --source HEAD~2 src/index.ts
+wit restore --source HEAD~2 src/index.ts
 ```
 
 ### Difference from Git
 
-| Git Command | tsgit Command |
+| Git Command | wit Command |
 |-------------|---------------|
-| `git checkout -- file` | `tsgit restore file` |
-| `git reset HEAD file` | `tsgit restore --staged file` |
+| `git checkout -- file` | `wit restore file` |
+| `git reset HEAD file` | `wit restore --staged file` |
 
 ---
 
@@ -144,7 +144,7 @@ tsgit restore --source HEAD~2 src/index.ts
 Undo commits while keeping changes staged.
 
 ```bash
-tsgit uncommit [count]
+wit uncommit [count]
 ```
 
 ### Arguments
@@ -157,51 +157,100 @@ tsgit uncommit [count]
 
 ```bash
 # Undo last commit, keep changes staged
-tsgit uncommit
+wit uncommit
 
 # Undo last 3 commits
-tsgit uncommit 3
+wit uncommit 3
 ```
 
 ### Use Cases
 
 **Fix a commit message:**
 ```bash
-tsgit uncommit
-tsgit commit -m "Better message"
+wit uncommit
+wit commit -m "Better message"
 ```
 
 **Add a forgotten file:**
 ```bash
-tsgit uncommit
-tsgit add forgotten-file.ts
-tsgit commit -m "Same message, now with forgotten file"
+wit uncommit
+wit add forgotten-file.ts
+wit commit -m "Same message, now with forgotten file"
 ```
 
 <Tip>
-For simpler cases, use `tsgit amend` instead:
+For simpler cases, use `wit amend` instead:
 ```bash
-tsgit amend -m "New message"
-tsgit add forgotten-file.ts && tsgit amend
+wit amend -m "New message"
+wit add forgotten-file.ts && wit amend
 ```
 </Tip>
 
 ---
 
-## Comparison: undo vs uncommit vs restore
+## reset
+
+Reset the current HEAD to a specific state.
+
+```bash
+wit reset [options] [commit]
+```
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `--soft` | Keep changes staged |
+| `--mixed` | Keep changes but unstage (default) |
+| `--hard` | Discard all changes (use with caution!) |
+
+### Examples
+
+```bash
+# Soft reset - undo commit, keep changes staged
+wit reset --soft HEAD~1
+
+# Mixed reset - undo commit, unstage changes
+wit reset HEAD~1
+
+# Hard reset - discard all changes (DANGEROUS)
+wit reset --hard HEAD~1
+
+# Reset to specific commit
+wit reset --hard abc1234
+```
+
+<Warning>
+`wit reset --hard` will permanently discard uncommitted changes. Use with caution!
+</Warning>
+
+### Difference from uncommit
+
+| Command | Keeps Changes? | Keeps Staged? |
+|---------|----------------|---------------|
+| `wit uncommit` | ✅ Yes | ✅ Yes |
+| `wit reset --soft` | ✅ Yes | ✅ Yes |
+| `wit reset` (mixed) | ✅ Yes | ❌ No |
+| `wit reset --hard` | ❌ No | ❌ No |
+
+---
+
+## Comparison: undo vs uncommit vs restore vs reset
 
 | Command | Purpose | Scope |
 |---------|---------|-------|
 | `undo` | Reverse any operation | Operations (commits, branches, etc.) |
 | `uncommit` | Remove commits, keep changes | Commits only |
 | `restore` | Discard/unstage file changes | Files only |
+| `reset` | Move HEAD, optionally discard changes | Commits and working tree |
 
 ### Decision Guide
 
-- **"I want to undo the last thing I did"** → `tsgit undo`
-- **"I want to redo my last commit differently"** → `tsgit uncommit`
-- **"I want to discard changes to a file"** → `tsgit restore <file>`
-- **"I want to unstage a file"** → `tsgit restore --staged <file>`
+- **"I want to undo the last thing I did"** → `wit undo`
+- **"I want to redo my last commit differently"** → `wit uncommit` or `wit amend`
+- **"I want to discard changes to a file"** → `wit restore <file>`
+- **"I want to unstage a file"** → `wit restore --staged <file>`
+- **"I want to go back to a specific commit"** → `wit reset [--hard] <commit>`
 
 ---
 
@@ -209,18 +258,18 @@ tsgit add forgotten-file.ts && tsgit amend
 
 ```bash
 # You made a commit with a typo
-tsgit commit -m "Add usr authentication"
+wit commit -m "Add usr authentication"
 
 # Option 1: Use undo
-tsgit undo
-tsgit commit -m "Add user authentication"
+wit undo
+wit commit -m "Add user authentication"
 
 # Option 2: Use amend (simpler for this case)
-tsgit amend -m "Add user authentication"
+wit amend -m "Add user authentication"
 
 # Later, you realize you modified the wrong file
-tsgit restore wrong-file.ts  # Discard changes
+wit restore wrong-file.ts  # Discard changes
 
 # You staged a file by mistake
-tsgit restore --staged accidental-file.ts
+wit restore --staged accidental-file.ts
 ```

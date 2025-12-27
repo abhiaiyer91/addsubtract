@@ -1,0 +1,374 @@
+---
+title: Personal Access Tokens
+description: "Authenticate with the wit API using personal access tokens"
+---
+
+# Personal Access Tokens
+
+Personal Access Tokens (PATs) provide a secure way to authenticate with the wit platform API from scripts, CI/CD pipelines, and other automated workflows.
+
+## Overview
+
+PATs are an alternative to OAuth for:
+- CI/CD pipelines
+- Automated scripts
+- API integrations
+- Command-line tools
+
+Each token has:
+- A unique identifier
+- Scoped permissions
+- Optional expiration date
+- Audit trail of usage
+
+## Quick Start
+
+```bash
+# Create a token
+wit token create my-ci-token
+
+# List your tokens
+wit token list
+
+# Revoke a token
+wit token revoke <token-id>
+```
+
+## Creating Tokens
+
+### Basic Token
+
+```bash
+wit token create my-token
+```
+
+Output:
+```
+Token created successfully
+
+Name:    my-token
+ID:      550e8400-e29b-41d4-a716-446655440000
+Token:   wit_abc123...xyz789
+Scopes:  repo:read, repo:write
+Expires: Never
+
+IMPORTANT: Copy this token now. You won't be able to see it again!
+
+To use this token:
+  export WIT_TOKEN=wit_abc123...xyz789
+```
+
+### Token with Expiration
+
+```bash
+# Expires in 30 days
+wit token create deploy-token --expires 30
+
+# Expires in 90 days
+wit token create ci-token --expires 90
+```
+
+### Token with Limited Scopes
+
+```bash
+# Read-only access
+wit token create readonly-token --scopes repo:read
+
+# Multiple scopes
+wit token create admin-token --scopes repo:read,repo:write,repo:admin
+```
+
+## Token Scopes
+
+| Scope | Description |
+|-------|-------------|
+| `repo:read` | Read repository data (clone, fetch, view) |
+| `repo:write` | Write repository data (push, create branches) |
+| `repo:admin` | Admin operations (delete, settings) |
+| `user:read` | Read user profile information |
+| `user:write` | Update user profile |
+
+### View Available Scopes
+
+```bash
+wit token scopes
+```
+
+```
+Available Token Scopes
+
+Repository:
+  repo:read    Read repository data (clone, fetch)
+  repo:write   Write to repositories (push)
+  repo:admin   Admin operations (delete, settings)
+
+User:
+  user:read    Read user profile
+  user:write   Update user profile
+```
+
+## Managing Tokens
+
+### List Tokens
+
+```bash
+wit token list
+```
+
+```
+Your Personal Access Tokens
+
+ID                                     Name          Scopes              Last Used      Expires
+550e8400-e29b-41d4-a716-446655440000   ci-token      repo:read,write     2 hours ago    in 30 days
+660f9500-f30c-52e5-b827-557766550111   deploy-token  repo:read           5 days ago     Never
+```
+
+### Revoke Token
+
+```bash
+wit token revoke 550e8400-e29b-41d4-a716-446655440000
+```
+
+```
+Token revoked successfully
+```
+
+## Using Tokens
+
+### Environment Variable
+
+```bash
+export WIT_TOKEN=wit_abc123...xyz789
+
+# Now all wit commands use this token
+wit push origin main
+```
+
+### In CI/CD
+
+#### GitHub Actions
+
+```yaml
+name: Deploy
+
+on: [push]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Push to wit
+        env:
+          WIT_TOKEN: ${{ secrets.WIT_TOKEN }}
+        run: |
+          wit remote add production https://wit.example.com/repo
+          wit push production main
+```
+
+#### GitLab CI
+
+```yaml
+deploy:
+  script:
+    - export WIT_TOKEN=$WIT_TOKEN
+    - wit push production main
+  variables:
+    WIT_TOKEN: $WIT_TOKEN
+```
+
+#### Jenkins
+
+```groovy
+pipeline {
+    environment {
+        WIT_TOKEN = credentials('wit-token')
+    }
+    stages {
+        stage('Deploy') {
+            steps {
+                sh 'wit push production main'
+            }
+        }
+    }
+}
+```
+
+### In Scripts
+
+```bash
+#!/bin/bash
+
+# Use token for API operations
+WIT_TOKEN="wit_abc123..." wit push origin main
+
+# Or export for multiple commands
+export WIT_TOKEN="wit_abc123..."
+wit fetch origin
+wit push origin main
+```
+
+### API Usage
+
+```bash
+# Using curl with token
+curl -H "Authorization: Bearer wit_abc123..." \
+  https://api.wit.example.com/v1/repos
+```
+
+```typescript
+// Using the wit API client
+import { getApiClient } from 'wit/api';
+
+const api = getApiClient({
+  token: process.env.WIT_TOKEN
+});
+
+const repos = await api.repos.list();
+```
+
+## Security Best Practices
+
+### 1. Use Minimal Scopes
+
+Only request the permissions you need:
+
+```bash
+# Bad: Full access for read-only operation
+wit token create reader --scopes repo:read,repo:write,repo:admin
+
+# Good: Minimal scope
+wit token create reader --scopes repo:read
+```
+
+### 2. Set Expiration
+
+For CI/CD tokens, set reasonable expiration:
+
+```bash
+# Token expires in 90 days
+wit token create ci-token --expires 90
+```
+
+### 3. Use Secrets Management
+
+Never hardcode tokens:
+
+```bash
+# Bad
+WIT_TOKEN="wit_abc123..." in code
+
+# Good
+WIT_TOKEN from environment/secrets manager
+```
+
+### 4. Rotate Regularly
+
+Create new tokens and revoke old ones periodically:
+
+```bash
+# Create new token
+wit token create ci-token-v2 --expires 90
+
+# Update CI/CD secrets
+
+# Revoke old token
+wit token revoke <old-token-id>
+```
+
+### 5. Audit Usage
+
+Monitor token usage:
+
+```bash
+wit token list
+```
+
+Check "Last Used" to identify inactive tokens.
+
+## Token Format
+
+wit tokens follow this format:
+
+```
+wit_<prefix>_<random>
+```
+
+- `wit_` - Identifies as a wit token
+- `<prefix>` - First 8 characters (visible in UI)
+- `<random>` - Cryptographically secure random string
+
+Tokens are hashed before storage - the full token is only shown once at creation.
+
+## Comparison with Other Auth Methods
+
+| Method | Best For | Expiration | Revocable |
+|--------|----------|------------|-----------|
+| Personal Access Token | CI/CD, scripts | Configurable | Yes |
+| OAuth (GitHub) | Interactive login | Session | Via GitHub |
+| SSH Keys | Git operations | Never | Yes |
+
+## API Reference
+
+### Create Token
+
+```http
+POST /api/tokens
+Authorization: Bearer <session-token>
+Content-Type: application/json
+
+{
+  "name": "my-token",
+  "scopes": ["repo:read", "repo:write"],
+  "expiresInDays": 30
+}
+```
+
+### List Tokens
+
+```http
+GET /api/tokens
+Authorization: Bearer <session-token>
+```
+
+### Revoke Token
+
+```http
+DELETE /api/tokens/:id
+Authorization: Bearer <session-token>
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Token not working">
+    Check that:
+    1. Token is set correctly: `echo $WIT_TOKEN`
+    2. Token hasn't expired: `wit token list`
+    3. Token has required scopes for the operation
+  </Accordion>
+  
+  <Accordion title="Lost token">
+    Tokens cannot be retrieved after creation. You must:
+    1. Revoke the old token: `wit token revoke <id>`
+    2. Create a new one: `wit token create <name>`
+  </Accordion>
+  
+  <Accordion title="Permission denied">
+    The token may lack required scopes:
+    ```bash
+    # Check token scopes
+    wit token list
+    
+    # Create new token with correct scopes
+    wit token create new-token --scopes repo:read,repo:write
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Related
+
+- [GitHub Integration](/features/github) - OAuth-based authentication
+- [SSH Keys](/configuration/ssh) - Key-based authentication
+- [API Reference](/api-reference/overview) - Full API documentation
