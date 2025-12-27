@@ -13,6 +13,7 @@ import {
   Layers,
   MoreHorizontal,
   Sparkles,
+  Maximize2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -30,6 +31,8 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { AgentPanel } from '@/components/agent/agent-panel';
+import { IDELayout } from '@/components/ide';
+import { useIDEStore } from '@/lib/ide-store';
 import { useSession } from '@/lib/auth-client';
 import { trpc } from '@/lib/trpc';
 import { toastSuccess, toastError } from '@/components/ui/use-toast';
@@ -48,6 +51,7 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
   const authenticated = !!session?.user;
   const utils = trpc.useUtils();
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const { isIDEMode, setIDEMode } = useIDEStore();
 
   // Fetch repository data
   const {
@@ -220,6 +224,30 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
   const { repo: repoInfo, owner: ownerInfo } = repoData;
   const ownerUsername = 'username' in ownerInfo ? ownerInfo.username : owner;
 
+  // Render IDE mode if enabled
+  if (isIDEMode && authenticated) {
+    return (
+      <>
+        <IDELayout
+          owner={ownerUsername}
+          repo={repoInfo.name}
+          repoId={repoInfo.id}
+          currentRef={repoInfo.defaultBranch || 'main'}
+        />
+        {/* Floating exit button */}
+        <Button
+          variant="outline"
+          size="sm"
+          className="fixed bottom-4 left-4 z-[60] gap-2 shadow-lg"
+          onClick={() => setIDEMode(false)}
+        >
+          <Maximize2 className="h-4 w-4" />
+          Exit IDE
+        </Button>
+      </>
+    );
+  }
+
   // Determine active tab based on current path
   const path = location.pathname;
   const getActiveTab = () => {
@@ -271,6 +299,28 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
 
         {/* Action buttons - responsive layout */}
         <div className="flex items-center gap-2 flex-shrink-0">
+          {/* IDE Mode button */}
+          {authenticated && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2 h-9"
+                    onClick={() => setIDEMode(true)}
+                  >
+                    <Maximize2 className="h-4 w-4" />
+                    <span className="hidden sm:inline">IDE</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  Open full IDE mode with code editor
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+
           {/* Agent button */}
           {authenticated && (
             <TooltipProvider>
