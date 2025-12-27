@@ -509,7 +509,7 @@ export function BlockEditor({
     >
       {/* Blocks */}
       <div className="space-y-0.5">
-        {blocks.map((block) => (
+        {blocks.map((block, index) => (
           <BlockItem
             key={block.id}
             block={block}
@@ -538,16 +538,10 @@ export function BlockEditor({
             onCloseSlashMenu={() =>
               setSlashMenu((prev) => ({ ...prev, isOpen: false }))
             }
+            placeholder={index === 0 && blocks.length === 1 ? placeholder : undefined}
           />
         ))}
       </div>
-
-      {/* Empty state / placeholder */}
-      {blocks.length === 1 && blocks[0].content === '' && placeholder && (
-        <div className="absolute top-0 left-0 text-muted-foreground/40 pointer-events-none pl-10">
-          {placeholder}
-        </div>
-      )}
 
       {/* Slash command menu */}
       <SlashMenu
