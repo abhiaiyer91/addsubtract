@@ -208,7 +208,7 @@ export function UserHomePage() {
   const repos = reposData || [];
 
   return (
-    <div className="container max-w-7xl py-6 space-y-6">
+    <div className="container max-w-[1400px] py-6 space-y-6">
       {/* Profile Header */}
       <div className="flex items-start gap-6">
         <Avatar className="h-20 w-20 rounded-xl">
