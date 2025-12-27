@@ -101,6 +101,8 @@ import {
   handleMergeQueue,
   // Journal (Notion-like docs)
   handleJournal,
+  // Wrapped (Monthly activity insights)
+  handleWrapped,
 } from './commands';
 import { handleHooks } from './core/hooks';
 import { handleSubmodule } from './core/submodule';
@@ -297,6 +299,7 @@ Quality of Life:
   blame <file>          Show who changed each line
   stats                 Repository statistics dashboard
   snapshot              Create/restore quick checkpoints
+  wrapped               Monthly activity insights (your coding Wrapped!)
 
 Issue Tracking (Linear-inspired):
   issue create "Title"  Create a new issue
@@ -467,6 +470,8 @@ const COMMANDS = [
   'ci',
   // Merge Queue
   'merge-queue',
+  // Wrapped
+  'wrapped',
   'help',
 ];
 
@@ -1139,6 +1144,18 @@ function main(): void {
       // Journal (Notion-like docs)
       case 'journal':
         handleJournal(args.slice(args.indexOf('journal') + 1)).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
+          }
+          process.exit(1);
+        });
+        return;
+
+      // Wrapped (Monthly activity insights)
+      case 'wrapped':
+        handleWrapped(args.slice(args.indexOf('wrapped') + 1)).catch((error: Error) => {
           if (error instanceof TsgitError) {
             console.error((error as TsgitError).format());
           } else {

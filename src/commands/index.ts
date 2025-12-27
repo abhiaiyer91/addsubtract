@@ -115,6 +115,9 @@ export { handleMergeQueue, MERGE_QUEUE_HELP } from './merge-queue';
 // Journal commands (Notion-like docs)
 export { handleJournal, JOURNAL_HELP } from './journal';
 
+// Wrapped - Monthly activity insights (Spotify Wrapped-style)
+export { handleWrapped } from './wrapped';
+
 // Collaborator management
 export {
   handleCollaborator,

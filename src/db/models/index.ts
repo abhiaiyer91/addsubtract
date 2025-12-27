@@ -117,3 +117,20 @@ export {
   JOURNAL_PAGE_STATUSES,
   JOURNAL_STATUS_CONFIG,
 } from './journal';
+
+// Wrapped model (monthly activity insights)
+export {
+  wrappedModel,
+  type WrappedData,
+  type WrappedPeriod,
+  type ActivityBreakdown,
+  type DailyActivity,
+  type HourlyDistribution,
+  type DayOfWeekDistribution,
+  type TopRepository,
+  type TopCollaborator,
+  type StreakInfo,
+  type FunStats,
+  type AIUsageStats,
+  type CIStats,
+} from './wrapped';
