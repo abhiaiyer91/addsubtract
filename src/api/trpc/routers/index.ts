@@ -28,6 +28,7 @@ import { repoAiKeysRouter } from './repo-ai-keys';
 import { dashboardRouter } from './dashboard';
 import { wrappedRouter } from './wrapped';
 import { triageAgentRouter } from './triage-agent';
+import { ideRouter } from './ide';
 
 /**
  * Main application router
@@ -63,6 +64,7 @@ export const appRouter = router({
   dashboard: dashboardRouter,
   wrapped: wrappedRouter,
   triageAgent: triageAgentRouter,
+  ide: ideRouter,
 });
 
 /**
@@ -100,4 +102,5 @@ export {
   dashboardRouter,
   wrappedRouter,
   triageAgentRouter,
+  ideRouter,
 };
