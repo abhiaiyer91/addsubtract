@@ -22,6 +22,10 @@ import { NewPullPage } from './routes/repo/pull-new';
 import { IssuesPage } from './routes/repo/issues';
 import { IssueDetailPage } from './routes/repo/issue-detail';
 import { NewIssuePage } from './routes/repo/issue-new';
+import { ProjectsPage } from './routes/repo/projects';
+import { ProjectDetailPage } from './routes/repo/project-detail';
+import { CyclesPage } from './routes/repo/cycles';
+import { CycleDetailPage } from './routes/repo/cycle-detail';
 import { StacksPage } from './routes/repo/stacks';
 import { StackDetailPage } from './routes/repo/stack-detail';
 import { WorkflowsPage } from './routes/repo/workflows';
@@ -102,6 +106,14 @@ export function App() {
             <Route path="/:owner/:repo/issues" element={<IssuesPage />} />
             <Route path="/:owner/:repo/issues/new" element={<NewIssuePage />} />
             <Route path="/:owner/:repo/issues/:number" element={<IssueDetailPage />} />
+
+            {/* Projects (Linear-like) */}
+            <Route path="/:owner/:repo/projects" element={<ProjectsPage />} />
+            <Route path="/:owner/:repo/projects/:projectId" element={<ProjectDetailPage />} />
+
+            {/* Cycles/Sprints (Linear-like) */}
+            <Route path="/:owner/:repo/cycles" element={<CyclesPage />} />
+            <Route path="/:owner/:repo/cycles/:cycleId" element={<CycleDetailPage />} />
 
             {/* Stacks */}
             <Route path="/:owner/:repo/stacks" element={<StacksPage />} />

@@ -278,6 +278,8 @@ export const issueModel = {
       state?: 'open' | 'closed';
       authorId?: string;
       assigneeId?: string;
+      projectId?: string;
+      cycleId?: string;
       limit?: number;
     } = {}
   ): Promise<Array<Issue & { author: Author | null }>> {
@@ -292,6 +294,12 @@ export const issueModel = {
     }
     if (options.assigneeId) {
       conditions.push(eq(issues.assigneeId, options.assigneeId));
+    }
+    if (options.projectId) {
+      conditions.push(eq(issues.projectId, options.projectId));
+    }
+    if (options.cycleId) {
+      conditions.push(eq(issues.cycleId, options.cycleId));
     }
 
     const result = await db

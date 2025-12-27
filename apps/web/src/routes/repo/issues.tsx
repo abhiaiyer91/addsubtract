@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams, Link, useSearchParams } from 'react-router-dom';
+import { useParams, Link, useSearchParams, useNavigate } from 'react-router-dom';
 import {
   CircleDot,
   CheckCircle2,
@@ -7,6 +7,7 @@ import {
   Plus,
   SlidersHorizontal,
   ChevronDown,
+  ChevronRight,
   User,
   Tag,
   List,
@@ -16,10 +17,19 @@ import {
   PenLine,
   MessageSquare,
   Clock,
+  FolderKanban,
+  RefreshCw,
+  Calendar,
+  Target,
+  AlertCircle,
+  Signal,
+  Timer,
+  TrendingUp,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   DropdownMenu,
@@ -28,6 +38,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import { RepoLayout } from './components/repo-layout';
 import { IssueListSkeleton } from '@/components/skeleton';
 import { KanbanBoard } from '@/components/issue/kanban-board';
@@ -36,11 +51,24 @@ import { trpc } from '@/lib/trpc';
 import { formatRelativeTime, cn } from '@/lib/utils';
 
 type ViewMode = 'list' | 'kanban' | 'inbox';
+type SidebarSection = 'all' | 'project' | 'cycle';
+
+// Priority config
+const PRIORITY_CONFIG: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
+  urgent: { label: 'Urgent', icon: <AlertCircle className="h-3 w-3" />, color: 'text-red-500' },
+  high: { label: 'High', icon: <Signal className="h-3 w-3" />, color: 'text-orange-500' },
+  medium: { label: 'Medium', icon: <Signal className="h-3 w-3" />, color: 'text-yellow-500' },
+  low: { label: 'Low', icon: <Signal className="h-3 w-3" />, color: 'text-blue-500' },
+  none: { label: 'No priority', icon: <Signal className="h-3 w-3" />, color: 'text-muted-foreground' },
+};
 
 export function IssuesPage() {
   const { owner, repo } = useParams<{ owner: string; repo: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
+  const [projectsOpen, setProjectsOpen] = useState(true);
+  const [cyclesOpen, setCyclesOpen] = useState(true);
   const { data: session } = useSession();
   const authenticated = !!session?.user;
 
@@ -48,6 +76,11 @@ export function IssuesPage() {
   const viewMode = (searchParams.get('view') as ViewMode) || 'list';
   const currentState = searchParams.get('state') || 'open';
   const isInboxView = viewMode === 'inbox';
+  
+  // Sidebar selection
+  const sidebarSection = (searchParams.get('section') as SidebarSection) || 'all';
+  const selectedProjectId = searchParams.get('project');
+  const selectedCycleId = searchParams.get('cycle');
 
   // Fetch repository data to get the repo ID
   const { data: repoData, isLoading: repoLoading } = trpc.repos.get.useQuery(
@@ -55,11 +88,31 @@ export function IssuesPage() {
     { enabled: !!owner && !!repo }
   );
 
+  // Fetch projects
+  const { data: projects } = trpc.projects.list.useQuery(
+    { repoId: repoData?.repo.id! },
+    { enabled: !!repoData?.repo.id }
+  );
+
+  // Fetch cycles
+  const { data: cycles } = trpc.cycles.list.useQuery(
+    { repoId: repoData?.repo.id! },
+    { enabled: !!repoData?.repo.id }
+  );
+
+  // Fetch current cycle
+  const { data: currentCycle } = trpc.cycles.getCurrent.useQuery(
+    { repoId: repoData?.repo.id! },
+    { enabled: !!repoData?.repo.id }
+  );
+
   // Fetch issues for list view
   const { data: issuesData, isLoading: issuesLoading } = trpc.issues.list.useQuery(
     {
       repoId: repoData?.repo.id!,
       state: currentState === 'open' ? 'open' : currentState === 'closed' ? 'closed' : undefined,
+      projectId: selectedProjectId || undefined,
+      cycleId: selectedCycleId || undefined,
       limit: 50,
     },
     { enabled: !!repoData?.repo.id && viewMode === 'list' }
@@ -69,6 +122,8 @@ export function IssuesPage() {
   const { data: kanbanData, isLoading: kanbanLoading } = trpc.issues.listGroupedByStatus.useQuery(
     {
       repoId: repoData?.repo.id!,
+      projectId: selectedProjectId || undefined,
+      cycleId: selectedCycleId || undefined,
     },
     { enabled: !!repoData?.repo.id && viewMode === 'kanban' }
   );
@@ -134,22 +189,50 @@ export function IssuesPage() {
     setSearchParams(newParams);
   };
 
+  const handleSidebarSelect = (section: SidebarSection, id?: string) => {
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set('section', section);
+    newParams.delete('project');
+    newParams.delete('cycle');
+    if (section === 'project' && id) {
+      newParams.set('project', id);
+    } else if (section === 'cycle' && id) {
+      newParams.set('cycle', id);
+    }
+    setSearchParams(newParams);
+  };
+
+  // Get current context name
+  const getContextName = () => {
+    if (selectedProjectId) {
+      const project = projects?.find(p => p.id === selectedProjectId);
+      return project?.name || 'Project';
+    }
+    if (selectedCycleId) {
+      const cycle = cycles?.find(c => c.id === selectedCycleId);
+      return cycle?.name || 'Cycle';
+    }
+    return 'All Issues';
+  };
+
   if (isLoading) {
     return (
       <RepoLayout owner={owner!} repo={repo!}>
-        <div className="space-y-4">
-          {/* Header skeleton */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-6">
-              <div className="h-6 w-24 bg-muted rounded animate-shimmer bg-gradient-to-r from-muted via-muted-foreground/10 to-muted bg-[length:200%_100%]" />
-              <div className="flex items-center gap-1">
-                <div className="h-8 w-16 bg-muted rounded animate-shimmer bg-gradient-to-r from-muted via-muted-foreground/10 to-muted bg-[length:200%_100%]" />
-                <div className="h-8 w-16 bg-muted rounded animate-shimmer bg-gradient-to-r from-muted via-muted-foreground/10 to-muted bg-[length:200%_100%]" />
-              </div>
+        <div className="flex gap-6">
+          <div className="w-56 flex-shrink-0">
+            <div className="space-y-2">
+              {[...Array(6)].map((_, i) => (
+                <div key={i} className="h-8 bg-muted rounded animate-pulse" />
+              ))}
             </div>
-            <div className="h-9 w-28 bg-muted rounded animate-shimmer bg-gradient-to-r from-muted via-muted-foreground/10 to-muted bg-[length:200%_100%]" />
           </div>
-          <IssueListSkeleton count={5} />
+          <div className="flex-1 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="h-6 w-24 bg-muted rounded animate-pulse" />
+              <div className="h-9 w-28 bg-muted rounded animate-pulse" />
+            </div>
+            <IssueListSkeleton count={5} />
+          </div>
         </div>
       </RepoLayout>
     );
@@ -157,235 +240,377 @@ export function IssuesPage() {
 
   return (
     <RepoLayout owner={owner!} repo={repo!}>
-      <div className="space-y-4">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <h1 className="text-xl font-semibold">Issues</h1>
-            
-            {/* View toggle */}
-            <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
-              <button
-                onClick={() => handleViewChange('list')}
-                className={cn(
-                  'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-colors',
-                  viewMode === 'list'
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                )}
-              >
-                <List className="h-4 w-4" />
-                <span>All</span>
-              </button>
-              <button
-                onClick={() => handleViewChange('kanban')}
-                className={cn(
-                  'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-colors',
-                  viewMode === 'kanban'
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                )}
-              >
-                <LayoutGrid className="h-4 w-4" />
-                <span>Board</span>
-              </button>
+      <div className="flex gap-6">
+        {/* Linear-style Sidebar */}
+        <aside className="w-56 flex-shrink-0 space-y-1">
+          {/* All Issues */}
+          <button
+            onClick={() => handleSidebarSelect('all')}
+            className={cn(
+              'w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors',
+              sidebarSection === 'all' && !selectedProjectId && !selectedCycleId
+                ? 'bg-primary/10 text-primary font-medium'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+            )}
+          >
+            <CircleDot className="h-4 w-4" />
+            All Issues
+            <Badge variant="secondary" className="ml-auto text-xs">
+              {openCount}
+            </Badge>
+          </button>
+
+          {/* Active Cycle Quick Link */}
+          {currentCycle && (
+            <button
+              onClick={() => handleSidebarSelect('cycle', currentCycle.id)}
+              className={cn(
+                'w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors',
+                selectedCycleId === currentCycle.id
+                  ? 'bg-primary/10 text-primary font-medium'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+              )}
+            >
+              <TrendingUp className="h-4 w-4 text-green-500" />
+              Active Cycle
+            </button>
+          )}
+
+          {/* My Issues (authenticated only) */}
+          {authenticated && (
+            <button
+              onClick={() => handleViewChange('inbox')}
+              className={cn(
+                'w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors',
+                viewMode === 'inbox'
+                  ? 'bg-primary/10 text-primary font-medium'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+              )}
+            >
+              <Inbox className="h-4 w-4" />
+              My Issues
+            </button>
+          )}
+
+          <div className="h-px bg-border my-2" />
+
+          {/* Projects Section */}
+          <Collapsible open={projectsOpen} onOpenChange={setProjectsOpen}>
+            <CollapsibleTrigger className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-muted-foreground hover:text-foreground">
+              <ChevronRight className={cn('h-3 w-3 transition-transform', projectsOpen && 'rotate-90')} />
+              <FolderKanban className="h-3.5 w-3.5" />
+              PROJECTS
               {authenticated && (
+                <Link
+                  to={`/${owner}/${repo}/projects`}
+                  className="ml-auto hover:text-primary"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </Link>
+              )}
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-0.5">
+              {projects?.map((project) => (
                 <button
-                  onClick={() => handleViewChange('inbox')}
+                  key={project.id}
+                  onClick={() => handleSidebarSelect('project', project.id)}
+                  className={cn(
+                    'w-full flex items-center gap-2 px-3 py-1.5 pl-8 rounded-md text-sm transition-colors',
+                    selectedProjectId === project.id
+                      ? 'bg-primary/10 text-primary font-medium'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                  )}
+                >
+                  {project.icon && <span className="text-sm">{project.icon}</span>}
+                  <span className="truncate">{project.name}</span>
+                </button>
+              ))}
+              {(!projects || projects.length === 0) && (
+                <div className="px-3 py-2 pl-8 text-xs text-muted-foreground">
+                  No projects yet
+                </div>
+              )}
+            </CollapsibleContent>
+          </Collapsible>
+
+          {/* Cycles Section */}
+          <Collapsible open={cyclesOpen} onOpenChange={setCyclesOpen}>
+            <CollapsibleTrigger className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-muted-foreground hover:text-foreground">
+              <ChevronRight className={cn('h-3 w-3 transition-transform', cyclesOpen && 'rotate-90')} />
+              <RefreshCw className="h-3.5 w-3.5" />
+              CYCLES
+              {authenticated && (
+                <Link
+                  to={`/${owner}/${repo}/cycles`}
+                  className="ml-auto hover:text-primary"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </Link>
+              )}
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-0.5">
+              {cycles?.slice(0, 5).map((cycle) => {
+                const isActive = currentCycle?.id === cycle.id;
+                return (
+                  <button
+                    key={cycle.id}
+                    onClick={() => handleSidebarSelect('cycle', cycle.id)}
+                    className={cn(
+                      'w-full flex items-center gap-2 px-3 py-1.5 pl-8 rounded-md text-sm transition-colors',
+                      selectedCycleId === cycle.id
+                        ? 'bg-primary/10 text-primary font-medium'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                    )}
+                  >
+                    {isActive && <span className="w-1.5 h-1.5 rounded-full bg-green-500" />}
+                    <span className="truncate">{cycle.name}</span>
+                  </button>
+                );
+              })}
+              {(!cycles || cycles.length === 0) && (
+                <div className="px-3 py-2 pl-8 text-xs text-muted-foreground">
+                  No cycles yet
+                </div>
+              )}
+            </CollapsibleContent>
+          </Collapsible>
+        </aside>
+
+        {/* Main Content */}
+        <div className="flex-1 space-y-4">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-6">
+              <h1 className="text-xl font-semibold">{getContextName()}</h1>
+              
+              {/* View toggle */}
+              <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
+                <button
+                  onClick={() => handleViewChange('list')}
                   className={cn(
                     'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-colors',
-                    viewMode === 'inbox'
+                    viewMode === 'list'
                       ? 'bg-background text-foreground shadow-sm'
                       : 'text-muted-foreground hover:text-foreground'
                   )}
                 >
-                  <Inbox className="h-4 w-4" />
-                  <span>Inbox</span>
-                </button>
-              )}
-            </div>
-
-            {/* State toggle (only for list view) */}
-            {viewMode === 'list' && (
-              <div className="flex items-center gap-1 text-sm">
-                <button
-                  onClick={() => handleStateChange('open')}
-                  className={cn(
-                    'flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors',
-                    currentState === 'open'
-                      ? 'bg-primary/10 text-primary font-medium'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                  )}
-                >
-                  <CircleDot className="h-4 w-4" />
-                  <span>{openCount} Open</span>
+                  <List className="h-4 w-4" />
+                  <span>List</span>
                 </button>
                 <button
-                  onClick={() => handleStateChange('closed')}
+                  onClick={() => handleViewChange('kanban')}
                   className={cn(
-                    'flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors',
-                    currentState === 'closed'
-                      ? 'bg-primary/10 text-primary font-medium'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                    'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-colors',
+                    viewMode === 'kanban'
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
                   )}
                 >
-                  <CheckCircle2 className="h-4 w-4" />
-                  <span>{closedCount} Closed</span>
+                  <LayoutGrid className="h-4 w-4" />
+                  <span>Board</span>
                 </button>
               </div>
+
+              {/* State toggle (only for list view) */}
+              {viewMode === 'list' && (
+                <div className="flex items-center gap-1 text-sm">
+                  <button
+                    onClick={() => handleStateChange('open')}
+                    className={cn(
+                      'flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors',
+                      currentState === 'open'
+                        ? 'bg-primary/10 text-primary font-medium'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                    )}
+                  >
+                    <CircleDot className="h-4 w-4" />
+                    <span>{openCount} Open</span>
+                  </button>
+                  <button
+                    onClick={() => handleStateChange('closed')}
+                    className={cn(
+                      'flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors',
+                      currentState === 'closed'
+                        ? 'bg-primary/10 text-primary font-medium'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                    )}
+                  >
+                    <CheckCircle2 className="h-4 w-4" />
+                    <span>{closedCount} Closed</span>
+                  </button>
+                </div>
+              )}
+            </div>
+            {authenticated && (
+              <Link to={`/${owner}/${repo}/issues/new`}>
+                <Button size="sm" className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  New Issue
+                </Button>
+              </Link>
             )}
           </div>
-          {authenticated && (
-            <Link to={`/${owner}/${repo}/issues/new`}>
-              <Button size="sm" className="gap-2">
-                <Plus className="h-4 w-4" />
-                New Issue
-              </Button>
-            </Link>
+
+          {/* Filters bar (only for list view) */}
+          {viewMode === 'list' && (
+            <div className="flex items-center gap-3 pb-2 border-b">
+              <div className="relative flex-1 max-w-sm">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search issues..."
+                  className="pl-9 h-9 bg-muted/50 border-0 focus-visible:bg-background focus-visible:ring-1"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground">
+                      <Signal className="h-4 w-4" />
+                      Priority
+                      <ChevronDown className="h-3 w-3" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    <DropdownMenuItem>Urgent</DropdownMenuItem>
+                    <DropdownMenuItem>High</DropdownMenuItem>
+                    <DropdownMenuItem>Medium</DropdownMenuItem>
+                    <DropdownMenuItem>Low</DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem>All priorities</DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground">
+                      <User className="h-4 w-4" />
+                      Assignee
+                      <ChevronDown className="h-3 w-3" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    <DropdownMenuItem>Assigned to me</DropdownMenuItem>
+                    <DropdownMenuItem>Unassigned</DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem>All assignees</DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground">
+                      <Tag className="h-4 w-4" />
+                      Label
+                      <ChevronDown className="h-3 w-3" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    <DropdownMenuItem>bug</DropdownMenuItem>
+                    <DropdownMenuItem>feature</DropdownMenuItem>
+                    <DropdownMenuItem>documentation</DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem>All labels</DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground">
+                      <SlidersHorizontal className="h-4 w-4" />
+                      Sort
+                      <ChevronDown className="h-3 w-3" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem>Newest</DropdownMenuItem>
+                    <DropdownMenuItem>Oldest</DropdownMenuItem>
+                    <DropdownMenuItem>Priority</DropdownMenuItem>
+                    <DropdownMenuItem>Due date</DropdownMenuItem>
+                    <DropdownMenuItem>Recently updated</DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
           )}
-        </div>
 
-        {/* Filters bar (only for list view) */}
-        {viewMode === 'list' && (
-          <div className="flex items-center gap-3 pb-2 border-b">
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search issues..."
-                className="pl-9 h-9 bg-muted/50 border-0 focus-visible:bg-background focus-visible:ring-1"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-
-            <div className="flex items-center gap-2">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground">
-                    <User className="h-4 w-4" />
-                    Author
-                    <ChevronDown className="h-3 w-3" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start">
-                  <DropdownMenuItem>Created by me</DropdownMenuItem>
-                  <DropdownMenuItem>Assigned to me</DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem>All authors</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground">
-                    <Tag className="h-4 w-4" />
-                    Label
-                    <ChevronDown className="h-3 w-3" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start">
-                  <DropdownMenuItem>bug</DropdownMenuItem>
-                  <DropdownMenuItem>feature</DropdownMenuItem>
-                  <DropdownMenuItem>documentation</DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem>All labels</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground">
-                    <SlidersHorizontal className="h-4 w-4" />
-                    Sort
-                    <ChevronDown className="h-3 w-3" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem>Newest</DropdownMenuItem>
-                  <DropdownMenuItem>Oldest</DropdownMenuItem>
-                  <DropdownMenuItem>Most commented</DropdownMenuItem>
-                  <DropdownMenuItem>Recently updated</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
-        )}
-
-        {/* Content based on view mode */}
-        {viewMode === 'inbox' && authenticated ? (
-          // Inbox view
-          <IssueInboxView
-            assignedToMe={assignedToMe}
-            createdByMe={createdByMe}
-            participated={participated}
-            assignedLoading={assignedLoading}
-            createdLoading={createdLoading}
-            participatedLoading={participatedLoading}
-            inboxSummary={inboxSummary}
-            owner={owner!}
-            repo={repo!}
-          />
-        ) : viewMode === 'kanban' ? (
-          // Kanban board view
-          repoData?.repo.id && kanbanData ? (
-            <KanbanBoard
-              repoId={repoData.repo.id}
+          {/* Content based on view mode */}
+          {viewMode === 'inbox' && authenticated ? (
+            <IssueInboxView
+              assignedToMe={assignedToMe}
+              createdByMe={createdByMe}
+              participated={participated}
+              assignedLoading={assignedLoading}
+              createdLoading={createdLoading}
+              participatedLoading={participatedLoading}
+              inboxSummary={inboxSummary}
               owner={owner!}
               repo={repo!}
-              groupedIssues={kanbanData}
             />
-          ) : (
-            <div className="text-center py-16">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-4">
-                <LayoutGrid className="h-8 w-8 text-muted-foreground" />
-              </div>
-              <h3 className="text-lg font-medium mb-1">No issues to display</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                Create an issue to see it on the board
-              </p>
-              {authenticated && (
-                <Link to={`/${owner}/${repo}/issues/new`}>
-                  <Button>Create the first issue</Button>
-                </Link>
-              )}
-            </div>
-          )
-        ) : (
-          // List view
-          <>
-            {filteredIssues.length === 0 ? (
+          ) : viewMode === 'kanban' ? (
+            repoData?.repo.id && kanbanData ? (
+              <KanbanBoard
+                repoId={repoData.repo.id}
+                owner={owner!}
+                repo={repo!}
+                groupedIssues={kanbanData}
+              />
+            ) : (
               <div className="text-center py-16">
                 <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-4">
-                  <CircleDot className="h-8 w-8 text-muted-foreground" />
+                  <LayoutGrid className="h-8 w-8 text-muted-foreground" />
                 </div>
-                <h3 className="text-lg font-medium mb-1">No issues found</h3>
+                <h3 className="text-lg font-medium mb-1">No issues to display</h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  {searchQuery
-                    ? 'Try a different search term'
-                    : currentState === 'open'
-                    ? 'There are no open issues yet'
-                    : 'There are no closed issues'}
+                  Create an issue to see it on the board
                 </p>
-                {authenticated && currentState === 'open' && !searchQuery && (
+                {authenticated && (
                   <Link to={`/${owner}/${repo}/issues/new`}>
                     <Button>Create the first issue</Button>
                   </Link>
                 )}
               </div>
-            ) : (
-              <div className="border rounded-lg divide-y">
-                {filteredIssues.map((issue) => (
-                  <IssueRow
-                    key={issue.id}
-                    issue={issue}
-                    owner={owner!}
-                    repo={repo!}
-                  />
-                ))}
-              </div>
-            )}
-          </>
-        )}
+            )
+          ) : (
+            <>
+              {filteredIssues.length === 0 ? (
+                <div className="text-center py-16">
+                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-4">
+                    <CircleDot className="h-8 w-8 text-muted-foreground" />
+                  </div>
+                  <h3 className="text-lg font-medium mb-1">No issues found</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    {searchQuery
+                      ? 'Try a different search term'
+                      : currentState === 'open'
+                      ? 'There are no open issues yet'
+                      : 'There are no closed issues'}
+                  </p>
+                  {authenticated && currentState === 'open' && !searchQuery && (
+                    <Link to={`/${owner}/${repo}/issues/new`}>
+                      <Button>Create the first issue</Button>
+                    </Link>
+                  )}
+                </div>
+              ) : (
+                <div className="border rounded-lg divide-y">
+                  {filteredIssues.map((issue) => (
+                    <IssueRow
+                      key={issue.id}
+                      issue={issue}
+                      owner={owner!}
+                      repo={repo!}
+                    />
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </div>
     </RepoLayout>
   );
@@ -398,6 +623,9 @@ interface IssueRowProps {
     title: string;
     state: string;
     status?: string;
+    priority?: string;
+    estimate?: number | null;
+    dueDate?: Date | string | null;
     createdAt: string | Date;
     author?: { username?: string | null; avatarUrl?: string | null } | null;
     labels?: { id: string; name: string; color: string }[];
@@ -422,9 +650,27 @@ function IssueRow({ issue, owner, repo }: IssueRowProps) {
 
   const status = issue.status || 'backlog';
   const statusInfo = statusConfig[status] || statusConfig.backlog;
+  const priorityInfo = PRIORITY_CONFIG[issue.priority || 'none'];
+
+  // Check if due date is overdue or soon
+  const getDueDateStatus = () => {
+    if (!issue.dueDate) return null;
+    const due = new Date(issue.dueDate);
+    const now = new Date();
+    const diffDays = Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    if (diffDays < 0) return 'overdue';
+    if (diffDays <= 3) return 'soon';
+    return 'normal';
+  };
+  const dueDateStatus = getDueDateStatus();
 
   return (
     <div className="flex items-center gap-4 px-4 py-3 hover:bg-muted/50 transition-colors group">
+      {/* Priority indicator */}
+      <div className={cn('flex-shrink-0', priorityInfo.color)} title={priorityInfo.label}>
+        {priorityInfo.icon}
+      </div>
+
       {/* Status icon */}
       <div className="flex-shrink-0">
         {isOpen ? (
@@ -487,16 +733,38 @@ function IssueRow({ issue, owner, repo }: IssueRowProps) {
         </div>
       </div>
 
-      {/* Assignee */}
-      {issue.assignee?.avatarUrl && (
-        <div className="flex-shrink-0">
+      {/* Right side: due date, estimate, assignee */}
+      <div className="flex items-center gap-3 flex-shrink-0">
+        {/* Due date */}
+        {issue.dueDate && (
+          <span className={cn(
+            'flex items-center gap-1 text-xs',
+            dueDateStatus === 'overdue' && 'text-red-500',
+            dueDateStatus === 'soon' && 'text-orange-500',
+            dueDateStatus === 'normal' && 'text-muted-foreground'
+          )}>
+            <Calendar className="h-3 w-3" />
+            {new Date(issue.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+          </span>
+        )}
+
+        {/* Estimate */}
+        {issue.estimate && (
+          <span className="flex items-center gap-1 text-xs text-muted-foreground">
+            <Target className="h-3 w-3" />
+            {issue.estimate}
+          </span>
+        )}
+
+        {/* Assignee */}
+        {issue.assignee?.avatarUrl && (
           <img
             src={issue.assignee.avatarUrl}
             alt={issue.assignee.username || 'Assignee'}
             className="h-6 w-6 rounded-full"
           />
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
@@ -631,7 +899,6 @@ function InboxIssueCard({ issue, owner, repo }: { issue: any; owner: string; rep
     ? <CircleDot className="h-4 w-4 text-green-500" />
     : <CheckCircle2 className="h-4 w-4 text-purple-500" />;
 
-  // Status badge config
   const statusConfig: Record<string, { label: string; color: string }> = {
     backlog: { label: 'Backlog', color: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300' },
     todo: { label: 'Todo', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' },

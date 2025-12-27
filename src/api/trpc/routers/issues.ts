@@ -35,8 +35,11 @@ export const issuesRouter = router({
         repoId: z.string().uuid(),
         state: z.enum(['open', 'closed']).optional(),
         status: issueStatusSchema.optional(),
+        priority: issuePrioritySchema.optional(),
         authorId: z.string().uuid().optional(),
         assigneeId: z.string().uuid().optional(),
+        projectId: z.string().uuid().optional(),
+        cycleId: z.string().uuid().optional(),
         limit: z.number().min(1).max(100).default(20),
         offset: z.number().min(0).default(0),
       })
@@ -45,8 +48,11 @@ export const issuesRouter = router({
       const issues = await issueModel.listByRepo(input.repoId, {
         state: input.state,
         status: input.status,
+        priority: input.priority,
         authorId: input.authorId,
         assigneeId: input.assigneeId,
+        projectId: input.projectId,
+        cycleId: input.cycleId,
         limit: input.limit,
         offset: input.offset,
       });
@@ -843,6 +849,8 @@ export const issuesRouter = router({
         state: z.enum(['open', 'closed']).optional(),
         authorId: z.string().uuid().optional(),
         assigneeId: z.string().uuid().optional(),
+        projectId: z.string().uuid().optional(),
+        cycleId: z.string().uuid().optional(),
       })
     )
     .query(async ({ input }) => {
@@ -851,6 +859,8 @@ export const issuesRouter = router({
         state: input.state,
         authorId: input.authorId,
         assigneeId: input.assigneeId,
+        projectId: input.projectId,
+        cycleId: input.cycleId,
         limit: 500,
       });
 
