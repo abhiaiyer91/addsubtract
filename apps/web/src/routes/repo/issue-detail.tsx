@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { CircleDot, CheckCircle2 } from 'lucide-react';
+import { CircleDot, CheckCircle2, ChevronRight, FolderKanban, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
@@ -57,6 +57,18 @@ export function IssueDetailPage() {
   const { data: availableLabels } = trpc.issues.listLabels.useQuery(
     { repoId: repoData?.repo.id! },
     { enabled: !!repoData?.repo.id }
+  );
+
+  // Fetch project if issue belongs to one
+  const { data: project } = trpc.projects.get.useQuery(
+    { projectId: issueData?.projectId! },
+    { enabled: !!issueData?.projectId }
+  );
+
+  // Fetch cycle if issue belongs to one
+  const { data: cycle } = trpc.cycles.get.useQuery(
+    { cycleId: issueData?.cycleId! },
+    { enabled: !!issueData?.cycleId }
   );
 
   // Mutations
@@ -217,6 +229,43 @@ export function IssueDetailPage() {
 
   return (
     <RepoLayout owner={owner!} repo={repo!}>
+      {/* Breadcrumb navigation */}
+      <div className="flex items-center gap-2 text-sm mb-4">
+        <Link 
+          to={`/${owner}/${repo}/issues`}
+          className="text-muted-foreground hover:text-foreground transition-colors"
+        >
+          Issues
+        </Link>
+        {(project || cycle) && (
+          <>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            <Link 
+              to={project 
+                ? `/${owner}/${repo}/issues?section=project&project=${project.id}` 
+                : `/${owner}/${repo}/issues?section=cycle&cycle=${cycle?.id}`
+              }
+              className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {project ? (
+                <>
+                  <FolderKanban className="h-4 w-4" />
+                  {project.icon && <span>{project.icon}</span>}
+                  {project.name}
+                </>
+              ) : cycle ? (
+                <>
+                  <RefreshCw className="h-4 w-4" />
+                  {cycle.name}
+                </>
+              ) : null}
+            </Link>
+          </>
+        )}
+        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+        <span className="text-foreground">#{issue.number}</span>
+      </div>
+
       {/* Issue header */}
       <div>
         <h1 className="text-2xl font-bold">
@@ -238,6 +287,25 @@ export function IssueDetailPage() {
             )}
             {issue.state === 'open' ? 'Open' : 'Closed'}
           </Badge>
+
+          {/* Project/Cycle badges */}
+          {project && (
+            <Link to={`/${owner}/${repo}/issues?section=project&project=${project.id}`}>
+              <Badge variant="outline" className="gap-1.5 hover:bg-muted transition-colors">
+                <FolderKanban className="h-3 w-3" />
+                {project.icon && <span>{project.icon}</span>}
+                {project.name}
+              </Badge>
+            </Link>
+          )}
+          {cycle && (
+            <Link to={`/${owner}/${repo}/issues?section=cycle&cycle=${cycle.id}`}>
+              <Badge variant="outline" className="gap-1.5 hover:bg-muted transition-colors">
+                <RefreshCw className="h-3 w-3" />
+                {cycle.name}
+              </Badge>
+            </Link>
+          )}
 
           <span className="text-muted-foreground">
             <Link

@@ -279,7 +279,7 @@ export function ProjectDetailPage() {
                   Add issues to this project to track progress
                 </p>
                 {authenticated && (
-                  <Link to={`/${owner}/${repo}/issues/new`}>
+                  <Link to={`/${owner}/${repo}/issues/new?project=${projectId}`}>
                     <Button>
                       <Plus className="mr-2 h-4 w-4" />
                       Create Issue
