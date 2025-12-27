@@ -9,6 +9,7 @@ import {
   Settings,
   History,
   Loader2,
+  Layers,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -143,6 +144,7 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
     if (path.includes('/commits')) return 'commits';
     if (path.includes('/issues')) return 'issues';
     if (path.includes('/pulls') || path.includes('/pull/')) return 'pulls';
+    if (path.includes('/stacks')) return 'stacks';
     if (path.includes('/settings')) return 'settings';
     return 'code';
   };
@@ -268,6 +270,10 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
             <Badge variant="secondary" className="ml-1">
               {repoInfo.openPrsCount}
             </Badge>
+          </Link>
+          <Link to={`/${owner}/${repo}/stacks`} className={tabClass('stacks')}>
+            <Layers className="h-4 w-4" />
+            Stacks
           </Link>
           {authenticated && (
             <Link to={`/${owner}/${repo}/settings`} className={tabClass('settings')}>

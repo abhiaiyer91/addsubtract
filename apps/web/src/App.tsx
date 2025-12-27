@@ -19,6 +19,8 @@ import { NewPullPage } from './routes/repo/pull-new';
 import { IssuesPage } from './routes/repo/issues';
 import { IssueDetailPage } from './routes/repo/issue-detail';
 import { NewIssuePage } from './routes/repo/issue-new';
+import { StacksPage } from './routes/repo/stacks';
+import { StackDetailPage } from './routes/repo/stack-detail';
 import { SettingsPage } from './routes/settings';
 import { NewRepoPage } from './routes/new';
 
@@ -56,6 +58,10 @@ export function App() {
             <Route path="/:owner/:repo/issues" element={<IssuesPage />} />
             <Route path="/:owner/:repo/issues/new" element={<NewIssuePage />} />
             <Route path="/:owner/:repo/issues/:number" element={<IssueDetailPage />} />
+
+            {/* Stacks */}
+            <Route path="/:owner/:repo/stacks" element={<StacksPage />} />
+            <Route path="/:owner/:repo/stacks/:stackName" element={<StackDetailPage />} />
           </Route>
         </Routes>
       </BrowserRouter>

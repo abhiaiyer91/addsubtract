@@ -14,6 +14,7 @@ import { sshKeysRouter } from './ssh-keys';
 import { tokensRouter } from './tokens';
 import { branchProtectionRouter } from './branch-protection';
 import { notificationsRouter } from './notifications';
+import { stacksRouter } from './stacks';
 
 /**
  * Main application router
@@ -35,6 +36,7 @@ export const appRouter = router({
   tokens: tokensRouter,
   branchProtection: branchProtectionRouter,
   notifications: notificationsRouter,
+  stacks: stacksRouter,
 });
 
 /**
@@ -59,4 +61,5 @@ export {
   tokensRouter,
   branchProtectionRouter,
   notificationsRouter,
+  stacksRouter,
 };
