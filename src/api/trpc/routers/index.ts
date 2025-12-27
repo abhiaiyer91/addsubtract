@@ -16,6 +16,7 @@ import { branchProtectionRouter } from './branch-protection';
 import { notificationsRouter } from './notifications';
 import { stacksRouter } from './stacks';
 import { workflowsRouter } from './workflows';
+import { agentRouter } from './agent';
 import { aiRouter } from './ai';
 import { searchRouter } from './search';
 import { mergeQueueRouter } from './merge-queue';
@@ -42,6 +43,7 @@ export const appRouter = router({
   notifications: notificationsRouter,
   stacks: stacksRouter,
   workflows: workflowsRouter,
+  agent: agentRouter,
   ai: aiRouter,
   search: searchRouter,
   mergeQueue: mergeQueueRouter,
@@ -70,6 +72,7 @@ export {
   branchProtectionRouter,
   notificationsRouter,
   stacksRouter,
+  agentRouter,
   aiRouter,
   searchRouter,
   mergeQueueRouter,

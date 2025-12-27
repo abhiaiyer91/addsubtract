@@ -38,11 +38,13 @@ import { SettingsPage } from './routes/settings';
 import { SSHKeysPage } from './routes/settings/keys';
 import { TokensPage } from './routes/settings/tokens';
 import { NewRepoPage } from './routes/new';
+import { AgentPage } from './routes/agent';
 import { NewOrgPage } from './routes/org/new';
 import { OrgPage } from './routes/org';
 import { OrgSettingsPage } from './routes/org/settings';
 import { OrgMembersPage } from './routes/org/members';
 import { OrgTeamsPage } from './routes/org/teams';
+import { TeamDetailPage } from './routes/org/team-detail';
 import { SearchPage } from './routes/search';
 import { InboxPage } from './routes/inbox';
 
@@ -65,6 +67,7 @@ export function App() {
             <Route path="/settings/keys" element={<SSHKeysPage />} />
             <Route path="/settings/tokens" element={<TokensPage />} />
             <Route path="/new" element={<NewRepoPage />} />
+            <Route path="/agent" element={<AgentPage />} />
             <Route path="/orgs/new" element={<NewOrgPage />} />
             <Route path="/search" element={<SearchPage />} />
             <Route path="/inbox" element={<InboxPage />} />
@@ -74,6 +77,7 @@ export function App() {
             <Route path="/org/:slug/settings" element={<OrgSettingsPage />} />
             <Route path="/org/:slug/members" element={<OrgMembersPage />} />
             <Route path="/org/:slug/teams" element={<OrgTeamsPage />} />
+            <Route path="/org/:slug/teams/:teamId" element={<TeamDetailPage />} />
 
             {/* User/Org profile */}
             <Route path="/:owner" element={<OwnerPage />} />

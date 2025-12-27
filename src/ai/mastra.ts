@@ -1,16 +1,58 @@
 /**
  * Mastra Configuration for wit
  * 
- * Sets up the Mastra instance with the wit agent and tools.
+ * Sets up the Mastra instance with the wit agent, tools, and memory.
+ * Uses LibSQL for persistent storage of conversation history.
  */
 
+import * as path from 'path';
+import * as os from 'os';
 import { Mastra } from '@mastra/core';
 import { Agent } from '@mastra/core/agent';
+import { Memory } from '@mastra/memory';
+import { LibSQLStore } from '@mastra/libsql';
 import { witAgent, createTsgitAgent } from './agent.js';
 import { witTools } from './tools/index.js';
 import type { AIConfig } from './types.js';
 
 let mastraInstance: Mastra | null = null;
+let memoryInstance: Memory | null = null;
+let storageInstance: LibSQLStore | null = null;
+
+/**
+ * Get the path to the wit data directory
+ */
+function getWitDataDir(): string {
+  const witDir = process.env.WIT_DATA_DIR || path.join(os.homedir(), '.wit');
+  return witDir;
+}
+
+/**
+ * Get or create the LibSQL storage instance
+ */
+export function getStorage(): LibSQLStore {
+  if (!storageInstance) {
+    const dbPath = path.join(getWitDataDir(), 'agent.db');
+    storageInstance = new LibSQLStore({
+      id: 'wit-agent-storage',
+      url: `file:${dbPath}`,
+    });
+  }
+  return storageInstance;
+}
+
+/**
+ * Get or create the Memory instance for conversation history
+ */
+export function getMemory(): Memory {
+  if (!memoryInstance) {
+    const storage = getStorage();
+    memoryInstance = new Memory({
+      storage,
+    });
+  }
+  return memoryInstance;
+}
 
 /**
  * Create and configure a Mastra instance for wit
@@ -19,12 +61,18 @@ export function createTsgitMastra(config: AIConfig = {}): Mastra {
   const model = config.model || process.env.WIT_AI_MODEL || 'openai/gpt-4o';
   
   const agent = createTsgitAgent(model);
+  const memory = getMemory();
+  const storage = getStorage();
   
   const mastra = new Mastra({
     agents: {
       wit: agent,
     },
     tools: witTools,
+    memory: {
+      wit: memory,
+    },
+    storage,
     logger: config.verbose ? undefined : false,
   });
   

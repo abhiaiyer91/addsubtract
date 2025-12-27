@@ -10,6 +10,8 @@ import {
   userModel,
   labelModel,
   activityHelpers,
+  orgModel,
+  orgMemberModel,
 } from '../../../db/models';
 import { BareRepository, forkRepository, getRepoDiskPath } from '../../../server/storage/repos';
 import { exists } from '../../../utils/fs';
@@ -180,6 +182,75 @@ export const reposRouter = router({
         isPrivate: input.isPrivate,
         ownerId: ctx.user.id,
         ownerType: 'user',
+        diskPath,
+        defaultBranch: input.defaultBranch,
+      });
+
+      // Create default labels
+      await labelModel.createDefaults(repo.id);
+
+      // Log activity
+      await activityHelpers.logRepoCreated(ctx.user.id, repo.id);
+
+      return repo;
+    }),
+
+  /**
+   * Create a new repository for an organization
+   */
+  createForOrg: protectedProcedure
+    .input(
+      z.object({
+        orgId: z.string().uuid(),
+        name: z
+          .string()
+          .min(1, 'Repository name is required')
+          .max(100, 'Repository name must be at most 100 characters')
+          .regex(
+            /^[a-zA-Z0-9._-]+$/,
+            'Repository name can only contain alphanumeric characters, dots, hyphens, and underscores'
+          ),
+        description: z.string().max(500).optional(),
+        isPrivate: z.boolean().default(false),
+        defaultBranch: z.string().default('main'),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      // Check if user has permission to create repos in this org (admin or owner)
+      const hasPermission = await orgMemberModel.hasRole(input.orgId, ctx.user.id, 'admin');
+      if (!hasPermission) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to create repositories in this organization',
+        });
+      }
+
+      // Get the organization
+      const org = await orgModel.findById(input.orgId);
+      if (!org) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Organization not found',
+        });
+      }
+
+      // Check if repo already exists for this org
+      const existing = await repoModel.findByOwnerAndName(input.orgId, input.name);
+      if (existing) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'Repository already exists',
+        });
+      }
+
+      const diskPath = `/repos/${org.name}/${input.name}.git`;
+
+      const repo = await repoModel.create({
+        name: input.name,
+        description: input.description,
+        isPrivate: input.isPrivate,
+        ownerId: input.orgId,
+        ownerType: 'organization',
         diskPath,
         defaultBranch: input.defaultBranch,
       });

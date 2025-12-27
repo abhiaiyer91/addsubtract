@@ -75,12 +75,12 @@ Do NOT use this for file operations - use readFile, writeFile, editFile instead.
     exitCode: z.number().optional(),
     stdout: z.string().optional(),
     stderr: z.string().optional(),
-    error: z.string().optional(),
+    errorMessage: z.string().optional().describe('Error message if operation failed'),
     timedOut: z.boolean().optional(),
     truncated: z.boolean().optional(),
     duration: z.number().optional().describe('Execution time in milliseconds'),
   }),
-  execute: async ({ command, args = [], timeout = 60000, env = {} }): Promise<any> => {
+  execute: async ({ command, args = [], timeout = 60000, env = {} }) => {
     try {
       const repo = Repository.find();
 
@@ -100,7 +100,7 @@ Do NOT use this for file operations - use readFile, writeFile, editFile instead.
       if (BLOCKED_COMMANDS.has(baseCommand)) {
         return {
           success: false,
-          error: `Command '${baseCommand}' is blocked for security reasons`,
+          errorMessage: `Command '${baseCommand}' is blocked for security reasons`,
         };
       }
 
@@ -111,7 +111,7 @@ Do NOT use this for file operations - use readFile, writeFile, editFile instead.
       if (!ALLOWED_COMMANDS.has(baseCommand) && !isRunScript) {
         return {
           success: false,
-          error: `Command '${baseCommand}' is not in the allowed list. Allowed: ${Array.from(ALLOWED_COMMANDS).slice(0, 20).join(', ')}...`,
+          errorMessage: `Command '${baseCommand}' is not in the allowed list. Allowed: ${Array.from(ALLOWED_COMMANDS).slice(0, 20).join(', ')}...`,
         };
       }
 
@@ -128,7 +128,7 @@ Do NOT use this for file operations - use readFile, writeFile, editFile instead.
           if (pattern.test(arg)) {
             return {
               success: false,
-              error: `Argument contains potentially dangerous pattern: ${arg}`,
+              errorMessage: `Argument contains potentially dangerous pattern: ${arg}`,
             };
           }
         }
@@ -154,7 +154,7 @@ Do NOT use this for file operations - use readFile, writeFile, editFile instead.
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to execute command',
+        errorMessage: error instanceof Error ? error.message : 'Failed to execute command',
       };
     }
   },
@@ -210,7 +210,7 @@ async function executeCommand(
   exitCode?: number;
   stdout?: string;
   stderr?: string;
-  error?: string;
+  errorMessage?: string;
   timedOut?: boolean;
   truncated?: boolean;
 }> {
@@ -258,7 +258,7 @@ async function executeCommand(
       clearTimeout(timeoutId);
       resolve({
         success: false,
-        error: err.message,
+        errorMessage: err.message,
       });
     });
 

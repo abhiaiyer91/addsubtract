@@ -35,9 +35,9 @@ Can recursively list subdirectories up to a specified depth.`,
     totalFiles: z.number().optional(),
     totalDirectories: z.number().optional(),
     truncated: z.boolean().optional().describe('Whether results were truncated due to limit'),
-    error: z.string().optional(),
+    errorMessage: z.string().optional().describe('Error message if operation failed'),
   }),
-  execute: async ({ dirPath = '.', recursive = false, maxDepth = 3, includeHidden = false, pattern }): Promise<any> => {
+  execute: async ({ dirPath = '.', recursive = false, maxDepth = 3, includeHidden = false, pattern }) => {
     try {
       const repo = Repository.find();
       const fullPath = path.join(repo.workDir, dirPath);
@@ -47,21 +47,21 @@ Can recursively list subdirectories up to a specified depth.`,
       if (!resolvedPath.startsWith(repo.workDir)) {
         return {
           success: false,
-          error: 'Access denied: Path is outside repository',
+          errorMessage: 'Access denied: Path is outside repository',
         };
       }
 
       if (!exists(fullPath)) {
         return {
           success: false,
-          error: `Directory not found: ${dirPath}`,
+          errorMessage: `Directory not found: ${dirPath}`,
         };
       }
 
       if (!isDirectory(fullPath)) {
         return {
           success: false,
-          error: `Path is a file, not a directory: ${dirPath}. Use readFile tool instead.`,
+          errorMessage: `Path is a file, not a directory: ${dirPath}. Use readFile tool instead.`,
         };
       }
 
@@ -177,7 +177,7 @@ Can recursively list subdirectories up to a specified depth.`,
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to list directory',
+        errorMessage: error instanceof Error ? error.message : 'Failed to list directory',
       };
     }
   },
