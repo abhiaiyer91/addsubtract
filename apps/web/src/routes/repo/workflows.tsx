@@ -14,6 +14,7 @@ import {
   GitBranch,
   User,
   Calendar,
+  Plus,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -182,15 +183,26 @@ export function WorkflowsPage() {
             </div>
           </div>
 
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={() => refetchRuns()}
-            className="gap-2"
-          >
-            <RefreshCw className="h-4 w-4" />
-            Refresh
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => refetchRuns()}
+              className="gap-2"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Refresh
+            </Button>
+            <Button 
+              size="sm" 
+              asChild
+            >
+              <Link to={`/${owner}/${repo}/actions/new`}>
+                <Plus className="h-4 w-4 mr-1" />
+                New Workflow
+              </Link>
+            </Button>
+          </div>
         </div>
 
         <div className="flex gap-6">

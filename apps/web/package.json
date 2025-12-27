@@ -45,11 +45,13 @@
     "react-hotkeys-hook": "^5.2.1",
     "react-markdown": "^9.0.1",
     "react-router-dom": "^7.1.0",
+    "reactflow": "^11.11.4",
     "remark-gfm": "^4.0.0",
     "shiki": "^1.24.2",
     "superjson": "^2.2.6",
     "tailwind-merge": "^2.6.0",
     "wit": "*",
+    "yaml": "^2.8.2",
     "zod": "^3.24.1",
     "zustand": "^5.0.9"
   },

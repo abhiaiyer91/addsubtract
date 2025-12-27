@@ -67,7 +67,7 @@ export function TokensPage() {
 
   const createToken = trpc.tokens.create.useMutation({
     onSuccess: (data) => {
-      setNewToken(data.rawToken);
+      setNewToken(data.token);
       setName('');
       setSelectedScopes([]);
       setExpiresIn('30');
@@ -145,7 +145,7 @@ export function TokensPage() {
   const isLoading = tokensLoading;
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <div className="container max-w-[1200px] mx-auto py-8 space-y-6">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm">
         <Link to="/settings" className="text-muted-foreground hover:text-foreground flex items-center gap-1">

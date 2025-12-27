@@ -330,9 +330,9 @@ export function AgentPanel({ isOpen, onClose, repoId, repoName, owner, embedded 
               <p className="text-sm text-muted-foreground mb-4">
                 Add your API key in repository settings to use the agent.
               </p>
-              {repoId && (
+              {repoId && owner && repoName && (
                 <Button asChild size="sm" className="gap-2">
-                  <Link to="settings/ai">
+                  <Link to={`/${owner}/${repoName}/settings/ai`}>
                     <Settings className="h-4 w-4" />
                     Configure AI
                   </Link>
@@ -629,9 +629,9 @@ export function AgentPanel({ isOpen, onClose, repoId, repoName, owner, embedded 
             <p className="text-sm text-muted-foreground mb-4">
               Add your API key in repository settings to use the agent.
             </p>
-            {repoId && (
+            {repoId && owner && repoName && (
               <Button asChild size="sm" className="gap-2">
-                <Link to="settings/ai">
+                <Link to={`/${owner}/${repoName}/settings/ai`}>
                   <Settings className="h-4 w-4" />
                   Configure AI
                 </Link>

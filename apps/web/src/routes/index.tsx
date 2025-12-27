@@ -50,13 +50,13 @@ function LandingView() {
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-up" style={{ animationDelay: '300ms' }}>
-            <Button size="xl" asChild>
+            <Button size="xl" asChild className="transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-primary/20">
               <Link to="/register">
                 Get started for free
-                <ArrowRight className="ml-2 h-5 w-5" />
+                <ArrowRight className="ml-2 h-5 w-5 transition-transform duration-300 group-hover:translate-x-1" />
               </Link>
             </Button>
-            <Button size="xl" variant="outline" asChild>
+            <Button size="xl" variant="outline" asChild className="transition-all duration-300 hover:scale-105 hover:shadow-lg hover:border-primary/50">
               <Link to="/login">Sign in</Link>
             </Button>
           </div>
@@ -138,13 +138,13 @@ function LandingView() {
             Join developers who are shipping code faster with Wit
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button size="xl" asChild>
+            <Button size="xl" asChild className="transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-primary/20">
               <Link to="/register">
                 Start free trial
-                <ArrowRight className="ml-2 h-5 w-5" />
+                <ArrowRight className="ml-2 h-5 w-5 transition-transform duration-300 group-hover:translate-x-1" />
               </Link>
             </Button>
-            <Button size="xl" variant="outline" asChild>
+            <Button size="xl" variant="outline" asChild className="transition-all duration-300 hover:scale-105 hover:shadow-lg hover:border-primary/50">
               <Link to="/login">Sign in</Link>
             </Button>
           </div>
@@ -164,11 +164,11 @@ function FeatureCard({
   description: string;
 }) {
   return (
-    <div className="feature-card group">
-      <div className="p-3 w-fit rounded-xl bg-primary/10 text-primary mb-4 transition-all duration-300 group-hover:bg-primary/20 group-hover:shadow-glow-sm">
+    <div className="feature-card group transition-all duration-300 hover:scale-105 hover:shadow-xl hover:border-primary/30">
+      <div className="p-3 w-fit rounded-xl bg-primary/10 text-primary mb-4 transition-all duration-300 group-hover:bg-primary/20 group-hover:shadow-glow-sm group-hover:scale-110">
         {icon}
       </div>
-      <h3 className="text-lg font-semibold mb-2">{title}</h3>
+      <h3 className="text-lg font-semibold mb-2 transition-colors duration-300 group-hover:text-primary">{title}</h3>
       <p className="text-muted-foreground leading-relaxed">{description}</p>
     </div>
   );
