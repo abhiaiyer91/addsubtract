@@ -18,7 +18,7 @@ export function HomePage() {
   const authenticated = isAuthenticated();
   const user = getUser();
 
-  if (authenticated && user) {
+  if (authenticated && user && user.username) {
     return <DashboardView username={user.username} />;
   }
 

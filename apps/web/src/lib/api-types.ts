@@ -1,94 +1,25 @@
 /**
- * API Types - These match the actual server API structure
- * 
- * The AppRouter type is imported from the shared definition.
- * These interfaces represent the data structures used throughout the app.
+ * API Types - Re-exported from wit core package
+ *
+ * This file re-exports types from the wit package to provide
+ * end-to-end type safety between the server and web app.
  */
 
-// Re-export the AppRouter type from the server
-// This enables end-to-end type safety with tRPC
-export type { AppRouter } from '../../../../src/api/trpc/routers';
+// Re-export the AppRouter type for tRPC
+export type { AppRouter } from 'wit';
 
-export interface User {
-  id: string;
-  username: string;
-  email: string;
-  name: string | null;
-  avatarUrl: string | null;
-  bio?: string | null;
-  location?: string | null;
-  website?: string | null;
-  createdAt: Date;
-  updatedAt?: Date;
-}
+// Re-export API types from wit core (with friendly names for web app)
+export type {
+  ApiUser as User,
+  ApiRepository as Repository,
+  ApiPullRequest as PullRequest,
+  ApiPullRequestWithAuthor as PullRequestWithAuthor,
+  ApiIssue as Issue,
+  ApiIssueWithAuthor as IssueWithAuthor,
+  ApiLabel as Label,
+} from 'wit';
 
-export interface Repository {
-  id: string;
-  ownerId: string;
-  ownerType: 'user' | 'organization';
-  name: string;
-  description: string | null;
-  isPrivate: boolean;
-  isFork: boolean;
-  forkedFromId: string | null;
-  defaultBranch: string;
-  starsCount: number;
-  forksCount: number;
-  watchersCount: number;
-  openIssuesCount: number;
-  openPrsCount: number;
-  diskPath: string;
-  createdAt: Date;
-  updatedAt: Date;
-  pushedAt: Date | null;
-}
-
-export interface PullRequest {
-  id: string;
-  repoId: string;
-  number: number;
-  title: string;
-  body: string | null;
-  state: 'open' | 'closed' | 'merged';
-  sourceBranch: string;
-  targetBranch: string;
-  sourceRepoId: string | null;
-  headSha: string;
-  baseSha: string;
-  mergeSha: string | null;
-  authorId: string;
-  isDraft: boolean;
-  isMergeable: boolean | null;
-  createdAt: Date;
-  updatedAt: Date;
-  mergedAt: Date | null;
-  closedAt: Date | null;
-  mergedById: string | null;
-}
-
-export interface Issue {
-  id: string;
-  repoId: string;
-  number: number;
-  title: string;
-  body: string | null;
-  state: 'open' | 'closed';
-  authorId: string;
-  assigneeId: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-  closedAt: Date | null;
-  closedById: string | null;
-}
-
-export interface Label {
-  id: string;
-  repoId: string;
-  name: string;
-  color: string;
-  description: string | null;
-  createdAt: Date;
-}
+// Additional UI-specific types that extend the base types
 
 export interface TreeEntry {
   name: string;

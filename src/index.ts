@@ -60,5 +60,57 @@ export * from './ai';
 // Primitives
 export * from './primitives';
 
+// API - tRPC router and client utilities
+export {
+  // Router
+  appRouter,
+  type AppRouter,
+  // Context
+  createContext,
+  createTestContext,
+  type Context,
+  // tRPC primitives
+  router,
+  publicProcedure,
+  protectedProcedure,
+  middleware,
+  mergeRouters,
+  // Middleware
+  isAuthed,
+  withRepoPermission,
+  isRepoAdmin,
+  isRepoMember,
+  withOrgRole,
+  isOrgAdmin,
+  isOrgOwner,
+  // Client
+  createClient,
+  createClientWithTokenGetter,
+  isTRPCClientError,
+  TRPCClientError,
+} from './api/trpc';
+
+// API Client and Types (namespaced to avoid conflicts with core Repository class)
+export {
+  ApiClient,
+  createApiClient,
+  getApiClient,
+  resetApiClient,
+  getServerUrl,
+  getAuthToken,
+  ApiError,
+} from './api/client';
+
+// API Types - exported with 'Api' prefix to avoid conflicts
+export type {
+  User as ApiUser,
+  Repository as ApiRepository,
+  PullRequest as ApiPullRequest,
+  PullRequestWithAuthor as ApiPullRequestWithAuthor,
+  Issue as ApiIssue,
+  IssueWithAuthor as ApiIssueWithAuthor,
+  Label as ApiLabel,
+} from './api/client';
+
 // Version
 export const VERSION = '2.0.0';

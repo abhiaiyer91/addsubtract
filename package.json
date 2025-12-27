@@ -7,6 +7,9 @@
   "bin": {
     "wit": "./dist/cli.js"
   },
+  "workspaces": [
+    "apps/*"
+  ],
   "scripts": {
     "build": "tsc",
     "start": "node dist/cli.js",
