@@ -16,7 +16,6 @@ import {
   AtSign,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,27 +26,21 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useSession, signOut } from '@/lib/auth-client';
-import { useState } from 'react';
 import { trpc } from '@/lib/trpc';
 import { formatRelativeTime } from '@/lib/utils';
+import { useCommandPaletteStore } from '@/hooks/useCommandPalette';
+import { isMac } from '@/lib/commands';
 
 export function Header() {
   const navigate = useNavigate();
   const { data: session } = useSession();
   const user = session?.user;
   const authenticated = !!user;
-  const [searchQuery, setSearchQuery] = useState('');
+  const { open: openCommandPalette } = useCommandPaletteStore();
 
   const handleLogout = async () => {
     await signOut();
     navigate('/');
-  };
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      navigate(`/search?q=${encodeURIComponent(searchQuery)}`);
-    }
   };
 
   return (
@@ -86,20 +79,21 @@ export function Header() {
           )}
         </div>
 
-        {/* Center section - Search */}
+        {/* Center section - Search (opens command palette) */}
         <div className="flex-1 max-w-md mx-4">
-          <form onSubmit={handleSearch}>
-            <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="search"
-                placeholder="Search repositories..."
-                className="pl-8 w-full"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-          </form>
+          <button
+            onClick={openCommandPalette}
+            className="flex h-10 w-full items-center gap-2 rounded-full border border-border/40 bg-muted/20 px-4 py-2 text-sm transition-all duration-300 hover:border-muted-foreground/30 hover:bg-muted/30 focus:border-primary/50 focus:bg-card focus:outline-none focus:ring-2 focus:ring-primary/20"
+          >
+            <Search className="h-4 w-4 text-muted-foreground" />
+            <span className="flex-1 text-left text-muted-foreground/50">
+              Search or jump to...
+            </span>
+            <kbd className="kbd hidden sm:inline-flex">
+              {isMac() ? '\u2318' : 'Ctrl'}
+            </kbd>
+            <kbd className="kbd hidden sm:inline-flex">K</kbd>
+          </button>
         </div>
 
         {/* Right section - User actions */}
