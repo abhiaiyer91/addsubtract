@@ -324,9 +324,9 @@ export const mergeQueueEntryModel = {
   },
 
   /**
-   * Reorder entries after one is removed
+   * Reorder entries after one is removed (internal helper)
    */
-  private async reorderAfterRemoval(
+  async reorderAfterRemoval(
     repoId: string,
     targetBranch: string,
     removedPosition: number
