@@ -20,6 +20,7 @@ import { initDatabase, healthCheck as dbHealthCheck, isConnected as isDbConnecte
 import { SSHServer, generateHostKey, SSHServerOptions } from './ssh';
 import { SSHKeyManager, FileBasedAccessControl } from './ssh/keys';
 import { Repository } from '../core/repository';
+import { createAuth } from '../lib/auth';
 
 /**
  * Server configuration options
@@ -83,9 +84,10 @@ export function createApp(repoManager: RepoManager, options: { verbose?: boolean
 
   // Enable CORS for web clients
   app.use('*', cors({
-    origin: '*',
-    allowMethods: ['GET', 'POST', 'OPTIONS'],
+    origin: ['http://localhost:5173', 'http://localhost:3000'],
+    allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
   }));
 
   // Health check endpoint
@@ -128,6 +130,12 @@ export function createApp(repoManager: RepoManager, options: { verbose?: boolean
         errors: results.filter(r => r.action === 'error').length,
       },
     });
+  });
+
+  // Better Auth routes
+  app.on(['POST', 'GET'], '/api/auth/*', (c) => {
+    const auth = createAuth();
+    return auth.handler(c.req.raw);
   });
 
   // tRPC API routes

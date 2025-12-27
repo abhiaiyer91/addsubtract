@@ -21,14 +21,20 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { getUser, isAuthenticated, logout } from '@/lib/auth';
+import { useSession, signOut } from '@/lib/auth-client';
 import { useState } from 'react';
 
 export function Header() {
   const navigate = useNavigate();
-  const user = getUser();
-  const authenticated = isAuthenticated();
+  const { data: session } = useSession();
+  const user = session?.user;
+  const authenticated = !!user;
   const [searchQuery, setSearchQuery] = useState('');
+
+  const handleLogout = async () => {
+    await signOut();
+    navigate('/');
+  };
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -124,7 +130,7 @@ export function Header() {
                     className="gap-2 rounded-full"
                   >
                     <Avatar className="h-6 w-6">
-                      <AvatarImage src={user?.avatarUrl || undefined} />
+                      <AvatarImage src={user?.image || undefined} />
                       <AvatarFallback>
                         {user?.username?.slice(0, 2).toUpperCase() || 'U'}
                       </AvatarFallback>
@@ -156,7 +162,7 @@ export function Header() {
                     Settings
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={logout} className="text-red-500">
+                  <DropdownMenuItem onClick={handleLogout} className="text-red-500">
                     <LogOut className="mr-2 h-4 w-4" />
                     Sign out
                   </DropdownMenuItem>

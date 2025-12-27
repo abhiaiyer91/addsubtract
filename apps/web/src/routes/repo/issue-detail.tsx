@@ -9,10 +9,10 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Markdown } from '@/components/markdown/renderer';
 import { LabelPicker } from '@/components/issue/label-picker';
-import { RepoHeader } from './components/repo-header';
+import { RepoLayout } from './components/repo-layout';
 import { Loading } from '@/components/ui/loading';
 import { formatRelativeTime, formatDate } from '@/lib/utils';
-import { isAuthenticated, getUser } from '@/lib/auth';
+import { useSession } from '@/lib/auth-client';
 import { trpc } from '@/lib/trpc';
 import type { Label } from '@/lib/api-types';
 
@@ -24,8 +24,9 @@ export function IssueDetailPage() {
   }>();
   const [comment, setComment] = useState('');
   const [selectedLabels, setSelectedLabels] = useState<Label[]>([]);
-  const authenticated = isAuthenticated();
-  const currentUser = getUser();
+  const { data: session } = useSession();
+  const authenticated = !!session?.user;
+  const currentUser = session?.user || null;
   const utils = trpc.useUtils();
 
   const issueNumber = parseInt(number!, 10);
@@ -81,24 +82,22 @@ export function IssueDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
-        <RepoHeader owner={owner!} repo={repo!} />
+      <RepoLayout owner={owner!} repo={repo!}>
         <Loading text="Loading issue..." />
-      </div>
+      </RepoLayout>
     );
   }
 
   if (!issueData) {
     return (
-      <div className="space-y-6">
-        <RepoHeader owner={owner!} repo={repo!} />
+      <RepoLayout owner={owner!} repo={repo!}>
         <div className="text-center py-12">
           <h2 className="text-2xl font-bold mb-2">Issue not found</h2>
           <p className="text-muted-foreground">
             Issue #{issueNumber} could not be found in this repository.
           </p>
         </div>
-      </div>
+      </RepoLayout>
     );
   }
 
@@ -124,9 +123,7 @@ export function IssueDetailPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <RepoHeader owner={owner!} repo={repo!} />
-
+    <RepoLayout owner={owner!} repo={repo!}>
       {/* Issue header */}
       <div>
         <h1 className="text-2xl font-bold">
@@ -303,6 +300,6 @@ export function IssueDetailPage() {
           </div>
         </div>
       </div>
-    </div>
+    </RepoLayout>
   );
 }

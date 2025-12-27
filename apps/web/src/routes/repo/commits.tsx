@@ -1,7 +1,7 @@
 import { useParams } from 'react-router-dom';
 import { CommitList, type Commit } from '@/components/repo/commit-list';
 import { BranchSelector } from '@/components/repo/branch-selector';
-import { RepoHeader } from './components/repo-header';
+import { RepoLayout } from './components/repo-layout';
 import { trpc } from '@/lib/trpc';
 import { Loading } from '@/components/ui/loading';
 
@@ -44,31 +44,30 @@ export function CommitsPage() {
 
   if (commitsLoading) {
     return (
-      <div className="space-y-6">
-        <RepoHeader owner={owner!} repo={repo!} />
+      <RepoLayout owner={owner!} repo={repo!}>
         <Loading />
-      </div>
+      </RepoLayout>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <RepoHeader owner={owner!} repo={repo!} />
-
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <BranchSelector
-            branches={branches}
-            currentRef={currentRef}
-            owner={owner!}
-            repo={repo!}
-            basePath="commits"
-          />
-          <h2 className="text-lg font-semibold">Commits</h2>
+    <RepoLayout owner={owner!} repo={repo!}>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <BranchSelector
+              branches={branches}
+              currentRef={currentRef}
+              owner={owner!}
+              repo={repo!}
+              basePath="commits"
+            />
+            <h2 className="text-lg font-semibold">Commits</h2>
+          </div>
         </div>
-      </div>
 
-      <CommitList commits={commits} owner={owner!} repo={repo!} />
-    </div>
+        <CommitList commits={commits} owner={owner!} repo={repo!} />
+      </div>
+    </RepoLayout>
   );
 }

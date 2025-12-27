@@ -1,52 +1,62 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { GitBranch, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { login as authLogin } from '@/lib/auth';
-import { trpc } from '@/lib/trpc';
+import { signIn, useSession } from '@/lib/auth-client';
 
 export function LoginPage() {
   const navigate = useNavigate();
+  const { data: session, isPending } = useSession();
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
-    usernameOrEmail: '',
+    email: '',
     password: '',
   });
 
-  const loginMutation = trpc.auth.login.useMutation({
-    onSuccess: (data) => {
-      // Store token and user info
-      authLogin(
-        {
-          id: data.user.id,
-          username: data.user.username,
-          email: data.user.email,
-          name: data.user.name || null,
-          avatarUrl: data.user.avatarUrl || null,
-        },
-        data.sessionId
-      );
+  // Redirect if already logged in
+  useEffect(() => {
+    if (session?.user) {
       navigate('/');
-    },
-    onError: (err) => {
-      setError(err.message || 'Invalid username or password');
-    },
-  });
+    }
+  }, [session, navigate]);
+
+  // Show loading while checking session
+  if (isPending) {
+    return (
+      <div className="flex items-center justify-center min-h-[80vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setIsLoading(true);
 
-    loginMutation.mutate({
-      usernameOrEmail: formData.usernameOrEmail,
-      password: formData.password,
-    });
+    try {
+      const result = await signIn.email({
+        email: formData.email,
+        password: formData.password,
+      });
+
+      if (result.error) {
+        setError(result.error.message || 'Invalid email or password');
+        setIsLoading(false);
+        return;
+      }
+
+      // Redirect to home on success
+      navigate('/');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+      setIsLoading(false);
+    }
   };
-
-  const isLoading = loginMutation.isPending;
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[80vh]">
@@ -68,14 +78,14 @@ export function LoginPage() {
               </div>
             )}
             <div className="space-y-2">
-              <Label htmlFor="usernameOrEmail">Username or email</Label>
+              <Label htmlFor="email">Email</Label>
               <Input
-                id="usernameOrEmail"
-                type="text"
+                id="email"
+                type="email"
                 placeholder="you@example.com"
-                value={formData.usernameOrEmail}
+                value={formData.email}
                 onChange={(e) =>
-                  setFormData({ ...formData, usernameOrEmail: e.target.value })
+                  setFormData({ ...formData, email: e.target.value })
                 }
                 required
                 disabled={isLoading}

@@ -1,16 +1,17 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { GitBranch, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { login as authLogin } from '@/lib/auth';
-import { trpc } from '@/lib/trpc';
+import { signUp, useSession } from '@/lib/auth-client';
 
 export function RegisterPage() {
   const navigate = useNavigate();
+  const { data: session, isPending } = useSession();
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -18,25 +19,21 @@ export function RegisterPage() {
     confirmPassword: '',
   });
 
-  const registerMutation = trpc.auth.register.useMutation({
-    onSuccess: (data) => {
-      // Store token and user info
-      authLogin(
-        {
-          id: data.user.id,
-          username: data.user.username,
-          email: data.user.email,
-          name: data.user.name || null,
-          avatarUrl: data.user.avatarUrl || null,
-        },
-        data.sessionId
-      );
+  // Redirect if already logged in
+  useEffect(() => {
+    if (session?.user) {
       navigate('/');
-    },
-    onError: (err) => {
-      setError(err.message || 'An error occurred. Please try again.');
-    },
-  });
+    }
+  }, [session, navigate]);
+
+  // Show loading while checking session
+  if (isPending) {
+    return (
+      <div className="flex items-center justify-center min-h-[80vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,14 +51,29 @@ export function RegisterPage() {
       return;
     }
 
-    registerMutation.mutate({
-      username: formData.username,
-      email: formData.email,
-      password: formData.password,
-    });
-  };
+    setIsLoading(true);
 
-  const isLoading = registerMutation.isPending;
+    try {
+      const result = await signUp.email({
+        email: formData.email,
+        password: formData.password,
+        name: formData.username, // Use username as display name
+        username: formData.username,
+      });
+
+      if (result.error) {
+        setError(result.error.message || 'An error occurred. Please try again.');
+        setIsLoading(false);
+        return;
+      }
+
+      // Redirect to home on success
+      navigate('/');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[80vh]">

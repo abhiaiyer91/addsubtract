@@ -305,6 +305,14 @@ export const reposRouter = router({
       // Determine fork name
       const forkName = input.name || sourceRepo.name;
 
+      // Ensure user has a username (required for forking)
+      if (!ctx.user.username) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'You must have a username to fork repositories',
+        });
+      }
+
       // Check if user already has a repo with this name
       const existingRepo = await repoModel.findByOwnerAndName(ctx.user.id, forkName);
       if (existingRepo) {

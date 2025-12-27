@@ -224,9 +224,7 @@ export const collaborators = pgTable(
     repoId: uuid('repo_id')
       .notNull()
       .references(() => repositories.id, { onDelete: 'cascade' }),
-    userId: uuid('user_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
+    userId: text('user_id').notNull(), // References better-auth user.id
     permission: permissionEnum('permission').notNull().default('read'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
@@ -241,9 +239,7 @@ export const stars = pgTable(
     repoId: uuid('repo_id')
       .notNull()
       .references(() => repositories.id, { onDelete: 'cascade' }),
-    userId: uuid('user_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
+    userId: text('user_id').notNull(), // References better-auth user.id
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => ({
@@ -257,9 +253,7 @@ export const watches = pgTable(
     repoId: uuid('repo_id')
       .notNull()
       .references(() => repositories.id, { onDelete: 'cascade' }),
-    userId: uuid('user_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
+    userId: text('user_id').notNull(), // References better-auth user.id
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => ({
@@ -310,9 +304,7 @@ export const pullRequests = pgTable('pull_requests', {
   baseSha: text('base_sha').notNull(),
   mergeSha: text('merge_sha'), // Set when merged
 
-  authorId: uuid('author_id')
-    .notNull()
-    .references(() => users.id),
+  authorId: text('author_id').notNull(), // References better-auth user.id
 
   // Milestone reference
   milestoneId: uuid('milestone_id').references(() => milestones.id, {
@@ -326,7 +318,7 @@ export const pullRequests = pgTable('pull_requests', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   mergedAt: timestamp('merged_at', { withTimezone: true }),
   closedAt: timestamp('closed_at', { withTimezone: true }),
-  mergedById: uuid('merged_by_id').references(() => users.id),
+  mergedById: text('merged_by_id'), // References better-auth user.id
 });
 
 export const prReviews = pgTable('pr_reviews', {
@@ -334,9 +326,7 @@ export const prReviews = pgTable('pr_reviews', {
   prId: uuid('pr_id')
     .notNull()
     .references(() => pullRequests.id, { onDelete: 'cascade' }),
-  userId: uuid('user_id')
-    .notNull()
-    .references(() => users.id),
+  userId: text('user_id').notNull(), // References better-auth user.id
 
   state: reviewStateEnum('state').notNull(),
   body: text('body'),
@@ -352,9 +342,7 @@ export const prComments = pgTable('pr_comments', {
     .notNull()
     .references(() => pullRequests.id, { onDelete: 'cascade' }),
   reviewId: uuid('review_id').references(() => prReviews.id, { onDelete: 'cascade' }),
-  userId: uuid('user_id')
-    .notNull()
-    .references(() => users.id),
+  userId: text('user_id').notNull(), // References better-auth user.id
 
   // For inline comments
   path: text('path'), // File path
@@ -386,10 +374,8 @@ export const issues = pgTable('issues', {
 
   state: issueStateEnum('state').notNull().default('open'),
 
-  authorId: uuid('author_id')
-    .notNull()
-    .references(() => users.id),
-  assigneeId: uuid('assignee_id').references(() => users.id),
+  authorId: text('author_id').notNull(), // References better-auth user.id
+  assigneeId: text('assignee_id'), // References better-auth user.id
 
   // Milestone reference
   milestoneId: uuid('milestone_id').references(() => milestones.id, {
@@ -399,7 +385,7 @@ export const issues = pgTable('issues', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   closedAt: timestamp('closed_at', { withTimezone: true }),
-  closedById: uuid('closed_by_id').references(() => users.id),
+  closedById: text('closed_by_id'), // References better-auth user.id
 });
 
 export const issueComments = pgTable('issue_comments', {
@@ -407,9 +393,7 @@ export const issueComments = pgTable('issue_comments', {
   issueId: uuid('issue_id')
     .notNull()
     .references(() => issues.id, { onDelete: 'cascade' }),
-  userId: uuid('user_id')
-    .notNull()
-    .references(() => users.id),
+  userId: text('user_id').notNull(), // References better-auth user.id
 
   body: text('body').notNull(),
 
@@ -476,9 +460,7 @@ export const releases = pgTable('releases', {
   body: text('body'), // Markdown release notes
   isDraft: boolean('is_draft').notNull().default(false),
   isPrerelease: boolean('is_prerelease').notNull().default(false),
-  authorId: uuid('author_id')
-    .notNull()
-    .references(() => users.id),
+  authorId: text('author_id').notNull(), // References better-auth user.id
   publishedAt: timestamp('published_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
@@ -504,9 +486,7 @@ export const releaseAssets = pgTable('release_assets', {
 export const activities = pgTable('activities', {
   id: uuid('id').primaryKey().defaultRandom(),
 
-  actorId: uuid('actor_id')
-    .notNull()
-    .references(() => users.id),
+  actorId: text('actor_id').notNull(), // References better-auth user.id
   repoId: uuid('repo_id').references(() => repositories.id, { onDelete: 'cascade' }),
 
   type: text('type').notNull(), // 'push', 'pr_opened', 'issue_opened', 'fork', etc.
@@ -571,7 +551,7 @@ export const workflowRuns = pgTable('workflow_runs', {
   conclusion: text('conclusion'),
   
   /** User who triggered the workflow (if manual) */
-  triggeredById: uuid('triggered_by_id').references(() => users.id),
+  triggeredById: text('triggered_by_id'), // References better-auth user.id
   
   /** When the workflow run was created/queued */
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),

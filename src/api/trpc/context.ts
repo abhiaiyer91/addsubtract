@@ -1,7 +1,32 @@
 import type { Context as HonoContext } from 'hono';
 import { getDb, type Database } from '../../db';
-import { sessionModel } from '../../db/models';
-import type { User } from '../../db/schema';
+import { createAuth } from '../../lib/auth';
+
+/**
+ * User type from better-auth session
+ * Includes username from the username plugin
+ */
+export interface AuthUser {
+  id: string;
+  email: string;
+  name: string;
+  username?: string | null;
+  image?: string | null;
+}
+
+/**
+ * Extended session user type that includes username plugin fields
+ */
+interface SessionUser {
+  id: string;
+  email: string;
+  name: string;
+  username?: string | null;
+  image?: string | null;
+  createdAt?: Date;
+  updatedAt?: Date;
+  emailVerified?: boolean;
+}
 
 /**
  * Context available in every tRPC procedure
@@ -10,38 +35,9 @@ export interface Context extends Record<string, unknown> {
   /** Database instance */
   db: Database;
   /** Authenticated user or null */
-  user: User | null;
+  user: AuthUser | null;
   /** Raw request object */
   req: Request;
-}
-
-/**
- * Extract session ID from request headers or cookies
- */
-function getSessionId(req: Request): string | undefined {
-  // Try Authorization header first (Bearer token)
-  const authHeader = req.headers.get('Authorization');
-  if (authHeader?.startsWith('Bearer ')) {
-    return authHeader.slice(7);
-  }
-
-  // Try Cookie header
-  const cookieHeader = req.headers.get('Cookie');
-  if (cookieHeader) {
-    const cookies = cookieHeader.split(';').reduce(
-      (acc, cookie) => {
-        const [key, value] = cookie.trim().split('=');
-        if (key && value) {
-          acc[key] = value;
-        }
-        return acc;
-      },
-      {} as Record<string, string>
-    );
-    return cookies['session'];
-  }
-
-  return undefined;
 }
 
 /**
@@ -52,20 +48,28 @@ export async function createContext(c: HonoContext): Promise<Context> {
   const db = getDb();
   const req = c.req.raw;
 
-  // Get session from request
-  const sessionId = getSessionId(req);
+  let user: AuthUser | null = null;
 
-  let user: User | null = null;
+  try {
+    // Use better-auth to validate session
+    const auth = createAuth();
+    const session = await auth.api.getSession({
+      headers: req.headers,
+    });
 
-  if (sessionId) {
-    try {
-      const session = await sessionModel.findWithUser(sessionId);
-      if (session && session.session.expiresAt > new Date()) {
-        user = session.user;
-      }
-    } catch {
-      // Session lookup failed, user remains null
+    if (session?.user) {
+      // Cast to SessionUser to access username from the username plugin
+      const sessionUser = session.user as SessionUser;
+      user = {
+        id: sessionUser.id,
+        email: sessionUser.email,
+        name: sessionUser.name,
+        username: sessionUser.username,
+        image: sessionUser.image,
+      };
     }
+  } catch {
+    // Session lookup failed, user remains null
   }
 
   return { db, user, req };
@@ -75,7 +79,7 @@ export async function createContext(c: HonoContext): Promise<Context> {
  * Create context for testing or CLI usage (without Hono)
  */
 export function createTestContext(options: {
-  user?: User | null;
+  user?: AuthUser | null;
   req?: Request;
 } = {}): Context {
   const db = getDb();

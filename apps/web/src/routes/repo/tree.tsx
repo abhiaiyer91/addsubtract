@@ -1,7 +1,7 @@
 import { useParams } from 'react-router-dom';
 import { FileTree, type TreeEntry } from '@/components/repo/file-tree';
 import { BranchSelector } from '@/components/repo/branch-selector';
-import { RepoHeader } from './components/repo-header';
+import { RepoLayout } from './components/repo-layout';
 import { trpc } from '@/lib/trpc';
 import { Loading } from '@/components/ui/loading';
 
@@ -43,35 +43,34 @@ export function TreePage() {
 
   if (treeLoading) {
     return (
-      <div className="space-y-6">
-        <RepoHeader owner={owner!} repo={repo!} />
+      <RepoLayout owner={owner!} repo={repo!}>
         <Loading />
-      </div>
+      </RepoLayout>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <RepoHeader owner={owner!} repo={repo!} />
+    <RepoLayout owner={owner!} repo={repo!}>
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <BranchSelector
+            branches={branches}
+            currentRef={currentRef}
+            owner={owner!}
+            repo={repo!}
+            basePath="tree"
+            filePath={currentPath}
+          />
+        </div>
 
-      <div className="flex items-center gap-4">
-        <BranchSelector
-          branches={branches}
-          currentRef={currentRef}
+        <FileTree
+          entries={tree}
           owner={owner!}
           repo={repo!}
-          basePath="tree"
-          filePath={currentPath}
+          currentRef={currentRef}
+          currentPath={currentPath}
         />
       </div>
-
-      <FileTree
-        entries={tree}
-        owner={owner!}
-        repo={repo!}
-        currentRef={currentRef}
-        currentPath={currentPath}
-      />
-    </div>
+    </RepoLayout>
   );
 }

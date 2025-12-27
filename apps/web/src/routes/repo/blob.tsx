@@ -3,8 +3,8 @@ import { ChevronRight, Pencil, History } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { BranchSelector } from '@/components/repo/branch-selector';
 import { CodeViewer } from '@/components/repo/code-viewer';
-import { RepoHeader } from './components/repo-header';
-import { isAuthenticated } from '@/lib/auth';
+import { RepoLayout } from './components/repo-layout';
+import { useSession } from '@/lib/auth-client';
 import { trpc } from '@/lib/trpc';
 import { Loading } from '@/components/ui/loading';
 
@@ -19,7 +19,8 @@ export function BlobPage() {
   const currentRef = ref || 'main';
   const filePath = path || '';
   const filename = filePath.split('/').pop() || '';
-  const authenticated = isAuthenticated();
+  const { data: session } = useSession();
+  const authenticated = !!session?.user;
 
   // Fetch real file data from tRPC
   const { data: fileData, isLoading: fileLoading, error: fileError } = trpc.repos.getFile.useQuery(
@@ -42,21 +43,19 @@ export function BlobPage() {
 
   if (fileLoading) {
     return (
-      <div className="space-y-6">
-        <RepoHeader owner={owner!} repo={repo!} />
+      <RepoLayout owner={owner!} repo={repo!}>
         <Loading />
-      </div>
+      </RepoLayout>
     );
   }
 
   if (fileError) {
     return (
-      <div className="space-y-6">
-        <RepoHeader owner={owner!} repo={repo!} />
+      <RepoLayout owner={owner!} repo={repo!}>
         <div className="p-4 text-center text-muted-foreground">
           {fileError.message || 'File not found'}
         </div>
-      </div>
+      </RepoLayout>
     );
   }
 
@@ -64,8 +63,7 @@ export function BlobPage() {
   const pathParts = filePath.split('/').filter(Boolean);
 
   return (
-    <div className="space-y-6">
-      <RepoHeader owner={owner!} repo={repo!} />
+    <RepoLayout owner={owner!} repo={repo!}>
 
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -126,6 +124,6 @@ export function BlobPage() {
       </div>
 
       <CodeViewer content={fileContent} filename={filename} />
-    </div>
+    </RepoLayout>
   );
 }

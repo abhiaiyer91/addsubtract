@@ -7,6 +7,11 @@ import {
   MessageSquare,
   FileCode,
   GitCommit,
+  Bot,
+  RefreshCw,
+  CheckCircle,
+  AlertCircle,
+  Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -18,14 +23,13 @@ import { DiffViewer, type DiffFile } from '@/components/diff/diff-viewer';
 import { PrTimeline } from '@/components/pr/pr-timeline';
 import { MergeButton } from '@/components/pr/merge-button';
 import { Markdown } from '@/components/markdown/renderer';
-import { RepoHeader } from './components/repo-header';
+import { RepoLayout } from './components/repo-layout';
 import { Loading } from '@/components/ui/loading';
 import { formatRelativeTime } from '@/lib/utils';
-import { isAuthenticated } from '@/lib/auth';
+import { useSession } from '@/lib/auth-client';
 import { trpc } from '@/lib/trpc';
 
-// Mock diff data - TODO: Implement getDiff endpoint
-const mockDiff: DiffFile[] = [];
+
 
 export function PullDetailPage() {
   const { owner, repo, number } = useParams<{
@@ -34,7 +38,8 @@ export function PullDetailPage() {
     number: string;
   }>();
   const [comment, setComment] = useState('');
-  const authenticated = isAuthenticated();
+  const { data: session } = useSession();
+  const authenticated = !!session?.user;
   const utils = trpc.useUtils();
 
   const prNumber = parseInt(number!, 10);
@@ -66,6 +71,34 @@ export function PullDetailPage() {
     { enabled: !!prData?.id }
   );
 
+  // Fetch diff
+  const { data: diffData, isLoading: diffLoading } = trpc.pulls.getDiff.useQuery(
+    { prId: prData?.id! },
+    { enabled: !!prData?.id }
+  );
+
+  // Fetch commits
+  const { data: commitsData, isLoading: commitsLoading } = trpc.pulls.getCommits.useQuery(
+    { prId: prData?.id! },
+    { enabled: !!prData?.id }
+  );
+
+  // Fetch AI review
+  const { data: aiReviewData, isLoading: aiReviewLoading, refetch: refetchAIReview } = trpc.pulls.getAIReview.useQuery(
+    { prId: prData?.id! },
+    { enabled: !!prData?.id }
+  );
+
+  // Trigger AI review mutation
+  const triggerReviewMutation = trpc.pulls.triggerAIReview.useMutation({
+    onSuccess: () => {
+      // Refetch AI review after a delay to allow processing
+      setTimeout(() => {
+        refetchAIReview();
+      }, 3000);
+    },
+  });
+
   // Mutations
   const addCommentMutation = trpc.pulls.addComment.useMutation({
     onSuccess: () => {
@@ -84,31 +117,49 @@ export function PullDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
-        <RepoHeader owner={owner!} repo={repo!} />
+      <RepoLayout owner={owner!} repo={repo!}>
         <Loading text="Loading pull request..." />
-      </div>
+      </RepoLayout>
     );
   }
 
   if (!prData) {
     return (
-      <div className="space-y-6">
-        <RepoHeader owner={owner!} repo={repo!} />
+      <RepoLayout owner={owner!} repo={repo!}>
         <div className="text-center py-12">
           <h2 className="text-2xl font-bold mb-2">Pull request not found</h2>
           <p className="text-muted-foreground">
             Pull request #{prNumber} could not be found in this repository.
           </p>
         </div>
-      </div>
+      </RepoLayout>
     );
   }
 
   const pr = prData;
   const reviews = reviewsData || [];
   const comments = commentsData || [];
-  const diff = mockDiff;
+  
+  // Transform diff data to match DiffFile type
+  const diff: DiffFile[] = (diffData?.files || []).map(file => ({
+    path: file.newPath,
+    oldPath: file.oldPath !== file.newPath ? file.oldPath : undefined,
+    status: file.status,
+    additions: file.additions,
+    deletions: file.deletions,
+    hunks: file.hunks.map(hunk => ({
+      oldStart: hunk.oldStart,
+      newStart: hunk.newStart,
+      oldLines: hunk.oldLines,
+      newLines: hunk.newLines,
+      lines: hunk.lines.map(line => ({
+        type: line.type === 'delete' ? 'remove' as const : line.type as 'add' | 'context',
+        content: line.content,
+      })),
+    })),
+  }));
+  
+  const commits = commitsData?.commits || [];
 
   // Build timeline from reviews and comments
   const timeline: Array<{
@@ -156,14 +207,11 @@ export function PullDetailPage() {
     closed: 'Closed',
   };
 
-  const handleMerge = async (_method: 'merge' | 'squash' | 'rebase') => {
+  const handleMerge = async (method: 'merge' | 'squash' | 'rebase') => {
     if (!prData?.id) return;
-    // For now, we'll use the head SHA as the merge SHA
-    // In a real implementation, the server would compute this
-    // TODO: Pass method to server when implementing different merge strategies
     mergeMutation.mutate({
       prId: prData.id,
-      mergeSha: prData.headSha,
+      strategy: method,
     });
   };
 
@@ -176,9 +224,7 @@ export function PullDetailPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <RepoHeader owner={owner!} repo={repo!} />
-
+    <RepoLayout owner={owner!} repo={repo!}>
       {/* PR Header */}
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2">
@@ -233,6 +279,15 @@ export function PullDetailPage() {
           <TabsTrigger value="conversation" className="gap-2">
             <MessageSquare className="h-4 w-4" />
             Conversation
+          </TabsTrigger>
+          <TabsTrigger value="ai-review" className="gap-2">
+            <Bot className="h-4 w-4" />
+            AI Review
+            {aiReviewData && (
+              <Badge variant={aiReviewData.state === 'approved' ? 'success' : 'warning'} className="ml-1">
+                {aiReviewData.state === 'approved' ? <CheckCircle className="h-3 w-3" /> : <AlertCircle className="h-3 w-3" />}
+              </Badge>
+            )}
           </TabsTrigger>
           <TabsTrigger value="commits" className="gap-2">
             <GitCommit className="h-4 w-4" />
@@ -321,17 +376,100 @@ export function PullDetailPage() {
           )}
         </TabsContent>
 
-        <TabsContent value="commits" className="mt-6">
+        <TabsContent value="ai-review" className="mt-6">
           <Card>
-            <CardContent className="p-6 text-center text-muted-foreground">
-              <GitCommit className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>Commit list coming soon</p>
+            <div className="flex items-center justify-between px-4 py-3 bg-muted/30 border-b">
+              <div className="flex items-center gap-2">
+                <Bot className="h-5 w-5 text-primary" />
+                <span className="font-medium">AI Code Review</span>
+                {aiReviewData?.state && (
+                  <Badge variant={aiReviewData.state === 'approved' ? 'success' : 'warning'}>
+                    {aiReviewData.state === 'approved' ? 'Approved' : 'Changes Requested'}
+                  </Badge>
+                )}
+              </div>
+              {authenticated && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => triggerReviewMutation.mutate({ prId: prData!.id })}
+                  disabled={triggerReviewMutation.isPending}
+                  className="gap-2"
+                >
+                  {triggerReviewMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4" />
+                  )}
+                  {aiReviewData ? 'Re-run Review' : 'Run AI Review'}
+                </Button>
+              )}
+            </div>
+            <CardContent className="p-4">
+              {aiReviewLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : aiReviewData?.body ? (
+                <Markdown content={aiReviewData.body} />
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Bot className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p className="mb-2">No AI review yet</p>
+                  <p className="text-sm">
+                    {authenticated 
+                      ? 'Click "Run AI Review" to analyze this pull request'
+                      : 'Sign in to run an AI review on this pull request'}
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
 
+        <TabsContent value="commits" className="mt-6">
+          {commitsLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : commits.length > 0 ? (
+            <Card>
+              <CardContent className="p-0">
+                <div className="divide-y">
+                  {commits.map((commit) => (
+                    <div key={commit.sha} className="p-4 hover:bg-muted/50">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{commit.message}</p>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            {commit.author} committed {new Date(commit.date).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
+                          {commit.sha.slice(0, 7)}
+                        </code>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="p-6 text-center text-muted-foreground">
+                <GitCommit className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>No commits found</p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
         <TabsContent value="files" className="mt-6">
-          {diff.length > 0 ? (
+          {diffLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : diff.length > 0 ? (
             <DiffViewer files={diff} />
           ) : (
             <Card>
@@ -343,6 +481,6 @@ export function PullDetailPage() {
           )}
         </TabsContent>
       </Tabs>
-    </div>
+    </RepoLayout>
   );
 }

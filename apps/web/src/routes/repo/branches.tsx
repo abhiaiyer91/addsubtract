@@ -3,9 +3,9 @@ import { GitBranch, Shield, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { RepoHeader } from './components/repo-header';
+import { RepoLayout } from './components/repo-layout';
 import { formatRelativeTime } from '@/lib/utils';
-import { isAuthenticated } from '@/lib/auth';
+import { useSession } from '@/lib/auth-client';
 
 // Mock branches
 const mockBranches = [
@@ -46,14 +46,14 @@ const mockBranches = [
 
 export function BranchesPage() {
   const { owner, repo } = useParams<{ owner: string; repo: string }>();
-  const authenticated = isAuthenticated();
+  const { data: session } = useSession();
+  const authenticated = !!session?.user;
 
   // TODO: Fetch real data with tRPC
   const branches = mockBranches;
 
   return (
-    <div className="space-y-6">
-      <RepoHeader owner={owner!} repo={repo!} />
+    <RepoLayout owner={owner!} repo={repo!}>
 
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold flex items-center gap-2">
@@ -118,6 +118,6 @@ export function BranchesPage() {
           </Card>
         ))}
       </div>
-    </div>
+    </RepoLayout>
   );
 }

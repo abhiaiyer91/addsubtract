@@ -1,135 +1,39 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
-import { randomBytes } from 'crypto';
 import { router, publicProcedure, protectedProcedure } from '../trpc';
-import { userModel, sessionModel } from '../../../db/models';
+import { userModel } from '../../../db/models';
+import { createAuth } from '../../../lib/auth';
 
 export const authRouter = router({
   /**
    * Get current authenticated user
+   * This uses the session from context (already validated by better-auth)
    */
   me: publicProcedure.query(({ ctx }) => ctx.user),
 
   /**
-   * Register a new user
+   * Check if username is available
    */
-  register: publicProcedure
-    .input(
-      z.object({
-        username: z
-          .string()
-          .min(3, 'Username must be at least 3 characters')
-          .max(39, 'Username must be at most 39 characters')
-          .regex(
-            /^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?$/,
-            'Username must start and end with alphanumeric characters and can only contain alphanumeric characters and hyphens'
-          ),
-        email: z.string().email('Invalid email address'),
-        name: z.string().max(255).optional(),
-        password: z.string().min(8, 'Password must be at least 8 characters').optional(),
-      })
-    )
-    .mutation(async ({ input }) => {
-      // Check if username is available
-      if (!(await userModel.isUsernameAvailable(input.username))) {
-        throw new TRPCError({
-          code: 'CONFLICT',
-          message: 'Username is already taken',
-        });
-      }
-
-      // Check if email is available
-      if (!(await userModel.isEmailAvailable(input.email))) {
-        throw new TRPCError({
-          code: 'CONFLICT',
-          message: 'Email is already registered',
-        });
-      }
-
-      // Create user
-      // TODO: Hash password properly with bcrypt or argon2
-      const user = await userModel.create({
-        username: input.username,
-        email: input.email,
-        name: input.name,
-        passwordHash: input.password, // In production, this should be hashed!
-      });
-
-      // Create session
-      const sessionId = randomBytes(32).toString('hex');
-      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
-      await sessionModel.create({
-        id: sessionId,
-        userId: user.id,
-        expiresAt,
-      });
-
-      return {
-        user,
-        sessionId,
-      };
+  checkUsername: publicProcedure
+    .input(z.object({ username: z.string().min(3).max(39) }))
+    .query(async ({ input }) => {
+      const available = await userModel.isUsernameAvailable(input.username);
+      return { available };
     }),
 
   /**
-   * Login with username/email and password
+   * Check if email is available
    */
-  login: publicProcedure
-    .input(
-      z.object({
-        usernameOrEmail: z.string().min(1, 'Username or email is required'),
-        password: z.string().min(1, 'Password is required'),
-      })
-    )
-    .mutation(async ({ input }) => {
-      // Find user by username or email
-      const user = await userModel.findByUsernameOrEmail(input.usernameOrEmail);
-
-      if (!user) {
-        throw new TRPCError({
-          code: 'UNAUTHORIZED',
-          message: 'Invalid credentials',
-        });
-      }
-
-      // TODO: Properly compare hashed passwords
-      if (user.passwordHash !== input.password) {
-        throw new TRPCError({
-          code: 'UNAUTHORIZED',
-          message: 'Invalid credentials',
-        });
-      }
-
-      // Create session
-      const sessionId = randomBytes(32).toString('hex');
-      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
-      await sessionModel.create({
-        id: sessionId,
-        userId: user.id,
-        expiresAt,
-      });
-
-      return {
-        user,
-        sessionId,
-      };
+  checkEmail: publicProcedure
+    .input(z.object({ email: z.string().email() }))
+    .query(async ({ input }) => {
+      const available = await userModel.isEmailAvailable(input.email);
+      return { available };
     }),
-
-  /**
-   * Logout - invalidate current session
-   */
-  logout: protectedProcedure.mutation(async ({ ctx }) => {
-    const authHeader = ctx.req.headers.get('Authorization');
-    const sessionId = authHeader?.replace('Bearer ', '');
-
-    if (sessionId) {
-      await sessionModel.delete(sessionId);
-    }
-
-    return { success: true };
-  }),
 
   /**
    * Update current user's profile
+   * Note: This updates fields in the better-auth user table
    */
   updateProfile: protectedProcedure
     .input(
@@ -155,42 +59,31 @@ export const authRouter = router({
     }),
 
   /**
-   * Change password
+   * Change password using better-auth
+   * Note: This requires the client to call better-auth's changePassword endpoint directly
+   * This endpoint just validates that the user is authenticated
    */
-  changePassword: protectedProcedure
-    .input(
-      z.object({
-        currentPassword: z.string().min(1, 'Current password is required'),
-        newPassword: z.string().min(8, 'New password must be at least 8 characters'),
-      })
-    )
-    .mutation(async ({ input, ctx }) => {
-      // Verify current password
-      // TODO: Properly compare hashed passwords
-      if (ctx.user.passwordHash !== input.currentPassword) {
-        throw new TRPCError({
-          code: 'UNAUTHORIZED',
-          message: 'Current password is incorrect',
-        });
-      }
-
-      // Update password
-      // TODO: Hash password properly
-      await userModel.update(ctx.user.id, {
-        passwordHash: input.newPassword,
-      });
-
-      // Invalidate all other sessions
-      await sessionModel.deleteAllForUser(ctx.user.id);
-
-      return { success: true };
-    }),
+  canChangePassword: protectedProcedure.query(() => {
+    // User is authenticated, they can use better-auth's changePassword endpoint
+    return { canChange: true };
+  }),
 
   /**
-   * Delete all sessions for current user (logout everywhere)
+   * Revoke all sessions for current user
+   * Uses better-auth's session revocation
    */
   logoutAll: protectedProcedure.mutation(async ({ ctx }) => {
-    await sessionModel.deleteAllForUser(ctx.user.id);
-    return { success: true };
+    try {
+      const auth = createAuth();
+      await auth.api.revokeOtherSessions({
+        headers: ctx.req.headers,
+      });
+      return { success: true };
+    } catch (error) {
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to revoke sessions',
+      });
+    }
   }),
 });

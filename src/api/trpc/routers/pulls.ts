@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import * as path from 'path';
+import { execSync } from 'child_process';
 import { router, publicProcedure, protectedProcedure } from '../trpc';
 import {
   prModel,
@@ -15,6 +16,147 @@ import {
 import { mergePullRequest, checkMergeability, getDefaultMergeMessage } from '../../../server/storage/merge';
 import { triggerAsyncReview } from '../../../ai/services/pr-review';
 import { exists } from '../../../utils/fs';
+
+/**
+ * Parse a unified diff into structured file changes
+ */
+function parseDiff(diffText: string): Array<{
+  oldPath: string;
+  newPath: string;
+  status: 'added' | 'deleted' | 'modified' | 'renamed';
+  additions: number;
+  deletions: number;
+  hunks: Array<{
+    oldStart: number;
+    oldLines: number;
+    newStart: number;
+    newLines: number;
+    lines: Array<{ type: 'context' | 'add' | 'delete'; content: string }>;
+  }>;
+}> {
+  const files: Array<{
+    oldPath: string;
+    newPath: string;
+    status: 'added' | 'deleted' | 'modified' | 'renamed';
+    additions: number;
+    deletions: number;
+    hunks: Array<{
+      oldStart: number;
+      oldLines: number;
+      newStart: number;
+      newLines: number;
+      lines: Array<{ type: 'context' | 'add' | 'delete'; content: string }>;
+    }>;
+  }> = [];
+
+  const fileChunks = diffText.split(/^diff --git /m).filter(Boolean);
+
+  for (const chunk of fileChunks) {
+    const lines = chunk.split('\n');
+    const headerMatch = lines[0]?.match(/a\/(.+) b\/(.+)/);
+    if (!headerMatch) continue;
+
+    const oldPath = headerMatch[1];
+    const newPath = headerMatch[2];
+
+    // Determine status
+    let status: 'added' | 'deleted' | 'modified' | 'renamed' = 'modified';
+    if (chunk.includes('new file mode')) {
+      status = 'added';
+    } else if (chunk.includes('deleted file mode')) {
+      status = 'deleted';
+    } else if (chunk.includes('rename from')) {
+      status = 'renamed';
+    }
+
+    const hunks: Array<{
+      oldStart: number;
+      oldLines: number;
+      newStart: number;
+      newLines: number;
+      lines: Array<{ type: 'context' | 'add' | 'delete'; content: string }>;
+    }> = [];
+
+    let additions = 0;
+    let deletions = 0;
+    let currentHunk: typeof hunks[0] | null = null;
+
+    for (const line of lines) {
+      // Hunk header: @@ -1,5 +1,7 @@
+      const hunkMatch = line.match(/^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/);
+      if (hunkMatch) {
+        if (currentHunk) {
+          hunks.push(currentHunk);
+        }
+        currentHunk = {
+          oldStart: parseInt(hunkMatch[1], 10),
+          oldLines: parseInt(hunkMatch[2] || '1', 10),
+          newStart: parseInt(hunkMatch[3], 10),
+          newLines: parseInt(hunkMatch[4] || '1', 10),
+          lines: [],
+        };
+        continue;
+      }
+
+      if (currentHunk) {
+        if (line.startsWith('+') && !line.startsWith('+++')) {
+          currentHunk.lines.push({ type: 'add', content: line.slice(1) });
+          additions++;
+        } else if (line.startsWith('-') && !line.startsWith('---')) {
+          currentHunk.lines.push({ type: 'delete', content: line.slice(1) });
+          deletions++;
+        } else if (line.startsWith(' ')) {
+          currentHunk.lines.push({ type: 'context', content: line.slice(1) });
+        }
+      }
+    }
+
+    if (currentHunk) {
+      hunks.push(currentHunk);
+    }
+
+    files.push({
+      oldPath,
+      newPath,
+      status,
+      additions,
+      deletions,
+      hunks,
+    });
+  }
+
+  return files;
+}
+
+/**
+ * Get commits between two refs
+ */
+function getCommitsBetween(repoPath: string, baseSha: string, headSha: string): Array<{
+  sha: string;
+  message: string;
+  author: string;
+  authorEmail: string;
+  date: string;
+}> {
+  try {
+    const output = execSync(
+      `git log --format="%H|%s|%an|%ae|%aI" ${baseSha}..${headSha}`,
+      { cwd: repoPath, encoding: 'utf-8' }
+    );
+    
+    return output
+      .trim()
+      .split('\n')
+      .filter(Boolean)
+      .map(line => {
+        const [sha, message, author, authorEmail, date] = line.split('|');
+        return { sha, message, author, authorEmail, date };
+      });
+  } catch (error) {
+    console.error('[pulls.getCommits] Error:', error);
+    return [];
+  }
+}
 
 export const pullsRouter = router({
   /**
@@ -734,6 +876,67 @@ export const pullsRouter = router({
     }),
 
   /**
+   * Get AI review for a pull request
+   * Returns the most recent AI-generated review
+   */
+  getAIReview: publicProcedure
+    .input(
+      z.object({
+        prId: z.string().uuid(),
+      })
+    )
+    .query(async ({ input }) => {
+      const pr = await prModel.findById(input.prId);
+
+      if (!pr) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Pull request not found',
+        });
+      }
+
+      // Get reviews and find the AI review (from wit-bot user)
+      const reviews = await prReviewModel.listByPr(input.prId);
+      
+      // Find AI reviews - look for reviews from wit-bot or reviews with AI marker in body
+      const aiReview = reviews.find(r => {
+        // Check if body contains AI review marker
+        if (r.body?.includes('AI Review:') || r.body?.includes('wit AI')) {
+          return true;
+        }
+        return false;
+      });
+
+      if (!aiReview) {
+        // Check comments as fallback
+        const comments = await prCommentModel.listByPr(input.prId);
+        const aiComment = comments.find(c => 
+          c.body?.includes('AI Review:') || c.body?.includes('wit AI')
+        );
+
+        if (aiComment) {
+          return {
+            id: aiComment.id,
+            type: 'comment' as const,
+            body: aiComment.body,
+            createdAt: aiComment.createdAt,
+            state: null,
+          };
+        }
+
+        return null;
+      }
+
+      return {
+        id: aiReview.id,
+        type: 'review' as const,
+        body: aiReview.body,
+        state: aiReview.state,
+        createdAt: aiReview.createdAt,
+      };
+    }),
+
+  /**
    * Trigger an AI review for a pull request
    * Can be used to re-run review or run review on draft PRs
    */
@@ -778,5 +981,122 @@ export const pullsRouter = router({
       triggerAsyncReview(pr.id);
 
       return { triggered: true, prId: pr.id, prNumber: pr.number };
+    }),
+
+  /**
+   * Get the diff for a pull request
+   * Returns parsed file changes with hunks
+   */
+  getDiff: publicProcedure
+    .input(
+      z.object({
+        prId: z.string().uuid(),
+      })
+    )
+    .query(async ({ input }) => {
+      const pr = await prModel.findById(input.prId);
+
+      if (!pr) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Pull request not found',
+        });
+      }
+
+      const repo = await repoModel.findById(pr.repoId);
+      if (!repo) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Repository not found',
+        });
+      }
+
+      // Resolve disk path
+      const reposDir = process.env.REPOS_DIR || './repos';
+      const diskPath = path.isAbsolute(repo.diskPath)
+        ? repo.diskPath
+        : path.join(process.cwd(), reposDir, repo.diskPath.replace(/^\/repos\//, ''));
+
+      if (!exists(diskPath)) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Repository not found on disk',
+        });
+      }
+
+      try {
+        const diffOutput = execSync(
+          `git diff ${pr.baseSha}..${pr.headSha}`,
+          { cwd: diskPath, encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024 }
+        );
+
+        const files = parseDiff(diffOutput);
+
+        // Calculate totals
+        const totalAdditions = files.reduce((sum, f) => sum + f.additions, 0);
+        const totalDeletions = files.reduce((sum, f) => sum + f.deletions, 0);
+
+        return {
+          files,
+          totalAdditions,
+          totalDeletions,
+          totalFiles: files.length,
+        };
+      } catch (error) {
+        console.error('[pulls.getDiff] Error:', error);
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to generate diff',
+        });
+      }
+    }),
+
+  /**
+   * Get commits for a pull request
+   * Returns list of commits between base and head
+   */
+  getCommits: publicProcedure
+    .input(
+      z.object({
+        prId: z.string().uuid(),
+      })
+    )
+    .query(async ({ input }) => {
+      const pr = await prModel.findById(input.prId);
+
+      if (!pr) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Pull request not found',
+        });
+      }
+
+      const repo = await repoModel.findById(pr.repoId);
+      if (!repo) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Repository not found',
+        });
+      }
+
+      // Resolve disk path
+      const reposDir = process.env.REPOS_DIR || './repos';
+      const diskPath = path.isAbsolute(repo.diskPath)
+        ? repo.diskPath
+        : path.join(process.cwd(), reposDir, repo.diskPath.replace(/^\/repos\//, ''));
+
+      if (!exists(diskPath)) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Repository not found on disk',
+        });
+      }
+
+      const commits = getCommitsBetween(diskPath, pr.baseSha, pr.headSha);
+
+      return {
+        commits,
+        totalCommits: commits.length,
+      };
     }),
 });

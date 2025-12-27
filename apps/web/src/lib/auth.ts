@@ -1,63 +1,62 @@
+/**
+ * Auth utilities for the web app
+ * 
+ * This module provides compatibility with the old auth API while using better-auth
+ */
+
+import { authClient, useSession as useBetterAuthSession } from './auth-client';
+
 export interface User {
   id: string;
-  username: string;
+  username: string | null;
   email: string;
   name?: string | null;
   avatarUrl?: string | null;
 }
 
-// Simple auth state (localStorage-based)
-const authState: { user: User | null; token: string | null } = {
-  user: null,
-  token: null,
-};
-
-export function getAuthToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem('token');
-}
-
-export function setAuthToken(token: string): void {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem('token', token);
-  authState.token = token;
-}
-
-export function clearAuthToken(): void {
-  if (typeof window === 'undefined') return;
-  localStorage.removeItem('token');
-  localStorage.removeItem('user');
-  authState.token = null;
-  authState.user = null;
-}
-
-export function getUser(): User | null {
-  if (typeof window === 'undefined') return null;
-  const userStr = localStorage.getItem('user');
-  if (!userStr) return null;
-  try {
-    return JSON.parse(userStr) as User;
-  } catch {
-    return null;
-  }
-}
-
-export function setUser(user: User): void {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem('user', JSON.stringify(user));
-  authState.user = user;
-}
-
+/**
+ * Check if the user is authenticated
+ * This is a synchronous check based on session cookie presence
+ */
 export function isAuthenticated(): boolean {
-  return !!getAuthToken() && !!getUser();
+  // Better-auth uses cookies, so we can't synchronously check
+  // This is a best-effort check - the actual auth state comes from useSession
+  return typeof document !== 'undefined' && document.cookie.includes('better-auth');
 }
 
-export function login(user: User, token: string): void {
-  setAuthToken(token);
-  setUser(user);
+/**
+ * Get the current user (synchronous - for backward compat)
+ * Prefer using useSession() hook instead
+ */
+export function getUser(): User | null {
+  // This can't work synchronously with better-auth
+  // Components should use useSession() instead
+  return null;
 }
 
-export function logout(): void {
-  clearAuthToken();
+/**
+ * Get auth token (for backward compat)
+ * better-auth uses cookies, not bearer tokens
+ */
+export function getAuthToken(): string | null {
+  return null;
+}
+
+/**
+ * Login function (for backward compat)
+ * Use signIn from auth-client instead
+ */
+export function login(_user: User, _token: string): void {
+  console.warn('login() is deprecated. Use signIn from auth-client instead.');
+}
+
+/**
+ * Logout function
+ */
+export async function logout(): Promise<void> {
+  await authClient.signOut();
   window.location.href = '/';
 }
+
+// Re-export the session hook
+export { useBetterAuthSession as useSession };

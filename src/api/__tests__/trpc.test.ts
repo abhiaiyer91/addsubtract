@@ -240,11 +240,10 @@ describe('tRPC API', () => {
       const authRouter = appRouter.auth;
       expect(authRouter).toBeDefined();
       expect(authRouter.me).toBeDefined();
-      expect(authRouter.register).toBeDefined();
-      expect(authRouter.login).toBeDefined();
-      expect(authRouter.logout).toBeDefined();
+      expect(authRouter.checkUsername).toBeDefined();
+      expect(authRouter.checkEmail).toBeDefined();
       expect(authRouter.updateProfile).toBeDefined();
-      expect(authRouter.changePassword).toBeDefined();
+      expect(authRouter.canChangePassword).toBeDefined();
       expect(authRouter.logoutAll).toBeDefined();
     });
   });

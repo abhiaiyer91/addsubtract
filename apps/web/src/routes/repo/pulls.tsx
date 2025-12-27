@@ -5,16 +5,17 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PrCard } from '@/components/pr/pr-card';
-import { RepoHeader } from './components/repo-header';
+import { RepoLayout } from './components/repo-layout';
 import { Loading } from '@/components/ui/loading';
-import { isAuthenticated } from '@/lib/auth';
+import { useSession } from '@/lib/auth-client';
 import { trpc } from '@/lib/trpc';
 
 export function PullsPage() {
   const { owner, repo } = useParams<{ owner: string; repo: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
-  const authenticated = isAuthenticated();
+  const { data: session } = useSession();
+  const authenticated = !!session?.user;
 
   const currentState = searchParams.get('state') || 'open';
 
@@ -55,16 +56,14 @@ export function PullsPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
-        <RepoHeader owner={owner!} repo={repo!} />
+      <RepoLayout owner={owner!} repo={repo!}>
         <Loading text="Loading pull requests..." />
-      </div>
+      </RepoLayout>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <RepoHeader owner={owner!} repo={repo!} />
+    <RepoLayout owner={owner!} repo={repo!}>
 
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold flex items-center gap-2">
@@ -151,6 +150,6 @@ export function PullsPage() {
           ))}
         </div>
       )}
-    </div>
+    </RepoLayout>
   );
 }

@@ -1,14 +1,15 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { IssueForm } from '@/components/issue/issue-form';
-import { RepoHeader } from './components/repo-header';
+import { RepoLayout } from './components/repo-layout';
 import { Loading } from '@/components/ui/loading';
-import { isAuthenticated } from '@/lib/auth';
+import { useSession } from '@/lib/auth-client';
 import { trpc } from '@/lib/trpc';
 
 export function NewIssuePage() {
   const { owner, repo } = useParams<{ owner: string; repo: string }>();
   const navigate = useNavigate();
-  const authenticated = isAuthenticated();
+  const { data: session } = useSession();
+  const authenticated = !!session?.user;
 
   // Fetch repository data to get the repo ID
   const { data: repoData, isLoading: repoLoading } = trpc.repos.get.useQuery(
@@ -36,27 +37,24 @@ export function NewIssuePage() {
 
   if (!authenticated) {
     return (
-      <div className="space-y-6">
-        <RepoHeader owner={owner!} repo={repo!} />
+      <RepoLayout owner={owner!} repo={repo!}>
         <div className="text-center py-12 text-muted-foreground">
           <p className="text-lg">Please sign in to create an issue.</p>
         </div>
-      </div>
+      </RepoLayout>
     );
   }
 
   if (repoLoading) {
     return (
-      <div className="space-y-6">
-        <RepoHeader owner={owner!} repo={repo!} />
+      <RepoLayout owner={owner!} repo={repo!}>
         <Loading text="Loading..." />
-      </div>
+      </RepoLayout>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <RepoHeader owner={owner!} repo={repo!} />
+    <RepoLayout owner={owner!} repo={repo!}>
       <div className="max-w-3xl">
         <IssueForm
           onSubmit={handleSubmit}
@@ -64,6 +62,6 @@ export function NewIssuePage() {
           error={createIssueMutation.error?.message}
         />
       </div>
-    </div>
+    </RepoLayout>
   );
 }
