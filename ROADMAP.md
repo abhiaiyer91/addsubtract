@@ -30,52 +30,262 @@ This isn't about replacing developers. It's about removing the friction between 
 
 ## Current Status (December 2024)
 
-| Domain | Status | Notes |
-|--------|--------|-------|
-| **Git Implementation** | 98% | 59 commands, full Git compatibility |
-| **AI Tools** | 95% | 15 tools, semantic search, code review |
-| **Server/Platform** | 85% | PRs work end-to-end, Issues, Forks, SSH |
-| **CLI Experience** | 95% | Smart status, semantic search, quality-of-life |
-| **Web UI** | 70% | Functional but not polished |
-| **Documentation** | 40% | Getting started, why wit - needs more |
-
-### What's Working Right Now
-
-**The Killer CLI Experience**
-```bash
-wit                           # Smart status - understands your context
-wit search "where is auth"    # Semantic code search
-wit ai commit                 # AI-generated commit messages
-wit ai review                 # AI code review
-```
-
-**Full Git Replacement**
-- 59 commands implemented
-- All plumbing and porcelain commands
-- Packed refs, rename detection, submodules, worktrees
-- Journal-based undo (actually works, unlike reflog)
-
-**Platform Features**
-- Pull requests with actual merge execution
-- Automatic AI review on PR creation
-- Branch protection rules
-- Issues with labels and milestones
-- Repository forking
-- SSH and HTTPS protocols
-- Rate limiting with Redis
+| Domain | Status | Implemented |
+|--------|--------|-------------|
+| **Git Implementation** | 98% | 66 commands, full Git compatibility |
+| **AI Tools** | 95% | 21 tools including semantic search, code review, PR generation |
+| **Server/Platform** | 90% | PRs, Issues, Forks, Webhooks, SSH, Releases, Milestones |
+| **CLI Experience** | 95% | Smart status, semantic search, stacked diffs |
+| **Web UI** | 75% | 76 components, 43 routes, full PR/Issue workflows |
+| **Documentation** | 40% | Getting started, architecture - needs command reference |
 
 ---
 
-## What We Just Shipped (This Session)
+## What's Implemented
 
-| Feature | Commit | Impact |
-|---------|--------|--------|
-| **Smart Status** | `8634e2e` | Running `wit` with no args shows intelligent context |
-| **Semantic Search** | `65e5392` | `wit search` - ask questions about your codebase |
-| **Auto AI PR Review** | `8e650fe` | Every PR gets AI review automatically |
-| **PR Merge Execution** | `6d53a1a` | PRs actually merge now (was broken!) |
-| **Branch Protection** | `1fb0944` | Protect main, require PRs |
-| **Getting Started** | `edc37a0` | Zero to productive in 5 minutes |
+### CLI Commands (66 total)
+
+**Porcelain (User-facing)**
+| Command | Description |
+|---------|-------------|
+| `wit` | Smart status - understands your context |
+| `wit init` | Initialize repository |
+| `wit add` | Stage files |
+| `wit commit` | Create commit |
+| `wit status` | Show status |
+| `wit log` | Show history |
+| `wit branch` | Manage branches |
+| `wit checkout` | Switch branches/restore files |
+| `wit switch` | Switch branches |
+| `wit merge` | Merge branches |
+| `wit diff` | Show changes |
+| `wit restore` | Restore files |
+
+**AI-Powered**
+| Command | Description |
+|---------|-------------|
+| `wit ai commit` | AI-generated commit messages |
+| `wit ai review` | AI code review |
+| `wit ai explain` | Explain commits/diffs |
+| `wit ai resolve` | AI conflict resolution |
+| `wit search` | Semantic code search |
+
+**Quality of Life**
+| Command | Description |
+|---------|-------------|
+| `wit amend` | Amend last commit |
+| `wit wip` | Quick work-in-progress commit |
+| `wit uncommit` | Undo last commit (keep changes) |
+| `wit cleanup` | Clean up merged branches |
+| `wit undo` | Journal-based undo (actually works!) |
+| `wit fixup` | Create fixup commits |
+| `wit snapshot` | Quick snapshots |
+| `wit blame` | Annotate file history |
+| `wit stats` | Repository statistics |
+
+**History Rewriting**
+| Command | Description |
+|---------|-------------|
+| `wit cherry-pick` | Apply commits |
+| `wit rebase` | Rebase branches |
+| `wit revert` | Revert commits |
+| `wit reset` | Reset HEAD |
+| `wit bisect` | Binary search for bugs |
+
+**Remote Operations**
+| Command | Description |
+|---------|-------------|
+| `wit clone` | Clone repository |
+| `wit fetch` | Fetch from remote |
+| `wit pull` | Pull changes |
+| `wit push` | Push changes |
+| `wit remote` | Manage remotes |
+
+**Platform**
+| Command | Description |
+|---------|-------------|
+| `wit serve` | Start wit server |
+| `wit pr` | Manage pull requests |
+| `wit issue` | Manage issues |
+| `wit inbox` | Notification inbox |
+| `wit review` | CodeRabbit-style review |
+| `wit stack` | Stacked diffs |
+| `wit cycle` | Sprint/cycle management |
+| `wit collaborator` | Manage collaborators |
+| `wit token` | Personal access tokens |
+
+**Plumbing**
+| Command | Description |
+|---------|-------------|
+| `wit cat-file` | Show object contents |
+| `wit hash-object` | Compute object hash |
+| `wit ls-files` | List tracked files |
+| `wit ls-tree` | List tree contents |
+| `wit rev-parse` | Parse revisions |
+| `wit update-ref` | Update references |
+| `wit symbolic-ref` | Manage symbolic refs |
+| `wit for-each-ref` | Iterate over refs |
+| `wit show-ref` | List references |
+| `wit fsck` | Verify repository |
+| `wit gc` | Garbage collection |
+| `wit reflog` | Reference log |
+
+**Advanced**
+| Command | Description |
+|---------|-------------|
+| `wit stash` | Stash changes |
+| `wit tag` | Manage tags |
+| `wit clean` | Remove untracked files |
+| `wit show` | Show objects |
+| `wit worktree` | Manage worktrees |
+| `wit submodule` | Manage submodules |
+| `wit github` | GitHub integration |
+
+---
+
+### AI Tools (21 total)
+
+**Git Operations**
+- `get-status` - Repository status
+- `get-diff` - Diff output
+- `stage-files` - Stage files
+- `create-commit` - Create commits
+- `get-log` - Commit history
+- `get-branches` - List branches
+- `switch-branch` - Switch branches
+- `get-merge-conflicts` - Detect conflicts
+- `resolve-conflict` - AI conflict resolution
+- `undo` - Undo operations
+- `search` - Code search
+- `semantic-search` - Semantic code search with embeddings
+
+**AI Generation**
+- `generate-pr-description` - AI-generated PR descriptions
+- `review-pr` - AI code review
+
+**Coding Agent Tools**
+- `read-file` - Read files
+- `write-file` - Write files
+- `edit-file` - Edit files
+- `list-directory` - List directories
+- `run-command` - Run shell commands
+- `create-branch` - Create branches
+- `open-pull-request` - Open PRs
+
+---
+
+### Platform Features (19 API Routers)
+
+**Core**
+| Feature | Status |
+|---------|--------|
+| Repositories | CRUD, fork, star, watch |
+| Pull Requests | Full lifecycle, merge (merge/squash/rebase), reviews, comments, suggestions, AI review |
+| Issues | Linear-inspired statuses, labels, assignees, comments |
+| Organizations | Org management, teams |
+| Users | User management |
+
+**Collaboration**
+| Feature | Status |
+|---------|--------|
+| Comments | Inline comments, reactions |
+| Activity | Activity feed |
+| Notifications | Notification system |
+| Stacks | Stacked diffs |
+
+**Infrastructure**
+| Feature | Status |
+|---------|--------|
+| Webhooks | Create, test, delivery (push, PR, issue events) |
+| Branch Protection | Protection rules |
+| SSH Keys | Key management |
+| Tokens | Personal access tokens |
+| Merge Queue | Merge queue |
+
+**Releases**
+| Feature | Status |
+|---------|--------|
+| Milestones | Milestone tracking |
+| Releases | Release management |
+| Workflows | CI/CD workflows |
+
+**AI & Search**
+| Feature | Status |
+|---------|--------|
+| AI API | AI features endpoint |
+| Search | Code search API |
+
+---
+
+### Web UI (76 components, 43 routes)
+
+**Implemented Pages**
+- Authentication (login, register)
+- Repository list, creation, settings
+- File browser, code viewer
+- Commit history, commit detail
+- Branch management
+- Pull request list, detail, creation
+- PR diff viewer with inline comments
+- Code suggestions with one-click apply
+- Issue list, detail, creation (Kanban board)
+- Release management
+- Milestone tracking
+- Organization management
+- User settings (tokens, SSH keys)
+- Webhook management
+- Branch protection settings
+- Collaborator management
+- Stacked diffs viewer
+- Command palette (Cmd+K)
+- Keyboard shortcuts
+
+**Key Components**
+- `diff-viewer.tsx` - Side-by-side and unified diff
+- `comment-thread.tsx` - Inline comment threads
+- `suggestion-block.tsx` - Code suggestions
+- `conflict-resolver.tsx` - Conflict resolution UI
+- `ai-chat.tsx` - Chat with codebase
+- `kanban-board.tsx` - Issue board
+- `CommandPalette.tsx` - Command palette
+- `merge-button.tsx` - Merge with options
+- `review-panel.tsx` - Code review panel
+
+---
+
+### Database Models (17 total)
+
+| Model | Tables |
+|-------|--------|
+| `user.ts` | Users (better-auth) |
+| `organization.ts` | Organizations, members, teams |
+| `repository.ts` | Repos, collaborators, stars, watches |
+| `pull-request.ts` | PRs, reviews, comments, labels, reviewers, inbox |
+| `issue.ts` | Issues, comments, labels, statuses |
+| `activity.ts` | Activity log |
+| `webhook.ts` | Webhooks, deliveries |
+| `milestones.ts` | Milestones |
+| `releases.ts` | Releases, assets |
+| `notification.ts` | Notifications |
+| `branch-protection.ts` | Protection rules |
+| `ssh-keys.ts` | SSH keys |
+| `tokens.ts` | Personal access tokens |
+| `stack.ts` | Stacked diffs |
+| `workflow.ts` | CI workflows |
+| `workflow-runs.ts` | Workflow runs |
+| `merge-queue.ts` | Merge queue |
+
+---
+
+### Test Coverage (59 test files)
+
+| Category | Files | Location |
+|----------|-------|----------|
+| Unit tests | 34 | `src/__tests__/` |
+| Integration tests | 17 | `tests/integration/` |
+| API tests | 1 | `src/api/__tests__/` |
+| Server tests | 2 | `src/server/__tests__/` |
+| Other tests | 5 | Various |
 
 ---
 
@@ -96,7 +306,7 @@ $ wit
   ──────────────────────────────────────────────────
 
   wit commit     · commit staged changes
-  wit ai commit · commit with AI-generated message
+  wit ai commit  · commit with AI-generated message
 ```
 
 No other Git tool understands what you're doing. We do.
@@ -116,7 +326,7 @@ Not grep. Understanding.
 
 ### 3. AI as Colleague
 
-- `wit commit` suggests the message
+- `wit ai commit` suggests the message
 - `wit search` understands intent, not just keywords
 - PRs get automatic AI review
 - Conflicts come with resolution suggestions
@@ -129,121 +339,104 @@ Not grep. Understanding.
 
 ---
 
-## The Honest Assessment
+## Roadmap
 
-### What's Great
-- **CLI experience is differentiated** - The smart status and search are genuinely better than git
-- **AI integration is deep** - Not bolted on, woven in
-- **Core Git is solid** - 889 passing tests, handles edge cases
+### Phase 1: Stability & Polish (Current)
 
-### What's Not Ready
-- **Web UI needs love** - Functional but not delightful
-- **Test failures in integration** - 17 failing tests in PR flow
-- **No real users yet** - We haven't dogfooded this seriously
-- **Documentation gaps** - Need command reference, examples
-
-### What I'm Uncertain About
-- **Is the server necessary?** - The CLI is the product. Maybe the platform is a distraction.
-- **Semantic search adoption** - Requires OPENAI_API_KEY. Friction.
-- **Differentiation clarity** - "Git that understands code" - do people get it?
-
----
-
-## Revised Roadmap
-
-### Phase 1: Polish What Exists (Next 1-2 weeks)
-
-**Goal:** Make the CLI experience flawless.
+**Goal:** Make wit rock-solid for daily use.
 
 | Task | Priority | Status |
 |------|----------|--------|
-| Fix 17 failing integration tests | P0 | TODO |
-| Add `wit review` command (pre-push) | P0 | TODO |
-| Command reference documentation | P1 | TODO |
+| Fix integration test failures | P0 | In Progress |
+| ESM/CommonJS configuration cleanup | P1 | TODO |
 | Error message audit | P1 | TODO |
-| Dogfood: use wit to build wit | P0 | TODO |
+| Dogfood: use wit to build wit | P0 | Ongoing |
 
-**Success metric:** I can develop wit using wit without touching git.
+**Success metric:** All tests pass, daily development uses wit.
 
-### Phase 2: Prove the Vision (Weeks 3-4)
+### Phase 2: Documentation & Onboarding (Next)
 
-**Goal:** One demo that makes people say "holy shit."
+**Goal:** Make it easy for anyone to try wit.
 
 | Task | Priority | Status |
 |------|----------|--------|
-| Record demo video | P0 | TODO |
-| Landing page with clear value prop | P0 | TODO |
-| Installation one-liner | P1 | TODO |
-| "5 minutes to wow" experience | P0 | TODO |
+| Command reference documentation | P0 | TODO |
+| Installation one-liner | P0 | TODO |
+| "5 minutes to wow" tutorial | P0 | TODO |
+| Demo video | P1 | TODO |
+| Landing page | P1 | TODO |
 
-**Success metric:** Share demo, get genuine excitement.
+**Success metric:** New user productive in 5 minutes.
 
-### Phase 3: First Users (Weeks 5-8)
+### Phase 3: Community & Growth
 
-**Goal:** 10 developers actually using wit.
+**Goal:** Build an active contributor community.
 
 | Task | Priority | Status |
 |------|----------|--------|
 | Open source launch | P0 | TODO |
 | Discord/community | P1 | TODO |
-| Respond to feedback fast | P0 | TODO |
-| Whatever users need | P0 | TODO |
+| First 10 external users | P0 | TODO |
+| First external contribution | P0 | TODO |
 
 **Success metric:** External PR from someone who isn't us.
 
 ---
 
-## Strategic Shift (December 27, 2024)
+## Feature Completeness
 
-**We're building a GitHub replacement, not just a better CLI.**
+### Git Compatibility: 98%
 
-The CLI got us here. But people don't switch platforms for a nicer `git status`. They switch when the *platform* is better.
+| Category | Status |
+|----------|--------|
+| Basic operations (init, add, commit, status) | Complete |
+| Branching (branch, checkout, switch, merge) | Complete |
+| History (log, diff, show, blame) | Complete |
+| Remotes (clone, fetch, pull, push) | Complete |
+| Stashing | Complete |
+| Tags | Complete |
+| Rebase | Complete |
+| Cherry-pick | Complete |
+| Bisect | Complete |
+| Submodules | Complete |
+| Worktrees | Complete |
+| Hooks | Complete |
+| Large files | Complete |
+| Partial clone | Complete |
 
-### Our Moat
+### Platform Features: 90%
 
-1. **Open source** - You own it forever
-2. **Self-hostable** - Your code, your infrastructure
-3. **Programmatic core** - CLI, UI, API all call the same TypeScript functions
-4. **AI-native** - Not bolted on, woven in
-5. **Clean slate** - We can rethink everything GitHub calcified
+| Feature | Status |
+|---------|--------|
+| Pull Requests | Complete |
+| Issues | Complete |
+| Forks | Complete |
+| Stars/Watch | Complete |
+| Webhooks | Complete |
+| Branch Protection | Complete |
+| Releases | Complete |
+| Milestones | Complete |
+| SSH Protocol | Complete |
+| HTTPS Protocol | Complete |
+| Rate Limiting | Complete |
+| Notifications | Complete |
+| Stacked Diffs | Complete |
+| Merge Queue | Complete |
+| CI/CD Integration | Partial |
+| Code Search | Complete |
+| Semantic Search | Complete |
 
-### The Web App is Now Priority
+### AI Features: 95%
 
-See `AGENT_TASKS.md` for the full breakdown. Key initiatives:
-
-**AI-First Features (Our Differentiator)**
-- AI-generated PR descriptions
-- "Explain this diff" inline
-- Semantic code search in UI
-- AI conflict resolution
-- Chat with your codebase
-
-**Code Review Experience**
-- Inline comments on diffs (table stakes)
-- Code suggestions with one-click apply
-- Side-by-side diff view
-- Batch review submission
-
-**Keyboard-First / Speed**
-- Command palette (Cmd+K)
-- Keyboard shortcuts everywhere
-- Instant search
-
-**Table Stakes**
-- Releases, milestones, webhooks
-- Branch protection UI
-- Collaborators management
-- SSH keys and tokens
-
-### The Anti-Roadmap (Revised)
-
-**Still not doing:**
-- Building our own CI runners (GitHub Actions compatibility is enough)
-- Enterprise features yet (SSO, audit logs)
-
-**Changed my mind on:**
-- ~~Web UI is secondary~~ → Web UI is the product
-- ~~Kill the platform?~~ → The platform is how we win
+| Feature | Status |
+|---------|--------|
+| AI Commit Messages | Complete |
+| AI Code Review | Complete |
+| AI PR Descriptions | Complete |
+| AI Conflict Resolution | Complete |
+| Semantic Search | Complete |
+| Chat with Codebase | Complete |
+| Coding Agent Tools | Complete |
 
 ---
 
@@ -251,10 +444,55 @@ See `AGENT_TASKS.md` for the full breakdown. Key initiatives:
 
 | Issue | Severity | Notes |
 |-------|----------|-------|
-| 17 failing integration tests | High | PR flow broken in tests |
-| ESM/CommonJS configuration mess | Medium | Build works but fragile |
-| Missing `ai` package in fresh install | Medium | Semantic search fails |
-| Package.json `type: module` removed | Low | Should fix properly |
+| Integration test failures | High | PR flow tests need fixes |
+| ESM/CommonJS configuration | Medium | Build works but fragile |
+| Missing `ai` package in fresh install | Medium | Semantic search may fail |
+
+---
+
+## The Anti-Roadmap
+
+**Not doing (yet):**
+- Building our own CI runners (GitHub Actions compatibility is enough)
+- Enterprise features (SSO, audit logs)
+- Mobile apps
+- Native desktop app
+
+**Philosophy:**
+- CLI and Web are both first-class
+- AI is woven in, not bolted on
+- Open source and self-hostable
+- Keyboard-first, mouse-optional
+
+---
+
+## For Contributors
+
+### Current Priorities
+
+1. **Fix failing tests** - `npm test` should pass
+2. **Documentation** - Command reference
+3. **Error message improvements** - Helpful suggestions
+
+### How to Help
+
+```bash
+git clone https://github.com/abhiaiyer91/wit
+cd wit
+npm install
+npm run build
+npm test
+```
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for full details. **We only accept AI-generated contributions.**
+
+### Code Philosophy
+
+- TypeScript strict mode
+- Tests for new functionality
+- User-facing errors should be helpful
+- CLI output should be beautiful
+- AI should feel like a colleague, not a feature
 
 ---
 
@@ -277,58 +515,6 @@ See `AGENT_TASKS.md` for the full breakdown. Key initiatives:
 
 ---
 
-## Open Questions
-
-1. **CLI-only or Platform?** - The CLI is clearly the product. Is the server a distraction or necessary infrastructure?
-
-2. **API Key Friction** - Semantic search requires OPENAI_API_KEY. Should we:
-   - Bundle a free tier?
-   - Support local models (Ollama)?
-   - Accept the friction as filtering for power users?
-
-3. **Relationship with Git** - Are we:
-   - A Git replacement? (ambitious)
-   - A Git wrapper? (safer)
-   - A Git companion? (different)
-
-4. **What's the wedge?** - Which single feature makes someone try wit?
-   - Smart status?
-   - Semantic search?
-   - AI commit messages?
-   - Something else?
-
----
-
-## For Contributors
-
-### Current Priorities
-
-1. **Fix failing tests** - `npm test` should pass
-2. **Add `wit review`** - Pre-push AI review
-3. **Documentation** - Command reference
-
-### How to Help
-
-```bash
-git clone https://github.com/abhiaiyer91/wit
-cd wit
-npm install
-npm run build
-npm test
-```
-
-Then pick something from the roadmap and open a PR.
-
-### Code Philosophy
-
-- TypeScript strict mode
-- Tests for new functionality
-- User-facing errors should be helpful
-- CLI output should be beautiful
-- AI should feel like a colleague, not a feature
-
----
-
 ## The Bet
 
 I'm betting that developers want:
@@ -342,4 +528,4 @@ Let's find out.
 
 ---
 
-*Last updated by wit, December 27, 2024*
+*Last updated: December 27, 2024*
