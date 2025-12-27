@@ -5,22 +5,34 @@ description: "How wit works under the hood"
 
 wit is a Git-compatible version control system written in TypeScript, with an integrated hosting platform.
 
-## System Overview
-
-```
-┌──────────────────────────────────────────────────────────────┐
-│                           CLI                                │
-│                      src/commands/*                          │
-├────────────────────────┬─────────────────────────────────────┤
-│      Core Git          │           Platform                  │
-│  - Repository          │  - API Server (Hono + tRPC)         │
-│  - Objects & Refs      │  - Web App (React)                  │
-│  - Merge & Diff        │  - Database (PostgreSQL)            │
-│  - Smart HTTP Protocol │  - Git hosting                      │
-├────────────────────────┴─────────────────────────────────────┤
-│                        Storage                               │
-│           .wit/objects    .wit/refs    PostgreSQL            │
-└──────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph CLI["CLI Layer"]
+        commands["src/commands/*"]
+    end
+    
+    subgraph Core["Core Git"]
+        repo["Repository"]
+        objects["Objects & Refs"]
+        merge["Merge & Diff"]
+        protocol["Smart HTTP"]
+    end
+    
+    subgraph Platform["Platform"]
+        api["API Server (Hono + tRPC)"]
+        web["Web App (React)"]
+        db["PostgreSQL"]
+    end
+    
+    subgraph Storage["Storage"]
+        gitfiles[".wit/objects & .wit/refs"]
+        postgres["PostgreSQL"]
+    end
+    
+    CLI --> Core
+    CLI --> Platform
+    Core --> Storage
+    Platform --> Storage
 ```
 
 ## Key Components
