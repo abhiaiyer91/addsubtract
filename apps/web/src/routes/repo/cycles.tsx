@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { DatePicker } from '@/components/ui/date-picker';
 import { RepoLayout } from './components/repo-layout';
 import { useSession } from '@/lib/auth-client';
 import { trpc } from '@/lib/trpc';
@@ -39,10 +40,14 @@ import { toastSuccess, toastError } from '@/components/ui/use-toast';
 export function CyclesPage() {
   const { owner, repo } = useParams<{ owner: string; repo: string }>();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [newCycle, setNewCycle] = useState({ 
+  const [newCycle, setNewCycle] = useState<{ 
+    name: string; 
+    startDate: Date | undefined; 
+    endDate: Date | undefined;
+  }>({ 
     name: '', 
-    startDate: '', 
-    endDate: '' 
+    startDate: undefined, 
+    endDate: undefined,
   });
   const { data: session } = useSession();
   const authenticated = !!session?.user;
@@ -78,7 +83,7 @@ export function CyclesPage() {
       utils.cycles.list.invalidate({ repoId: repoData?.repo.id! });
       utils.cycles.getCurrent.invalidate({ repoId: repoData?.repo.id! });
       setShowCreateDialog(false);
-      setNewCycle({ name: '', startDate: '', endDate: '' });
+      setNewCycle({ name: '', startDate: undefined, endDate: undefined });
       toastSuccess({ title: 'Cycle created successfully' });
     },
     onError: (error) => {
@@ -93,8 +98,8 @@ export function CyclesPage() {
     createMutation.mutate({
       repoId: repoData.repo.id,
       name: newCycle.name.trim(),
-      startDate: newCycle.startDate,
-      endDate: newCycle.endDate,
+      startDate: newCycle.startDate.toISOString().split('T')[0],
+      endDate: newCycle.endDate.toISOString().split('T')[0],
     });
   };
 
@@ -263,20 +268,22 @@ export function CyclesPage() {
             <div className="grid gap-4 grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="startDate">Start Date</Label>
-                <Input
-                  id="startDate"
-                  type="date"
-                  value={newCycle.startDate}
-                  onChange={(e) => setNewCycle({ ...newCycle, startDate: e.target.value })}
+                <DatePicker
+                  date={newCycle.startDate}
+                  onDateChange={(date) => setNewCycle({ ...newCycle, startDate: date })}
+                  placeholder="Select start date"
+                  toDate={newCycle.endDate}
+                  className="w-full"
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="endDate">End Date</Label>
-                <Input
-                  id="endDate"
-                  type="date"
-                  value={newCycle.endDate}
-                  onChange={(e) => setNewCycle({ ...newCycle, endDate: e.target.value })}
+                <DatePicker
+                  date={newCycle.endDate}
+                  onDateChange={(date) => setNewCycle({ ...newCycle, endDate: date })}
+                  placeholder="Select end date"
+                  fromDate={newCycle.startDate}
+                  className="w-full"
                 />
               </div>
             </div>
