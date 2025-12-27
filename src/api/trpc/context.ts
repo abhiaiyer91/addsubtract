@@ -56,22 +56,28 @@ export async function createContext(c: HonoContext): Promise<Context> {
     if (authHeader?.startsWith('Bearer ')) {
       const token = authHeader.slice(7);
       
-      // Validate token with better-auth
-      const auth = createAuth();
-      const session = await auth.api.getSession({
-        headers: new Headers({
-          'cookie': `better-auth.session_token=${token}`,
-        }),
-      });
+      // Look up session directly in database by token
+      const { session: sessionTable } = await import('../../db/auth-schema');
+      const { eq } = await import('drizzle-orm');
+      const { user: userTable } = await import('../../db/auth-schema');
+      
+      const [sessionRecord] = await db
+        .select({
+          session: sessionTable,
+          user: userTable,
+        })
+        .from(sessionTable)
+        .innerJoin(userTable, eq(sessionTable.userId, userTable.id))
+        .where(eq(sessionTable.token, token))
+        .limit(1);
 
-      if (session?.user) {
-        const sessionUser = session.user as SessionUser;
+      if (sessionRecord && sessionRecord.session.expiresAt > new Date()) {
         user = {
-          id: sessionUser.id,
-          email: sessionUser.email,
-          name: sessionUser.name,
-          username: sessionUser.username,
-          image: sessionUser.image,
+          id: sessionRecord.user.id,
+          email: sessionRecord.user.email,
+          name: sessionRecord.user.name,
+          username: sessionRecord.user.username,
+          image: sessionRecord.user.image,
         };
       }
     } else {
