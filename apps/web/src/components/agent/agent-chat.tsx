@@ -8,6 +8,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { ChatMessage } from './chat-message';
 import { ChatInput } from './chat-input';
 import { trpc } from '@/lib/trpc';
@@ -30,6 +40,7 @@ export function AgentChat({ repoId }: AgentChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [streamingMessage, setStreamingMessage] = useState<string>('');
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
+  const [deleteSessionId, setDeleteSessionId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const utils = trpc.useUtils();
 
@@ -150,8 +161,8 @@ export function AgentChat({ repoId }: AgentChatProps) {
   const handleSend = async (message: string) => {
     const provider = selectedProvider as 'anthropic' | 'openai' | undefined;
     if (!activeSessionId) {
-      // Create a new session first
-      const newSession = await createSession.mutateAsync({});
+      // Create a new session first, passing repoId so AI keys can be found
+      const newSession = await createSession.mutateAsync({ repoId });
       chat.mutate({ sessionId: newSession.id, message, provider });
     } else {
       // Add optimistic user message
@@ -170,13 +181,18 @@ export function AgentChat({ repoId }: AgentChatProps) {
   };
 
   const handleNewSession = () => {
-    createSession.mutate({});
+    createSession.mutate({ repoId });
   };
 
   const handleDeleteSession = (sessionId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm('Are you sure you want to delete this session?')) {
-      deleteSession.mutate({ sessionId });
+    setDeleteSessionId(sessionId);
+  };
+
+  const confirmDeleteSession = () => {
+    if (deleteSessionId) {
+      deleteSession.mutate({ sessionId: deleteSessionId });
+      setDeleteSessionId(null);
     }
   };
 
@@ -381,6 +397,27 @@ export function AgentChat({ repoId }: AgentChatProps) {
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteSessionId} onOpenChange={(open) => !open && setDeleteSessionId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete conversation?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this conversation and all its messages. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteSession}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
