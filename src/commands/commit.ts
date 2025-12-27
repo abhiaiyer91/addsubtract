@@ -8,6 +8,7 @@ import { Journal, StateSnapshot } from '../core/journal';
 import { TsgitError, Errors, ErrorCode } from '../core/errors';
 import { Author } from '../core/types';
 import { updateReflog } from './reflog';
+import { IssueManager } from '../core/issues';
 
 /**
  * Options for commit command
@@ -21,6 +22,8 @@ export interface CommitOptions {
   author?: string;             // Override author
   noVerify?: boolean;          // Skip pre-commit hooks
   dryRun?: boolean;            // Show what would be committed
+  closes?: string[];           // Issue IDs to close (e.g., WIT-1, WIT-2)
+  refs?: string[];             // Issue IDs to reference without closing
 }
 
 /**
@@ -33,6 +36,8 @@ export interface CommitResult {
   branch: string | null;
   filesCommitted: number;
   isAmend: boolean;
+  closedIssues?: string[];    // Display IDs of closed issues
+  referencedIssues?: string[]; // Display IDs of referenced issues
 }
 
 /**
@@ -184,6 +189,54 @@ export function commitWithOptions(
     resultMessage = `[detached HEAD ${shortHash}] ${messageFirstLine}`;
   }
 
+  // Handle issue integration
+  const closedIssues: string[] = [];
+  const referencedIssues: string[] = [];
+
+  try {
+    const issueManager = new IssueManager(repo.gitDir);
+    
+    // Process --closes flags
+    if (options.closes && options.closes.length > 0) {
+      for (const issueId of options.closes) {
+        const issue = issueManager.close(issueId, hash);
+        if (issue) {
+          closedIssues.push(issueManager.getDisplayId(issue));
+        }
+      }
+    }
+
+    // Process --refs flags  
+    if (options.refs && options.refs.length > 0) {
+      for (const issueId of options.refs) {
+        const linked = issueManager.linkCommit(issueId, hash);
+        if (linked) {
+          const issue = issueManager.get(issueId);
+          if (issue) {
+            referencedIssues.push(issueManager.getDisplayId(issue));
+          }
+        }
+      }
+    }
+
+    // Also process issue references in commit message automatically
+    const { closed, referenced } = issueManager.processCommit(options.message, hash);
+    for (const issue of closed) {
+      const displayId = issueManager.getDisplayId(issue);
+      if (!closedIssues.includes(displayId)) {
+        closedIssues.push(displayId);
+      }
+    }
+    for (const issue of referenced) {
+      const displayId = issueManager.getDisplayId(issue);
+      if (!referencedIssues.includes(displayId) && !closedIssues.includes(displayId)) {
+        referencedIssues.push(displayId);
+      }
+    }
+  } catch {
+    // Issue manager might not be initialized, that's ok
+  }
+
   return {
     success: true,
     hash,
@@ -191,6 +244,8 @@ export function commitWithOptions(
     branch,
     filesCommitted: repo.index.size,
     isAmend: !!options.amend,
+    closedIssues: closedIssues.length > 0 ? closedIssues : undefined,
+    referencedIssues: referencedIssues.length > 0 ? referencedIssues : undefined,
   };
 }
 
@@ -258,6 +313,8 @@ export function handleCommit(args: string[]): void {
     message: '',
   };
   const files: string[] = [];
+  const closes: string[] = [];
+  const refs: string[] = [];
 
   // Parse arguments
   for (let i = 0; i < args.length; i++) {
@@ -277,6 +334,13 @@ export function handleCommit(args: string[]): void {
       options.noVerify = true;
     } else if (arg === '--dry-run') {
       options.dryRun = true;
+    } else if (arg === '--closes' || arg === '--close' || arg === '-c') {
+      // Support comma-separated or multiple flags
+      const issueArg = args[++i] || '';
+      closes.push(...issueArg.split(',').map(s => s.trim()).filter(Boolean));
+    } else if (arg === '--refs' || arg === '--ref') {
+      const issueArg = args[++i] || '';
+      refs.push(...issueArg.split(',').map(s => s.trim()).filter(Boolean));
     } else if (!arg.startsWith('-')) {
       files.push(arg);
     }
@@ -284,6 +348,14 @@ export function handleCommit(args: string[]): void {
 
   if (files.length > 0) {
     options.files = files;
+  }
+
+  if (closes.length > 0) {
+    options.closes = closes;
+  }
+
+  if (refs.length > 0) {
+    options.refs = refs;
   }
 
   if (!options.message) {
@@ -296,16 +368,28 @@ export function handleCommit(args: string[]): void {
     console.error('  --allow-empty        Allow empty commits');
     console.error('  --author <author>    Override author (format: "Name <email>")');
     console.error('  --dry-run            Show what would be committed');
+    console.error('  --closes <issue>     Close issue(s) with this commit (e.g., WIT-1,WIT-2)');
+    console.error('  --refs <issue>       Reference issue(s) without closing');
     console.error('\nExamples:');
     console.error('  wit commit -m "Add feature"');
     console.error('  wit commit -a -m "Update all"');
     console.error('  wit commit file.ts -m "Fix bug"');
+    console.error('  wit commit -m "Fix login" --closes WIT-123');
+    console.error('  wit commit -m "Progress" --refs WIT-456');
     process.exit(1);
   }
 
   try {
     const result = commitWithOptions(repo, options);
     console.log(result.message);
+    
+    // Show closed/referenced issues
+    if (result.closedIssues && result.closedIssues.length > 0) {
+      console.log(`\x1b[32m✓\x1b[0m Closed: ${result.closedIssues.join(', ')}`);
+    }
+    if (result.referencedIssues && result.referencedIssues.length > 0) {
+      console.log(`\x1b[36m→\x1b[0m Referenced: ${result.referencedIssues.join(', ')}`);
+    }
   } catch (error) {
     if (error instanceof TsgitError) {
       console.error(error.format());

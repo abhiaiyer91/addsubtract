@@ -13,6 +13,8 @@ import { renderDiffHTML, getDiffStyles, getWordDiffStyles } from './diff-viewer'
 import { buildFileTree, renderFileTreeHTML, getFileTreeStyles } from './file-tree';
 import { SearchEngine, renderSearchResultsHTML, getSearchStyles } from './search';
 import { getTheme, Theme, getThemeNames } from './themes';
+import { IssueManager, Issue, IssueStatus, IssuePriority } from '../core/issues';
+import { renderBoard, renderIssueList, renderIssueDetail, getIssueBoardStyles, getIssueBoardScript } from './issue-board';
 
 const DEFAULT_PORT = 3847;
 
@@ -25,12 +27,15 @@ export class PremiumWebUI {
   private port: number;
   private searchEngine: SearchEngine;
   private currentTheme: Theme;
+  private issueManager: IssueManager;
 
   constructor(repo: Repository, port: number = DEFAULT_PORT) {
     this.repo = repo;
     this.port = port;
     this.searchEngine = new SearchEngine(repo);
     this.currentTheme = getTheme('github-dark');
+    this.issueManager = new IssueManager(repo.gitDir);
+    this.issueManager.init();
     this.server = http.createServer((req, res) => this.handleRequest(req, res));
   }
 
@@ -121,7 +126,115 @@ export class PremiumWebUI {
             this.serveJSON(res, { success: true });
           }
           break;
+        
+        // Issue tracking API endpoints
+        case '/api/issues':
+          if (req.method === 'GET') {
+            this.serveJSON(res, this.getIssues(parsedUrl.query));
+          } else if (req.method === 'POST') {
+            const body = await this.readBody(req);
+            const data = JSON.parse(body);
+            const issue = this.issueManager.create(data);
+            this.serveJSON(res, { 
+              ...issue, 
+              displayId: this.issueManager.getDisplayId(issue) 
+            });
+          }
+          break;
+        case '/api/issues/board':
+          this.serveText(res, this.getIssueBoardHTML(), 'text/html');
+          break;
+        case '/api/issues/list':
+          this.serveText(res, this.getIssueListHTML(), 'text/html');
+          break;
+        case '/api/issues/stats':
+          this.serveJSON(res, this.issueManager.getStats());
+          break;
+        case '/api/cycles':
+          if (req.method === 'GET') {
+            this.serveJSON(res, this.issueManager.listCycles());
+          } else if (req.method === 'POST') {
+            const body = await this.readBody(req);
+            const data = JSON.parse(body);
+            const cycle = this.issueManager.createCycle(data);
+            this.serveJSON(res, cycle);
+          }
+          break;
+        case '/api/cycles/current':
+          const activeCycle = this.issueManager.getActiveCycle();
+          if (activeCycle) {
+            this.serveJSON(res, {
+              ...activeCycle,
+              progress: this.issueManager.getCycleProgress(activeCycle.id)
+            });
+          } else {
+            this.serveJSON(res, null);
+          }
+          break;
         default:
+          // Handle dynamic issue routes like /api/issues/:id
+          const issueMatch = pathname.match(/^\/api\/issues\/([^\/]+)$/);
+          if (issueMatch) {
+            const issueId = issueMatch[1];
+            if (req.method === 'GET') {
+              const issue = this.issueManager.get(issueId);
+              if (issue) {
+                this.serveJSON(res, { 
+                  ...issue, 
+                  displayId: this.issueManager.getDisplayId(issue) 
+                });
+              } else {
+                res.writeHead(404);
+                res.end(JSON.stringify({ error: 'Issue not found' }));
+              }
+            } else if (req.method === 'PATCH') {
+              const body = await this.readBody(req);
+              const updates = JSON.parse(body);
+              const issue = this.issueManager.update(issueId, updates);
+              if (issue) {
+                this.serveJSON(res, { 
+                  ...issue, 
+                  displayId: this.issueManager.getDisplayId(issue) 
+                });
+              } else {
+                res.writeHead(404);
+                res.end(JSON.stringify({ error: 'Issue not found' }));
+              }
+            } else if (req.method === 'DELETE') {
+              const deleted = this.issueManager.delete(issueId);
+              this.serveJSON(res, { success: deleted });
+            }
+            break;
+          }
+          
+          // Handle issue detail route
+          const detailMatch = pathname.match(/^\/api\/issues\/([^\/]+)\/detail$/);
+          if (detailMatch) {
+            const issue = this.issueManager.get(detailMatch[1]);
+            if (issue) {
+              this.serveText(res, renderIssueDetail(issue, this.issueManager), 'text/html');
+            } else {
+              res.writeHead(404);
+              res.end('Issue not found');
+            }
+            break;
+          }
+          
+          // Handle issue comments route
+          const commentsMatch = pathname.match(/^\/api\/issues\/([^\/]+)\/comments$/);
+          if (commentsMatch) {
+            const issueId = commentsMatch[1];
+            if (req.method === 'GET') {
+              this.serveJSON(res, this.issueManager.getComments(issueId));
+            } else if (req.method === 'POST') {
+              const body = await this.readBody(req);
+              const { content } = JSON.parse(body);
+              const comment = this.issueManager.addComment(issueId, content);
+              this.serveJSON(res, comment);
+            }
+            break;
+          }
+          
           res.writeHead(404);
           res.end('Not Found');
       }
@@ -241,6 +354,31 @@ export class PremiumWebUI {
       description: entry.description,
       timestamp: new Date(entry.timestamp).toISOString(),
     }));
+  }
+
+  private getIssues(query: any): any {
+    const options: any = {};
+    if (query.status) options.status = query.status;
+    if (query.priority) options.priority = query.priority;
+    if (query.assignee) options.assignee = query.assignee;
+    if (query.search) options.search = query.search;
+    if (query.cycleId) options.cycleId = query.cycleId;
+    
+    const issues = this.issueManager.list(options);
+    return issues.map(issue => ({
+      ...issue,
+      displayId: this.issueManager.getDisplayId(issue),
+    }));
+  }
+
+  private getIssueBoardHTML(): string {
+    const issues = this.issueManager.list({ sortBy: 'priority', sortOrder: 'desc' });
+    return renderBoard(issues, this.issueManager);
+  }
+
+  private getIssueListHTML(): string {
+    const issues = this.issueManager.list({ sortBy: 'updated', sortOrder: 'desc' });
+    return renderIssueList(issues, this.issueManager);
   }
 
   private serveHTML(res: http.ServerResponse): void {
@@ -401,6 +539,13 @@ export class PremiumWebUI {
             </svg>
             Graph
           </button>
+          <button class="panel-tab" data-panel="issues">
+            <svg viewBox="0 0 16 16" fill="currentColor">
+              <path d="M8 9.5a1.5 1.5 0 100-3 1.5 1.5 0 000 3z"/>
+              <path fill-rule="evenodd" d="M8 0a8 8 0 100 16A8 8 0 008 0zM1.5 8a6.5 6.5 0 1113 0 6.5 6.5 0 01-13 0z"/>
+            </svg>
+            Issues
+          </button>
           <button class="panel-tab" data-panel="diff">
             <svg viewBox="0 0 16 16" fill="currentColor">
               <path d="M8.75 1.75a.75.75 0 00-1.5 0V5H4a.75.75 0 000 1.5h3.25v3.25a.75.75 0 001.5 0V6.5H12A.75.75 0 0012 5H8.75V1.75z"/>
@@ -423,6 +568,18 @@ export class PremiumWebUI {
             </div>
           </div>
         </div>
+        
+        <div class="panel-content" id="panel-issues" style="display: none;">
+          <div id="issues-container">
+            <div class="loading-state">
+              <div class="spinner"></div>
+              <p>Loading issues...</p>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Issue Detail Side Panel -->
+        <div id="issue-detail-panel" class="issue-detail-side-panel"></div>
         
         <div class="panel-content" id="panel-diff" style="display: none;">
           <div id="diff-container">
@@ -1501,6 +1658,26 @@ export class PremiumWebUI {
     ${getWordDiffStyles()}
     ${getFileTreeStyles()}
     ${getSearchStyles()}
+    ${getIssueBoardStyles()}
+    
+    /* Issue Detail Side Panel */
+    .issue-detail-side-panel {
+      position: fixed;
+      top: 52px;
+      right: -400px;
+      width: 400px;
+      height: calc(100vh - 52px);
+      background: var(--bg-elevated);
+      border-left: 1px solid var(--border-default);
+      box-shadow: var(--shadow-xl);
+      transition: right 0.3s ease;
+      z-index: 100;
+      overflow: hidden;
+    }
+    
+    .issue-detail-side-panel.open {
+      right: 0;
+    }
     
     /* Override diff styles for premium look */
     .diff-container {
@@ -1576,6 +1753,27 @@ export class PremiumWebUI {
       initKeyboardShortcuts();
     });
     
+    // Issue tracking functions
+    ${getIssueBoardScript()}
+    
+    async function loadIssueBoard() {
+      const container = document.getElementById('issues-container');
+      container.innerHTML = '<div class="loading-state"><div class="spinner"></div><p>Loading issues...</p></div>';
+      
+      try {
+        const html = await fetchHTML('/api/issues/board');
+        container.innerHTML = html;
+        
+        // Attach drag handlers
+        document.querySelectorAll('.issue-card').forEach(card => {
+          card.addEventListener('dragstart', handleDragStart);
+          card.addEventListener('dragend', handleDragEnd);
+        });
+      } catch (e) {
+        container.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><h3>No issues yet</h3><p>Create your first issue to get started</p><button class="btn btn-primary" onclick="createIssue()">Create Issue</button></div>';
+      }
+    }
+    
     // Tab switching
     function initTabs() {
       document.querySelectorAll('.panel-tab').forEach(tab => {
@@ -1593,6 +1791,7 @@ export class PremiumWebUI {
       document.getElementById('panel-' + panel).style.display = 'block';
       
       if (panel === 'history') loadHistory();
+      if (panel === 'issues') loadIssueBoard();
     }
     
     // Keyboard shortcuts

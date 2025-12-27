@@ -59,6 +59,9 @@ import {
   // Advanced features
   handleReflog,
   handleGC,
+  // Issue tracking (Linear-inspired)
+  handleIssue,
+  handleCycle,
 } from './commands';
 import { handleHooks } from './core/hooks';
 import { handleSubmodule } from './core/submodule';
@@ -171,6 +174,18 @@ Quality of Life:
   stats                 Repository statistics dashboard
   snapshot              Create/restore quick checkpoints
 
+Issue Tracking (Linear-inspired):
+  issue create "Title"  Create a new issue
+  issue list            List issues (--status, --priority, --assignee)
+  issue show <id>       Show issue details (e.g., WIT-123)
+  issue start <id>      Start working on an issue
+  issue close <id>      Close an issue
+  issue board           Show kanban board view
+  issue stats           Show issue statistics
+  cycle create          Create a new sprint/cycle
+  cycle current         Show active cycle progress
+  cycle add <issue>     Add issue to current cycle
+
 Monorepo Support:
   scope                 Show current repository scope
   scope set <path>...   Limit operations to specific paths
@@ -226,6 +241,15 @@ Examples:
   wit fetch origin           # Fetch from origin
   wit pull                   # Pull current branch
   wit push -u origin main    # Push and set upstream
+
+Issue Tracking:
+  wit issue create "Fix login bug"    # Create issue
+  wit issue list                      # List open issues
+  wit issue start WIT-1               # Start working on issue
+  wit issue board                     # Kanban board view
+  wit commit -m "Fix bug" --closes WIT-1  # Close issue on commit
+  wit cycle create --weeks 2          # Create 2-week sprint
+  wit cycle add WIT-1                 # Add issue to sprint
 `;
 
 const COMMANDS = [
@@ -236,6 +260,8 @@ const COMMANDS = [
   'scope', 'graph',
   'ui', 'web',
   'ai',
+  // Issue tracking
+  'issue', 'cycle',
   'cat-file', 'hash-object', 'ls-files', 'ls-tree',
   // Plumbing commands
   'rev-parse', 'update-ref', 'symbolic-ref', 'for-each-ref', 'show-ref', 'fsck',
@@ -687,6 +713,15 @@ function main(): void {
 
       case 'gc':
         handleGC(cmdArgs);
+        break;
+
+      // Issue tracking commands
+      case 'issue':
+        handleIssue(rawArgs);
+        break;
+
+      case 'cycle':
+        handleCycle(rawArgs);
         break;
 
       default: {

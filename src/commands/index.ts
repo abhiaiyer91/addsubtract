@@ -64,3 +64,7 @@ export { handlePush, push } from './push';
 // Advanced features
 export { handleReflog, ReflogManager, updateReflog } from './reflog';
 export { handleGC, GarbageCollector } from './gc';
+
+// Issue tracking (Linear-inspired)
+export { handleIssue } from './issue';
+export { handleCycle } from './cycle';
