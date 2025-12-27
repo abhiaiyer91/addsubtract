@@ -256,7 +256,7 @@ export function AgentPanel({ isOpen, onClose, repoId, repoName, owner }: AgentPa
   return (
     <div
       className={cn(
-        'fixed inset-y-0 right-0 z-40 flex flex-col',
+        'fixed inset-y-0 right-0 z-[60] flex flex-col',
         'w-full sm:w-[440px] md:w-[500px] lg:w-[560px]',
         'bg-background border-l border-border/50',
         'shadow-2xl shadow-black/20',
