@@ -2,14 +2,14 @@
  * Code Completion Router
  * 
  * AI-powered code completion API for the IDE.
- * Provides inline suggestions using LLM fill-in-the-middle (FIM) completion.
+ * Uses Mastra for all AI operations.
  */
 
 import { z } from 'zod';
 import { router, protectedProcedure } from '../trpc';
 import { TRPCError } from '@trpc/server';
-import Anthropic from '@anthropic-ai/sdk';
-import OpenAI from 'openai';
+import { Agent } from '@mastra/core/agent';
+import { getAnyApiKeyForRepo, isAIAvailable } from '../../../ai/mastra.js';
 
 // Cache for rate limiting and deduplication
 const completionCache = new Map<string, { result: string; timestamp: number }>();
@@ -21,117 +21,79 @@ const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute
 const RATE_LIMIT_MAX_REQUESTS = 60; // 60 requests per minute
 
 /**
- * Get AI client based on available API keys
+ * System prompt for code completion
  */
-function getAIClient(): { type: 'anthropic' | 'openai'; client: Anthropic | OpenAI } | null {
-  if (process.env.ANTHROPIC_API_KEY) {
-    return { type: 'anthropic', client: new Anthropic() };
-  }
-  if (process.env.OPENAI_API_KEY) {
-    return { type: 'openai', client: new OpenAI() };
-  }
-  return null;
-}
-
-/**
- * Generate completion using Anthropic Claude
- */
-async function generateAnthropicCompletion(
-  client: Anthropic,
-  prefix: string,
-  suffix: string,
-  language: string,
-  filePath: string,
-  maxTokens: number = 150
-): Promise<string> {
-  const systemPrompt = `You are an expert code completion assistant. Your task is to complete the code at the cursor position.
-You will receive:
-- Code before the cursor (prefix)
-- Code after the cursor (suffix)
-- The programming language
-- The file path for context
+const COMPLETION_SYSTEM_PROMPT = `You are an expert code completion assistant. Your task is to complete the code at the cursor position.
 
 Rules:
-1. Only output the completion text - no explanations, no markdown
+1. Only output the completion text - no explanations, no markdown, no code blocks
 2. Complete in a way that makes the code syntactically correct
 3. Match the existing code style (indentation, naming conventions)
 4. Keep completions concise - complete the current statement or block
 5. If the context suggests a function call, complete it with sensible parameters
 6. Do not repeat code that's already in the prefix
-7. The completion should flow naturally into the suffix`;
+7. The completion should flow naturally into the suffix
+8. Output ONLY the raw code to insert - nothing else`;
 
-  const userPrompt = `File: ${filePath}
-Language: ${language}
-
-Code before cursor:
-\`\`\`
-${prefix.slice(-1500)}
-\`\`\`
-
-Code after cursor:
-\`\`\`
-${suffix.slice(0, 500)}
-\`\`\`
-
-Complete the code at the cursor position. Output ONLY the completion text.`;
-
-  const response = await client.messages.create({
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: maxTokens,
-    messages: [
-      { role: 'user', content: userPrompt }
-    ],
-    system: systemPrompt,
+/**
+ * Create a completion agent using Mastra
+ */
+function createCompletionAgent(model: string): Agent {
+  return new Agent({
+    id: 'wit-completion-agent',
+    name: 'Code Completion Agent',
+    description: 'Generates inline code completions',
+    instructions: COMPLETION_SYSTEM_PROMPT,
+    model,
   });
-
-  const textBlock = response.content.find(block => block.type === 'text');
-  if (!textBlock || textBlock.type !== 'text') {
-    return '';
-  }
-
-  return cleanCompletion(textBlock.text, prefix, suffix);
 }
 
 /**
- * Generate completion using OpenAI
+ * Generate completion using Mastra agent
  */
-async function generateOpenAICompletion(
-  client: OpenAI,
+async function generateCompletion(
   prefix: string,
   suffix: string,
   language: string,
   filePath: string,
+  repoId: string | null,
   maxTokens: number = 150
 ): Promise<string> {
-  const systemPrompt = `You are an expert code completion assistant. Complete the code at the cursor position.
-Rules:
-1. Only output the completion text - no explanations, no markdown
-2. Complete in a way that makes the code syntactically correct
-3. Match the existing code style
-4. Keep completions concise
-5. Do not repeat code from the prefix`;
+  // Get API key (repo-level or server-level)
+  const apiKeyInfo = await getAnyApiKeyForRepo(repoId);
+  
+  if (!apiKeyInfo) {
+    throw new Error('No AI API key configured. Set ANTHROPIC_API_KEY or OPENAI_API_KEY.');
+  }
 
-  const userPrompt = `File: ${filePath} (${language})
+  // Determine model based on provider
+  const model = apiKeyInfo.provider === 'anthropic' 
+    ? 'anthropic/claude-sonnet-4-20250514'
+    : 'openai/gpt-4o-mini';
 
-PREFIX:
+  // Create completion agent
+  const agent = createCompletionAgent(model);
+
+  // Build the completion prompt
+  const userPrompt = `File: ${filePath}
+Language: ${language}
+
+Code before cursor:
 ${prefix.slice(-1500)}
-<CURSOR>
-SUFFIX:
+
+Code after cursor:
 ${suffix.slice(0, 500)}
 
-Output only the code to insert at <CURSOR>.`;
+Complete the code at the cursor position. Output ONLY the completion text, nothing else.`;
 
-  const response = await client.chat.completions.create({
-    model: 'gpt-4o-mini',
-    max_tokens: maxTokens,
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userPrompt }
-    ],
-    temperature: 0.2,
+  // Generate completion using Mastra agent
+  const response = await agent.generate(userPrompt, {
+    maxTokens,
   });
 
-  const completion = response.choices[0]?.message?.content || '';
+  // Extract text from response
+  const completion = typeof response.text === 'string' ? response.text : '';
+  
   return cleanCompletion(completion, prefix, suffix);
 }
 
@@ -214,10 +176,11 @@ export const completionRouter = router({
       suffix: z.string().describe('Code after the cursor'),
       filePath: z.string().describe('Path to the current file'),
       language: z.string().describe('Programming language'),
+      repoId: z.string().optional().describe('Repository ID for repo-specific API keys'),
       maxTokens: z.number().optional().default(150).describe('Maximum tokens to generate'),
     }))
     .mutation(async ({ input, ctx }) => {
-      const { prefix, suffix, filePath, language, maxTokens } = input;
+      const { prefix, suffix, filePath, language, repoId, maxTokens } = input;
       const userId = ctx.user.id;
 
       // Rate limit check
@@ -238,9 +201,8 @@ export const completionRouter = router({
         };
       }
 
-      // Get AI client
-      const aiClient = getAIClient();
-      if (!aiClient) {
+      // Check if AI is available
+      if (!isAIAvailable() && !repoId) {
         throw new TRPCError({
           code: 'PRECONDITION_FAILED',
           message: 'No AI API key configured. Set ANTHROPIC_API_KEY or OPENAI_API_KEY.',
@@ -248,27 +210,14 @@ export const completionRouter = router({
       }
 
       try {
-        let completion: string;
-        
-        if (aiClient.type === 'anthropic') {
-          completion = await generateAnthropicCompletion(
-            aiClient.client as Anthropic,
-            prefix,
-            suffix,
-            language,
-            filePath,
-            maxTokens
-          );
-        } else {
-          completion = await generateOpenAICompletion(
-            aiClient.client as OpenAI,
-            prefix,
-            suffix,
-            language,
-            filePath,
-            maxTokens
-          );
-        }
+        const completion = await generateCompletion(
+          prefix,
+          suffix,
+          language,
+          filePath,
+          repoId || null,
+          maxTokens
+        );
 
         // Cache the result
         completionCache.set(cacheKey, { result: completion, timestamp: Date.now() });
@@ -305,10 +254,11 @@ export const completionRouter = router({
       suffix: z.string(),
       filePath: z.string(),
       language: z.string(),
+      repoId: z.string().optional(),
       count: z.number().optional().default(3).describe('Number of suggestions to generate'),
     }))
     .mutation(async ({ input, ctx }) => {
-      const { prefix, suffix, filePath, language, count } = input;
+      const { prefix, suffix, filePath, language, repoId, count } = input;
       const userId = ctx.user.id;
 
       // Rate limit check (counts as multiple requests)
@@ -321,8 +271,8 @@ export const completionRouter = router({
         }
       }
 
-      const aiClient = getAIClient();
-      if (!aiClient) {
+      // Check if AI is available
+      if (!isAIAvailable() && !repoId) {
         throw new TRPCError({
           code: 'PRECONDITION_FAILED',
           message: 'No AI API key configured.',
@@ -335,27 +285,14 @@ export const completionRouter = router({
         const completions: string[] = [];
 
         for (const maxTokens of tokenCounts) {
-          let completion: string;
-          
-          if (aiClient.type === 'anthropic') {
-            completion = await generateAnthropicCompletion(
-              aiClient.client as Anthropic,
-              prefix,
-              suffix,
-              language,
-              filePath,
-              maxTokens
-            );
-          } else {
-            completion = await generateOpenAICompletion(
-              aiClient.client as OpenAI,
-              prefix,
-              suffix,
-              language,
-              filePath,
-              maxTokens
-            );
-          }
+          const completion = await generateCompletion(
+            prefix,
+            suffix,
+            language,
+            filePath,
+            repoId || null,
+            maxTokens
+          );
 
           if (completion && !completions.includes(completion)) {
             completions.push(completion);
