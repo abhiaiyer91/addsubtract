@@ -8,6 +8,7 @@
  */
 
 import { z } from 'zod';
+import * as path from 'path';
 import { TRPCError } from '@trpc/server';
 import { observable } from '@trpc/server/observable';
 import { router, publicProcedure, protectedProcedure } from '../trpc';
@@ -19,6 +20,22 @@ import {
   repoAiKeyModel,
 } from '../../../db/models';
 import { getTsgitAgent, isAIAvailable, getAIInfo } from '../../../ai/mastra';
+import { AGENT_MODES, type AgentMode, type AgentContext } from '../../../ai/types';
+
+// Lazy import to avoid circular dependencies
+async function getAgentForMode(mode: AgentMode, context: AgentContext, model: string) {
+  const { createAgentForMode } = await import('../../../ai/agents/factory.js');
+  return createAgentForMode(mode, context, model);
+}
+
+/**
+ * Generate disk path for a repository
+ * Inlined to avoid circular dependency with server/storage
+ */
+function getRepoDiskPath(ownerUsername: string, repoName: string): string {
+  const reposDir = process.env.REPOS_DIR || './repos';
+  return path.join(reposDir, ownerUsername, `${repoName}.git`);
+}
 
 // Available models configuration
 const AVAILABLE_MODELS = {
@@ -110,6 +127,16 @@ export const agentRouter = router({
     }),
 
   /**
+   * Get available agent modes
+   */
+  getModes: publicProcedure.query(() => {
+    return {
+      modes: Object.values(AGENT_MODES),
+      defaultMode: 'questions' as AgentMode,
+    };
+  }),
+
+  /**
    * Create a new agent session
    */
   createSession: protectedProcedure
@@ -118,6 +145,7 @@ export const agentRouter = router({
         repoId: z.string().uuid().optional(),
         branch: z.string().optional(),
         title: z.string().optional(),
+        mode: z.enum(['questions', 'pm', 'code']).default('questions'),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -138,6 +166,7 @@ export const agentRouter = router({
         branch: input.branch,
         title: input.title,
         status: 'active',
+        mode: input.mode,
       });
 
       return session;
@@ -361,6 +390,30 @@ export const agentRouter = router({
         });
       }
 
+      // Build agent context if we have a repository
+      let agentContext: AgentContext | null = null;
+      if (session.repoId) {
+        const repo = await repoModel.findById(session.repoId);
+        if (repo) {
+          // Get owner info to determine owner username
+          const repoWithOwner = await repoModel.findByIdWithOwner(session.repoId);
+          if (repoWithOwner) {
+            // Get username - handle both user (with username) and organization (with name)
+            const ownerUsername = 'username' in repoWithOwner.owner 
+              ? (repoWithOwner.owner.username || repoWithOwner.owner.name)
+              : repoWithOwner.owner.name;
+            agentContext = {
+              repoId: session.repoId,
+              owner: ownerUsername,
+              repoName: repo.name,
+              repoPath: getRepoDiskPath(ownerUsername, repo.name),
+              userId: ctx.user.id,
+              mode: (session.mode || 'questions') as AgentMode,
+            };
+          }
+        }
+      }
+
       // Save user message
       const userMessage = await agentMessageModel.create({
         sessionId: input.sessionId,
@@ -383,8 +436,15 @@ export const agentRouter = router({
         contextPrompt += '\n---\n\n';
       }
 
-      // Get agent response
-      const agent = getTsgitAgent();
+      // Get agent based on mode (or fallback to general agent)
+      const sessionMode = (session.mode || 'questions') as AgentMode;
+      const modelId = provider === 'anthropic' ? 'anthropic/claude-opus-4-5' : 'openai/gpt-5.2';
+      
+      // Use mode-based agent if we have a repo context, otherwise fallback to general agent
+      const agent = agentContext 
+        ? await getAgentForMode(sessionMode, agentContext, modelId)
+        : getTsgitAgent();
+      
       const fullPrompt = contextPrompt + `User: ${input.message}`;
       
       try {

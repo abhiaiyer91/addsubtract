@@ -40,6 +40,83 @@ export const repoModel = {
   },
 
   /**
+   * Find a repository by ID with owner information
+   */
+  async findByIdWithOwner(
+    id: string
+  ): Promise<
+    | { repo: Repository; owner: Owner | { id: string; name: string; type: 'organization' } }
+    | undefined
+  > {
+    const db = getDb();
+    const repo = await this.findById(id);
+    if (!repo) return undefined;
+
+    // Try better-auth user table first
+    try {
+      const userResult = await db
+        .select()
+        .from(user)
+        .where(sql`${user.id} = ${repo.ownerId}::text`);
+
+      if (userResult.length > 0) {
+        return {
+          repo,
+          owner: {
+            id: userResult[0].id,
+            name: userResult[0].name,
+            email: userResult[0].email,
+            username: userResult[0].username,
+            image: userResult[0].image,
+            avatarUrl: userResult[0].avatarUrl,
+          },
+        };
+      }
+    } catch {
+      // Ignore type mismatch, try legacy table
+    }
+
+    // Try legacy users table
+    const legacyUserResult = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, repo.ownerId));
+
+    if (legacyUserResult.length > 0) {
+      return {
+        repo,
+        owner: {
+          id: legacyUserResult[0].id,
+          name: legacyUserResult[0].name ?? '',
+          email: legacyUserResult[0].email,
+          username: legacyUserResult[0].username,
+          image: null,
+          avatarUrl: legacyUserResult[0].avatarUrl,
+        },
+      };
+    }
+
+    // Try organization
+    const orgResult = await db
+      .select()
+      .from(organizations)
+      .where(eq(organizations.id, repo.ownerId));
+
+    if (orgResult.length > 0) {
+      return {
+        repo,
+        owner: {
+          id: orgResult[0].id,
+          name: orgResult[0].name,
+          type: 'organization' as const,
+        },
+      };
+    }
+
+    return undefined;
+  },
+
+  /**
    * Find a repository by owner and name
    */
   async findByOwnerAndName(

@@ -1256,6 +1256,12 @@ export const agentSessionStatusEnum = pgEnum('agent_session_status', [
   'cancelled',
 ]);
 
+export const agentModeEnum = pgEnum('agent_mode', [
+  'questions',
+  'pm',
+  'code',
+]);
+
 export const agentMessageRoleEnum = pgEnum('agent_message_role', [
   'user',
   'assistant',
@@ -1284,6 +1290,9 @@ export const agentSessions = pgTable('agent_sessions', {
   
   // Current status
   status: agentSessionStatusEnum('status').notNull().default('active'),
+  
+  // Agent mode (questions, pm, code)
+  mode: agentModeEnum('mode').notNull().default('questions'),
   
   // Timestamps
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),

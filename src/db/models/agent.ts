@@ -97,7 +97,7 @@ export const agentSessionModel = {
    */
   async update(
     id: string,
-    data: Partial<Pick<AgentSession, 'title' | 'status' | 'branch'>>
+    data: Partial<Pick<AgentSession, 'title' | 'status' | 'branch' | 'mode'>>
   ): Promise<AgentSession | undefined> {
     const db = getDb();
     const [session] = await db

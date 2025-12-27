@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 import {
-  Bot,
   Plus,
   MessageSquare,
   Trash2,
@@ -16,6 +15,9 @@ import {
   PanelRightClose,
   History,
   ChevronRight,
+  HelpCircle,
+  ClipboardList,
+  FileCode,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -56,6 +58,26 @@ interface Message {
   createdAt: Date;
 }
 
+type AgentMode = 'questions' | 'pm' | 'code';
+
+const MODE_CONFIG: Record<AgentMode, { icon: React.ElementType; label: string; description: string }> = {
+  questions: {
+    icon: HelpCircle,
+    label: 'Questions',
+    description: 'Ask questions about the codebase',
+  },
+  pm: {
+    icon: ClipboardList,
+    label: 'PM',
+    description: 'Create issues, PRs, and manage projects',
+  },
+  code: {
+    icon: FileCode,
+    label: 'Code',
+    description: 'Write code and commit changes',
+  },
+};
+
 interface AgentPanelProps {
   isOpen: boolean;
   onClose: () => void;
@@ -66,13 +88,27 @@ interface AgentPanelProps {
   embedded?: boolean;
 }
 
-const quickActions = [
-  { id: 'branch', icon: GitBranch, label: 'Create branch', prompt: 'Create a new branch called ' },
-  { id: 'commit', icon: GitCommit, label: 'Commit changes', prompt: 'Help me commit my current changes with a good message' },
-  { id: 'pr', icon: GitPullRequest, label: 'Create PR', prompt: 'Create a pull request for the current branch' },
-  { id: 'issue', icon: CircleDot, label: 'Create issue', prompt: 'Create an issue for ' },
-  { id: 'explain', icon: Code, label: 'Explain code', prompt: 'Explain this code: ' },
-];
+// Mode-specific quick actions
+const QUICK_ACTIONS: Record<AgentMode, Array<{ id: string; icon: React.ElementType; label: string; prompt: string }>> = {
+  questions: [
+    { id: 'explain', icon: Code, label: 'Explain code', prompt: 'Explain this code: ' },
+    { id: 'find', icon: HelpCircle, label: 'Find usage', prompt: 'Find all usages of ' },
+    { id: 'architecture', icon: ClipboardList, label: 'Architecture', prompt: 'Explain the architecture of this project' },
+    { id: 'debug', icon: AlertCircle, label: 'Debug help', prompt: 'Help me debug this issue: ' },
+  ],
+  pm: [
+    { id: 'issue', icon: CircleDot, label: 'Create issue', prompt: 'Create an issue for ' },
+    { id: 'pr', icon: GitPullRequest, label: 'Create PR', prompt: 'Create a pull request for the current branch' },
+    { id: 'list-issues', icon: ClipboardList, label: 'List issues', prompt: 'List all open issues' },
+    { id: 'list-prs', icon: GitPullRequest, label: 'List PRs', prompt: 'List all open pull requests' },
+  ],
+  code: [
+    { id: 'branch', icon: GitBranch, label: 'Create branch', prompt: 'Create a new branch called ' },
+    { id: 'commit', icon: GitCommit, label: 'Commit changes', prompt: 'Help me commit my current changes with a good message' },
+    { id: 'edit', icon: FileCode, label: 'Edit file', prompt: 'Edit the file ' },
+    { id: 'refactor', icon: Code, label: 'Refactor', prompt: 'Refactor this code to ' },
+  ],
+};
 
 export function AgentPanel({ isOpen, onClose, repoId, repoName, owner, embedded = false }: AgentPanelProps) {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
@@ -81,6 +117,7 @@ export function AgentPanel({ isOpen, onClose, repoId, repoName, owner, embedded 
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
   const [deleteSessionId, setDeleteSessionId] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  const [selectedMode, setSelectedMode] = useState<AgentMode>('questions');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<ChatInputRef>(null);
   const utils = trpc.useUtils();
@@ -112,6 +149,10 @@ export function AgentPanel({ isOpen, onClose, repoId, repoName, owner, embedded 
     onSuccess: (newSession) => {
       setActiveSessionId(newSession.id);
       setMessages([]);
+      // Update selected mode based on session mode
+      if (newSession.mode) {
+        setSelectedMode(newSession.mode as AgentMode);
+      }
       utils.agent.listSessions.invalidate();
     },
   });
@@ -223,7 +264,7 @@ export function AgentPanel({ isOpen, onClose, repoId, repoName, owner, embedded 
   const handleSend = async (message: string) => {
     const provider = selectedProvider as 'anthropic' | 'openai' | undefined;
     if (!activeSessionId) {
-      const newSession = await createSession.mutateAsync({ repoId });
+      const newSession = await createSession.mutateAsync({ repoId, mode: selectedMode });
       chat.mutate({ sessionId: newSession.id, message, provider });
     } else {
       const tempId = `temp-${Date.now()}`;
@@ -241,8 +282,16 @@ export function AgentPanel({ isOpen, onClose, repoId, repoName, owner, embedded 
   };
 
   const handleNewSession = () => {
-    createSession.mutate({ repoId });
+    createSession.mutate({ repoId, mode: selectedMode });
     setShowHistory(false);
+  };
+
+  const handleModeChange = (mode: AgentMode) => {
+    setSelectedMode(mode);
+    // If we have an active session, start a new one with the new mode
+    if (activeSessionId) {
+      createSession.mutate({ repoId, mode });
+    }
   };
 
   const handleQuickAction = (prompt: string) => {
@@ -453,37 +502,47 @@ export function AgentPanel({ isOpen, onClose, repoId, repoName, owner, embedded 
                 </div>
                 <DropdownMenuSeparator />
                 <div className="max-h-64 overflow-y-auto">
-                  {sessions.map((session) => (
-                    <DropdownMenuItem
-                      key={session.id}
-                      onClick={() => {
-                        setActiveSessionId(session.id);
-                        setShowHistory(false);
-                      }}
-                      className={cn(
-                        'flex items-center justify-between gap-2 py-2',
-                        activeSessionId === session.id && 'bg-accent'
-                      )}
-                    >
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <MessageSquare className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
-                        <div className="min-w-0">
-                          <p className="text-sm truncate">{session.title || 'New conversation'}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {formatRelativeTime(session.createdAt)}
-                          </p>
-                        </div>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        className="h-6 w-6 opacity-0 group-hover:opacity-100 hover:bg-destructive/10"
-                        onClick={(e) => handleDeleteSession(session.id, e)}
+                  {sessions.map((session) => {
+                    const sessionMode = (session.mode as AgentMode) || 'questions';
+                    const ModeIcon = MODE_CONFIG[sessionMode]?.icon || MessageSquare;
+                    return (
+                      <DropdownMenuItem
+                        key={session.id}
+                        onClick={() => {
+                          setActiveSessionId(session.id);
+                          setSelectedMode(sessionMode);
+                          setShowHistory(false);
+                        }}
+                        className={cn(
+                          'flex items-center justify-between gap-2 py-2',
+                          activeSessionId === session.id && 'bg-accent'
+                        )}
                       >
-                        <Trash2 className="h-3 w-3 text-destructive" />
-                      </Button>
-                    </DropdownMenuItem>
-                  ))}
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <ModeIcon className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <p className="text-sm truncate">{session.title || 'New conversation'}</p>
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                                {MODE_CONFIG[sessionMode]?.label || sessionMode}
+                              </span>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              {formatRelativeTime(session.createdAt)}
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          className="h-6 w-6 opacity-0 group-hover:opacity-100 hover:bg-destructive/10"
+                          onClick={(e) => handleDeleteSession(session.id, e)}
+                        >
+                          <Trash2 className="h-3 w-3 text-destructive" />
+                        </Button>
+                      </DropdownMenuItem>
+                    );
+                  })}
                 </div>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleNewSession} className="gap-2">
@@ -526,6 +585,39 @@ export function AgentPanel({ isOpen, onClose, repoId, repoName, owner, embedded 
         </div>
       </div>
 
+      {/* Mode selector tabs */}
+      {isAiAvailable && (
+        <div className="flex items-center gap-1 px-3 py-2 border-b border-border/50 bg-muted/10">
+          {(Object.keys(MODE_CONFIG) as AgentMode[]).map((mode) => {
+            const config = MODE_CONFIG[mode];
+            const Icon = config.icon;
+            return (
+              <TooltipProvider key={mode}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant={selectedMode === mode ? 'secondary' : 'ghost'}
+                      size="sm"
+                      onClick={() => handleModeChange(mode)}
+                      className={cn(
+                        'h-8 px-3 gap-1.5 text-xs',
+                        selectedMode === mode 
+                          ? 'bg-primary/10 text-primary hover:bg-primary/20' 
+                          : 'text-muted-foreground hover:text-foreground'
+                      )}
+                    >
+                      <Icon className="h-3.5 w-3.5" />
+                      {config.label}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>{config.description}</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            );
+          })}
+        </div>
+      )}
+
       {/* AI not configured */}
       {!isAiAvailable ? (
         <div className="flex-1 flex items-center justify-center p-6">
@@ -561,11 +653,18 @@ export function AgentPanel({ isOpen, onClose, repoId, repoName, owner, embedded 
                   {/* Welcome message */}
                   <div className="text-center pt-8 pb-4">
                     <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-primary/20 to-emerald-400/20 mb-4">
-                      <Bot className="h-7 w-7 text-primary" />
+                      {(() => {
+                        const Icon = MODE_CONFIG[selectedMode].icon;
+                        return <Icon className="h-7 w-7 text-primary" />;
+                      })()}
                     </div>
-                    <h3 className="text-lg font-semibold mb-1">How can I help?</h3>
+                    <h3 className="text-lg font-semibold mb-1">
+                      {selectedMode === 'questions' && 'Ask me anything'}
+                      {selectedMode === 'pm' && 'Project Management'}
+                      {selectedMode === 'code' && 'Ready to code'}
+                    </h3>
                     <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-                      I can help you write code, create branches, commit changes, open PRs, and more.
+                      {MODE_CONFIG[selectedMode].description}
                     </p>
                   </div>
 
@@ -573,7 +672,7 @@ export function AgentPanel({ isOpen, onClose, repoId, repoName, owner, embedded 
                   <div className="space-y-2">
                     <p className="text-xs font-medium text-muted-foreground px-1">Quick actions</p>
                     <div className="grid grid-cols-2 gap-2">
-                      {quickActions.slice(0, 4).map((action) => (
+                      {QUICK_ACTIONS[selectedMode].map((action) => (
                         <button
                           key={action.id}
                           onClick={() => handleQuickAction(action.prompt)}
@@ -594,11 +693,19 @@ export function AgentPanel({ isOpen, onClose, repoId, repoName, owner, embedded 
                   <div className="space-y-2">
                     <p className="text-xs font-medium text-muted-foreground px-1">Try asking</p>
                     <div className="space-y-1.5">
-                      {[
+                      {(selectedMode === 'questions' ? [
                         'What does this repository do?',
                         'Find all TODO comments in the codebase',
                         'How is authentication implemented?',
-                      ].map((suggestion) => (
+                      ] : selectedMode === 'pm' ? [
+                        'List all open issues assigned to me',
+                        'Create an issue for adding dark mode',
+                        'What PRs need review?',
+                      ] : [
+                        'Create a new feature branch',
+                        'Help me implement a login page',
+                        'Fix the TypeScript errors in this file',
+                      ]).map((suggestion) => (
                         <button
                           key={suggestion}
                           onClick={() => handleSend(suggestion)}
