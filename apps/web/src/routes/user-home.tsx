@@ -239,11 +239,11 @@ export function UserHomePage() {
       {/* Quick Stats for own profile */}
       {isOwnProfile && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full">
-          <Card>
+          <Card className="hover:shadow-md transition-shadow border-l-4 border-l-primary">
             <CardContent className="pt-4 pb-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-primary/10">
-                  <Code2 className="h-4 w-4 text-primary" />
+                <div className="p-3 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5">
+                  <Code2 className="h-5 w-5 text-primary" />
                 </div>
                 <div>
                   <p className="text-2xl font-bold">{repos.length}</p>
@@ -252,11 +252,11 @@ export function UserHomePage() {
               </div>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="hover:shadow-md transition-shadow border-l-4 border-l-purple-500">
             <CardContent className="pt-4 pb-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-purple-500/10">
-                  <GitPullRequest className="h-4 w-4 text-purple-500" />
+                <div className="p-3 rounded-xl bg-gradient-to-br from-purple-500/20 to-purple-500/5">
+                  <GitPullRequest className="h-5 w-5 text-purple-500" />
                 </div>
                 <div>
                   <p className="text-2xl font-bold">{(prSummary?.awaitingReview || 0) + (prSummary?.myOpenPrs || 0)}</p>
@@ -265,11 +265,11 @@ export function UserHomePage() {
               </div>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="hover:shadow-md transition-shadow border-l-4 border-l-green-500">
             <CardContent className="pt-4 pb-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-green-500/10">
-                  <CircleDot className="h-4 w-4 text-green-500" />
+                <div className="p-3 rounded-xl bg-gradient-to-br from-green-500/20 to-green-500/5">
+                  <CircleDot className="h-5 w-5 text-green-500" />
                 </div>
                 <div>
                   <p className="text-2xl font-bold">{(issueSummary?.assignedToMe || 0) + (issueSummary?.createdByMe || 0)}</p>
@@ -278,11 +278,11 @@ export function UserHomePage() {
               </div>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="hover:shadow-md transition-shadow border-l-4 border-l-blue-500">
             <CardContent className="pt-4 pb-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-blue-500/10">
-                  <Bell className="h-4 w-4 text-blue-500" />
+                <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500/20 to-blue-500/5">
+                  <Bell className="h-5 w-5 text-blue-500" />
                 </div>
                 <div>
                   <p className="text-2xl font-bold">{unreadCount || 0}</p>
