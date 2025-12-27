@@ -21,7 +21,7 @@ export { generatePRDescriptionTool, PR_DESCRIPTION_PROMPT } from './generate-pr-
 export { reviewPRTool, CODE_REVIEW_PROMPT, formatReviewComment } from './review-pr.js';
 export type { ReviewCategory } from './review-pr.js';
 
-// Coding agent tools
+// Coding agent tools (disk-based)
 export { readFileTool } from './read-file.js';
 export { writeFileTool } from './write-file.js';
 export { editFileTool } from './edit-file.js';
@@ -29,6 +29,14 @@ export { listDirectoryTool } from './list-directory.js';
 export { runCommandTool } from './run-command.js';
 export { createBranchTool } from './create-branch.js';
 export { openPullRequestTool } from './open-pull-request.js';
+
+// Virtual filesystem tools (in-memory, for IDE/server)
+export { virtualWriteFileTool, getVirtualRepo, setVirtualRepo, clearVirtualRepo } from './virtual-write-file.js';
+export { virtualReadFileTool } from './virtual-read-file.js';
+export { virtualEditFileTool } from './virtual-edit-file.js';
+export { virtualListDirectoryTool } from './virtual-list-directory.js';
+export { virtualCommitTool } from './virtual-commit.js';
+export { virtualStatusTool } from './virtual-status.js';
 
 import { getStatusTool } from './get-status.js';
 import { getDiffTool } from './get-diff.js';
@@ -45,7 +53,7 @@ import { semanticSearchTool, indexRepositoryTool, getIndexStatusTool } from './s
 import { generatePRDescriptionTool } from './generate-pr-description.js';
 import { reviewPRTool } from './review-pr.js';
 
-// Coding agent tools imports
+// Coding agent tools imports (disk-based)
 import { readFileTool } from './read-file.js';
 import { writeFileTool } from './write-file.js';
 import { editFileTool } from './edit-file.js';
@@ -53,6 +61,14 @@ import { listDirectoryTool } from './list-directory.js';
 import { runCommandTool } from './run-command.js';
 import { createBranchTool } from './create-branch.js';
 import { openPullRequestTool } from './open-pull-request.js';
+
+// Virtual filesystem tools imports (in-memory, for IDE/server)
+import { virtualWriteFileTool } from './virtual-write-file.js';
+import { virtualReadFileTool } from './virtual-read-file.js';
+import { virtualEditFileTool } from './virtual-edit-file.js';
+import { virtualListDirectoryTool } from './virtual-list-directory.js';
+import { virtualCommitTool } from './virtual-commit.js';
+import { virtualStatusTool } from './virtual-status.js';
 
 /**
  * All wit tools bundled together for easy registration with an agent
@@ -76,7 +92,7 @@ export const witTools = {
   generatePRDescription: generatePRDescriptionTool,
   reviewPR: reviewPRTool,
   
-  // Coding agent tools
+  // Coding agent tools (disk-based)
   readFile: readFileTool,
   writeFile: writeFileTool,
   editFile: editFileTool,
@@ -84,4 +100,17 @@ export const witTools = {
   runCommand: runCommandTool,
   createBranch: createBranchTool,
   openPullRequest: openPullRequestTool,
+};
+
+/**
+ * Virtual filesystem tools for IDE and server-side use
+ * These work with in-memory filesystems and can commit directly to bare repos
+ */
+export const virtualTools = {
+  readFile: virtualReadFileTool,
+  writeFile: virtualWriteFileTool,
+  editFile: virtualEditFileTool,
+  listDirectory: virtualListDirectoryTool,
+  commit: virtualCommitTool,
+  status: virtualStatusTool,
 };

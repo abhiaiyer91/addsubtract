@@ -13,6 +13,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { Repository } from '../core/repository';
 import { RemoteManager } from '../core/remote';
+import { Refs } from '../core/refs';
 import { TsgitError, ErrorCode } from '../core/errors';
 import { exists, mkdirp, writeFile } from '../utils/fs';
 import {
@@ -76,29 +77,37 @@ export function parseRepoUrl(url: string): { protocol: string; host: string; pat
     };
   }
 
-  // Handle file paths
-  const filePath = url.replace(/\.git$/, '');
-  const name = path.basename(filePath);
+  // Handle file paths - keep the original path, only extract name without .git
+  const name = path.basename(url).replace(/\.git$/, '');
   return {
     protocol: 'file',
     host: '',
-    path: filePath,
+    path: url, // Keep original path including .git suffix
     name,
   };
 }
 
 /**
  * Clone a local repository (file:// protocol)
+ * Supports both regular repos (with .wit directory) and bare repos
  */
 function cloneLocal(sourcePath: string, destPath: string, options: CloneOptions): Repository {
-  // Verify source exists
-  const sourceGitDir = path.join(sourcePath, '.wit');
+  // Check for source repository - support both .wit and bare repos
+  let sourceGitDir = path.join(sourcePath, '.wit');
+  let isBareSource = false;
+  
   if (!exists(sourceGitDir)) {
-    throw new TsgitError(
-      `repository '${sourcePath}' does not exist`,
-      ErrorCode.NOT_A_REPOSITORY,
-      ['Check the path and try again']
-    );
+    // Check if it's a bare repository (objects dir directly in path)
+    if (exists(path.join(sourcePath, 'objects'))) {
+      sourceGitDir = sourcePath;
+      isBareSource = true;
+    } else {
+      throw new TsgitError(
+        `repository '${sourcePath}' does not exist`,
+        ErrorCode.NOT_A_REPOSITORY,
+        ['Check the path and try again']
+      );
+    }
   }
 
   // Initialize destination repository
@@ -118,14 +127,14 @@ function cloneLocal(sourcePath: string, destPath: string, options: CloneOptions)
   const destObjectsDir = path.join(repo.gitDir, 'objects');
   copyObjectsRecursive(sourceObjectsDir, destObjectsDir);
 
-  // Get refs from source
-  const sourceRepo = new Repository(sourcePath);
-  const branches = sourceRepo.refs.listBranches();
+  // Create refs from source - for bare repos, read refs directly
+  const sourceRefs = new Refs(sourceGitDir);
+  const branches = sourceRefs.listBranches();
   
   // Set up remote tracking branches
   console.log(colors.dim('Setting up remote tracking branches...'));
   for (const branch of branches) {
-    const hash = sourceRepo.refs.resolve(branch);
+    const hash = sourceRefs.resolve(branch);
     if (hash) {
       remoteManager.updateTrackingBranch(originName, branch, hash);
     }
@@ -146,7 +155,7 @@ function cloneLocal(sourcePath: string, destPath: string, options: CloneOptions)
 
   // Create local branch and checkout
   if (defaultBranch && !options.bare && !options.noCheckout) {
-    const hash = sourceRepo.refs.resolve(defaultBranch);
+    const hash = sourceRefs.resolve(defaultBranch);
     if (hash) {
       // Create local branch pointing to the same commit
       repo.refs.createBranch(defaultBranch, hash);
