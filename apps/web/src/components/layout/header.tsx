@@ -58,7 +58,7 @@ export function Header() {
               {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </Button>
 
-            <Link to={authenticated ? "/inbox" : "/"} className="flex items-center gap-2 group flex-shrink-0">
+            <Link to={authenticated && user?.username ? `/${user.username}` : "/"} className="flex items-center gap-2 group flex-shrink-0">
               <div className="p-1.5 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
                 <GitBranch className="h-4 w-4 md:h-5 md:w-5 text-primary" />
               </div>
@@ -221,12 +221,12 @@ export function Header() {
               {authenticated && (
                 <>
                   <Link
-                    to="/inbox"
+                    to={user?.username ? `/${user.username}` : '/'}
                     className="flex items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-lg transition-all"
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     <Inbox className="h-4 w-4" />
-                    Inbox
+                    Home
                   </Link>
                   <Link
                     to="/new"
@@ -327,14 +327,19 @@ function OrganizationSwitcher() {
 
 function InboxButton() {
   const navigate = useNavigate();
+  const { data: session } = useSession();
   const { data: unreadCount } = trpc.notifications.unreadCount.useQuery();
+
+  // Link to user's home dashboard
+  const homeUrl = session?.user?.username ? `/${session.user.username}` : '/';
 
   return (
     <Button 
       variant="ghost" 
       size="icon" 
       className="relative h-9 w-9"
-      onClick={() => navigate('/inbox')}
+      onClick={() => navigate(homeUrl)}
+      title="Home"
     >
       <Inbox className="h-4 w-4" />
       {unreadCount && unreadCount > 0 && (
