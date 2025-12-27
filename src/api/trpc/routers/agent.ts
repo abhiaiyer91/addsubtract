@@ -25,7 +25,7 @@ const AVAILABLE_MODELS = {
   anthropic: {
     id: 'anthropic',
     name: 'Anthropic',
-    model: 'anthropic:claude-opus-4-5',
+    model: 'anthropic/claude-opus-4-5',
     description: 'Claude Opus 4.5 (Recommended)',
   },
   openai: {
