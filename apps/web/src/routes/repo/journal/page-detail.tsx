@@ -1,19 +1,20 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   FileText,
   Trash2,
   Clock,
-  MessageSquare,
   Star,
   MoreHorizontal,
   ImagePlus,
   Smile,
-  ChevronRight,
   History,
   Copy,
   Link as LinkIcon,
   ArrowUpRight,
+  Share2,
+  MessageCircle,
+  ChevronDown,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -39,12 +40,12 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Textarea } from '@/components/ui/textarea';
 import { RepoLayout } from '../components/repo-layout';
 import { useSession } from '@/lib/auth-client';
 import { trpc } from '@/lib/trpc';
 import { formatRelativeTime, cn } from '@/lib/utils';
 import { useToast } from '@/components/ui/use-toast';
+import { BlockEditor } from '@/components/editor/block-editor';
 
 // Common page icons for the picker
 const COMMON_ICONS = [
@@ -61,15 +62,15 @@ export function JournalPageDetail() {
   const authenticated = !!session?.user;
   const utils = trpc.useUtils();
 
-  const [isEditing, setIsEditing] = useState(false);
   const [editedContent, setEditedContent] = useState('');
   const [editedTitle, setEditedTitle] = useState('');
   const [showIconPicker, setShowIconPicker] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isHeaderHovered, setIsHeaderHovered] = useState(false);
+  const [pendingContent, setPendingContent] = useState<string | null>(null);
 
   const titleRef = useRef<HTMLTextAreaElement>(null);
-  const contentRef = useRef<HTMLTextAreaElement>(null);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Fetch repository data
   const { data: repoData, isLoading: repoLoading } = trpc.repos.get.useQuery(
@@ -89,15 +90,7 @@ export function JournalPageDetail() {
     { enabled: !!repoData?.repo.id }
   );
 
-  // Set initial content when page loads
-  useEffect(() => {
-    if (page) {
-      setEditedContent(page.content || '');
-      setEditedTitle(page.title || '');
-    }
-  }, [page]);
-
-  // Mutations
+  // Mutations - declare before using in callbacks
   const updateMutation = trpc.journal.update.useMutation({
     onSuccess: () => {
       utils.journal.getBySlug.invalidate();
@@ -126,6 +119,49 @@ export function JournalPageDetail() {
     },
   });
 
+  // Set initial content when page loads
+  useEffect(() => {
+    if (page) {
+      setEditedContent(page.content || '');
+      setEditedTitle(page.title || '');
+      setPendingContent(null);
+    }
+  }, [page]);
+
+  // Auto-save content with debounce
+  const handleContentChange = useCallback(
+    (newContent: string) => {
+      setEditedContent(newContent);
+      setPendingContent(newContent);
+
+      // Clear existing timeout
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+
+      // Set new timeout for auto-save
+      saveTimeoutRef.current = setTimeout(() => {
+        if (page && newContent !== (page.content || '')) {
+          updateMutation.mutate({
+            pageId: page.id,
+            content: newContent,
+          });
+          setPendingContent(null);
+        }
+      }, 1000); // Save after 1 second of inactivity
+    },
+    [page, updateMutation]
+  );
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, []);
+
   // Auto-resize textarea
   const autoResize = (element: HTMLTextAreaElement) => {
     element.style.height = 'auto';
@@ -138,11 +174,7 @@ export function JournalPageDetail() {
     autoResize(e.target);
   };
 
-  // Handle content change
-  const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setEditedContent(e.target.value);
-    autoResize(e.target);
-  };
+
 
   // Save changes on blur
   const handleTitleBlur = () => {
@@ -154,14 +186,7 @@ export function JournalPageDetail() {
     }
   };
 
-  const handleContentBlur = () => {
-    if (page && editedContent !== (page.content || '')) {
-      updateMutation.mutate({
-        pageId: page.id,
-        content: editedContent,
-      });
-    }
-  };
+
 
   // Handle icon change
   const handleIconChange = (icon: string) => {
@@ -338,7 +363,7 @@ export function JournalPageDetail() {
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault();
-                    contentRef.current?.focus();
+                    // Let focus move to block editor naturally
                   }
                 }}
               />
@@ -348,39 +373,78 @@ export function JournalPageDetail() {
               </h1>
             )}
 
-            {/* Meta info */}
-            <div className="flex items-center gap-4 text-sm text-muted-foreground mb-8 pb-4 border-b">
-              <span className="flex items-center gap-1.5">
-                <Clock className="h-4 w-4" />
-                {formatRelativeTime(page.updatedAt)}
-              </span>
-              {page.status !== 'draft' && (
-                <span
-                  className={cn(
-                    'px-2 py-0.5 rounded-full text-xs font-medium',
-                    page.status === 'published'
-                      ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                      : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-                  )}
-                >
-                  {page.status === 'published' ? 'Published' : 'Archived'}
-                </span>
-              )}
+            {/* Page properties bar */}
+            <div className="flex items-center justify-between py-3 mb-6 group">
+              <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                {/* Status badge */}
+                {page.status === 'draft' && (
+                  <span className="px-2 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground">
+                    Draft
+                  </span>
+                )}
+                {page.status === 'published' && (
+                  <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                    Published
+                  </span>
+                )}
+                {page.status === 'archived' && (
+                  <span className="px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
+                    Archived
+                  </span>
+                )}
 
-              {/* Actions */}
+                {/* Last edited */}
+                <span className="flex items-center gap-1.5 opacity-70">
+                  <Clock className="h-3.5 w-3.5" />
+                  Edited {formatRelativeTime(page.updatedAt)}
+                </span>
+              </div>
+
+              {/* Right side actions - subtle until hovered */}
               {canEdit && (
-                <div className="flex-1 flex justify-end">
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <TooltipProvider delayDuration={300}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                          <Share2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">Share</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                          <MessageCircle className="h-3.5 w-3.5" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">Comments</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                          <History className="h-3.5 w-3.5" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">History</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                          <Star className="h-3.5 w-3.5" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">Add to favorites</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                        <MoreHorizontal className="h-4 w-4" />
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                        <MoreHorizontal className="h-3.5 w-3.5" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-48">
-                      <DropdownMenuItem>
-                        <Star className="mr-2 h-4 w-4" />
-                        Add to favorites
-                      </DropdownMenuItem>
+                    <DropdownMenuContent align="end" className="w-52">
                       <DropdownMenuItem>
                         <Copy className="mr-2 h-4 w-4" />
                         Duplicate
@@ -403,7 +467,7 @@ export function JournalPageDetail() {
                           onClick={() => archiveMutation.mutate({ pageId: page.id })}
                         >
                           <History className="mr-2 h-4 w-4" />
-                          Archive
+                          Move to archive
                         </DropdownMenuItem>
                       )}
                       <DropdownMenuSeparator />
@@ -420,27 +484,23 @@ export function JournalPageDetail() {
               )}
             </div>
 
-            {/* Content */}
-            {canEdit ? (
-              <textarea
-                ref={contentRef}
+            {/* Content - Block Editor */}
+            <div className="relative">
+              <BlockEditor
                 value={editedContent}
                 onChange={handleContentChange}
-                onBlur={handleContentBlur}
-                placeholder="Start writing, or press '/' for commands..."
-                className="w-full min-h-[50vh] bg-transparent border-0 outline-none resize-none text-base leading-relaxed placeholder:text-muted-foreground/40"
+                placeholder="Type '/' for commands..."
+                readOnly={!canEdit}
+                autoFocus={false}
               />
-            ) : (
-              <div className="prose dark:prose-invert max-w-none">
-                {page.content ? (
-                  <div className="whitespace-pre-wrap">{page.content}</div>
-                ) : (
-                  <p className="text-muted-foreground italic">
-                    This page is empty.
-                  </p>
-                )}
-              </div>
-            )}
+              
+              {/* Save indicator */}
+              {pendingContent !== null && (
+                <div className="absolute top-0 right-0 text-xs text-muted-foreground">
+                  Saving...
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -496,33 +556,55 @@ function JournalDetailLayout({
   currentSlug,
 }: JournalDetailLayoutProps) {
   const navigate = useNavigate();
+  const sidebarWidth = 260;
 
   return (
     <div className="flex h-[calc(100vh-200px)] -mx-6 -mt-6">
       {/* Sidebar */}
-      <div className="w-64 border-r bg-muted/30 flex flex-col overflow-y-auto">
-        <div className="p-2 flex-1">
-          <div className="space-y-0.5">
-            {tree.map((item) => (
-              <SidebarItem
-                key={item.id}
-                item={item}
-                owner={owner}
-                repo={repo}
-                level={0}
-                currentSlug={currentSlug}
-              />
-            ))}
+      <div
+        className="border-r bg-muted/20 flex flex-col"
+        style={{ width: sidebarWidth }}
+      >
+        {/* Sidebar header */}
+        <div className="px-3 py-2 border-b">
+          <div className="flex items-center gap-2 text-sm font-medium text-foreground/80">
+            <FileText className="h-4 w-4" />
+            <span>Journal</span>
           </div>
         </div>
 
+        {/* Page tree */}
+        <div className="flex-1 overflow-y-auto py-2 px-1">
+          <div className="space-y-0.5">
+            {tree.length === 0 ? (
+              <div className="px-3 py-6 text-center">
+                <p className="text-xs text-muted-foreground">No pages yet</p>
+              </div>
+            ) : (
+              tree.map((item) => (
+                <SidebarItem
+                  key={item.id}
+                  item={item}
+                  owner={owner}
+                  repo={repo}
+                  level={0}
+                  currentSlug={currentSlug}
+                />
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* New page button */}
         {authenticated && (
-          <div className="p-2 border-t">
+          <div className="px-2 py-2 border-t">
             <button
               onClick={() => navigate(`/${owner}/${repo}/journal/new`)}
-              className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors"
+              className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
             >
-              <FileText className="h-4 w-4" />
+              <span className="flex items-center justify-center w-5 h-5 rounded border border-dashed border-muted-foreground/30">
+                <span className="text-xs">+</span>
+              </span>
               New page
             </button>
           </div>
@@ -530,7 +612,7 @@ function JournalDetailLayout({
       </div>
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col bg-background">{children}</div>
+      <div className="flex-1 flex flex-col bg-background overflow-hidden">{children}</div>
     </div>
   );
 }
@@ -553,6 +635,8 @@ interface SidebarItemProps {
 
 function SidebarItem({ item, owner, repo, level, currentSlug }: SidebarItemProps) {
   const [isOpen, setIsOpen] = useState(true);
+  const [isHovered, setIsHovered] = useState(false);
+  const navigate = useNavigate();
   const hasChildren = item.children && item.children.length > 0;
   const isActive = item.slug === currentSlug;
 
@@ -560,43 +644,79 @@ function SidebarItem({ item, owner, repo, level, currentSlug }: SidebarItemProps
     <div>
       <div
         className={cn(
-          'flex items-center gap-1 py-1 px-1 rounded-md transition-colors cursor-pointer',
-          isActive ? 'bg-muted' : 'hover:bg-muted/70'
+          'group flex items-center gap-0.5 py-[3px] px-1 rounded-md transition-colors cursor-pointer',
+          isActive
+            ? 'bg-primary/10 text-primary'
+            : 'text-foreground/70 hover:bg-muted hover:text-foreground'
         )}
-        style={{ paddingLeft: `${level * 12 + 4}px` }}
+        style={{ paddingLeft: `${level * 16 + 4}px` }}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
       >
-        {hasChildren ? (
-          <button
-            onClick={() => setIsOpen(!isOpen)}
-            className="h-5 w-5 flex items-center justify-center rounded hover:bg-muted-foreground/20"
-          >
-            {isOpen ? (
-              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground rotate-90 transition-transform" />
-            ) : (
-              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground transition-transform" />
+        {/* Expand/collapse toggle */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsOpen(!isOpen);
+          }}
+          className={cn(
+            'h-5 w-5 flex items-center justify-center rounded hover:bg-muted-foreground/10 transition-colors',
+            !hasChildren && 'opacity-0 pointer-events-none'
+          )}
+        >
+          <ChevronDown
+            className={cn(
+              'h-3 w-3 text-muted-foreground transition-transform duration-150',
+              !isOpen && '-rotate-90'
             )}
-          </button>
-        ) : (
-          <span className="w-5" />
-        )}
+          />
+        </button>
 
-        <span className="flex-shrink-0 w-5 h-5 flex items-center justify-center text-sm">
-          {item.icon || <FileText className="h-4 w-4 text-muted-foreground" />}
+        {/* Page icon */}
+        <span className="flex-shrink-0 w-5 h-5 flex items-center justify-center">
+          {item.icon ? (
+            <span className="text-sm">{item.icon}</span>
+          ) : (
+            <FileText className={cn(
+              'h-4 w-4',
+              isActive ? 'text-primary' : 'text-muted-foreground'
+            )} />
+          )}
         </span>
 
+        {/* Page title */}
         <Link
           to={`/${owner}/${repo}/journal/${item.slug}`}
           className={cn(
-            'flex-1 truncate text-sm py-0.5',
-            isActive ? 'text-foreground font-medium' : 'text-foreground/80'
+            'flex-1 truncate text-[13px] py-0.5 pl-1',
+            isActive && 'font-medium'
           )}
         >
           {item.title || 'Untitled'}
         </Link>
+
+        {/* Quick add button - visible on hover */}
+        {isHovered && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/${owner}/${repo}/journal/new?parent=${item.id}`);
+            }}
+            className="h-5 w-5 flex items-center justify-center rounded hover:bg-muted-foreground/10 opacity-50 hover:opacity-100"
+          >
+            <span className="text-xs font-medium">+</span>
+          </button>
+        )}
       </div>
 
+      {/* Children */}
       {hasChildren && isOpen && (
-        <div>
+        <div className="relative">
+          {/* Indent guide line */}
+          <div
+            className="absolute left-0 top-0 bottom-0 w-px bg-muted"
+            style={{ marginLeft: `${level * 16 + 14}px` }}
+          />
           {item.children.map((child: any) => (
             <SidebarItem
               key={child.id}

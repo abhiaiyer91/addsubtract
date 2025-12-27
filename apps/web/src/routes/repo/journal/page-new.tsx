@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   FileText,
@@ -13,6 +13,7 @@ import { useSession } from '@/lib/auth-client';
 import { trpc } from '@/lib/trpc';
 import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
+import { BlockEditor } from '@/components/editor/block-editor';
 
 // Common page icons
 const COMMON_ICONS = [
@@ -38,7 +39,6 @@ export function NewJournalPage() {
   const [isSaving, setIsSaving] = useState(false);
 
   const titleRef = useRef<HTMLTextAreaElement>(null);
-  const contentRef = useRef<HTMLTextAreaElement>(null);
 
   // Focus title on mount
   useEffect(() => {
@@ -105,10 +105,9 @@ export function NewJournalPage() {
     autoResize(e.target);
   };
 
-  const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setContent(e.target.value);
-    autoResize(e.target);
-  };
+  const handleContentChange = useCallback((newContent: string) => {
+    setContent(newContent);
+  }, []);
 
   const handleIconChange = (newIcon: string) => {
     setIcon(newIcon);
@@ -268,18 +267,17 @@ export function NewJournalPage() {
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   e.preventDefault();
-                  contentRef.current?.focus();
+                  // Focus will move to block editor naturally
                 }
               }}
             />
 
-            {/* Content */}
-            <textarea
-              ref={contentRef}
+            {/* Content - Block Editor */}
+            <BlockEditor
               value={content}
               onChange={handleContentChange}
-              placeholder="Start writing, or press '/' for commands..."
-              className="w-full min-h-[40vh] bg-transparent border-0 outline-none resize-none text-base leading-relaxed placeholder:text-muted-foreground/40"
+              placeholder="Type '/' for commands..."
+              autoFocus={false}
             />
 
             {/* Save bar */}
