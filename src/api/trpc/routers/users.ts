@@ -42,7 +42,7 @@ export const usersRouter = router({
   getById: publicProcedure
     .input(
       z.object({
-        id: z.string().uuid(),
+        id: z.string().min(1),
       })
     )
     .query(async ({ input }) => {
@@ -169,20 +169,20 @@ export const usersRouter = router({
     .input(
       z.object({
         name: z.string().max(255).optional(),
-        bio: z.string().max(256).optional(),
-        location: z.string().max(100).optional(),
-        website: z.string().url().max(255).optional().or(z.literal('')),
-        avatarUrl: z.string().url().max(500).optional().or(z.literal('')),
+        bio: z.string().max(256).nullable().optional(),
+        location: z.string().max(100).nullable().optional(),
+        website: z.string().url().max(255).nullable().optional().or(z.literal('')),
+        avatarUrl: z.string().url().max(500).nullable().optional().or(z.literal('')),
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const updates: Record<string, string | undefined> = {};
+      const updates: Record<string, string | null | undefined> = {};
 
       if (input.name !== undefined) updates.name = input.name;
       if (input.bio !== undefined) updates.bio = input.bio;
       if (input.location !== undefined) updates.location = input.location;
-      if (input.website !== undefined) updates.website = input.website || undefined;
-      if (input.avatarUrl !== undefined) updates.avatarUrl = input.avatarUrl || undefined;
+      if (input.website !== undefined) updates.website = input.website || null;
+      if (input.avatarUrl !== undefined) updates.avatarUrl = input.avatarUrl || null;
 
       const user = await userModel.update(ctx.user.id, updates);
       return user;
