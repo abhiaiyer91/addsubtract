@@ -7,7 +7,7 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { router, publicProcedure, protectedProcedure } from '../trpc';
-import { repoModel, collaboratorModel, userModel } from '../../../db/models';
+import { repoModel, collaboratorModel, userModel, issueModel, prModel } from '../../../db/models';
 
 export const searchRouter = router({
   /**
@@ -32,22 +32,102 @@ export const searchRouter = router({
         metadata?: Record<string, any>;
       }> = [];
 
+      const limitPerType = input.type === 'all' ? Math.ceil(input.limit / 3) : input.limit;
+
       // Search repositories
       if (input.type === 'all' || input.type === 'repositories') {
-        const repos = await repoModel.search(input.query, input.limit);
+        const repos = await repoModel.search(input.query, limitPerType);
 
         for (const repo of repos) {
+          // Get owner info for full URL
+          const owner = await userModel.findById(repo.ownerId);
+          const ownerUsername = owner?.username || owner?.name || 'unknown';
+          
           results.push({
             type: 'repository',
             id: repo.id,
-            title: repo.name,
+            title: `${ownerUsername}/${repo.name}`,
             description: repo.description || undefined,
-            url: `/${repo.name}`, // Will need owner from frontend
+            url: `/${ownerUsername}/${repo.name}`,
             metadata: {
               stars: repo.starsCount,
               isPrivate: repo.isPrivate,
+              owner: ownerUsername,
             },
           });
+        }
+      }
+
+      // Search issues
+      if (input.type === 'all' || input.type === 'issues') {
+        try {
+          const issues = await issueModel.search(input.query, {
+            limit: limitPerType,
+            repoId: input.repoId,
+          });
+
+          for (const issue of issues) {
+            // Get repo info for URL
+            const repo = await repoModel.findById(issue.repoId);
+            if (repo) {
+              const owner = await userModel.findById(repo.ownerId);
+              const ownerUsername = owner?.username || owner?.name || 'unknown';
+              
+              results.push({
+                type: 'issue',
+                id: issue.id,
+                title: issue.title,
+                description: issue.body?.substring(0, 200) || undefined,
+                url: `/${ownerUsername}/${repo.name}/issues/${issue.number}`,
+                metadata: {
+                  state: issue.state,
+                  number: issue.number,
+                  repo: `${ownerUsername}/${repo.name}`,
+                  status: issue.status,
+                  priority: issue.priority,
+                },
+              });
+            }
+          }
+        } catch (e) {
+          // Issue search not yet implemented, skip
+        }
+      }
+
+      // Search pull requests
+      if (input.type === 'all' || input.type === 'prs') {
+        try {
+          const prs = await prModel.search(input.query, {
+            limit: limitPerType,
+            repoId: input.repoId,
+          });
+
+          for (const pr of prs) {
+            // Get repo info for URL
+            const repo = await repoModel.findById(pr.repoId);
+            if (repo) {
+              const owner = await userModel.findById(repo.ownerId);
+              const ownerUsername = owner?.username || owner?.name || 'unknown';
+              
+              results.push({
+                type: 'pull_request',
+                id: pr.id,
+                title: pr.title,
+                description: pr.body?.substring(0, 200) || undefined,
+                url: `/${ownerUsername}/${repo.name}/pull/${pr.number}`,
+                metadata: {
+                  state: pr.state,
+                  number: pr.number,
+                  repo: `${ownerUsername}/${repo.name}`,
+                  sourceBranch: pr.sourceBranch,
+                  targetBranch: pr.targetBranch,
+                  isDraft: pr.isDraft,
+                },
+              });
+            }
+          }
+        } catch (e) {
+          // PR search not yet implemented, skip
         }
       }
 

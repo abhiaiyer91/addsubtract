@@ -4,6 +4,7 @@ import { TRPCProvider } from './lib/trpc';
 import { Layout } from './components/layout';
 import { Toaster } from './components/ui/toaster';
 import { CommandPalette, ShortcutsModal } from './components/command';
+import { SearchModal } from './components/search';
 import { BranchSwitcher } from './components/branch';
 
 // Routes
@@ -79,6 +80,7 @@ export function App() {
       <BrowserRouter>
         <ScrollToTop />
         {/* Global keyboard-first components */}
+        <SearchModal />
         <CommandPalette />
         <ShortcutsModal />
         <BranchSwitcher />

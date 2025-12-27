@@ -34,6 +34,40 @@ type Author = {
 
 export const prModel = {
   /**
+   * Search pull requests by title or body
+   */
+  async search(
+    query: string,
+    options: { limit?: number; repoId?: string; state?: 'open' | 'closed' | 'merged' } = {}
+  ): Promise<PullRequest[]> {
+    const db = getDb();
+    const { limit = 20, repoId, state } = options;
+    const lowerQuery = `%${query.toLowerCase()}%`;
+
+    const conditions = [
+      or(
+        sql`LOWER(${pullRequests.title}) LIKE ${lowerQuery}`,
+        sql`LOWER(${pullRequests.body}) LIKE ${lowerQuery}`
+      ),
+    ];
+
+    if (repoId) {
+      conditions.push(eq(pullRequests.repoId, repoId));
+    }
+
+    if (state) {
+      conditions.push(eq(pullRequests.state, state));
+    }
+
+    return db
+      .select()
+      .from(pullRequests)
+      .where(and(...conditions))
+      .orderBy(desc(pullRequests.updatedAt))
+      .limit(limit);
+  },
+
+  /**
    * Find a PR by ID
    */
   async findById(id: string): Promise<PullRequest | undefined> {
