@@ -52,3 +52,6 @@ export { milestoneModel, type MilestoneWithProgress } from './milestones';
 
 // Release models
 export { releaseModel, releaseAssetModel } from './releases';
+
+// Notification models
+export { notificationModel, notificationHelpers, type NotificationWithActor } from './notification';

@@ -636,7 +636,57 @@ export const stepRuns = pgTable('step_runs', {
   logs: text('logs'),
 });
 
+// ============ NOTIFICATIONS ============
+
+export const notificationTypeEnum = pgEnum('notification_type', [
+  'pr_review_requested',
+  'pr_reviewed',
+  'pr_merged',
+  'pr_comment',
+  'issue_assigned',
+  'issue_comment',
+  'mention',
+  'repo_push',
+  'repo_starred',
+  'repo_forked',
+  'ci_failed',
+  'ci_passed',
+]);
+
+export const notifications = pgTable('notifications', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  
+  // Recipient of the notification
+  userId: text('user_id').notNull(), // References better-auth user.id
+  
+  // Notification type
+  type: notificationTypeEnum('type').notNull(),
+  
+  // Title and body
+  title: text('title').notNull(),
+  body: text('body'),
+  
+  // Related entities (optional)
+  repoId: uuid('repo_id').references(() => repositories.id, { onDelete: 'cascade' }),
+  prId: uuid('pr_id').references(() => pullRequests.id, { onDelete: 'cascade' }),
+  issueId: uuid('issue_id').references(() => issues.id, { onDelete: 'cascade' }),
+  
+  // Actor who triggered the notification (optional)
+  actorId: text('actor_id'), // References better-auth user.id
+  
+  // URL to navigate to when clicked
+  url: text('url'),
+  
+  // Read status
+  read: boolean('read').notNull().default(false),
+  
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
 // ============ TYPE EXPORTS ============
+
+export type Notification = typeof notifications.$inferSelect;
+export type NewNotification = typeof notifications.$inferInsert;
 
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;

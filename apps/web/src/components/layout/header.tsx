@@ -9,6 +9,11 @@ import {
   LogOut,
   User,
   BookOpen,
+  Check,
+  GitPullRequest,
+  CircleDot,
+  MessageSquare,
+  AtSign,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,6 +28,8 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useSession, signOut } from '@/lib/auth-client';
 import { useState } from 'react';
+import { trpc } from '@/lib/trpc';
+import { formatRelativeTime } from '@/lib/utils';
 
 export function Header() {
   const navigate = useNavigate();
@@ -114,12 +121,7 @@ export function Header() {
               </DropdownMenu>
 
               {/* Notifications */}
-              <Button variant="ghost" size="icon" className="relative">
-                <Bell className="h-4 w-4" />
-                <span className="absolute -top-1 -right-1 h-3 w-3 bg-blue-500 rounded-full text-[10px] flex items-center justify-center text-white">
-                  3
-                </span>
-              </Button>
+              <NotificationsDropdown />
 
               {/* User menu */}
               <DropdownMenu>
@@ -182,5 +184,127 @@ export function Header() {
         </div>
       </div>
     </header>
+  );
+}
+
+function NotificationsDropdown() {
+  const navigate = useNavigate();
+  const { data: unreadCount } = trpc.notifications.unreadCount.useQuery();
+  const { data: notifications } = trpc.notifications.list.useQuery({ limit: 10 });
+  const utils = trpc.useUtils();
+  
+  const markAsRead = trpc.notifications.markAsRead.useMutation({
+    onSuccess: () => {
+      utils.notifications.unreadCount.invalidate();
+      utils.notifications.list.invalidate();
+    },
+  });
+
+  const markAllAsRead = trpc.notifications.markAllAsRead.useMutation({
+    onSuccess: () => {
+      utils.notifications.unreadCount.invalidate();
+      utils.notifications.list.invalidate();
+    },
+  });
+
+  const getNotificationIcon = (type: string) => {
+    switch (type) {
+      case 'pr_review_requested':
+      case 'pr_reviewed':
+      case 'pr_merged':
+        return <GitPullRequest className="h-4 w-4 text-purple-500" />;
+      case 'pr_comment':
+      case 'issue_comment':
+        return <MessageSquare className="h-4 w-4 text-blue-500" />;
+      case 'issue_assigned':
+        return <CircleDot className="h-4 w-4 text-green-500" />;
+      case 'mention':
+        return <AtSign className="h-4 w-4 text-yellow-500" />;
+      default:
+        return <Bell className="h-4 w-4 text-muted-foreground" />;
+    }
+  };
+
+  const handleNotificationClick = (notification: any) => {
+    if (!notification.read) {
+      markAsRead.mutate({ id: notification.id });
+    }
+    if (notification.url) {
+      navigate(notification.url);
+    }
+  };
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="relative">
+          <Bell className="h-4 w-4" />
+          {unreadCount && unreadCount > 0 && (
+            <span className="absolute -top-1 -right-1 h-4 w-4 bg-blue-500 rounded-full text-[10px] flex items-center justify-center text-white font-medium">
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </span>
+          )}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-80">
+        <DropdownMenuLabel className="flex items-center justify-between">
+          <span>Notifications</span>
+          {unreadCount && unreadCount > 0 && (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-auto p-0 text-xs text-muted-foreground hover:text-foreground"
+              onClick={() => markAllAsRead.mutate()}
+            >
+              <Check className="h-3 w-3 mr-1" />
+              Mark all read
+            </Button>
+          )}
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {!notifications || notifications.length === 0 ? (
+          <div className="p-4 text-center text-sm text-muted-foreground">
+            No notifications
+          </div>
+        ) : (
+          <>
+            {notifications.map((notification) => (
+              <DropdownMenuItem
+                key={notification.id}
+                className={`flex items-start gap-3 p-3 cursor-pointer ${!notification.read ? 'bg-muted/50' : ''}`}
+                onClick={() => handleNotificationClick(notification)}
+              >
+                <div className="mt-0.5">
+                  {getNotificationIcon(notification.type)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className={`text-sm truncate ${!notification.read ? 'font-medium' : ''}`}>
+                    {notification.title}
+                  </p>
+                  {notification.actor && (
+                    <p className="text-xs text-muted-foreground">
+                      {notification.actor.name || notification.actor.username}
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    {formatRelativeTime(notification.createdAt)}
+                  </p>
+                </div>
+                {!notification.read && (
+                  <div className="h-2 w-2 bg-blue-500 rounded-full mt-1.5" />
+                )}
+              </DropdownMenuItem>
+            ))}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem 
+              className="text-center text-sm text-primary justify-center"
+              onClick={() => navigate('/notifications')}
+            >
+              View all notifications
+            </DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

@@ -6,13 +6,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Loading } from '@/components/ui/loading';
 import { trpc } from '@/lib/trpc';
-import { getUser, isAuthenticated } from '@/lib/auth';
+import { useSession } from '@/lib/auth-client';
 
 export function NewRepoPage() {
   const navigate = useNavigate();
-  const user = getUser();
-  const authenticated = isAuthenticated();
+  const { data: session, isPending } = useSession();
+  const user = session?.user;
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -28,7 +29,11 @@ export function NewRepoPage() {
     },
   });
 
-  if (!authenticated || !user) {
+  if (isPending) {
+    return <Loading text="Loading..." />;
+  }
+
+  if (!user) {
     return (
       <div className="max-w-2xl mx-auto py-12">
         <Card>

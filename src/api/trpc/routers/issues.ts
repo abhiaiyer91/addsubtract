@@ -10,6 +10,7 @@ import {
   collaboratorModel,
   activityHelpers,
 } from '../../../db/models';
+import { eventBus, extractMentions } from '../../../events';
 
 export const issuesRouter = router({
   /**
@@ -177,6 +178,28 @@ export const issuesRouter = router({
       // Log activity
       await activityHelpers.logIssueOpened(ctx.user.id, input.repoId, issue.number, issue.title);
 
+      // Emit issue.created event
+      const repoFullName = `${ctx.user.username || ctx.user.name}/${repo.name}`;
+      await eventBus.emit('issue.created', ctx.user.id, {
+        issueId: issue.id,
+        issueNumber: issue.number,
+        issueTitle: issue.title,
+        repoId: input.repoId,
+        repoFullName,
+      });
+
+      // If assigned, emit issue.assigned event
+      if (input.assigneeId) {
+        await eventBus.emit('issue.assigned', ctx.user.id, {
+          issueId: issue.id,
+          issueNumber: issue.number,
+          issueTitle: issue.title,
+          repoId: input.repoId,
+          repoFullName,
+          assigneeId: input.assigneeId,
+        });
+      }
+
       return issue;
     }),
 
@@ -254,8 +277,18 @@ export const issuesRouter = router({
       const closedIssue = await issueModel.close(input.issueId, ctx.user.id);
 
       // Log activity
-      if (closedIssue) {
+      if (closedIssue && repo) {
         await activityHelpers.logIssueClosed(ctx.user.id, issue.repoId, issue.number, issue.title);
+
+        // Emit issue.closed event
+        await eventBus.emit('issue.closed', ctx.user.id, {
+          issueId: issue.id,
+          issueNumber: issue.number,
+          issueTitle: issue.title,
+          repoId: issue.repoId,
+          repoFullName: `${ctx.user.username || ctx.user.name}/${repo.name}`,
+          authorId: issue.authorId,
+        });
       }
 
       return closedIssue;
@@ -335,7 +368,21 @@ export const issuesRouter = router({
         });
       }
 
-      return issueModel.assign(input.issueId, input.assigneeId);
+      const assignedIssue = await issueModel.assign(input.issueId, input.assigneeId);
+
+      // Emit issue.assigned event
+      if (assignedIssue && repo) {
+        await eventBus.emit('issue.assigned', ctx.user.id, {
+          issueId: issue.id,
+          issueNumber: issue.number,
+          issueTitle: issue.title,
+          repoId: issue.repoId,
+          repoFullName: `${ctx.user.username || ctx.user.name}/${repo.name}`,
+          assigneeId: input.assigneeId,
+        });
+      }
+
+      return assignedIssue;
     }),
 
   /**
@@ -392,11 +439,31 @@ export const issuesRouter = router({
         });
       }
 
-      return issueCommentModel.create({
+      const comment = await issueCommentModel.create({
         issueId: input.issueId,
         userId: ctx.user.id,
         body: input.body,
       });
+
+      // Emit issue.commented event
+      const repo = await repoModel.findById(issue.repoId);
+      if (repo) {
+        const mentionedUsernames = extractMentions(input.body);
+
+        await eventBus.emit('issue.commented', ctx.user.id, {
+          issueId: issue.id,
+          issueNumber: issue.number,
+          issueTitle: issue.title,
+          repoId: issue.repoId,
+          repoFullName: `${ctx.user.username || ctx.user.name}/${repo.name}`,
+          authorId: issue.authorId,
+          commentId: comment.id,
+          commentBody: input.body,
+          mentionedUserIds: [], // TODO: resolve usernames to IDs
+        });
+      }
+
+      return comment;
     }),
 
   /**

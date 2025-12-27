@@ -11,11 +11,11 @@ import {
   repoModel,
   collaboratorModel,
   activityHelpers,
-  userModel,
 } from '../../../db/models';
 import { mergePullRequest, checkMergeability, getDefaultMergeMessage } from '../../../server/storage/merge';
 import { triggerAsyncReview } from '../../../ai/services/pr-review';
 import { exists } from '../../../utils/fs';
+import { eventBus, extractMentions } from '../../../events';
 
 /**
  * Parse a unified diff into structured file changes
@@ -318,6 +318,18 @@ export const pullsRouter = router({
       // Log activity
       await activityHelpers.logPrOpened(ctx.user.id, input.repoId, pr.number, pr.title);
 
+      // Emit pr.created event
+      const repoFullName = `${ctx.user.username || ctx.user.name}/${repo.name}`;
+      await eventBus.emit('pr.created', ctx.user.id, {
+        prId: pr.id,
+        prNumber: pr.number,
+        prTitle: pr.title,
+        repoId: input.repoId,
+        repoFullName,
+        sourceBranch: input.sourceBranch,
+        targetBranch: input.targetBranch,
+      });
+
       // Trigger async AI review (fire-and-forget, doesn't block PR creation)
       if (!input.isDraft) {
         triggerAsyncReview(pr.id);
@@ -526,6 +538,19 @@ export const pullsRouter = router({
       // Log activity
       if (mergedPr) {
         await activityHelpers.logPrMerged(ctx.user.id, pr.repoId, pr.number, pr.title);
+        
+        // Emit pr.merged event for notifications
+        // Use user info from context since we already have the repo
+        const repoFullName = `${ctx.user.username || ctx.user.name}/${repo.name}`;
+        await eventBus.emit('pr.merged', ctx.user.id, {
+          prId: pr.id,
+          prNumber: pr.number,
+          prTitle: pr.title,
+          repoId: pr.repoId,
+          repoFullName,
+          authorId: pr.authorId,
+          mergeStrategy: input.strategy,
+        });
       }
 
       return {
@@ -569,6 +594,19 @@ export const pullsRouter = router({
       // Log activity
       if (closedPr) {
         await activityHelpers.logPrClosed(ctx.user.id, pr.repoId, pr.number, pr.title);
+        
+        // Emit pr.closed event
+        const repo = await repoModel.findById(pr.repoId);
+        if (repo) {
+          await eventBus.emit('pr.closed', ctx.user.id, {
+            prId: pr.id,
+            prNumber: pr.number,
+            prTitle: pr.title,
+            repoId: pr.repoId,
+            repoFullName: `${ctx.user.username || ctx.user.name}/${repo.name}`,
+            authorId: pr.authorId,
+          });
+        }
       }
 
       return closedPr;
@@ -636,13 +674,29 @@ export const pullsRouter = router({
         });
       }
 
-      return prReviewModel.create({
+      const review = await prReviewModel.create({
         prId: input.prId,
         userId: ctx.user.id,
         state: input.state,
         body: input.body,
         commitSha: input.commitSha,
       });
+
+      // Emit pr.reviewed event
+      const repo = await repoModel.findById(pr.repoId);
+      if (repo) {
+        await eventBus.emit('pr.reviewed', ctx.user.id, {
+          prId: pr.id,
+          prNumber: pr.number,
+          prTitle: pr.title,
+          repoId: pr.repoId,
+          repoFullName: `${ctx.user.username || ctx.user.name}/${repo.name}`,
+          authorId: pr.authorId,
+          reviewState: input.state,
+        });
+      }
+
+      return review;
     }),
 
   /**
@@ -684,7 +738,7 @@ export const pullsRouter = router({
         });
       }
 
-      return prCommentModel.create({
+      const comment = await prCommentModel.create({
         prId: input.prId,
         userId: ctx.user.id,
         body: input.body,
@@ -695,6 +749,30 @@ export const pullsRouter = router({
         reviewId: input.reviewId,
         replyToId: input.replyToId,
       });
+
+      // Emit pr.commented event
+      const repo = await repoModel.findById(pr.repoId);
+      if (repo) {
+        const mentionedUsernames = extractMentions(input.body);
+        
+        await eventBus.emit('pr.commented', ctx.user.id, {
+          prId: pr.id,
+          prNumber: pr.number,
+          prTitle: pr.title,
+          repoId: pr.repoId,
+          repoFullName: `${ctx.user.username || ctx.user.name}/${repo.name}`,
+          authorId: pr.authorId,
+          commentId: comment.id,
+          commentBody: input.body,
+          mentionedUserIds: [], // TODO: resolve usernames to IDs
+        });
+
+        // Emit individual mention events
+        // Note: mentionedUsernames contains usernames, need to resolve to user IDs
+        // This is left as TODO - would need to look up users by username
+      }
+
+      return comment;
     }),
 
   /**

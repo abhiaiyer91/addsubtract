@@ -13,6 +13,7 @@ import {
 } from '../../../db/models';
 import { BareRepository, forkRepository, getRepoDiskPath } from '../../../server/storage/repos';
 import { exists } from '../../../utils/fs';
+import { eventBus } from '../../../events';
 
 /**
  * Helper to get a BareRepository from disk path
@@ -365,6 +366,18 @@ export const reposRouter = router({
 
       // Get source owner for response
       const sourceOwner = await userModel.findById(sourceRepo.ownerId);
+      
+      // Emit repo.forked event
+      const sourceFullName = sourceOwner 
+        ? `${sourceOwner.username || sourceOwner.name}/${sourceRepo.name}` 
+        : sourceRepo.name;
+      await eventBus.emit('repo.forked', ctx.user.id, {
+        repoId: fork.id,
+        repoFullName: `${ctx.user.username || ctx.user.name}/${forkName}`,
+        forkedFromId: sourceRepo.id,
+        forkedFromFullName: sourceFullName,
+        ownerId: sourceRepo.ownerId,
+      });
 
       return {
         ...fork,
@@ -446,6 +459,15 @@ export const reposRouter = router({
 
       // Log activity
       await activityHelpers.logRepoStarred(ctx.user.id, input.repoId, repo.name);
+
+      // Emit repo.starred event
+      const owner = await userModel.findById(repo.ownerId);
+      const repoFullName = owner ? `${owner.username || owner.name}/${repo.name}` : repo.name;
+      await eventBus.emit('repo.starred', ctx.user.id, {
+        repoId: repo.id,
+        repoFullName,
+        ownerId: repo.ownerId,
+      });
 
       return { success: true };
     }),
