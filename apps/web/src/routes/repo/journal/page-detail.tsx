@@ -91,8 +91,12 @@ export function JournalPageDetail() {
   // Mutations - declare before using in callbacks
   const updateMutation = trpc.journal.update.useMutation({
     onSuccess: () => {
+      setPendingContent(null);
       utils.journal.getBySlug.invalidate();
       utils.journal.tree.invalidate();
+    },
+    onError: () => {
+      setPendingContent(null);
     },
   });
 

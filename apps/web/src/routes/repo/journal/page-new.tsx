@@ -41,6 +41,8 @@ export function NewJournalPage() {
     titleRef.current?.focus();
   }, []);
 
+  const utils = trpc.useUtils();
+
   // Fetch repository data
   const { data: repoData, isLoading: repoLoading } = trpc.repos.get.useQuery(
     { owner: owner!, repo: repo! },
@@ -49,7 +51,12 @@ export function NewJournalPage() {
 
   // Create mutation
   const createMutation = trpc.journal.create.useMutation({
-    onSuccess: (page) => {
+    onSuccess: async (page) => {
+      // Invalidate queries before navigating so the page detail view has fresh data
+      await Promise.all([
+        utils.journal.tree.invalidate(),
+        utils.journal.list.invalidate(),
+      ]);
       toast({ title: 'Page created' });
       navigate(`/${owner}/${repo}/journal/${page.slug}`);
     },

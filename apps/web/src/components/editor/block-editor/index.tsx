@@ -1,4 +1,21 @@
 import { useState, useCallback, useRef, useEffect, KeyboardEvent } from 'react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { cn } from '@/lib/utils';
 import { BlockItem } from './block-item';
 import { SlashMenu } from './slash-menu';
@@ -9,6 +26,49 @@ import {
   blocksToMarkdown,
   markdownToBlocks,
 } from './types';
+
+// Sortable wrapper for BlockItem
+interface SortableBlockItemProps {
+  block: Block;
+  isSelected: boolean;
+  isFocused: boolean;
+  onUpdate: (updates: Partial<Block>) => void;
+  onDelete: () => void;
+  onDuplicate: () => void;
+  onAddBlockAfter: (type?: BlockType) => void;
+  onFocus: () => void;
+  onBlur: () => void;
+  onKeyDown: (e: KeyboardEvent<HTMLTextAreaElement | HTMLInputElement>) => void;
+  onSlashCommand: (query: string, position: { top: number; left: number }) => void;
+  onCloseSlashMenu: () => void;
+  placeholder?: string;
+}
+
+function SortableBlockItem(props: SortableBlockItemProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: props.block.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes}>
+      <BlockItem
+        {...props}
+        isDragging={isDragging}
+        dragHandleProps={listeners}
+      />
+    </div>
+  );
+}
 
 interface BlockEditorProps {
   value: string;
@@ -49,6 +109,31 @@ export function BlockEditor({
 
   const containerRef = useRef<HTMLDivElement>(null);
   const isInitialMount = useRef(true);
+
+  // DnD sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  // Handle drag end
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      setBlocks((prev) => {
+        const oldIndex = prev.findIndex((b) => b.id === active.id);
+        const newIndex = prev.findIndex((b) => b.id === over.id);
+        return arrayMove(prev, oldIndex, newIndex);
+      });
+    }
+  }, []);
 
   // Sync blocks to markdown on change
   useEffect(() => {
@@ -508,40 +593,51 @@ export function BlockEditor({
       onClick={handleContainerClick}
     >
       {/* Blocks */}
-      <div className="space-y-0.5">
-        {blocks.map((block, index) => (
-          <BlockItem
-            key={block.id}
-            block={block}
-            isSelected={selectedBlockId === block.id}
-            isFocused={focusedBlockId === block.id}
-            onUpdate={(updates) => updateBlock(block.id, updates)}
-            onDelete={() => deleteBlock(block.id)}
-            onDuplicate={() => duplicateBlock(block.id)}
-            onAddBlockAfter={(type?: BlockType) => addBlockAfter(block.id, type)}
-            onFocus={() => {
-              setFocusedBlockId(block.id);
-              setSelectedBlockId(block.id);
-            }}
-            onBlur={() => {
-              // Don't clear focus immediately - allow click handling
-            }}
-            onKeyDown={(e) => handleBlockKeyDown(block.id, e)}
-            onSlashCommand={(query, position) =>
-              setSlashMenu({
-                isOpen: true,
-                query,
-                position,
-                blockId: block.id,
-              })
-            }
-            onCloseSlashMenu={() =>
-              setSlashMenu((prev) => ({ ...prev, isOpen: false }))
-            }
-            placeholder={index === 0 && blocks.length === 1 ? placeholder : undefined}
-          />
-        ))}
-      </div>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext
+          items={blocks.map((b) => b.id)}
+          strategy={verticalListSortingStrategy}
+        >
+          <div className="space-y-0.5">
+            {blocks.map((block, index) => (
+              <SortableBlockItem
+                key={block.id}
+                block={block}
+                isSelected={selectedBlockId === block.id}
+                isFocused={focusedBlockId === block.id}
+                onUpdate={(updates) => updateBlock(block.id, updates)}
+                onDelete={() => deleteBlock(block.id)}
+                onDuplicate={() => duplicateBlock(block.id)}
+                onAddBlockAfter={(type?: BlockType) => addBlockAfter(block.id, type)}
+                onFocus={() => {
+                  setFocusedBlockId(block.id);
+                  setSelectedBlockId(block.id);
+                }}
+                onBlur={() => {
+                  // Don't clear focus immediately - allow click handling
+                }}
+                onKeyDown={(e) => handleBlockKeyDown(block.id, e)}
+                onSlashCommand={(query, position) =>
+                  setSlashMenu({
+                    isOpen: true,
+                    query,
+                    position,
+                    blockId: block.id,
+                  })
+                }
+                onCloseSlashMenu={() =>
+                  setSlashMenu((prev) => ({ ...prev, isOpen: false }))
+                }
+                placeholder={index === 0 && blocks.length === 1 ? placeholder : undefined}
+              />
+            ))}
+          </div>
+        </SortableContext>
+      </DndContext>
 
       {/* Slash command menu */}
       <SlashMenu
