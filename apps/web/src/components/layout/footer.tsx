@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom';
 import { GitBranch } from 'lucide-react';
 
 export function Footer() {
@@ -16,32 +15,16 @@ export function Footer() {
           </div>
 
           <nav className="flex items-center gap-1">
-            <Link
-              to="/about"
-              className="px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-full transition-all duration-200"
-            >
-              About
-            </Link>
-            <Link
-              to="/docs"
+            <a
+              href="https://test-4cc74a53.mintlify.app/introduction"
+              target="_blank"
+              rel="noopener noreferrer"
               className="px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-full transition-all duration-200"
             >
               Docs
-            </Link>
-            <Link
-              to="/privacy"
-              className="px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-full transition-all duration-200"
-            >
-              Privacy
-            </Link>
-            <Link
-              to="/terms"
-              className="px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-full transition-all duration-200"
-            >
-              Terms
-            </Link>
+            </a>
             <a
-              href="https://github.com/wit"
+              href="https://github.com/abhiaiyer91/wit"
               target="_blank"
               rel="noopener noreferrer"
               className="px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-full transition-all duration-200"
