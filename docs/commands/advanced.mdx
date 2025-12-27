@@ -7,279 +7,14 @@ description: "Power user commands for advanced workflows"
 
 These commands provide powerful capabilities for advanced workflows.
 
-## Stacked Diffs
-
-Break down large features into smaller, reviewable branches that build on each other.
-
-```bash
-wit stack <command> [options]
-```
-
-<Info>
-For a complete guide, see [Stacked Diffs](/commands/stacked-diffs).
-</Info>
-
-### Quick Start
-
-```bash
-# Create a stack from main
-wit stack create auth-feature
-
-# Create branches as you work
-wit stack push                    # Creates auth-feature/part-1
-wit add . && wit commit -m "Add login"
-
-wit stack push                    # Creates auth-feature/part-2  
-wit add . && wit commit -m "Add logout"
-
-# View the stack
-wit stack show
-
-# Sync after main updates
-wit stack sync
-
-# Submit all for review
-wit stack submit
-```
-
-### Commands
-
-| Command | Description |
-|---------|-------------|
-| `create <name>` | Start a new stack from current branch |
-| `push [name]` | Add a new branch to the stack |
-| `pop` | Remove top branch from stack |
-| `show` | Visualize the stack |
-| `sync` | Rebase entire stack |
-| `submit` | Push all branches for review |
-| `up` / `down` | Navigate branches |
-| `goto <n>` | Jump to specific branch |
-
----
-
-## History Rewriting
-
-### cherry-pick
-
-Apply changes from specific commits to the current branch.
-
-```bash
-wit cherry-pick <commit> [options]
-```
-
-**Options:**
-
-| Option | Description |
-|--------|-------------|
-| `--continue` | Continue after resolving conflicts |
-| `--abort` | Abort the operation |
-| `--skip` | Skip current commit and continue |
-| `--no-commit` | Apply changes without committing |
-
-**Examples:**
-
-```bash
-# Apply a specific commit
-wit cherry-pick abc1234
-
-# Cherry-pick without committing
-wit cherry-pick abc1234 --no-commit
-
-# Continue after resolving conflicts
-wit cherry-pick --continue
-
-# Abort if something goes wrong
-wit cherry-pick --abort
-```
-
-### rebase
-
-Rebase the current branch onto another branch.
-
-```bash
-wit rebase <branch> [options]
-```
-
-**Options:**
-
-| Option | Description |
-|--------|-------------|
-| `--onto <new>` | Rebase onto a specific base |
-| `--continue` | Continue after resolving conflicts |
-| `--abort` | Abort the rebase |
-| `--skip` | Skip current commit |
-
-**Examples:**
-
-```bash
-# Rebase current branch onto main
-wit rebase main
-
-# Rebase onto a specific commit
-wit rebase --onto new-base old-base
-
-# Continue after conflict resolution
-wit rebase --continue
-
-# Abort the rebase
-wit rebase --abort
-```
-
-### revert
-
-Create a new commit that undoes the changes from a previous commit.
-
-```bash
-wit revert <commit> [options]
-```
-
-**Options:**
-
-| Option | Description |
-|--------|-------------|
-| `--no-commit`, `-n` | Revert without committing |
-| `--continue` | Continue after resolving conflicts |
-| `--abort` | Abort the operation |
-| `-m <n>` | Specify mainline parent for merge commits |
-
-**Examples:**
-
-```bash
-# Revert a commit
-wit revert abc1234
-
-# Revert without committing
-wit revert -n abc1234
-
-# Revert a merge commit
-wit revert -m 1 abc1234
-```
-
----
-
-## Remote Operations
-
-### remote
-
-Manage remote repositories.
-
-```bash
-wit remote [command] [options]
-```
-
-**Commands:**
-
-| Command | Description |
-|---------|-------------|
-| (none) | List remotes |
-| `-v` | List remotes with URLs |
-| `add <name> <url>` | Add a new remote |
-| `remove <name>` | Remove a remote |
-| `set-url <name> <url>` | Change remote URL |
-
-**Examples:**
-
-```bash
-# List remotes
-wit remote
-
-# List with URLs
-wit remote -v
-
-# Add a remote
-wit remote add origin https://github.com/user/repo.git
-
-# Remove a remote
-wit remote remove origin
-```
-
-### clone
-
-Clone a repository.
-
-```bash
-wit clone <url> [directory] [options]
-```
-
-**Examples:**
-
-```bash
-# Clone to current directory
-wit clone https://github.com/user/repo.git
-
-# Clone to specific directory
-wit clone https://github.com/user/repo.git my-project
-
-# Clone a local repository
-wit clone ./source-repo ./dest-repo
-```
-
-### fetch
-
-Download objects and refs from a remote.
-
-```bash
-wit fetch [remote] [options]
-```
-
-**Examples:**
-
-```bash
-# Fetch from origin
-wit fetch
-
-# Fetch from specific remote
-wit fetch upstream
-
-# Fetch all remotes
-wit fetch --all
-```
-
-### pull
-
-Fetch and merge changes from a remote.
-
-```bash
-wit pull [remote] [branch] [options]
-```
-
-**Examples:**
-
-```bash
-# Pull current branch
-wit pull
-
-# Pull from specific remote
-wit pull origin main
-```
-
-### push
-
-Push commits to a remote repository.
-
-```bash
-wit push [remote] [branch] [options]
-```
-
-**Options:**
-
-| Option | Description |
-|--------|-------------|
-| `-u`, `--set-upstream` | Set upstream for the branch |
-| `--force`, `-f` | Force push (use with caution) |
-
-**Examples:**
-
-```bash
-# Push current branch
-wit push
-
-# Push and set upstream
-wit push -u origin main
-
-# Push to specific remote and branch
-wit push origin feature-branch
-```
+<Note>
+For stacked diffs, see [Stacked Diffs](/commands/stacked-diffs).
+For history rewriting (cherry-pick, rebase, revert), see [History Rewriting](/commands/history-rewriting).
+For remote operations, see [Remotes](/commands/remotes).
+For stash, see [Stash](/commands/stash).
+For tags, see [Tags](/commands/tags).
+For debugging (bisect, show, clean), see [Debugging](/commands/debugging).
+</Note>
 
 ---
 
@@ -336,6 +71,10 @@ npm run lint
 npm run test
 ```
 
+<Info>
+For more details, see [Hooks](/features/hooks).
+</Info>
+
 ---
 
 ## Submodules
@@ -374,6 +113,10 @@ wit submodule status
 # Run a command in all submodules
 wit submodule foreach "npm install"
 ```
+
+<Info>
+For more details, see [Submodules](/features/submodules).
+</Info>
 
 ---
 
@@ -431,6 +174,10 @@ cd ../project
 # Clean up
 wit worktree remove ../hotfix
 ```
+
+<Info>
+For more details, see [Worktrees](/features/worktrees).
+</Info>
 
 ---
 
@@ -515,175 +262,6 @@ wit gc --prune=now
 
 ---
 
-## Tags
-
-Create and manage tags.
-
-```bash
-wit tag [options] [tagname] [commit]
-```
-
-### Options
-
-| Option | Description |
-|--------|-------------|
-| `-a` | Create annotated tag |
-| `-m <message>` | Tag message |
-| `-d <name>` | Delete a tag |
-| `-l` | List tags |
-
-### Examples
-
-```bash
-# List all tags
-wit tag
-
-# Create lightweight tag
-wit tag v1.0.0
-
-# Create annotated tag
-wit tag -a v1.0.0 -m "Release version 1.0.0"
-
-# Tag specific commit
-wit tag v1.0.0 abc1234
-
-# Delete a tag
-wit tag -d v1.0.0
-```
-
----
-
-## Stash
-
-Save working directory changes temporarily.
-
-```bash
-wit stash [command] [options]
-```
-
-### Commands
-
-| Command | Description |
-|---------|-------------|
-| (none) or `push` | Stash current changes |
-| `list` | List all stashes |
-| `pop` | Apply and remove latest stash |
-| `apply` | Apply latest stash without removing |
-| `drop` | Remove a stash |
-| `clear` | Remove all stashes |
-
-### Examples
-
-```bash
-# Stash current changes
-wit stash
-
-# Stash with message
-wit stash push -m "Work in progress on feature"
-
-# List stashes
-wit stash list
-
-# Apply latest stash
-wit stash pop
-
-# Apply specific stash
-wit stash apply stash@{1}
-
-# Drop a stash
-wit stash drop stash@{0}
-```
-
----
-
-## Debugging Commands
-
-### show
-
-Show commit details.
-
-```bash
-wit show <commit> [options]
-```
-
-**Examples:**
-
-```bash
-# Show latest commit
-wit show HEAD
-
-# Show specific commit
-wit show abc1234
-
-# Show file at specific commit
-wit show abc1234:path/to/file.ts
-```
-
-### bisect
-
-Binary search for bug introduction.
-
-```bash
-wit bisect <command> [options]
-```
-
-**Commands:**
-
-| Command | Description |
-|---------|-------------|
-| `start` | Start bisect session |
-| `good <commit>` | Mark commit as good |
-| `bad <commit>` | Mark commit as bad |
-| `reset` | End bisect session |
-
-**Example:**
-
-```bash
-wit bisect start
-wit bisect bad HEAD
-wit bisect good v1.0.0
-# wit will checkout commits for you to test
-# After each test, run:
-wit bisect good  # or wit bisect bad
-# When done:
-wit bisect reset
-```
-
-### clean
-
-Remove untracked files.
-
-```bash
-wit clean [options]
-```
-
-**Options:**
-
-| Option | Description |
-|--------|-------------|
-| `-n`, `--dry-run` | Preview what would be deleted |
-| `-f`, `--force` | Actually delete files |
-
-**Examples:**
-
-```bash
-# Preview untracked files
-wit clean -n
-
-# Delete untracked files
-wit clean -f
-```
-
-### fsck
-
-Verify repository integrity.
-
-```bash
-wit fsck
-```
-
----
-
 ## Monorepo Scopes
 
 Limit operations to specific paths in a monorepo.
@@ -729,6 +307,10 @@ wit add .     # Stages only frontend files
 wit log       # Shows commits affecting frontend
 wit diff      # Shows changes in frontend only
 ```
+
+<Info>
+For more details, see [Monorepo Scopes](/features/monorepo-scopes).
+</Info>
 
 ---
 
