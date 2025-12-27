@@ -43,7 +43,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { RepoLayout } from './components/repo-layout';
-import { Progress } from '@/components/ui/progress';
 import { useSession } from '@/lib/auth-client';
 import { trpc } from '@/lib/trpc';
 import { formatRelativeTime, cn } from '@/lib/utils';
