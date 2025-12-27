@@ -3,492 +3,62 @@ title: "Architecture Overview"
 description: "How wit works under the hood"
 ---
 
-# Architecture Overview
+wit is a Git-compatible version control system written in TypeScript, with an integrated hosting platform.
 
-wit is a complete Git implementation written in TypeScript. This document explains the internal architecture for contributors and anyone curious about how version control works.
-
-## High-Level Architecture
-
-### CLI Architecture
+## System Overview
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                          CLI Layer                           │
-│  src/cli.ts → src/commands/*.ts                              │
-├─────────────────────────────────────────────────────────────┤
-│                        Core Layer                            │
-│  Repository │ ObjectStore │ Index │ Refs │ Merge │ Diff     │
-├─────────────────────────────────────────────────────────────┤
-│                      Protocol Layer                          │
-│  SmartHTTP │ PackfileReader │ PackfileWriter │ Pack          │
-├─────────────────────────────────────────────────────────────┤
-│                      Storage Layer                           │
-│  Filesystem (objects/, refs/, index, HEAD)                   │
-└─────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                           CLI                                │
+│                      src/commands/*                          │
+├────────────────────────┬─────────────────────────────────────┤
+│      Core Git          │           Platform                  │
+│  - Repository          │  - API Server (Hono + tRPC)         │
+│  - Objects & Refs      │  - Web App (React)                  │
+│  - Merge & Diff        │  - Database (PostgreSQL)            │
+│  - Smart HTTP Protocol │  - Git hosting                      │
+├────────────────────────┴─────────────────────────────────────┤
+│                        Storage                               │
+│           .wit/objects    .wit/refs    PostgreSQL            │
+└──────────────────────────────────────────────────────────────┘
 ```
 
-### Platform Architecture
+## Key Components
 
-wit also includes a full platform for hosting repositories:
+| Directory | Purpose |
+|-----------|---------|
+| `src/commands/` | CLI command handlers |
+| `src/core/` | Git internals: objects, refs, index, merge, diff |
+| `src/core/protocol/` | Smart HTTP, packfile read/write |
+| `src/server/` | Hono server, Git HTTP endpoints |
+| `src/api/trpc/` | tRPC routers for the platform API |
+| `src/db/` | Drizzle schema and data models |
+| `src/ai/` | AI agent and tools |
+| `src/ui/` | Terminal UI, web UI, graph rendering |
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         wit Platform                             │
-├─────────────────────────────────────────────────────────────────┤
-│  Web App (React)          │  API Server (Hono)                  │
-│  - Repository browser     │  - tRPC API                         │
-│  - Pull requests UI       │  - Git Smart HTTP                   │
-│  - Issues UI              │  - Health checks                    │
-├───────────────────────────┼─────────────────────────────────────┤
-│  CLI (wit)                │  Primitives                         │
-│  - Local git ops          │  - Filesystem (versioned files)     │
-│  - wit pr, wit issue      │  - Knowledge (key-value store)      │
-│  - wit serve              │  - Git-backed storage               │
-├───────────────────────────┴─────────────────────────────────────┤
-│                         Storage Layer                            │
-│  - Git Objects (filesystem)  - PostgreSQL (Drizzle ORM)         │
-└─────────────────────────────────────────────────────────────────┘
-```
+## How Git Storage Works
 
-### Database Schema
+wit stores data the same way Git does:
 
-The platform uses PostgreSQL for user data, PRs, and issues:
+- **Objects** (blobs, trees, commits, tags) are content-addressed by SHA-1 hash
+- **Refs** (branches, tags) are files containing commit hashes
+- **Index** tracks staged files for the next commit
+- **Packfiles** bundle objects for network transfer
 
-| Table | Description |
-|-------|-------------|
-| `users` | User accounts and OAuth |
-| `organizations` | Teams and organizations |
-| `repositories` | Repository metadata |
-| `pull_requests` | Pull request data |
-| `issues` | Issue tracking |
-| `activities` | Activity feed |
-| `webhooks` | Webhook configurations |
+All objects live in `.wit/objects/`, refs in `.wit/refs/`.
 
-### tRPC API Routers
+## Network Protocol
 
-The API is organized into routers:
+wit implements Git Smart HTTP for clone/fetch/push:
 
-| Router | Purpose |
-|--------|---------|
-| `auth` | Login, logout, register |
-| `users` | User profiles |
-| `repos` | Repository CRUD, stars, search |
-| `pulls` | Pull request operations |
-| `issues` | Issue management |
-| `comments` | PR and issue comments |
-| `activity` | Activity feeds |
+1. Client discovers refs via `GET /info/refs`
+2. Client/server exchange packfiles via `POST /git-upload-pack` or `/git-receive-pack`
 
-## Directory Structure
+## Platform
 
-```
-src/
-├── cli.ts                 # CLI entry point, command routing
-├── commands/              # Command implementations
-│   ├── add.ts             # wit add
-│   ├── commit.ts          # wit commit
-│   ├── push.ts            # wit push
-│   ├── pr.ts              # wit pr (pull requests)
-│   ├── issue.ts           # wit issue
-│   ├── serve.ts           # wit serve
-│   └── ...
-├── core/                  # Core Git functionality
-│   ├── repository.ts      # Repository class
-│   ├── object-store.ts    # Object read/write
-│   ├── object.ts          # Blob, Tree, Commit, Tag classes
-│   ├── index.ts           # Staging area
-│   ├── refs.ts            # Reference management
-│   ├── merge.ts           # Merge algorithms
-│   ├── diff.ts            # Diff generation
-│   ├── github.ts          # GitHub OAuth
-│   └── protocol/          # Git protocol
-│       ├── smart-http.ts  # Smart HTTP client
-│       ├── pack.ts        # Pack utilities
-│       └── packfile-*.ts  # Packfile read/write
-├── server/                # Git server
-│   ├── index.ts           # Hono server
-│   ├── routes/
-│   │   └── git.ts         # Smart HTTP endpoints
-│   ├── middleware/
-│   │   └── auth.ts        # Authentication
-│   └── storage/
-│       ├── repos.ts       # Repository management
-│       └── sync.ts        # Database sync
-├── db/                    # Database layer
-│   ├── schema.ts          # Drizzle schema
-│   ├── models/            # Data access
-│   │   ├── user.ts
-│   │   ├── repository.ts
-│   │   ├── pull-request.ts
-│   │   └── issue.ts
-│   └── seed.ts            # Development data
-├── api/                   # API layer
-│   ├── client.ts          # API client
-│   └── trpc/              # tRPC setup
-│       ├── index.ts
-│       ├── trpc.ts
-│       ├── context.ts
-│       └── routers/
-│           ├── auth.ts
-│           ├── repos.ts
-│           ├── pulls.ts
-│           └── issues.ts
-├── primitives/            # Git-backed primitives
-│   ├── filesystem.ts      # Versioned file operations
-│   ├── knowledge.ts       # Key-value store
-│   └── types.ts           # Type definitions
-├── ai/                    # AI integration
-│   ├── agent.ts           # Mastra agent
-│   ├── mastra.ts          # Configuration
-│   └── tools/             # Agent tools
-├── ui/                    # Visual interfaces
-│   ├── web-premium.ts     # Web UI
-│   ├── tui.ts             # Terminal UI
-│   └── graph.ts           # Commit graph
-└── utils/                 # Utilities
-    ├── fs.ts              # Filesystem helpers
-    ├── hash.ts            # SHA-1/SHA-256
-    └── compression.ts     # Zlib
-```
+The hosting platform adds:
 
-## Core Concepts
-
-### Git Objects
-
-All data in Git is stored as objects. There are four types:
-
-| Type | Description | Content |
-|------|-------------|---------|
-| **blob** | File content | Raw bytes |
-| **tree** | Directory | List of (mode, name, hash) entries |
-| **commit** | Snapshot | Tree hash, parent(s), author, message |
-| **tag** | Named pointer | Object hash, tagger, message |
-
-Each object is:
-1. Serialized to bytes
-2. Prefixed with `{type} {size}\0`
-3. Hashed with SHA-1 (or SHA-256)
-4. Compressed with zlib
-5. Stored at `.wit/objects/{hash[0:2]}/{hash[2:]}`
-
-```typescript
-// src/core/object.ts
-export class Blob extends GitObject {
-  serialize(): Buffer {
-    return this.content;
-  }
-}
-
-export class Tree extends GitObject {
-  serialize(): Buffer {
-    // Sort entries, then format as:
-    // {mode} {name}\0{20-byte-hash}
-  }
-}
-
-export class Commit extends GitObject {
-  serialize(): Buffer {
-    // tree {hash}\n
-    // parent {hash}\n (0 or more)
-    // author {name} <{email}> {timestamp} {tz}\n
-    // committer {name} <{email}> {timestamp} {tz}\n
-    // \n
-    // {message}
-  }
-}
-```
-
-### Object Store
-
-The `ObjectStore` class handles reading and writing objects:
-
-```typescript
-// src/core/object-store.ts
-export class ObjectStore {
-  // Write object, return hash
-  writeObject(obj: GitObject): string {
-    const content = obj.serialize();
-    const hash = hashObject(obj.type, content);
-    const buffer = createObjectBuffer(obj.type, content);
-    const compressed = compress(buffer);
-    writeFile(this.getPath(hash), compressed);
-    return hash;
-  }
-
-  // Read object by hash
-  readObject(hash: string): GitObject {
-    const compressed = readFile(this.getPath(hash));
-    const buffer = decompress(compressed);
-    const { type, content } = parseObjectBuffer(buffer);
-    return deserialize(type, content);
-  }
-}
-```
-
-### Index (Staging Area)
-
-The index tracks files staged for the next commit:
-
-```typescript
-// src/core/index.ts
-interface IndexEntry {
-  mode: string;      // File mode (100644, 100755, etc.)
-  hash: string;      // Blob hash
-  stage: number;     // 0=normal, 1/2/3=conflict
-  path: string;      // File path
-  // Metadata for change detection:
-  ctime: number;
-  mtime: number;
-  size: number;
-}
-```
-
-The index is stored at `.wit/index` as JSON (Git uses binary format).
-
-### References
-
-References are pointers to commits:
-
-```
-.wit/
-├── HEAD                    # Current branch (symbolic ref)
-├── refs/
-│   ├── heads/
-│   │   ├── main            # Branch: contains commit hash
-│   │   └── feature
-│   ├── tags/
-│   │   └── v1.0.0          # Tag: contains commit/tag hash
-│   └── remotes/
-│       └── origin/
-│           └── main        # Remote tracking branch
-```
-
-```typescript
-// src/core/refs.ts
-export class RefManager {
-  resolve(ref: string): string | null {
-    // HEAD → refs/heads/main → {commit-hash}
-  }
-  
-  update(ref: string, hash: string): void {
-    // Write hash to ref file
-  }
-}
-```
-
-### Repository
-
-The `Repository` class ties everything together:
-
-```typescript
-// src/core/repository.ts
-export class Repository {
-  readonly gitDir: string;      // .wit directory
-  readonly workDir: string;     // Working directory
-  readonly objects: ObjectStore;
-  readonly index: Index;
-  readonly refs: RefManager;
-  
-  // High-level operations
-  add(paths: string[]): void;
-  commit(message: string): string;
-  checkout(ref: string): void;
-  merge(branch: string): MergeResult;
-}
-```
-
-## Git Protocol
-
-### Smart HTTP
-
-wit implements Git's Smart HTTP protocol for clone/fetch/push:
-
-```
-Clone/Fetch:
-1. GET /info/refs?service=git-upload-pack
-   ← Server sends refs with capabilities
-2. POST /git-upload-pack
-   → Client sends wanted refs
-   ← Server sends packfile
-
-Push:
-1. GET /info/refs?service=git-receive-pack
-   ← Server sends refs with capabilities
-2. POST /git-receive-pack
-   → Client sends ref updates + packfile
-   ← Server sends status
-```
-
-```typescript
-// src/core/protocol/smart-http.ts
-export class SmartHttpClient {
-  async discoverRefs(): Promise<RefInfo[]>;
-  async fetchPack(wants: string[]): Promise<Buffer>;
-  async pushPack(updates: RefUpdate[], pack: Buffer): Promise<PushResult>;
-}
-```
-
-### Packfiles
-
-Packfiles are compressed archives of objects, used for network transfer:
-
-```
-PACK header (12 bytes):
-  - "PACK" signature (4 bytes)
-  - Version (4 bytes, big-endian)
-  - Object count (4 bytes, big-endian)
-
-Objects (variable):
-  - Type + size (varint encoded)
-  - Compressed data (zlib)
-
-Checksum (20 bytes):
-  - SHA-1 of everything before
-```
-
-```typescript
-// src/core/protocol/packfile-writer.ts
-export function createPackfile(objects: PackableObject[]): Buffer {
-  // Write header
-  // For each object: write type, size, compressed data
-  // Write checksum
-}
-
-// src/core/protocol/packfile-reader.ts
-export function readPackfile(data: Buffer): GitObject[] {
-  // Parse header
-  // Read each object
-  // Verify checksum
-}
-```
-
-## Algorithms
-
-### Three-Way Merge
-
-When merging branches, wit uses three-way merge:
-
-```
-      A (base)
-     / \
-    B   C
-     \ /
-      M (merged)
-```
-
-For each file:
-1. If B and C are same → use either
-2. If only B changed → use B
-3. If only C changed → use C
-4. If both changed differently → conflict
-
-```typescript
-// src/core/merge.ts
-export function threeWayMerge(
-  base: string,
-  ours: string,
-  theirs: string
-): MergeResult {
-  // Line-by-line comparison
-  // Detect conflicts
-  // Generate merged content or conflict markers
-}
-```
-
-### Diff Algorithm
-
-wit uses Myers' diff algorithm to compute changes:
-
-```typescript
-// src/core/diff.ts
-export function diff(a: string[], b: string[]): DiffHunk[] {
-  // Find shortest edit script
-  // Group into hunks
-  // Return add/remove operations
-}
-```
-
-## Data Flow Examples
-
-### `wit add file.txt`
-
-```
-1. Read file.txt content
-2. Create Blob object
-3. Write blob to object store → get hash
-4. Update index with (path, hash, mode)
-5. Save index to .wit/index
-```
-
-### `wit commit -m "message"`
-
-```
-1. Read index entries
-2. Build tree structure from entries
-3. Create Tree objects (bottom-up)
-4. Get parent commit hash from HEAD
-5. Create Commit object (tree, parent, message)
-6. Write commit to object store → get hash
-7. Update refs/heads/{branch} with hash
-8. Record in journal (for undo)
-```
-
-### `wit push origin main`
-
-```
-1. Discover remote refs (GET /info/refs)
-2. Find local commit hash
-3. Find remote commit hash
-4. Collect objects to send (local - remote)
-5. Create packfile from objects
-6. Send ref update + packfile (POST /git-receive-pack)
-7. Parse response for success/failure
-```
-
-## Extension Points
-
-### Adding a New Command
-
-1. Create `src/commands/mycommand.ts`:
-
-```typescript
-export function handleMyCommand(args: string[]): void {
-  const repo = Repository.open('.');
-  // Your logic here
-}
-```
-
-2. Add to `src/cli.ts`:
-
-```typescript
-case 'mycommand':
-  handleMyCommand(args.slice(1));
-  break;
-```
-
-### Adding a New Object Type
-
-1. Extend `GitObject` in `src/core/object.ts`
-2. Implement `serialize()` and `static deserialize()`
-3. Add to type registry in `ObjectStore`
-
-### Adding Protocol Support
-
-1. Implement in `src/core/protocol/`
-2. Follow existing patterns in `smart-http.ts`
-3. Add authentication in `getCredentials()`
-
-## Testing
-
-```bash
-# Run all tests
-npm test
-
-# Run specific test file
-npm test -- src/core/__tests__/repository.test.ts
-
-# Run with coverage
-npm run test:coverage
-```
-
-Test files are located alongside source files in `__tests__/` directories.
+- **PostgreSQL** for users, orgs, repos, PRs, issues
+- **tRPC API** for the web app and CLI commands like `wit pr`
+- **React web app** for browsing repos and managing PRs
 
