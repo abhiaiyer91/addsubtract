@@ -77,6 +77,8 @@ import {
   handleInbox,
   // Issue tracking (Linear-inspired) - also exports handleCycle
   handleCycle,
+  // Project management (Linear-inspired)
+  handleProject,
   // Platform management
   handleUp,
   handleDown,
@@ -287,6 +289,17 @@ Issue Tracking (Linear-inspired):
   issue close <id>      Close an issue
   issue board           Show kanban board view
   issue stats           Show issue statistics
+  issue priority <n> <p> Set issue priority (urgent/high/medium/low/none)
+  issue due <n> <date>  Set due date
+  issue block <a> <b>   Mark issue A as blocking issue B
+  
+  project create "Name" Create a new project
+  project list          List projects
+  project view "Name"   View project details
+  project issues "Name" List issues in a project
+  project progress "N"  Show project progress
+  project complete "N"  Mark project as complete
+  
   cycle create          Create a new sprint/cycle
   cycle current         Show active cycle progress
   cycle add <issue>     Add issue to current cycle
@@ -389,7 +402,7 @@ const COMMANDS = [
   'ui', 'web',
   'ai', 'search', 'review',
   // Issue tracking
-  'issue', 'cycle',
+  'issue', 'cycle', 'project',
   'cat-file', 'hash-object', 'ls-files', 'ls-tree',
   // Plumbing commands
   'rev-parse', 'update-ref', 'symbolic-ref', 'for-each-ref', 'show-ref', 'fsck',
@@ -982,8 +995,27 @@ function main(): void {
 
       // Issue tracking - cycle commands (Linear-inspired sprints)
       case 'cycle':
-        handleCycle(rawArgs);
-        break;
+        handleCycle(rawArgs).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
+          }
+          process.exit(1);
+        });
+        return; // Exit main() to let async handle complete
+
+      // Project management (Linear-inspired)
+      case 'project':
+        handleProject(args.slice(args.indexOf('project') + 1)).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
+          }
+          process.exit(1);
+        });
+        return; // Exit main() to let async handle complete
 
       // Platform management commands
       case 'up':

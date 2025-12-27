@@ -10,12 +10,19 @@ import {
   collaboratorModel,
   activityHelpers,
   ISSUE_STATUSES,
+  ISSUE_PRIORITIES,
 } from '../../../db/models';
+import { issueRelationModel } from '../../../db/models/issue-relations';
+import { issueActivityModel } from '../../../db/models/issue-activity';
+import { issueTemplateModel } from '../../../db/models/issue-template';
+import { issueViewModel, type ViewFilters, type ViewDisplayOptions } from '../../../db/models/issue-view';
 import { eventBus, extractMentions } from '../../../events';
-import type { IssueStatus } from '../../../db/schema';
+import type { IssueStatus, IssuePriority, IssueRelationType } from '../../../db/schema';
 
-// Zod schema for issue status
-const issueStatusSchema = z.enum(['backlog', 'todo', 'in_progress', 'in_review', 'done', 'canceled']);
+// Zod schemas for issue enums
+const issueStatusSchema = z.enum(['triage', 'backlog', 'todo', 'in_progress', 'in_review', 'done', 'canceled']);
+const issuePrioritySchema = z.enum(['none', 'low', 'medium', 'high', 'urgent']);
+const issueRelationTypeSchema = z.enum(['blocks', 'blocked_by', 'relates_to', 'duplicates', 'duplicated_by']);
 
 export const issuesRouter = router({
   /**
@@ -156,6 +163,14 @@ export const issuesRouter = router({
         body: z.string().optional(),
         labelIds: z.array(z.string().uuid()).optional(),
         assigneeId: z.string().uuid().optional(),
+        priority: issuePrioritySchema.optional(),
+        status: issueStatusSchema.optional(),
+        dueDate: z.string().datetime().optional(),
+        estimate: z.number().int().min(0).optional(),
+        parentId: z.string().uuid().optional(),
+        projectId: z.string().uuid().optional(),
+        cycleId: z.string().uuid().optional(),
+        templateId: z.string().uuid().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -168,14 +183,34 @@ export const issuesRouter = router({
         });
       }
 
-      const issue = await issueModel.create({
+      // Apply template if provided
+      let issueData: any = {
         repoId: input.repoId,
         title: input.title,
         body: input.body,
         authorId: ctx.user.id,
         state: 'open',
         assigneeId: input.assigneeId,
-      });
+        priority: input.priority,
+        status: input.status,
+        dueDate: input.dueDate ? new Date(input.dueDate) : undefined,
+        estimate: input.estimate,
+        parentId: input.parentId,
+        projectId: input.projectId,
+        cycleId: input.cycleId,
+      };
+
+      if (input.templateId) {
+        const template = await issueTemplateModel.findById(input.templateId);
+        if (template) {
+          issueData = issueTemplateModel.applyTemplate(template, issueData);
+        }
+      }
+
+      const issue = await issueModel.create(issueData);
+
+      // Log activity
+      await issueActivityModel.logCreated(issue.id, ctx.user.id);
 
       // Add labels if provided
       if (input.labelIds && input.labelIds.length > 0) {
@@ -930,4 +965,1374 @@ export const issuesRouter = router({
   statuses: publicProcedure.query(() => {
     return ISSUE_STATUSES;
   }),
+
+  /**
+   * Get available issue priorities
+   */
+  priorities: publicProcedure.query(() => {
+    return ISSUE_PRIORITIES;
+  }),
+
+  // ============ PRIORITY ENDPOINTS ============
+
+  /**
+   * Update issue priority
+   */
+  updatePriority: protectedProcedure
+    .input(
+      z.object({
+        issueId: z.string().uuid(),
+        priority: issuePrioritySchema,
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const issue = await issueModel.findById(input.issueId);
+
+      if (!issue) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Issue not found',
+        });
+      }
+
+      // Check write permission
+      const repo = await repoModel.findById(issue.repoId);
+      const isOwner = repo?.ownerId === ctx.user.id;
+      const canWrite = isOwner || (await collaboratorModel.hasPermission(issue.repoId, ctx.user.id, 'write'));
+      const isAuthor = issue.authorId === ctx.user.id;
+
+      if (!canWrite && !isAuthor) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to update this issue',
+        });
+      }
+
+      const oldPriority = issue.priority;
+      const updatedIssue = await issueModel.updatePriority(input.issueId, input.priority);
+
+      // Log activity
+      if (updatedIssue && oldPriority !== input.priority) {
+        await issueActivityModel.logPriorityChanged(
+          input.issueId,
+          ctx.user.id,
+          oldPriority,
+          input.priority
+        );
+      }
+
+      return updatedIssue;
+    }),
+
+  /**
+   * List issues by priority
+   */
+  listByPriority: publicProcedure
+    .input(
+      z.object({
+        repoId: z.string().uuid(),
+        priority: issuePrioritySchema,
+        state: z.enum(['open', 'closed']).optional(),
+        limit: z.number().min(1).max(100).default(50),
+      })
+    )
+    .query(async ({ input }) => {
+      return issueModel.listByPriority(input.repoId, input.priority, {
+        state: input.state,
+        limit: input.limit,
+      });
+    }),
+
+  // ============ DUE DATE ENDPOINTS ============
+
+  /**
+   * Set due date for an issue
+   */
+  setDueDate: protectedProcedure
+    .input(
+      z.object({
+        issueId: z.string().uuid(),
+        dueDate: z.string().datetime(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const issue = await issueModel.findById(input.issueId);
+
+      if (!issue) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Issue not found',
+        });
+      }
+
+      const repo = await repoModel.findById(issue.repoId);
+      const isOwner = repo?.ownerId === ctx.user.id;
+      const canWrite = isOwner || (await collaboratorModel.hasPermission(issue.repoId, ctx.user.id, 'write'));
+      const isAuthor = issue.authorId === ctx.user.id;
+
+      if (!canWrite && !isAuthor) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to update this issue',
+        });
+      }
+
+      const dueDate = new Date(input.dueDate);
+      const updatedIssue = await issueModel.setDueDate(input.issueId, dueDate);
+
+      // Log activity
+      if (updatedIssue) {
+        await issueActivityModel.logDueDateSet(input.issueId, ctx.user.id, dueDate);
+      }
+
+      return updatedIssue;
+    }),
+
+  /**
+   * Clear due date from an issue
+   */
+  clearDueDate: protectedProcedure
+    .input(
+      z.object({
+        issueId: z.string().uuid(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const issue = await issueModel.findById(input.issueId);
+
+      if (!issue) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Issue not found',
+        });
+      }
+
+      const repo = await repoModel.findById(issue.repoId);
+      const isOwner = repo?.ownerId === ctx.user.id;
+      const canWrite = isOwner || (await collaboratorModel.hasPermission(issue.repoId, ctx.user.id, 'write'));
+      const isAuthor = issue.authorId === ctx.user.id;
+
+      if (!canWrite && !isAuthor) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to update this issue',
+        });
+      }
+
+      const previousDueDate = issue.dueDate;
+      const updatedIssue = await issueModel.clearDueDate(input.issueId);
+
+      // Log activity
+      if (updatedIssue && previousDueDate) {
+        await issueActivityModel.logDueDateCleared(input.issueId, ctx.user.id, previousDueDate);
+      }
+
+      return updatedIssue;
+    }),
+
+  /**
+   * List overdue issues
+   */
+  listOverdue: publicProcedure
+    .input(
+      z.object({
+        repoId: z.string().uuid(),
+        limit: z.number().min(1).max(100).default(50),
+      })
+    )
+    .query(async ({ input }) => {
+      return issueModel.listOverdue(input.repoId, input.limit);
+    }),
+
+  /**
+   * List issues due soon
+   */
+  listDueSoon: publicProcedure
+    .input(
+      z.object({
+        repoId: z.string().uuid(),
+        days: z.number().min(1).max(30).default(7),
+        limit: z.number().min(1).max(100).default(50),
+      })
+    )
+    .query(async ({ input }) => {
+      return issueModel.listDueSoon(input.repoId, input.days, input.limit);
+    }),
+
+  // ============ ESTIMATE ENDPOINTS ============
+
+  /**
+   * Set estimate for an issue
+   */
+  setEstimate: protectedProcedure
+    .input(
+      z.object({
+        issueId: z.string().uuid(),
+        estimate: z.number().int().min(0),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const issue = await issueModel.findById(input.issueId);
+
+      if (!issue) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Issue not found',
+        });
+      }
+
+      const repo = await repoModel.findById(issue.repoId);
+      const isOwner = repo?.ownerId === ctx.user.id;
+      const canWrite = isOwner || (await collaboratorModel.hasPermission(issue.repoId, ctx.user.id, 'write'));
+      const isAuthor = issue.authorId === ctx.user.id;
+
+      if (!canWrite && !isAuthor) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to update this issue',
+        });
+      }
+
+      const oldEstimate = issue.estimate;
+      const updatedIssue = await issueModel.setEstimate(input.issueId, input.estimate);
+
+      // Log activity
+      if (updatedIssue) {
+        await issueActivityModel.logEstimateChanged(
+          input.issueId,
+          ctx.user.id,
+          oldEstimate,
+          input.estimate
+        );
+      }
+
+      return updatedIssue;
+    }),
+
+  /**
+   * Clear estimate from an issue
+   */
+  clearEstimate: protectedProcedure
+    .input(
+      z.object({
+        issueId: z.string().uuid(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const issue = await issueModel.findById(input.issueId);
+
+      if (!issue) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Issue not found',
+        });
+      }
+
+      const repo = await repoModel.findById(issue.repoId);
+      const isOwner = repo?.ownerId === ctx.user.id;
+      const canWrite = isOwner || (await collaboratorModel.hasPermission(issue.repoId, ctx.user.id, 'write'));
+      const isAuthor = issue.authorId === ctx.user.id;
+
+      if (!canWrite && !isAuthor) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to update this issue',
+        });
+      }
+
+      const oldEstimate = issue.estimate;
+      const updatedIssue = await issueModel.clearEstimate(input.issueId);
+
+      if (updatedIssue && oldEstimate !== null) {
+        await issueActivityModel.logEstimateChanged(
+          input.issueId,
+          ctx.user.id,
+          oldEstimate,
+          null
+        );
+      }
+
+      return updatedIssue;
+    }),
+
+  /**
+   * Get total estimate for filtered issues
+   */
+  getTotalEstimate: publicProcedure
+    .input(
+      z.object({
+        repoId: z.string().uuid(),
+        state: z.enum(['open', 'closed']).optional(),
+        status: issueStatusSchema.optional(),
+        assigneeId: z.string().uuid().optional(),
+        projectId: z.string().uuid().optional(),
+        cycleId: z.string().uuid().optional(),
+      })
+    )
+    .query(async ({ input }) => {
+      return issueModel.getTotalEstimate(input.repoId, {
+        state: input.state,
+        status: input.status,
+        assigneeId: input.assigneeId,
+        projectId: input.projectId,
+        cycleId: input.cycleId,
+      });
+    }),
+
+  // ============ PARENT/SUB-ISSUE ENDPOINTS ============
+
+  /**
+   * Set parent issue (make this a sub-issue)
+   */
+  setParent: protectedProcedure
+    .input(
+      z.object({
+        issueId: z.string().uuid(),
+        parentId: z.string().uuid(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const issue = await issueModel.findById(input.issueId);
+
+      if (!issue) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Issue not found',
+        });
+      }
+
+      const parent = await issueModel.findById(input.parentId);
+      if (!parent) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Parent issue not found',
+        });
+      }
+
+      // Ensure both issues are in the same repo
+      if (issue.repoId !== parent.repoId) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Parent and child issues must be in the same repository',
+        });
+      }
+
+      const repo = await repoModel.findById(issue.repoId);
+      const isOwner = repo?.ownerId === ctx.user.id;
+      const canWrite = isOwner || (await collaboratorModel.hasPermission(issue.repoId, ctx.user.id, 'write'));
+
+      if (!canWrite) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to update this issue',
+        });
+      }
+
+      try {
+        const updatedIssue = await issueModel.setParent(input.issueId, input.parentId);
+
+        if (updatedIssue) {
+          await issueActivityModel.logParentSet(
+            input.issueId,
+            ctx.user.id,
+            input.parentId,
+            parent.number
+          );
+        }
+
+        return updatedIssue;
+      } catch (error: any) {
+        if (error.message?.includes('circular')) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Cannot create circular parent-child relationship',
+          });
+        }
+        throw error;
+      }
+    }),
+
+  /**
+   * Remove parent (make this a top-level issue)
+   */
+  removeParent: protectedProcedure
+    .input(
+      z.object({
+        issueId: z.string().uuid(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const issue = await issueModel.findById(input.issueId);
+
+      if (!issue) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Issue not found',
+        });
+      }
+
+      const repo = await repoModel.findById(issue.repoId);
+      const isOwner = repo?.ownerId === ctx.user.id;
+      const canWrite = isOwner || (await collaboratorModel.hasPermission(issue.repoId, ctx.user.id, 'write'));
+
+      if (!canWrite) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to update this issue',
+        });
+      }
+
+      const previousParentId = issue.parentId;
+      let previousParentNumber: number | undefined;
+
+      if (previousParentId) {
+        const previousParent = await issueModel.findById(previousParentId);
+        previousParentNumber = previousParent?.number;
+      }
+
+      const updatedIssue = await issueModel.removeParent(input.issueId);
+
+      if (updatedIssue && previousParentId) {
+        await issueActivityModel.logParentRemoved(
+          input.issueId,
+          ctx.user.id,
+          previousParentId,
+          previousParentNumber
+        );
+      }
+
+      return updatedIssue;
+    }),
+
+  /**
+   * Get sub-issues of a parent
+   */
+  getSubIssues: publicProcedure
+    .input(
+      z.object({
+        parentId: z.string().uuid(),
+      })
+    )
+    .query(async ({ input }) => {
+      return issueModel.getSubIssues(input.parentId);
+    }),
+
+  /**
+   * Get sub-issue progress
+   */
+  getSubIssueProgress: publicProcedure
+    .input(
+      z.object({
+        parentId: z.string().uuid(),
+      })
+    )
+    .query(async ({ input }) => {
+      return issueModel.getSubIssueProgress(input.parentId);
+    }),
+
+  /**
+   * Create a sub-issue
+   */
+  createSubIssue: protectedProcedure
+    .input(
+      z.object({
+        parentId: z.string().uuid(),
+        title: z.string().min(1, 'Title is required').max(256),
+        body: z.string().optional(),
+        priority: issuePrioritySchema.optional(),
+        assigneeId: z.string().uuid().optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const parent = await issueModel.findById(input.parentId);
+
+      if (!parent) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Parent issue not found',
+        });
+      }
+
+      const repo = await repoModel.findById(parent.repoId);
+      if (!repo) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Repository not found',
+        });
+      }
+
+      // Inherit some properties from parent
+      const subIssue = await issueModel.create({
+        repoId: parent.repoId,
+        title: input.title,
+        body: input.body,
+        authorId: ctx.user.id,
+        state: 'open',
+        priority: input.priority || parent.priority,
+        assigneeId: input.assigneeId,
+        parentId: input.parentId,
+        projectId: parent.projectId, // Inherit project
+        cycleId: parent.cycleId, // Inherit cycle
+      });
+
+      // Log activities
+      await issueActivityModel.logCreated(subIssue.id, ctx.user.id);
+      await issueActivityModel.logParentSet(subIssue.id, ctx.user.id, input.parentId, parent.number);
+
+      return subIssue;
+    }),
+
+  // ============ ISSUE RELATIONS ENDPOINTS ============
+
+  /**
+   * Add a relation between issues
+   */
+  addRelation: protectedProcedure
+    .input(
+      z.object({
+        issueId: z.string().uuid(),
+        relatedIssueId: z.string().uuid(),
+        type: issueRelationTypeSchema,
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const issue = await issueModel.findById(input.issueId);
+
+      if (!issue) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Issue not found',
+        });
+      }
+
+      const relatedIssue = await issueModel.findById(input.relatedIssueId);
+      if (!relatedIssue) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Related issue not found',
+        });
+      }
+
+      const repo = await repoModel.findById(issue.repoId);
+      const isOwner = repo?.ownerId === ctx.user.id;
+      const canWrite = isOwner || (await collaboratorModel.hasPermission(issue.repoId, ctx.user.id, 'write'));
+
+      if (!canWrite) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to update this issue',
+        });
+      }
+
+      try {
+        const relation = await issueRelationModel.addRelation(
+          input.issueId,
+          input.relatedIssueId,
+          input.type,
+          ctx.user.id
+        );
+
+        // Log activity
+        await issueActivityModel.logRelationAdded(
+          input.issueId,
+          ctx.user.id,
+          input.type,
+          input.relatedIssueId,
+          relatedIssue.number
+        );
+
+        return relation;
+      } catch (error: any) {
+        if (error.message?.includes('self')) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Cannot create relation to self',
+          });
+        }
+        throw error;
+      }
+    }),
+
+  /**
+   * Remove a relation between issues
+   */
+  removeRelation: protectedProcedure
+    .input(
+      z.object({
+        issueId: z.string().uuid(),
+        relatedIssueId: z.string().uuid(),
+        type: issueRelationTypeSchema,
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const issue = await issueModel.findById(input.issueId);
+
+      if (!issue) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Issue not found',
+        });
+      }
+
+      const repo = await repoModel.findById(issue.repoId);
+      const isOwner = repo?.ownerId === ctx.user.id;
+      const canWrite = isOwner || (await collaboratorModel.hasPermission(issue.repoId, ctx.user.id, 'write'));
+
+      if (!canWrite) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to update this issue',
+        });
+      }
+
+      const relatedIssue = await issueModel.findById(input.relatedIssueId);
+      const removed = await issueRelationModel.removeRelation(
+        input.issueId,
+        input.relatedIssueId,
+        input.type
+      );
+
+      if (removed) {
+        await issueActivityModel.logRelationRemoved(
+          input.issueId,
+          ctx.user.id,
+          input.type,
+          input.relatedIssueId,
+          relatedIssue?.number
+        );
+      }
+
+      return { success: removed };
+    }),
+
+  /**
+   * Get all relations for an issue
+   */
+  getRelations: publicProcedure
+    .input(
+      z.object({
+        issueId: z.string().uuid(),
+      })
+    )
+    .query(async ({ input }) => {
+      return issueRelationModel.getRelations(input.issueId);
+    }),
+
+  /**
+   * Check if an issue is blocked
+   */
+  isBlocked: publicProcedure
+    .input(
+      z.object({
+        issueId: z.string().uuid(),
+      })
+    )
+    .query(async ({ input }) => {
+      return issueRelationModel.isBlocked(input.issueId);
+    }),
+
+  /**
+   * Mark an issue as duplicate
+   */
+  markAsDuplicate: protectedProcedure
+    .input(
+      z.object({
+        issueId: z.string().uuid(),
+        canonicalIssueId: z.string().uuid(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const issue = await issueModel.findById(input.issueId);
+
+      if (!issue) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Issue not found',
+        });
+      }
+
+      const canonical = await issueModel.findById(input.canonicalIssueId);
+      if (!canonical) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Canonical issue not found',
+        });
+      }
+
+      const repo = await repoModel.findById(issue.repoId);
+      const isOwner = repo?.ownerId === ctx.user.id;
+      const canWrite = isOwner || (await collaboratorModel.hasPermission(issue.repoId, ctx.user.id, 'write'));
+
+      if (!canWrite) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to update this issue',
+        });
+      }
+
+      const relation = await issueRelationModel.markAsDuplicate(
+        input.issueId,
+        input.canonicalIssueId,
+        ctx.user.id
+      );
+
+      await issueActivityModel.logRelationAdded(
+        input.issueId,
+        ctx.user.id,
+        'duplicates',
+        input.canonicalIssueId,
+        canonical.number
+      );
+
+      return relation;
+    }),
+
+  // ============ ACTIVITY LOG ENDPOINTS ============
+
+  /**
+   * Get activity log for an issue
+   */
+  getActivity: publicProcedure
+    .input(
+      z.object({
+        issueId: z.string().uuid(),
+        limit: z.number().min(1).max(100).default(50),
+        offset: z.number().min(0).default(0),
+      })
+    )
+    .query(async ({ input }) => {
+      return issueActivityModel.listByIssue(input.issueId, {
+        limit: input.limit,
+        offset: input.offset,
+      });
+    }),
+
+  /**
+   * Get activity log for a repository
+   */
+  getRepoActivity: publicProcedure
+    .input(
+      z.object({
+        repoId: z.string().uuid(),
+        limit: z.number().min(1).max(100).default(50),
+        offset: z.number().min(0).default(0),
+      })
+    )
+    .query(async ({ input }) => {
+      return issueActivityModel.listByRepo(input.repoId, {
+        limit: input.limit,
+        offset: input.offset,
+      });
+    }),
+
+  // ============ TRIAGE ENDPOINTS ============
+
+  /**
+   * List issues in triage
+   */
+  listTriage: publicProcedure
+    .input(
+      z.object({
+        repoId: z.string().uuid(),
+        limit: z.number().min(1).max(100).default(50),
+      })
+    )
+    .query(async ({ input }) => {
+      return issueModel.listTriage(input.repoId, input.limit);
+    }),
+
+  /**
+   * Accept triage item (move to backlog or specified status)
+   */
+  acceptTriage: protectedProcedure
+    .input(
+      z.object({
+        issueId: z.string().uuid(),
+        targetStatus: issueStatusSchema.default('backlog'),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const issue = await issueModel.findById(input.issueId);
+
+      if (!issue) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Issue not found',
+        });
+      }
+
+      if (issue.status !== 'triage') {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Issue is not in triage',
+        });
+      }
+
+      const repo = await repoModel.findById(issue.repoId);
+      const isOwner = repo?.ownerId === ctx.user.id;
+      const canWrite = isOwner || (await collaboratorModel.hasPermission(issue.repoId, ctx.user.id, 'write'));
+
+      if (!canWrite) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to triage issues',
+        });
+      }
+
+      const updatedIssue = await issueModel.acceptTriage(input.issueId, input.targetStatus);
+
+      if (updatedIssue) {
+        await issueActivityModel.logStatusChanged(
+          input.issueId,
+          ctx.user.id,
+          'triage',
+          input.targetStatus
+        );
+      }
+
+      return updatedIssue;
+    }),
+
+  /**
+   * Reject triage item (close as canceled)
+   */
+  rejectTriage: protectedProcedure
+    .input(
+      z.object({
+        issueId: z.string().uuid(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const issue = await issueModel.findById(input.issueId);
+
+      if (!issue) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Issue not found',
+        });
+      }
+
+      if (issue.status !== 'triage') {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Issue is not in triage',
+        });
+      }
+
+      const repo = await repoModel.findById(issue.repoId);
+      const isOwner = repo?.ownerId === ctx.user.id;
+      const canWrite = isOwner || (await collaboratorModel.hasPermission(issue.repoId, ctx.user.id, 'write'));
+
+      if (!canWrite) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to triage issues',
+        });
+      }
+
+      const updatedIssue = await issueModel.rejectTriage(input.issueId, ctx.user.id);
+
+      if (updatedIssue) {
+        await issueActivityModel.logStatusChanged(input.issueId, ctx.user.id, 'triage', 'canceled');
+        await issueActivityModel.logClosed(input.issueId, ctx.user.id);
+      }
+
+      return updatedIssue;
+    }),
+
+  // ============ TEMPLATE ENDPOINTS ============
+
+  /**
+   * List templates for a repository
+   */
+  listTemplates: publicProcedure
+    .input(
+      z.object({
+        repoId: z.string().uuid(),
+      })
+    )
+    .query(async ({ input }) => {
+      return issueTemplateModel.listByRepo(input.repoId);
+    }),
+
+  /**
+   * Get a template by ID
+   */
+  getTemplate: publicProcedure
+    .input(
+      z.object({
+        templateId: z.string().uuid(),
+      })
+    )
+    .query(async ({ input }) => {
+      const template = await issueTemplateModel.findById(input.templateId);
+      if (!template) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Template not found',
+        });
+      }
+      return template;
+    }),
+
+  /**
+   * Create a template
+   */
+  createTemplate: protectedProcedure
+    .input(
+      z.object({
+        repoId: z.string().uuid(),
+        name: z.string().min(1, 'Name is required').max(100),
+        description: z.string().max(500).optional(),
+        titleTemplate: z.string().max(256).optional(),
+        bodyTemplate: z.string().optional(),
+        defaultLabels: z.array(z.string().uuid()).optional(),
+        defaultAssigneeId: z.string().uuid().optional(),
+        defaultPriority: issuePrioritySchema.optional(),
+        defaultStatus: issueStatusSchema.optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const repo = await repoModel.findById(input.repoId);
+
+      if (!repo) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Repository not found',
+        });
+      }
+
+      const isOwner = repo.ownerId === ctx.user.id;
+      const canWrite = isOwner || (await collaboratorModel.hasPermission(input.repoId, ctx.user.id, 'write'));
+
+      if (!canWrite) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to create templates',
+        });
+      }
+
+      return issueTemplateModel.create({
+        repoId: input.repoId,
+        name: input.name,
+        description: input.description,
+        titleTemplate: input.titleTemplate,
+        bodyTemplate: input.bodyTemplate,
+        defaultLabels: input.defaultLabels ? JSON.stringify(input.defaultLabels) : undefined,
+        defaultAssigneeId: input.defaultAssigneeId,
+        defaultPriority: input.defaultPriority,
+        defaultStatus: input.defaultStatus,
+      });
+    }),
+
+  /**
+   * Update a template
+   */
+  updateTemplate: protectedProcedure
+    .input(
+      z.object({
+        templateId: z.string().uuid(),
+        name: z.string().min(1).max(100).optional(),
+        description: z.string().max(500).optional(),
+        titleTemplate: z.string().max(256).optional(),
+        bodyTemplate: z.string().optional(),
+        defaultLabels: z.array(z.string().uuid()).optional(),
+        defaultAssigneeId: z.string().uuid().nullable().optional(),
+        defaultPriority: issuePrioritySchema.optional(),
+        defaultStatus: issueStatusSchema.optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const template = await issueTemplateModel.findById(input.templateId);
+
+      if (!template) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Template not found',
+        });
+      }
+
+      const repo = await repoModel.findById(template.repoId);
+      const isOwner = repo?.ownerId === ctx.user.id;
+      const canWrite = isOwner || (await collaboratorModel.hasPermission(template.repoId, ctx.user.id, 'write'));
+
+      if (!canWrite) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to update templates',
+        });
+      }
+
+      const updates: any = {};
+      if (input.name !== undefined) updates.name = input.name;
+      if (input.description !== undefined) updates.description = input.description;
+      if (input.titleTemplate !== undefined) updates.titleTemplate = input.titleTemplate;
+      if (input.bodyTemplate !== undefined) updates.bodyTemplate = input.bodyTemplate;
+      if (input.defaultLabels !== undefined) updates.defaultLabels = JSON.stringify(input.defaultLabels);
+      if (input.defaultAssigneeId !== undefined) updates.defaultAssigneeId = input.defaultAssigneeId;
+      if (input.defaultPriority !== undefined) updates.defaultPriority = input.defaultPriority;
+      if (input.defaultStatus !== undefined) updates.defaultStatus = input.defaultStatus;
+
+      return issueTemplateModel.update(input.templateId, updates);
+    }),
+
+  /**
+   * Delete a template
+   */
+  deleteTemplate: protectedProcedure
+    .input(
+      z.object({
+        templateId: z.string().uuid(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const template = await issueTemplateModel.findById(input.templateId);
+
+      if (!template) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Template not found',
+        });
+      }
+
+      const repo = await repoModel.findById(template.repoId);
+      const isOwner = repo?.ownerId === ctx.user.id;
+      const isAdmin = await collaboratorModel.hasPermission(template.repoId, ctx.user.id, 'admin');
+
+      if (!isOwner && !isAdmin) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to delete templates',
+        });
+      }
+
+      return issueTemplateModel.delete(input.templateId);
+    }),
+
+  // ============ VIEW ENDPOINTS ============
+
+  /**
+   * List views for a repository
+   */
+  listViews: publicProcedure
+    .input(
+      z.object({
+        repoId: z.string().uuid(),
+        userId: z.string().uuid(),
+      })
+    )
+    .query(async ({ input }) => {
+      return issueViewModel.listByRepo(input.repoId, input.userId);
+    }),
+
+  /**
+   * Get a view by ID
+   */
+  getView: publicProcedure
+    .input(
+      z.object({
+        viewId: z.string().uuid(),
+      })
+    )
+    .query(async ({ input }) => {
+      const view = await issueViewModel.findById(input.viewId);
+      if (!view) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'View not found',
+        });
+      }
+      return {
+        ...view,
+        filters: issueViewModel.parseFilters(view),
+        displayOptions: issueViewModel.parseDisplayOptions(view),
+      };
+    }),
+
+  /**
+   * Create a view
+   */
+  createView: protectedProcedure
+    .input(
+      z.object({
+        repoId: z.string().uuid(),
+        name: z.string().min(1, 'Name is required').max(100),
+        description: z.string().max(500).optional(),
+        filters: z.object({
+          state: z.enum(['open', 'closed', 'all']).optional(),
+          status: z.array(z.string()).optional(),
+          priority: z.array(z.string()).optional(),
+          assigneeId: z.string().optional(),
+          authorId: z.string().optional(),
+          projectId: z.string().optional(),
+          cycleId: z.string().optional(),
+          labels: z.array(z.string()).optional(),
+          hasParent: z.boolean().optional(),
+          hasDueDate: z.boolean().optional(),
+          isOverdue: z.boolean().optional(),
+        }),
+        displayOptions: z.object({
+          viewType: z.enum(['list', 'board', 'timeline']).default('list'),
+          groupBy: z.enum(['status', 'priority', 'assignee', 'project', 'cycle', 'none']).optional(),
+          sortBy: z.enum(['created', 'updated', 'priority', 'dueDate']).optional(),
+          sortOrder: z.enum(['asc', 'desc']).optional(),
+          showSubIssues: z.boolean().optional(),
+          showCompletedIssues: z.boolean().optional(),
+        }).optional(),
+        isShared: z.boolean().default(false),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      return issueViewModel.create({
+        repoId: input.repoId,
+        creatorId: ctx.user.id,
+        name: input.name,
+        description: input.description,
+        filters: issueViewModel.serializeFilters(input.filters),
+        displayOptions: input.displayOptions 
+          ? issueViewModel.serializeDisplayOptions(input.displayOptions)
+          : undefined,
+        isShared: input.isShared,
+      });
+    }),
+
+  /**
+   * Update a view
+   */
+  updateView: protectedProcedure
+    .input(
+      z.object({
+        viewId: z.string().uuid(),
+        name: z.string().min(1).max(100).optional(),
+        description: z.string().max(500).optional(),
+        filters: z.object({
+          state: z.enum(['open', 'closed', 'all']).optional(),
+          status: z.array(z.string()).optional(),
+          priority: z.array(z.string()).optional(),
+          assigneeId: z.string().optional(),
+          authorId: z.string().optional(),
+          projectId: z.string().optional(),
+          cycleId: z.string().optional(),
+          labels: z.array(z.string()).optional(),
+          hasParent: z.boolean().optional(),
+          hasDueDate: z.boolean().optional(),
+          isOverdue: z.boolean().optional(),
+        }).optional(),
+        displayOptions: z.object({
+          viewType: z.enum(['list', 'board', 'timeline']),
+          groupBy: z.enum(['status', 'priority', 'assignee', 'project', 'cycle', 'none']).optional(),
+          sortBy: z.enum(['created', 'updated', 'priority', 'dueDate']).optional(),
+          sortOrder: z.enum(['asc', 'desc']).optional(),
+          showSubIssues: z.boolean().optional(),
+          showCompletedIssues: z.boolean().optional(),
+        }).optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const view = await issueViewModel.findById(input.viewId);
+
+      if (!view) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'View not found',
+        });
+      }
+
+      // Only creator can update
+      if (view.creatorId !== ctx.user.id) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You can only update your own views',
+        });
+      }
+
+      const updates: any = {};
+      if (input.name !== undefined) updates.name = input.name;
+      if (input.description !== undefined) updates.description = input.description;
+      if (input.filters !== undefined) updates.filters = issueViewModel.serializeFilters(input.filters);
+      if (input.displayOptions !== undefined) {
+        updates.displayOptions = issueViewModel.serializeDisplayOptions(input.displayOptions);
+      }
+
+      return issueViewModel.update(input.viewId, updates);
+    }),
+
+  /**
+   * Delete a view
+   */
+  deleteView: protectedProcedure
+    .input(
+      z.object({
+        viewId: z.string().uuid(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const view = await issueViewModel.findById(input.viewId);
+
+      if (!view) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'View not found',
+        });
+      }
+
+      // Only creator can delete
+      if (view.creatorId !== ctx.user.id) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You can only delete your own views',
+        });
+      }
+
+      return issueViewModel.delete(input.viewId);
+    }),
+
+  /**
+   * Share/unshare a view
+   */
+  shareView: protectedProcedure
+    .input(
+      z.object({
+        viewId: z.string().uuid(),
+        isShared: z.boolean(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const view = await issueViewModel.findById(input.viewId);
+
+      if (!view) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'View not found',
+        });
+      }
+
+      if (view.creatorId !== ctx.user.id) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You can only share your own views',
+        });
+      }
+
+      return input.isShared 
+        ? issueViewModel.share(input.viewId)
+        : issueViewModel.unshare(input.viewId);
+    }),
+
+  /**
+   * Duplicate a view
+   */
+  duplicateView: protectedProcedure
+    .input(
+      z.object({
+        viewId: z.string().uuid(),
+        newName: z.string().min(1).max(100).optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const view = await issueViewModel.findById(input.viewId);
+
+      if (!view) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'View not found',
+        });
+      }
+
+      return issueViewModel.duplicate(input.viewId, ctx.user.id, input.newName);
+    }),
+
+  // ============ PROJECT/CYCLE ASSIGNMENT ============
+
+  /**
+   * Assign issue to a project
+   */
+  assignToProject: protectedProcedure
+    .input(
+      z.object({
+        issueId: z.string().uuid(),
+        projectId: z.string().uuid().nullable(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const issue = await issueModel.findById(input.issueId);
+
+      if (!issue) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Issue not found',
+        });
+      }
+
+      const repo = await repoModel.findById(issue.repoId);
+      const isOwner = repo?.ownerId === ctx.user.id;
+      const canWrite = isOwner || (await collaboratorModel.hasPermission(issue.repoId, ctx.user.id, 'write'));
+
+      if (!canWrite) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to update this issue',
+        });
+      }
+
+      const oldProjectId = issue.projectId;
+      const updatedIssue = await issueModel.assignToProject(input.issueId, input.projectId);
+
+      if (updatedIssue) {
+        await issueActivityModel.logProjectChanged(
+          input.issueId,
+          ctx.user.id,
+          oldProjectId,
+          input.projectId
+        );
+      }
+
+      return updatedIssue;
+    }),
+
+  /**
+   * Assign issue to a cycle
+   */
+  assignToCycle: protectedProcedure
+    .input(
+      z.object({
+        issueId: z.string().uuid(),
+        cycleId: z.string().uuid().nullable(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const issue = await issueModel.findById(input.issueId);
+
+      if (!issue) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Issue not found',
+        });
+      }
+
+      const repo = await repoModel.findById(issue.repoId);
+      const isOwner = repo?.ownerId === ctx.user.id;
+      const canWrite = isOwner || (await collaboratorModel.hasPermission(issue.repoId, ctx.user.id, 'write'));
+
+      if (!canWrite) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to update this issue',
+        });
+      }
+
+      const oldCycleId = issue.cycleId;
+      const updatedIssue = await issueModel.assignToCycle(input.issueId, input.cycleId);
+
+      if (updatedIssue) {
+        await issueActivityModel.logCycleChanged(
+          input.issueId,
+          ctx.user.id,
+          oldCycleId,
+          input.cycleId
+        );
+      }
+
+      return updatedIssue;
+    }),
 });

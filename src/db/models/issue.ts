@@ -1,4 +1,4 @@
-import { eq, and, desc, sql, inArray } from 'drizzle-orm';
+import { eq, and, desc, asc, sql, inArray, lt, gt, gte, lte, isNull, isNotNull, count } from 'drizzle-orm';
 import { getDb } from '../index';
 import {
   issues,
@@ -13,12 +13,14 @@ import {
   type Label,
   type NewLabel,
   type IssueStatus,
+  type IssuePriority,
 } from '../schema';
 import { user } from '../auth-schema';
 import { repoModel } from './repository';
 
-// Issue status values for Kanban board
+// Issue status values for Kanban board (includes triage)
 export const ISSUE_STATUSES: IssueStatus[] = [
+  'triage',
   'backlog',
   'todo',
   'in_progress',
@@ -26,6 +28,24 @@ export const ISSUE_STATUSES: IssueStatus[] = [
   'done',
   'canceled',
 ];
+
+// Issue priority values (Linear-style)
+export const ISSUE_PRIORITIES: IssuePriority[] = [
+  'none',
+  'low',
+  'medium',
+  'high',
+  'urgent',
+];
+
+// Priority display configuration
+export const PRIORITY_CONFIG: Record<IssuePriority, { label: string; color: string; icon: string }> = {
+  none: { label: 'No priority', color: '6b7280', icon: '○' },
+  low: { label: 'Low', color: '3b82f6', icon: '◔' },
+  medium: { label: 'Medium', color: 'eab308', icon: '◑' },
+  high: { label: 'High', color: 'f97316', icon: '◕' },
+  urgent: { label: 'Urgent', color: 'ef4444', icon: '●' },
+};
 
 // Author type from better-auth user table
 type Author = {
@@ -134,17 +154,26 @@ export const issueModel = {
   },
 
   /**
-   * List issues by repo
+   * List issues by repo with comprehensive filtering
    */
   async listByRepo(
     repoId: string,
     options: {
       state?: 'open' | 'closed';
       status?: IssueStatus;
+      priority?: IssuePriority;
       authorId?: string;
       assigneeId?: string;
+      projectId?: string;
+      cycleId?: string;
+      parentId?: string;
+      hasParent?: boolean;
+      hasDueDate?: boolean;
+      isOverdue?: boolean;
       limit?: number;
       offset?: number;
+      sortBy?: 'created' | 'updated' | 'priority' | 'dueDate';
+      sortOrder?: 'asc' | 'desc';
     } = {}
   ): Promise<Issue[]> {
     const db = getDb();
@@ -158,6 +187,10 @@ export const issueModel = {
       conditions.push(eq(issues.status, options.status));
     }
 
+    if (options.priority) {
+      conditions.push(eq(issues.priority, options.priority));
+    }
+
     if (options.authorId) {
       conditions.push(eq(issues.authorId, options.authorId));
     }
@@ -166,11 +199,64 @@ export const issueModel = {
       conditions.push(eq(issues.assigneeId, options.assigneeId));
     }
 
+    if (options.projectId) {
+      conditions.push(eq(issues.projectId, options.projectId));
+    }
+
+    if (options.cycleId) {
+      conditions.push(eq(issues.cycleId, options.cycleId));
+    }
+
+    if (options.parentId) {
+      conditions.push(eq(issues.parentId, options.parentId));
+    }
+
+    if (options.hasParent === true) {
+      conditions.push(isNotNull(issues.parentId));
+    } else if (options.hasParent === false) {
+      conditions.push(isNull(issues.parentId));
+    }
+
+    if (options.hasDueDate === true) {
+      conditions.push(isNotNull(issues.dueDate));
+    } else if (options.hasDueDate === false) {
+      conditions.push(isNull(issues.dueDate));
+    }
+
+    if (options.isOverdue) {
+      conditions.push(isNotNull(issues.dueDate));
+      conditions.push(lt(issues.dueDate, new Date()));
+      conditions.push(eq(issues.state, 'open'));
+    }
+
+    // Determine sort order
+    const sortOrder = options.sortOrder === 'asc' ? asc : desc;
+    let orderByColumn;
+    switch (options.sortBy) {
+      case 'updated':
+        orderByColumn = sortOrder(issues.updatedAt);
+        break;
+      case 'priority':
+        // Custom priority ordering: urgent > high > medium > low > none
+        orderByColumn = sql`CASE ${issues.priority} 
+          WHEN 'urgent' THEN 1 
+          WHEN 'high' THEN 2 
+          WHEN 'medium' THEN 3 
+          WHEN 'low' THEN 4 
+          ELSE 5 END ${options.sortOrder === 'desc' ? sql`DESC` : sql`ASC`}`;
+        break;
+      case 'dueDate':
+        orderByColumn = sortOrder(issues.dueDate);
+        break;
+      default:
+        orderByColumn = sortOrder(issues.createdAt);
+    }
+
     let query = db
       .select()
       .from(issues)
       .where(and(...conditions))
-      .orderBy(desc(issues.createdAt));
+      .orderBy(orderByColumn);
 
     if (options.limit) {
       query = query.limit(options.limit) as typeof query;
@@ -247,6 +333,7 @@ export const issueModel = {
 
     // Group by status (default to 'backlog' for issues without status)
     const grouped: Record<IssueStatus, Issue[]> = {
+      triage: [],
       backlog: [],
       todo: [],
       in_progress: [],
@@ -439,6 +526,445 @@ export const issueModel = {
       .set({ assigneeId: null, updatedAt: new Date() })
       .where(eq(issues.id, id))
       .returning();
+    return issue;
+  },
+
+  // ============ PRIORITY METHODS ============
+
+  /**
+   * Update issue priority
+   */
+  async updatePriority(id: string, priority: IssuePriority): Promise<Issue | undefined> {
+    const db = getDb();
+    const [issue] = await db
+      .update(issues)
+      .set({ priority, updatedAt: new Date() })
+      .where(eq(issues.id, id))
+      .returning();
+    return issue;
+  },
+
+  /**
+   * List issues by priority
+   */
+  async listByPriority(
+    repoId: string,
+    priority: IssuePriority,
+    options: { state?: 'open' | 'closed'; limit?: number } = {}
+  ): Promise<Issue[]> {
+    const db = getDb();
+    const conditions = [eq(issues.repoId, repoId), eq(issues.priority, priority)];
+    
+    if (options.state) {
+      conditions.push(eq(issues.state, options.state));
+    }
+
+    let query = db
+      .select()
+      .from(issues)
+      .where(and(...conditions))
+      .orderBy(desc(issues.createdAt));
+
+    if (options.limit) {
+      query = query.limit(options.limit) as typeof query;
+    }
+
+    return query;
+  },
+
+  // ============ DUE DATE METHODS ============
+
+  /**
+   * Set due date for an issue
+   */
+  async setDueDate(id: string, dueDate: Date): Promise<Issue | undefined> {
+    const db = getDb();
+    const [issue] = await db
+      .update(issues)
+      .set({ dueDate, updatedAt: new Date() })
+      .where(eq(issues.id, id))
+      .returning();
+    return issue;
+  },
+
+  /**
+   * Clear due date from an issue
+   */
+  async clearDueDate(id: string): Promise<Issue | undefined> {
+    const db = getDb();
+    const [issue] = await db
+      .update(issues)
+      .set({ dueDate: null, updatedAt: new Date() })
+      .where(eq(issues.id, id))
+      .returning();
+    return issue;
+  },
+
+  /**
+   * List overdue issues (due date in the past, still open)
+   */
+  async listOverdue(repoId: string, limit?: number): Promise<Issue[]> {
+    const db = getDb();
+    const now = new Date();
+
+    let query = db
+      .select()
+      .from(issues)
+      .where(
+        and(
+          eq(issues.repoId, repoId),
+          eq(issues.state, 'open'),
+          isNotNull(issues.dueDate),
+          lt(issues.dueDate, now)
+        )
+      )
+      .orderBy(asc(issues.dueDate));
+
+    if (limit) {
+      query = query.limit(limit) as typeof query;
+    }
+
+    return query;
+  },
+
+  /**
+   * List issues due within N days
+   */
+  async listDueSoon(repoId: string, days: number = 7, limit?: number): Promise<Issue[]> {
+    const db = getDb();
+    const now = new Date();
+    const futureDate = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+
+    let query = db
+      .select()
+      .from(issues)
+      .where(
+        and(
+          eq(issues.repoId, repoId),
+          eq(issues.state, 'open'),
+          isNotNull(issues.dueDate),
+          gte(issues.dueDate, now),
+          lte(issues.dueDate, futureDate)
+        )
+      )
+      .orderBy(asc(issues.dueDate));
+
+    if (limit) {
+      query = query.limit(limit) as typeof query;
+    }
+
+    return query;
+  },
+
+  // ============ ESTIMATE METHODS ============
+
+  /**
+   * Set estimate for an issue
+   */
+  async setEstimate(id: string, estimate: number): Promise<Issue | undefined> {
+    const db = getDb();
+    const [issue] = await db
+      .update(issues)
+      .set({ estimate, updatedAt: new Date() })
+      .where(eq(issues.id, id))
+      .returning();
+    return issue;
+  },
+
+  /**
+   * Clear estimate from an issue
+   */
+  async clearEstimate(id: string): Promise<Issue | undefined> {
+    const db = getDb();
+    const [issue] = await db
+      .update(issues)
+      .set({ estimate: null, updatedAt: new Date() })
+      .where(eq(issues.id, id))
+      .returning();
+    return issue;
+  },
+
+  /**
+   * Get total estimate for filtered issues
+   */
+  async getTotalEstimate(
+    repoId: string,
+    options: {
+      state?: 'open' | 'closed';
+      status?: IssueStatus;
+      assigneeId?: string;
+      projectId?: string;
+      cycleId?: string;
+    } = {}
+  ): Promise<number> {
+    const db = getDb();
+    const conditions = [eq(issues.repoId, repoId), isNotNull(issues.estimate)];
+
+    if (options.state) {
+      conditions.push(eq(issues.state, options.state));
+    }
+    if (options.status) {
+      conditions.push(eq(issues.status, options.status));
+    }
+    if (options.assigneeId) {
+      conditions.push(eq(issues.assigneeId, options.assigneeId));
+    }
+    if (options.projectId) {
+      conditions.push(eq(issues.projectId, options.projectId));
+    }
+    if (options.cycleId) {
+      conditions.push(eq(issues.cycleId, options.cycleId));
+    }
+
+    const result = await db
+      .select({ total: sql<number>`COALESCE(SUM(${issues.estimate}), 0)` })
+      .from(issues)
+      .where(and(...conditions));
+
+    return Number(result[0]?.total ?? 0);
+  },
+
+  // ============ PARENT/SUB-ISSUE METHODS ============
+
+  /**
+   * Set parent issue (makes this a sub-issue)
+   */
+  async setParent(issueId: string, parentId: string): Promise<Issue | undefined> {
+    const db = getDb();
+    
+    // Prevent circular references
+    const parent = await this.findById(parentId);
+    if (parent?.parentId === issueId) {
+      throw new Error('Cannot create circular parent-child relationship');
+    }
+
+    const [issue] = await db
+      .update(issues)
+      .set({ parentId, updatedAt: new Date() })
+      .where(eq(issues.id, issueId))
+      .returning();
+    return issue;
+  },
+
+  /**
+   * Remove parent (makes this a top-level issue)
+   */
+  async removeParent(issueId: string): Promise<Issue | undefined> {
+    const db = getDb();
+    const [issue] = await db
+      .update(issues)
+      .set({ parentId: null, updatedAt: new Date() })
+      .where(eq(issues.id, issueId))
+      .returning();
+    return issue;
+  },
+
+  /**
+   * Get sub-issues of a parent
+   */
+  async getSubIssues(parentId: string): Promise<Issue[]> {
+    const db = getDb();
+    return db
+      .select()
+      .from(issues)
+      .where(eq(issues.parentId, parentId))
+      .orderBy(desc(issues.createdAt));
+  },
+
+  /**
+   * Get parent issue
+   */
+  async getParent(issueId: string): Promise<Issue | undefined> {
+    const issue = await this.findById(issueId);
+    if (!issue?.parentId) return undefined;
+    return this.findById(issue.parentId);
+  },
+
+  /**
+   * Get sub-issue count
+   */
+  async getSubIssueCount(parentId: string): Promise<number> {
+    const db = getDb();
+    const result = await db
+      .select({ count: count() })
+      .from(issues)
+      .where(eq(issues.parentId, parentId));
+    return Number(result[0]?.count ?? 0);
+  },
+
+  /**
+   * Get sub-issue progress
+   */
+  async getSubIssueProgress(parentId: string): Promise<{ total: number; completed: number; percentage: number }> {
+    const db = getDb();
+    
+    const subIssues = await this.getSubIssues(parentId);
+    const total = subIssues.length;
+    const completed = subIssues.filter(i => i.state === 'closed').length;
+    const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+    return { total, completed, percentage };
+  },
+
+  /**
+   * Check if all sub-issues are complete
+   */
+  async areAllSubIssuesComplete(parentId: string): Promise<boolean> {
+    const { total, completed } = await this.getSubIssueProgress(parentId);
+    return total > 0 && total === completed;
+  },
+
+  /**
+   * Close all sub-issues when parent is closed
+   */
+  async closeSubIssues(parentId: string, closedById: string): Promise<number> {
+    const db = getDb();
+    const now = new Date();
+
+    const result = await db
+      .update(issues)
+      .set({
+        state: 'closed',
+        status: 'done',
+        closedAt: now,
+        closedById,
+        updatedAt: now,
+      })
+      .where(and(eq(issues.parentId, parentId), eq(issues.state, 'open')))
+      .returning();
+
+    return result.length;
+  },
+
+  // ============ PROJECT/CYCLE ASSIGNMENT ============
+
+  /**
+   * Assign issue to a project
+   */
+  async assignToProject(issueId: string, projectId: string | null): Promise<Issue | undefined> {
+    const db = getDb();
+    const [issue] = await db
+      .update(issues)
+      .set({ projectId, updatedAt: new Date() })
+      .where(eq(issues.id, issueId))
+      .returning();
+    return issue;
+  },
+
+  /**
+   * Assign issue to a cycle
+   */
+  async assignToCycle(issueId: string, cycleId: string | null): Promise<Issue | undefined> {
+    const db = getDb();
+    const [issue] = await db
+      .update(issues)
+      .set({ cycleId, updatedAt: new Date() })
+      .where(eq(issues.id, issueId))
+      .returning();
+    return issue;
+  },
+
+  /**
+   * List issues by project
+   */
+  async listByProject(
+    projectId: string,
+    options: { state?: 'open' | 'closed'; limit?: number } = {}
+  ): Promise<Issue[]> {
+    const db = getDb();
+    const conditions = [eq(issues.projectId, projectId)];
+
+    if (options.state) {
+      conditions.push(eq(issues.state, options.state));
+    }
+
+    let query = db
+      .select()
+      .from(issues)
+      .where(and(...conditions))
+      .orderBy(desc(issues.createdAt));
+
+    if (options.limit) {
+      query = query.limit(options.limit) as typeof query;
+    }
+
+    return query;
+  },
+
+  /**
+   * List issues by cycle
+   */
+  async listByCycle(
+    cycleId: string,
+    options: { state?: 'open' | 'closed'; limit?: number } = {}
+  ): Promise<Issue[]> {
+    const db = getDb();
+    const conditions = [eq(issues.cycleId, cycleId)];
+
+    if (options.state) {
+      conditions.push(eq(issues.state, options.state));
+    }
+
+    let query = db
+      .select()
+      .from(issues)
+      .where(and(...conditions))
+      .orderBy(desc(issues.createdAt));
+
+    if (options.limit) {
+      query = query.limit(options.limit) as typeof query;
+    }
+
+    return query;
+  },
+
+  // ============ TRIAGE METHODS ============
+
+  /**
+   * List issues in triage
+   */
+  async listTriage(repoId: string, limit?: number): Promise<Issue[]> {
+    const db = getDb();
+    
+    let query = db
+      .select()
+      .from(issues)
+      .where(and(eq(issues.repoId, repoId), eq(issues.status, 'triage')))
+      .orderBy(desc(issues.createdAt));
+
+    if (limit) {
+      query = query.limit(limit) as typeof query;
+    }
+
+    return query;
+  },
+
+  /**
+   * Accept triage item (move to backlog or specified status)
+   */
+  async acceptTriage(id: string, targetStatus: IssueStatus = 'backlog'): Promise<Issue | undefined> {
+    return this.updateStatus(id, targetStatus);
+  },
+
+  /**
+   * Reject triage item (close as canceled)
+   */
+  async rejectTriage(id: string, closedById: string): Promise<Issue | undefined> {
+    const db = getDb();
+    const now = new Date();
+
+    const [issue] = await db
+      .update(issues)
+      .set({
+        status: 'canceled',
+        state: 'closed',
+        closedAt: now,
+        closedById,
+        updatedAt: now,
+      })
+      .where(eq(issues.id, id))
+      .returning();
+
     return issue;
   },
 };
