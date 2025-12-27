@@ -61,10 +61,9 @@
       "group": "Getting Started",
       "pages": [
         "introduction",
-        "getting-started",
-        "why-wit",
         "quickstart",
         "installation",
+        "why-wit",
         "contributing"
       ]
     },
