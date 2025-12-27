@@ -16,6 +16,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Loading } from '@/components/ui/loading';
 import { EmptyState } from '@/components/ui/empty-state';
 import { RepoLayout } from '../components/repo-layout';
@@ -26,13 +27,13 @@ import { formatDate, cn } from '@/lib/utils';
 interface MilestoneFormData {
   title: string;
   description: string;
-  dueDate: string;
+  dueDate: Date | undefined;
 }
 
 const DEFAULT_FORM: MilestoneFormData = {
   title: '',
   description: '',
-  dueDate: '',
+  dueDate: undefined,
 };
 
 export function MilestonesPage() {
@@ -116,9 +117,7 @@ export function MilestonesPage() {
     setFormData({
       title: milestone.title,
       description: milestone.description || '',
-      dueDate: milestone.dueDate
-        ? new Date(milestone.dueDate).toISOString().split('T')[0]
-        : '',
+      dueDate: milestone.dueDate ? new Date(milestone.dueDate) : undefined,
     });
     setIsDialogOpen(true);
   };
@@ -138,7 +137,7 @@ export function MilestonesPage() {
       repoId: repoData.repo.id,
       title: formData.title.trim(),
       description: formData.description.trim() || undefined,
-      dueDate: formData.dueDate ? new Date(formData.dueDate) : undefined,
+      dueDate: formData.dueDate,
     };
 
     if (editingMilestone) {
@@ -259,11 +258,11 @@ export function MilestonesPage() {
 
                     <div className="space-y-2">
                       <Label htmlFor="dueDate">Due date (optional)</Label>
-                      <Input
-                        id="dueDate"
-                        type="date"
-                        value={formData.dueDate}
-                        onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                      <DatePicker
+                        date={formData.dueDate}
+                        onDateChange={(date) => setFormData({ ...formData, dueDate: date })}
+                        placeholder="Select due date"
+                        className="w-full"
                       />
                     </div>
 
