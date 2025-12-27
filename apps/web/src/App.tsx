@@ -27,6 +27,8 @@ import { WorkflowsPage } from './routes/repo/workflows';
 import { SettingsPage } from './routes/settings';
 import { NewRepoPage } from './routes/new';
 import { SearchPage } from './routes/search';
+import { PullsInboxPage } from './routes/pulls';
+import { IssuesInboxPage } from './routes/issues';
 
 export function App() {
   return (
@@ -46,6 +48,8 @@ export function App() {
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/new" element={<NewRepoPage />} />
             <Route path="/search" element={<SearchPage />} />
+            <Route path="/pulls" element={<PullsInboxPage />} />
+            <Route path="/issues" element={<IssuesInboxPage />} />
 
             {/* User/Org profile */}
             <Route path="/:owner" element={<OwnerPage />} />

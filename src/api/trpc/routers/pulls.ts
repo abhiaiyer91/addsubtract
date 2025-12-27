@@ -1543,9 +1543,15 @@ export const pullsRouter = router({
   /**
    * Get inbox summary - counts for each inbox section
    */
-  inboxSummary: protectedProcedure.query(async ({ ctx }) => {
-    return inboxModel.getSummary(ctx.user.id);
-  }),
+  inboxSummary: protectedProcedure
+    .input(
+      z.object({
+        repoId: z.string().uuid().optional(),
+      }).optional()
+    )
+    .query(async ({ input, ctx }) => {
+      return inboxModel.getSummary(ctx.user.id, input?.repoId);
+    }),
 
   /**
    * Get PRs awaiting the user's review
@@ -1556,11 +1562,12 @@ export const pullsRouter = router({
       z.object({
         limit: z.number().min(1).max(100).default(20),
         offset: z.number().min(0).default(0),
+        repoId: z.string().uuid().optional(),
       }).optional()
     )
     .query(async ({ input, ctx }) => {
-      const { limit = 20, offset = 0 } = input ?? {};
-      return inboxModel.getAwaitingReview(ctx.user.id, { limit, offset });
+      const { limit = 20, offset = 0, repoId } = input ?? {};
+      return inboxModel.getAwaitingReview(ctx.user.id, { limit, offset, repoId });
     }),
 
   /**
@@ -1571,11 +1578,12 @@ export const pullsRouter = router({
       z.object({
         limit: z.number().min(1).max(100).default(20),
         offset: z.number().min(0).default(0),
+        repoId: z.string().uuid().optional(),
       }).optional()
     )
     .query(async ({ input, ctx }) => {
-      const { limit = 20, offset = 0 } = input ?? {};
-      return inboxModel.getMyPrsAwaitingReview(ctx.user.id, { limit, offset });
+      const { limit = 20, offset = 0, repoId } = input ?? {};
+      return inboxModel.getMyPrsAwaitingReview(ctx.user.id, { limit, offset, repoId });
     }),
 
   /**
@@ -1587,11 +1595,12 @@ export const pullsRouter = router({
         limit: z.number().min(1).max(100).default(20),
         offset: z.number().min(0).default(0),
         state: z.enum(['open', 'closed', 'all']).default('open'),
+        repoId: z.string().uuid().optional(),
       }).optional()
     )
     .query(async ({ input, ctx }) => {
-      const { limit = 20, offset = 0, state = 'open' } = input ?? {};
-      return inboxModel.getParticipated(ctx.user.id, { limit, offset, state });
+      const { limit = 20, offset = 0, state = 'open', repoId } = input ?? {};
+      return inboxModel.getParticipated(ctx.user.id, { limit, offset, state, repoId });
     }),
 
   // ============ REVIEWER MANAGEMENT ============

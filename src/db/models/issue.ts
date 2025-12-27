@@ -1,4 +1,4 @@
-import { eq, and, desc, sql, inArray } from 'drizzle-orm';
+import { eq, and, desc, sql, inArray, ne, or } from 'drizzle-orm';
 import { getDb } from '../index';
 import {
   issues,
@@ -743,5 +743,282 @@ export const issueLabelModel = {
       .orderBy(desc(issues.createdAt));
 
     return result.map((r) => r.issues);
+  },
+};
+
+// ============ ISSUE INBOX MODEL ============
+
+type InboxIssue = Issue & {
+  repo: { id: string; name: string; ownerId: string };
+  author: { id: string; name: string; username: string | null; avatarUrl: string | null } | null;
+  repoOwner?: string;
+  repoName?: string;
+};
+
+export const issueInboxModel = {
+  /**
+   * Get issues assigned to the user
+   */
+  async getAssignedToMe(
+    userId: string,
+    options: { limit?: number; offset?: number; repoId?: string; state?: 'open' | 'closed' | 'all' } = {}
+  ): Promise<InboxIssue[]> {
+    const db = getDb();
+    const { limit = 50, offset = 0, repoId, state = 'open' } = options;
+
+    const conditions = [eq(issues.assigneeId, userId)];
+    
+    if (state !== 'all') {
+      conditions.push(eq(issues.state, state));
+    }
+    if (repoId !== undefined) {
+      conditions.push(eq(issues.repoId, repoId));
+    }
+
+    const result = await db
+      .select({
+        issue: issues,
+        repo: {
+          id: repositories.id,
+          name: repositories.name,
+          ownerId: repositories.ownerId,
+        },
+        author: {
+          id: user.id,
+          name: user.name,
+          username: user.username,
+          avatarUrl: user.avatarUrl,
+        },
+        repoOwner: user.username,
+      })
+      .from(issues)
+      .innerJoin(repositories, eq(issues.repoId, repositories.id))
+      .leftJoin(user, eq(issues.authorId, user.id))
+      .where(and(...conditions))
+      .orderBy(desc(issues.updatedAt))
+      .limit(limit)
+      .offset(offset);
+
+    // Get repo owner usernames
+    const enriched = await Promise.all(
+      result.map(async (r) => {
+        const ownerResult = await db
+          .select({ username: user.username })
+          .from(user)
+          .where(eq(user.id, r.repo.ownerId))
+          .limit(1);
+
+        return {
+          ...r.issue,
+          repo: r.repo,
+          author: r.author,
+          repoOwner: ownerResult[0]?.username || '',
+          repoName: r.repo.name,
+        };
+      })
+    );
+
+    return enriched;
+  },
+
+  /**
+   * Get issues created by the user
+   */
+  async getCreatedByMe(
+    userId: string,
+    options: { limit?: number; offset?: number; repoId?: string; state?: 'open' | 'closed' | 'all' } = {}
+  ): Promise<InboxIssue[]> {
+    const db = getDb();
+    const { limit = 50, offset = 0, repoId, state = 'open' } = options;
+
+    const conditions = [eq(issues.authorId, userId)];
+    
+    if (state !== 'all') {
+      conditions.push(eq(issues.state, state));
+    }
+    if (repoId !== undefined) {
+      conditions.push(eq(issues.repoId, repoId));
+    }
+
+    const result = await db
+      .select({
+        issue: issues,
+        repo: {
+          id: repositories.id,
+          name: repositories.name,
+          ownerId: repositories.ownerId,
+        },
+      })
+      .from(issues)
+      .innerJoin(repositories, eq(issues.repoId, repositories.id))
+      .where(and(...conditions))
+      .orderBy(desc(issues.updatedAt))
+      .limit(limit)
+      .offset(offset);
+
+    // Enrich with owner username
+    const enriched = await Promise.all(
+      result.map(async (r) => {
+        const ownerResult = await db
+          .select({ username: user.username })
+          .from(user)
+          .where(eq(user.id, r.repo.ownerId))
+          .limit(1);
+
+        const authorResult = await db
+          .select({ id: user.id, name: user.name, username: user.username, avatarUrl: user.avatarUrl })
+          .from(user)
+          .where(eq(user.id, userId))
+          .limit(1);
+
+        return {
+          ...r.issue,
+          repo: r.repo,
+          author: authorResult[0] || null,
+          repoOwner: ownerResult[0]?.username || '',
+          repoName: r.repo.name,
+        };
+      })
+    );
+
+    return enriched;
+  },
+
+  /**
+   * Get issues where the user has commented (participated)
+   */
+  async getParticipated(
+    userId: string,
+    options: { limit?: number; offset?: number; repoId?: string; state?: 'open' | 'closed' | 'all' } = {}
+  ): Promise<InboxIssue[]> {
+    const db = getDb();
+    const { limit = 50, offset = 0, repoId, state = 'open' } = options;
+
+    // Get issues where user commented but isn't the author
+    const commentedIssueIds = db
+      .selectDistinct({ issueId: issueComments.issueId })
+      .from(issueComments)
+      .where(eq(issueComments.userId, userId));
+
+    const conditions = [
+      ne(issues.authorId, userId),
+      inArray(issues.id, commentedIssueIds),
+    ];
+
+    if (state !== 'all') {
+      conditions.push(eq(issues.state, state));
+    }
+    if (repoId !== undefined) {
+      conditions.push(eq(issues.repoId, repoId));
+    }
+
+    const result = await db
+      .select({
+        issue: issues,
+        repo: {
+          id: repositories.id,
+          name: repositories.name,
+          ownerId: repositories.ownerId,
+        },
+        author: {
+          id: user.id,
+          name: user.name,
+          username: user.username,
+          avatarUrl: user.avatarUrl,
+        },
+      })
+      .from(issues)
+      .innerJoin(repositories, eq(issues.repoId, repositories.id))
+      .leftJoin(user, eq(issues.authorId, user.id))
+      .where(and(...conditions))
+      .orderBy(desc(issues.updatedAt))
+      .limit(limit)
+      .offset(offset);
+
+    // Enrich with owner username
+    const enriched = await Promise.all(
+      result.map(async (r) => {
+        const ownerResult = await db
+          .select({ username: user.username })
+          .from(user)
+          .where(eq(user.id, r.repo.ownerId))
+          .limit(1);
+
+        return {
+          ...r.issue,
+          repo: r.repo,
+          author: r.author,
+          repoOwner: ownerResult[0]?.username || '',
+          repoName: r.repo.name,
+        };
+      })
+    );
+
+    return enriched;
+  },
+
+  /**
+   * Get inbox summary counts
+   */
+  async getSummary(userId: string, repoId?: string): Promise<{
+    assignedToMe: number;
+    createdByMe: number;
+    participated: number;
+  }> {
+    const db = getDb();
+
+    // Build conditions for assigned
+    const assignedConditions = [
+      eq(issues.assigneeId, userId),
+      eq(issues.state, 'open'),
+    ];
+    if (repoId !== undefined) {
+      assignedConditions.push(eq(issues.repoId, repoId));
+    }
+
+    const assignedResult = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(issues)
+      .where(and(...assignedConditions));
+
+    // Build conditions for created
+    const createdConditions = [
+      eq(issues.authorId, userId),
+      eq(issues.state, 'open'),
+    ];
+    if (repoId !== undefined) {
+      createdConditions.push(eq(issues.repoId, repoId));
+    }
+
+    const createdResult = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(issues)
+      .where(and(...createdConditions));
+
+    // Build conditions for participated
+    const commentedIssueIds = db
+      .selectDistinct({ issueId: issueComments.issueId })
+      .from(issueComments)
+      .where(eq(issueComments.userId, userId));
+
+    const participatedConditions = [
+      ne(issues.authorId, userId),
+      eq(issues.state, 'open'),
+      inArray(issues.id, commentedIssueIds),
+    ];
+    if (repoId !== undefined) {
+      participatedConditions.push(eq(issues.repoId, repoId));
+    }
+
+    const participatedResult = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(issues)
+      .where(and(...participatedConditions));
+
+    return {
+      assignedToMe: Number(assignedResult[0]?.count ?? 0),
+      createdByMe: Number(createdResult[0]?.count ?? 0),
+      participated: Number(participatedResult[0]?.count ?? 0),
+    };
   },
 };

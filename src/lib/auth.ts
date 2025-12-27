@@ -31,6 +31,9 @@ export function createAuth() {
       schema: authSchema,
     }),
     
+    // Secret for signing tokens - required in production
+    secret: process.env.BETTER_AUTH_SECRET,
+    
     // Email and password authentication
     emailAndPassword: {
       enabled: true,

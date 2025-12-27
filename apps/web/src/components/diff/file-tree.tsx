@@ -1,264 +1,281 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo } from 'react';
 import {
   ChevronDown,
   ChevronRight,
   File,
   Folder,
   FolderOpen,
-  Check,
-  Eye,
-  EyeOff,
+  Search,
+  MessageSquare,
+  CheckCircle,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import type { DiffFile } from './diff-viewer';
 
-export interface FileTreeProps {
-  files: DiffFile[];
-  /** Files that have been marked as viewed */
-  viewedFiles?: Set<string>;
-  /** Called when a file's viewed status changes */
-  onToggleViewed?: (path: string) => void;
-  /** Called when a file is clicked */
-  onFileClick?: (path: string) => void;
-  /** Currently selected file path */
+interface FileInfo {
+  path: string;
+  additions: number;
+  deletions: number;
+  status: 'added' | 'deleted' | 'modified' | 'renamed';
+  commentCount?: number;
+  viewed?: boolean;
+}
+
+interface FileTreeProps {
+  files: FileInfo[];
   selectedFile?: string;
-  /** Whether to show the tree or just a flat list */
-  showAsTree?: boolean;
-  /** Class name for the container */
+  onSelectFile: (path: string) => void;
   className?: string;
 }
 
 interface TreeNode {
   name: string;
   path: string;
-  type: 'file' | 'directory';
-  children?: TreeNode[];
-  file?: DiffFile;
+  isFolder: boolean;
+  children: TreeNode[];
+  file?: FileInfo;
 }
 
-// Build tree structure from flat file list
-function buildTree(files: DiffFile[]): TreeNode[] {
-  const root: Record<string, TreeNode> = {};
-
+function buildTree(files: FileInfo[]): TreeNode[] {
+  const root: TreeNode[] = [];
+  
   for (const file of files) {
     const parts = file.path.split('/');
-    let current = root;
+    let currentLevel = root;
     let currentPath = '';
-
+    
     for (let i = 0; i < parts.length; i++) {
       const part = parts[i];
       currentPath = currentPath ? `${currentPath}/${part}` : part;
-      const isLast = i === parts.length - 1;
-
-      if (!current[part]) {
-        current[part] = {
+      const isFile = i === parts.length - 1;
+      
+      let existing = currentLevel.find(n => n.name === part);
+      
+      if (!existing) {
+        existing = {
           name: part,
           path: currentPath,
-          type: isLast ? 'file' : 'directory',
-          children: isLast ? undefined : {},
-          file: isLast ? file : undefined,
+          isFolder: !isFile,
+          children: [],
+          file: isFile ? file : undefined,
         };
+        currentLevel.push(existing);
       }
-
-      if (!isLast) {
-        current = current[part].children as Record<string, TreeNode>;
-      }
+      
+      currentLevel = existing.children;
     }
   }
-
-  // Convert to array and sort (directories first, then alphabetical)
-  function convertToArray(obj: Record<string, TreeNode>): TreeNode[] {
-    return Object.values(obj)
-      .map((node) => ({
-        ...node,
-        children: node.children ? convertToArray(node.children as any) : undefined,
-      }))
-      .sort((a, b) => {
-        if (a.type === 'directory' && b.type === 'file') return -1;
-        if (a.type === 'file' && b.type === 'directory') return 1;
-        return a.name.localeCompare(b.name);
-      });
-  }
-
-  return convertToArray(root);
+  
+  // Sort: folders first, then alphabetically
+  const sortNodes = (nodes: TreeNode[]): TreeNode[] => {
+    return nodes.sort((a, b) => {
+      if (a.isFolder && !b.isFolder) return -1;
+      if (!a.isFolder && b.isFolder) return 1;
+      return a.name.localeCompare(b.name);
+    }).map(node => ({
+      ...node,
+      children: sortNodes(node.children),
+    }));
+  };
+  
+  return sortNodes(root);
 }
 
 export function FileTree({
   files,
-  viewedFiles = new Set(),
-  onToggleViewed,
-  onFileClick,
   selectedFile,
-  showAsTree = true,
+  onSelectFile,
   className,
 }: FileTreeProps) {
-  const [collapsedDirs, setCollapsedDirs] = useState<Set<string>>(new Set());
-
-  const tree = useMemo(() => (showAsTree ? buildTree(files) : null), [files, showAsTree]);
-
-  const toggleDir = useCallback((path: string) => {
-    setCollapsedDirs((prev) => {
-      const next = new Set(prev);
-      if (next.has(path)) {
-        next.delete(path);
-      } else {
-        next.add(path);
-      }
-      return next;
-    });
-  }, []);
-
-  const viewedCount = viewedFiles.size;
-  const totalCount = files.length;
-
-  const statusColors: Record<DiffFile['status'], string> = {
-    added: 'text-green-500',
-    deleted: 'text-red-500',
-    modified: 'text-yellow-500',
-    renamed: 'text-blue-500',
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  const tree = useMemo(() => buildTree(files), [files]);
+  
+  const filteredFiles = useMemo(() => {
+    if (!searchQuery) return files;
+    const query = searchQuery.toLowerCase();
+    return files.filter(f => f.path.toLowerCase().includes(query));
+  }, [files, searchQuery]);
+  
+  const toggleFolder = (path: string) => {
+    const newExpanded = new Set(expandedFolders);
+    if (newExpanded.has(path)) {
+      newExpanded.delete(path);
+    } else {
+      newExpanded.add(path);
+    }
+    setExpandedFolders(newExpanded);
   };
-
-  const renderNode = (node: TreeNode, depth: number = 0) => {
-    const isCollapsed = collapsedDirs.has(node.path);
-    const isViewed = viewedFiles.has(node.path);
-    const isSelected = selectedFile === node.path;
-
-    if (node.type === 'directory') {
+  
+  // Expand all folders by default
+  useMemo(() => {
+    const allFolders = new Set<string>();
+    const collectFolders = (nodes: TreeNode[]) => {
+      for (const node of nodes) {
+        if (node.isFolder) {
+          allFolders.add(node.path);
+          collectFolders(node.children);
+        }
+      }
+    };
+    collectFolders(tree);
+    setExpandedFolders(allFolders);
+  }, [tree]);
+  
+  const renderNode = (node: TreeNode, level: number = 0) => {
+    if (searchQuery && !node.isFolder) {
+      // When searching, only show matching files
+      if (!node.path.toLowerCase().includes(searchQuery.toLowerCase())) {
+        return null;
+      }
+    }
+    
+    if (node.isFolder) {
+      const isExpanded = expandedFolders.has(node.path);
+      const visibleChildren = node.children.filter(child => {
+        if (!searchQuery) return true;
+        if (child.isFolder) return true;
+        return child.path.toLowerCase().includes(searchQuery.toLowerCase());
+      });
+      
+      if (searchQuery && visibleChildren.length === 0) {
+        return null;
+      }
+      
       return (
         <div key={node.path}>
           <button
-            type="button"
-            className="w-full flex items-center gap-1 px-2 py-1 text-left text-sm hover:bg-muted/50 rounded"
-            style={{ paddingLeft: `${depth * 12 + 8}px` }}
-            onClick={() => toggleDir(node.path)}
+            onClick={() => toggleFolder(node.path)}
+            className="flex items-center gap-1 w-full py-1 px-1 hover:bg-muted rounded text-sm text-muted-foreground hover:text-foreground"
+            style={{ paddingLeft: `${level * 12 + 4}px` }}
           >
-            {isCollapsed ? (
-              <ChevronRight className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+            {isExpanded ? (
+              <ChevronDown className="h-3 w-3" />
             ) : (
-              <ChevronDown className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+              <ChevronRight className="h-3 w-3" />
             )}
-            {isCollapsed ? (
-              <Folder className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            {isExpanded ? (
+              <FolderOpen className="h-4 w-4 text-blue-500" />
             ) : (
-              <FolderOpen className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+              <Folder className="h-4 w-4 text-blue-500" />
             )}
-            <span className="truncate">{node.name}</span>
+            <span>{node.name}</span>
           </button>
-          {!isCollapsed && node.children?.map((child) => renderNode(child, depth + 1))}
+          {isExpanded && (
+            <div>
+              {node.children.map(child => renderNode(child, level + 1))}
+            </div>
+          )}
         </div>
       );
     }
-
+    
     const file = node.file!;
-
+    const isSelected = selectedFile === file.path;
+    
     return (
-      <div
+      <button
         key={node.path}
+        onClick={() => onSelectFile(file.path)}
         className={cn(
-          'group flex items-center gap-1 px-2 py-1 text-sm hover:bg-muted/50 rounded cursor-pointer',
-          isSelected && 'bg-primary/10',
-          isViewed && 'opacity-60'
+          'flex items-center gap-1.5 w-full py-1 px-1 rounded text-sm',
+          isSelected
+            ? 'bg-primary/10 text-primary'
+            : 'hover:bg-muted text-muted-foreground hover:text-foreground',
+          file.viewed && 'opacity-60'
         )}
-        style={{ paddingLeft: `${depth * 12 + 8}px` }}
-        onClick={() => onFileClick?.(node.path)}
+        style={{ paddingLeft: `${level * 12 + 4}px` }}
       >
-        {/* Viewed checkbox */}
-        {onToggleViewed && (
-          <button
-            type="button"
-            className={cn(
-              'h-4 w-4 rounded border flex-shrink-0 flex items-center justify-center',
-              isViewed
-                ? 'bg-primary border-primary text-primary-foreground'
-                : 'border-muted-foreground/50 hover:border-primary'
-            )}
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleViewed(node.path);
-            }}
-          >
-            {isViewed && <Check className="h-3 w-3" />}
-          </button>
+        <File className={cn(
+          'h-4 w-4',
+          file.status === 'added' && 'text-green-500',
+          file.status === 'deleted' && 'text-red-500',
+          file.status === 'modified' && 'text-yellow-500',
+          file.status === 'renamed' && 'text-blue-500'
+        )} />
+        <span className="flex-1 truncate text-left">{node.name}</span>
+        {file.viewed && (
+          <CheckCircle className="h-3 w-3 text-green-500" />
         )}
-
-        {/* File icon */}
-        <File className={cn('h-4 w-4 flex-shrink-0', statusColors[file.status])} />
-
-        {/* File name */}
-        <span className="truncate flex-1">{node.name}</span>
-
-        {/* Stats */}
-        <span className="text-xs text-green-500 flex-shrink-0">+{file.additions}</span>
-        <span className="text-xs text-red-500 flex-shrink-0">-{file.deletions}</span>
-      </div>
-    );
-  };
-
-  const renderFlatList = () => {
-    return files.map((file) => {
-      const isViewed = viewedFiles.has(file.path);
-      const isSelected = selectedFile === file.path;
-
-      return (
-        <div
-          key={file.path}
-          className={cn(
-            'group flex items-center gap-2 px-2 py-1 text-sm hover:bg-muted/50 rounded cursor-pointer',
-            isSelected && 'bg-primary/10',
-            isViewed && 'opacity-60'
-          )}
-          onClick={() => onFileClick?.(file.path)}
-        >
-          {/* Viewed checkbox */}
-          {onToggleViewed && (
-            <button
-              type="button"
-              className={cn(
-                'h-4 w-4 rounded border flex-shrink-0 flex items-center justify-center',
-                isViewed
-                  ? 'bg-primary border-primary text-primary-foreground'
-                  : 'border-muted-foreground/50 hover:border-primary'
-              )}
-              onClick={(e) => {
-                e.stopPropagation();
-                onToggleViewed(file.path);
-              }}
-            >
-              {isViewed && <Check className="h-3 w-3" />}
-            </button>
-          )}
-
-          {/* File icon */}
-          <File className={cn('h-4 w-4 flex-shrink-0', statusColors[file.status])} />
-
-          {/* File path */}
-          <span className="truncate flex-1 font-mono text-xs">{file.path}</span>
-
-          {/* Stats */}
-          <span className="text-xs text-green-500 flex-shrink-0">+{file.additions}</span>
-          <span className="text-xs text-red-500 flex-shrink-0">-{file.deletions}</span>
-        </div>
-      );
-    });
-  };
-
-  return (
-    <div className={cn('flex flex-col h-full', className)}>
-      {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b">
-        <span className="text-sm font-medium">Files</span>
-        {onToggleViewed && (
-          <Badge variant="secondary" className="text-xs">
-            {viewedCount}/{totalCount} viewed
+        {file.commentCount && file.commentCount > 0 && (
+          <Badge variant="outline" className="h-4 px-1 text-[10px]">
+            <MessageSquare className="h-2.5 w-2.5 mr-0.5" />
+            {file.commentCount}
           </Badge>
         )}
+        <span className="text-[10px] font-mono">
+          <span className="text-green-500">+{file.additions}</span>
+          {' '}
+          <span className="text-red-500">-{file.deletions}</span>
+        </span>
+      </button>
+    );
+  };
+  
+  return (
+    <div className={cn('flex flex-col h-full', className)}>
+      {/* Search */}
+      <div className="p-2 border-b">
+        <div className="relative">
+          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Input
+            placeholder="Filter files..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="h-7 pl-7 text-sm"
+          />
+        </div>
       </div>
-
-      {/* File list */}
+      
+      {/* Summary */}
+      <div className="px-3 py-2 border-b text-xs text-muted-foreground">
+        {files.length} file{files.length !== 1 ? 's' : ''} changed
+        <span className="ml-2 text-green-500">
+          +{files.reduce((acc, f) => acc + f.additions, 0)}
+        </span>
+        <span className="ml-1 text-red-500">
+          -{files.reduce((acc, f) => acc + f.deletions, 0)}
+        </span>
+      </div>
+      
+      {/* Tree */}
       <div className="flex-1 overflow-y-auto p-2">
-        {showAsTree && tree ? tree.map((node) => renderNode(node)) : renderFlatList()}
+        {searchQuery ? (
+          // Flat list when searching
+          <div>
+            {filteredFiles.map(file => (
+              <button
+                key={file.path}
+                onClick={() => onSelectFile(file.path)}
+                className={cn(
+                  'flex items-center gap-1.5 w-full py-1 px-2 rounded text-sm',
+                  selectedFile === file.path
+                    ? 'bg-primary/10 text-primary'
+                    : 'hover:bg-muted text-muted-foreground hover:text-foreground'
+                )}
+              >
+                <File className={cn(
+                  'h-4 w-4 shrink-0',
+                  file.status === 'added' && 'text-green-500',
+                  file.status === 'deleted' && 'text-red-500',
+                  file.status === 'modified' && 'text-yellow-500',
+                  file.status === 'renamed' && 'text-blue-500'
+                )} />
+                <span className="flex-1 truncate text-left">{file.path}</span>
+                <span className="text-[10px] font-mono shrink-0">
+                  <span className="text-green-500">+{file.additions}</span>
+                  {' '}
+                  <span className="text-red-500">-{file.deletions}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          // Tree view
+          tree.map(node => renderNode(node))
+        )}
       </div>
     </div>
   );

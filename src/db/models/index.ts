@@ -38,6 +38,7 @@ export {
   issueCommentModel,
   labelModel,
   issueLabelModel,
+  issueInboxModel,
   ISSUE_STATUSES,
 } from './issue';
 

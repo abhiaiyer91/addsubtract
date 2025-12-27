@@ -1,8 +1,9 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { ChevronDown, ChevronRight, File, Plus, MessageSquare, Columns, AlignJustify, Sparkles, Loader2, Lightbulb, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Markdown } from '@/components/markdown/renderer';
 import { trpc } from '@/lib/trpc';
@@ -67,6 +68,12 @@ export interface DiffViewerProps {
   isEditingComment?: boolean;
   isDeletingComment?: boolean;
   isResolvingComment?: boolean;
+  /** Files that have been viewed */
+  viewedFiles?: Set<string>;
+  /** Called when file viewed state changes */
+  onToggleViewed?: (path: string) => void;
+  /** Whether to show viewed toggle */
+  showViewedToggle?: boolean;
 }
 
 // Parse a raw unified diff string into DiffFile[]
@@ -184,6 +191,9 @@ export function DiffViewer({
   isEditingComment,
   isDeletingComment,
   isResolvingComment,
+  viewedFiles = new Set(),
+  onToggleViewed,
+  showViewedToggle = false,
 }: DiffViewerProps) {
   // Initialize view mode from localStorage or default
   const [viewMode, setViewMode] = useState<DiffViewMode>(() => {
@@ -283,6 +293,9 @@ export function DiffViewer({
           isEditingComment={isEditingComment}
           isDeletingComment={isDeletingComment}
           isResolvingComment={isResolvingComment}
+          isViewed={viewedFiles.has(file.path)}
+          onToggleViewed={onToggleViewed}
+          showViewedToggle={showViewedToggle}
         />
       ))}
     </div>
@@ -306,6 +319,9 @@ interface DiffFileViewProps {
   isEditingComment?: boolean;
   isDeletingComment?: boolean;
   isResolvingComment?: boolean;
+  isViewed?: boolean;
+  onToggleViewed?: (path: string) => void;
+  showViewedToggle?: boolean;
 }
 
 function DiffFileView({
@@ -325,6 +341,9 @@ function DiffFileView({
   isEditingComment,
   isDeletingComment,
   isResolvingComment,
+  isViewed = false,
+  onToggleViewed,
+  showViewedToggle = false,
 }: DiffFileViewProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [showExplanation, setShowExplanation] = useState(false);
@@ -388,7 +407,7 @@ function DiffFileView({
   };
 
   return (
-    <div className="border rounded-lg overflow-hidden">
+    <div className={cn('border rounded-lg overflow-hidden', isViewed && 'opacity-60')}>
       {/* File header */}
       <div
         className="flex items-center gap-3 px-4 py-2 bg-muted/50 border-b cursor-pointer hover:bg-muted/70"
@@ -415,10 +434,10 @@ function DiffFileView({
         </span>
 
         {commentCount > 0 && (
-          <span className="flex items-center gap-1 text-xs text-muted-foreground">
+          <Badge variant="outline" className="gap-1">
             <MessageSquare className="h-3 w-3" />
             {commentCount}
-          </span>
+          </Badge>
         )}
         
         {/* AI Explain button */}
@@ -449,6 +468,23 @@ function DiffFileView({
           <span className="text-green-500">+{file.additions}</span>
           <span className="text-red-500">-{file.deletions}</span>
         </div>
+
+        {/* Viewed toggle */}
+        {showViewedToggle && onToggleViewed && (
+          <div
+            className="flex items-center gap-1.5"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleViewed(file.path);
+            }}
+          >
+            <Checkbox
+              checked={isViewed}
+              className="h-4 w-4"
+            />
+            <span className="text-xs text-muted-foreground">Viewed</span>
+          </div>
+        )}
       </div>
 
       {/* AI Explanation panel */}

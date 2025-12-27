@@ -850,10 +850,20 @@ export const inboxModel = {
    */
   async getAwaitingReview(
     userId: string,
-    options: { limit?: number; offset?: number } = {}
+    options: { limit?: number; offset?: number; repoId?: string } = {}
   ): Promise<InboxPr[]> {
     const db = getDb();
-    const { limit = 50, offset = 0 } = options;
+    const { limit = 50, offset = 0, repoId } = options;
+
+    // Build where conditions
+    const conditions = [
+      eq(prReviewers.userId, userId),
+      eq(prReviewers.state, 'pending'),
+      eq(pullRequests.state, 'open'),
+    ];
+    if (repoId !== undefined) {
+      conditions.push(eq(pullRequests.repoId, repoId));
+    }
 
     // Get PRs where user has pending review request and PR is open
     const result = await db
@@ -869,13 +879,7 @@ export const inboxModel = {
       .from(prReviewers)
       .innerJoin(pullRequests, eq(prReviewers.prId, pullRequests.id))
       .innerJoin(repositories, eq(pullRequests.repoId, repositories.id))
-      .where(
-        and(
-          eq(prReviewers.userId, userId),
-          eq(prReviewers.state, 'pending'),
-          eq(pullRequests.state, 'open')
-        )
-      )
+      .where(and(...conditions))
       .orderBy(desc(prReviewers.requestedAt))
       .limit(limit)
       .offset(offset);
@@ -904,10 +908,19 @@ export const inboxModel = {
    */
   async getMyPrsAwaitingReview(
     userId: string,
-    options: { limit?: number; offset?: number } = {}
+    options: { limit?: number; offset?: number; repoId?: string } = {}
   ): Promise<InboxPr[]> {
     const db = getDb();
-    const { limit = 50, offset = 0 } = options;
+    const { limit = 50, offset = 0, repoId } = options;
+
+    // Build where conditions
+    const conditions = [
+      eq(pullRequests.authorId, userId),
+      eq(pullRequests.state, 'open'),
+    ];
+    if (repoId !== undefined) {
+      conditions.push(eq(pullRequests.repoId, repoId));
+    }
 
     // Get open PRs by the user
     const result = await db
@@ -921,7 +934,7 @@ export const inboxModel = {
       })
       .from(pullRequests)
       .innerJoin(repositories, eq(pullRequests.repoId, repositories.id))
-      .where(and(eq(pullRequests.authorId, userId), eq(pullRequests.state, 'open')))
+      .where(and(...conditions))
       .orderBy(desc(pullRequests.updatedAt))
       .limit(limit)
       .offset(offset);
@@ -951,10 +964,10 @@ export const inboxModel = {
    */
   async getParticipated(
     userId: string,
-    options: { limit?: number; offset?: number; state?: 'open' | 'closed' | 'all' } = {}
+    options: { limit?: number; offset?: number; state?: 'open' | 'closed' | 'all'; repoId?: string } = {}
   ): Promise<InboxPr[]> {
     const db = getDb();
-    const { limit = 50, offset = 0, state = 'open' } = options;
+    const { limit = 50, offset = 0, state = 'open', repoId } = options;
 
     // Find PRs where user has reviewed or commented (but isn't the author)
     const reviewedPrIds = db
@@ -978,6 +991,10 @@ export const inboxModel = {
 
     if (state !== 'all') {
       conditions.push(eq(pullRequests.state, state));
+    }
+
+    if (repoId !== undefined) {
+      conditions.push(eq(pullRequests.repoId, repoId));
     }
 
     const result = await db
@@ -1019,48 +1036,65 @@ export const inboxModel = {
   /**
    * Get inbox summary counts for a user
    */
-  async getSummary(userId: string): Promise<{
+  async getSummary(userId: string, repoId?: string): Promise<{
     awaitingReview: number;
-    myPrsOpen: number;
+    myOpenPrs: number;
     participated: number;
   }> {
     const db = getDb();
+
+    // Build conditions for awaiting review
+    const awaitingConditions = [
+      eq(prReviewers.userId, userId),
+      eq(prReviewers.state, 'pending'),
+      eq(pullRequests.state, 'open'),
+    ];
+    if (repoId !== undefined) {
+      awaitingConditions.push(eq(pullRequests.repoId, repoId));
+    }
 
     // Count PRs awaiting review
     const awaitingReviewResult = await db
       .select({ count: sql<number>`count(*)` })
       .from(prReviewers)
       .innerJoin(pullRequests, eq(prReviewers.prId, pullRequests.id))
-      .where(
-        and(
-          eq(prReviewers.userId, userId),
-          eq(prReviewers.state, 'pending'),
-          eq(pullRequests.state, 'open')
-        )
-      );
+      .where(and(...awaitingConditions));
+
+    // Build conditions for my PRs
+    const myPrsConditions = [
+      eq(pullRequests.authorId, userId),
+      eq(pullRequests.state, 'open'),
+    ];
+    if (repoId !== undefined) {
+      myPrsConditions.push(eq(pullRequests.repoId, repoId));
+    }
 
     // Count user's open PRs
     const myPrsResult = await db
       .select({ count: sql<number>`count(*)` })
       .from(pullRequests)
-      .where(and(eq(pullRequests.authorId, userId), eq(pullRequests.state, 'open')));
+      .where(and(...myPrsConditions));
+
+    // Build conditions for participated
+    const participatedConditions = [
+      eq(prReviews.userId, userId),
+      eq(pullRequests.state, 'open'),
+      ne(pullRequests.authorId, userId),
+    ];
+    if (repoId !== undefined) {
+      participatedConditions.push(eq(pullRequests.repoId, repoId));
+    }
 
     // Count participated PRs (rough count - PRs where user reviewed)
     const participatedResult = await db
       .select({ count: sql<number>`count(distinct ${prReviews.prId})` })
       .from(prReviews)
       .innerJoin(pullRequests, eq(prReviews.prId, pullRequests.id))
-      .where(
-        and(
-          eq(prReviews.userId, userId),
-          eq(pullRequests.state, 'open'),
-          ne(pullRequests.authorId, userId)
-        )
-      );
+      .where(and(...participatedConditions));
 
     return {
       awaitingReview: Number(awaitingReviewResult[0]?.count ?? 0),
-      myPrsOpen: Number(myPrsResult[0]?.count ?? 0),
+      myOpenPrs: Number(myPrsResult[0]?.count ?? 0),
       participated: Number(participatedResult[0]?.count ?? 0),
     };
   },
