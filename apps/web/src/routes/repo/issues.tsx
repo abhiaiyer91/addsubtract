@@ -25,6 +25,7 @@ import {
   Signal,
   Timer,
   TrendingUp,
+  X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -202,17 +203,37 @@ export function IssuesPage() {
     setSearchParams(newParams);
   };
 
-  // Get current context name
-  const getContextName = () => {
+  // Get current context info
+  const getContextInfo = () => {
     if (selectedProjectId) {
       const project = projects?.find(p => p.id === selectedProjectId);
-      return project?.name || 'Project';
+      return { 
+        name: project?.name || 'Project', 
+        type: 'project' as const, 
+        icon: project?.icon,
+        id: selectedProjectId 
+      };
     }
     if (selectedCycleId) {
       const cycle = cycles?.find(c => c.id === selectedCycleId);
-      return cycle?.name || 'Cycle';
+      return { 
+        name: cycle?.name || 'Cycle', 
+        type: 'cycle' as const, 
+        icon: null,
+        id: selectedCycleId 
+      };
     }
-    return 'All Issues';
+    return { name: 'All Issues', type: 'all' as const, icon: null, id: null };
+  };
+
+  const contextInfo = getContextInfo();
+
+  const clearContext = () => {
+    const newParams = new URLSearchParams(searchParams);
+    newParams.delete('section');
+    newParams.delete('project');
+    newParams.delete('cycle');
+    setSearchParams(newParams);
   };
 
   if (isLoading) {
@@ -380,10 +401,95 @@ export function IssuesPage() {
 
         {/* Main Content */}
         <div className="flex-1 space-y-4">
+          {/* Breadcrumb - shows when filtering by project or cycle */}
+          {(selectedProjectId || selectedCycleId) && (
+            <div className="flex items-center gap-2 text-sm">
+              <Link 
+                to={`/${owner}/${repo}/issues`} 
+                className="text-muted-foreground hover:text-foreground transition-colors"
+                onClick={(e) => {
+                  e.preventDefault();
+                  clearContext();
+                }}
+              >
+                All Issues
+              </Link>
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              <span className="flex items-center gap-1.5 text-foreground font-medium">
+                {contextInfo.type === 'project' ? (
+                  <FolderKanban className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <RefreshCw className="h-4 w-4 text-muted-foreground" />
+                )}
+                {contextInfo.icon && <span>{contextInfo.icon}</span>}
+                {contextInfo.name}
+              </span>
+              <button
+                onClick={clearContext}
+                className="ml-1 p-0.5 rounded hover:bg-muted transition-colors"
+                title="Clear filter"
+              >
+                <X className="h-3.5 w-3.5 text-muted-foreground" />
+              </button>
+            </div>
+          )}
+
           {/* Header */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-6">
-              <h1 className="text-xl font-semibold">{getContextName()}</h1>
+              {/* Context Switcher Dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="flex items-center gap-2 text-xl font-semibold hover:text-primary transition-colors">
+                    {contextInfo.icon && <span>{contextInfo.icon}</span>}
+                    {contextInfo.name}
+                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-64">
+                  <DropdownMenuItem onClick={() => clearContext()}>
+                    <CircleDot className="mr-2 h-4 w-4" />
+                    All Issues
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  {projects && projects.length > 0 && (
+                    <>
+                      <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                        Projects
+                      </div>
+                      {projects.map((project) => (
+                        <DropdownMenuItem
+                          key={project.id}
+                          onClick={() => handleSidebarSelect('project', project.id)}
+                          className={selectedProjectId === project.id ? 'bg-primary/10' : ''}
+                        >
+                          <FolderKanban className="mr-2 h-4 w-4" />
+                          {project.icon && <span className="mr-1">{project.icon}</span>}
+                          {project.name}
+                        </DropdownMenuItem>
+                      ))}
+                      <DropdownMenuSeparator />
+                    </>
+                  )}
+                  {cycles && cycles.length > 0 && (
+                    <>
+                      <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                        Cycles
+                      </div>
+                      {cycles.slice(0, 5).map((cycle) => (
+                        <DropdownMenuItem
+                          key={cycle.id}
+                          onClick={() => handleSidebarSelect('cycle', cycle.id)}
+                          className={selectedCycleId === cycle.id ? 'bg-primary/10' : ''}
+                        >
+                          <RefreshCw className="mr-2 h-4 w-4" />
+                          {cycle.name}
+                        </DropdownMenuItem>
+                      ))}
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
               
               {/* View toggle */}
               <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
@@ -444,7 +550,12 @@ export function IssuesPage() {
               )}
             </div>
             {authenticated && (
-              <Link to={`/${owner}/${repo}/issues/new`}>
+              <Link 
+                to={`/${owner}/${repo}/issues/new${
+                  selectedProjectId ? `?project=${selectedProjectId}` : 
+                  selectedCycleId ? `?cycle=${selectedCycleId}` : ''
+                }`}
+              >
                 <Button size="sm" className="gap-2">
                   <Plus className="h-4 w-4" />
                   New Issue

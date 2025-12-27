@@ -260,7 +260,7 @@ export function CycleDetailPage() {
               <Badge variant="secondary">{progress?.total || 0}</Badge>
             </h2>
             {authenticated && (
-              <Link to={`/${owner}/${repo}/issues/new`}>
+              <Link to={`/${owner}/${repo}/issues/new?cycle=${cycleId}`}>
                 <Button size="sm" variant="outline">
                   <Plus className="mr-2 h-4 w-4" />
                   Add Issue
@@ -284,7 +284,7 @@ export function CycleDetailPage() {
                 Add issues to this cycle to track sprint progress
               </p>
               {authenticated && (
-                <Link to={`/${owner}/${repo}/issues/new`}>
+                <Link to={`/${owner}/${repo}/issues/new?cycle=${cycleId}`}>
                   <Button>
                     <Plus className="mr-2 h-4 w-4" />
                     Create Issue

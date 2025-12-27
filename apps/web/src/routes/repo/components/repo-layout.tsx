@@ -15,6 +15,8 @@ import {
   Sparkles,
   Maximize2,
   BookOpen,
+  FolderKanban,
+  RefreshCw,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -262,6 +264,21 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
   };
   const activeTab = getActiveTab();
 
+  // Determine active sub-tab for issues section
+  const getActiveIssuesSubTab = () => {
+    if (path.includes('/projects')) return 'projects';
+    if (path.includes('/cycles')) return 'cycles';
+    return 'issues';
+  };
+  const activeIssuesSubTab = getActiveIssuesSubTab();
+
+  const subTabClass = (tab: string) =>
+    `flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-colors ${
+      activeIssuesSubTab === tab
+        ? 'bg-primary/10 text-primary font-medium'
+        : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+    }`;
+
   const tabClass = (tab: string) =>
     `flex items-center gap-1.5 md:gap-2 px-2 md:px-4 py-2 border-b-2 text-sm transition-colors whitespace-nowrap ${
       activeTab === tab
@@ -488,6 +505,24 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
           )}
         </nav>
       </div>
+
+      {/* Sub-navigation for Issues section */}
+      {activeTab === 'issues' && (
+        <div className="flex items-center gap-2 -mt-2">
+          <Link to={`/${owner}/${repo}/issues`} className={subTabClass('issues')}>
+            <CircleDot className="h-4 w-4" />
+            Issues
+          </Link>
+          <Link to={`/${owner}/${repo}/projects`} className={subTabClass('projects')}>
+            <FolderKanban className="h-4 w-4" />
+            Projects
+          </Link>
+          <Link to={`/${owner}/${repo}/cycles`} className={subTabClass('cycles')}>
+            <RefreshCw className="h-4 w-4" />
+            Cycles
+          </Link>
+        </div>
+      )}
 
       {/* Page content */}
       {children}
