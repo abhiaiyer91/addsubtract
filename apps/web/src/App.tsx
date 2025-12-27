@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { TRPCProvider } from './lib/trpc';
 import { Layout } from './components/layout';
+import { CommandPalette, ShortcutsModal } from './components/command';
+import { BranchSwitcher } from './components/branch';
 
 // Routes
 import { HomePage } from './routes/index';
@@ -40,11 +42,17 @@ import { OrgPage } from './routes/org';
 import { OrgSettingsPage } from './routes/org/settings';
 import { OrgMembersPage } from './routes/org/members';
 import { OrgTeamsPage } from './routes/org/teams';
+import { SearchPage } from './routes/search';
 
 export function App() {
   return (
     <TRPCProvider>
       <BrowserRouter>
+        {/* Global keyboard-first components */}
+        <CommandPalette />
+        <ShortcutsModal />
+        <BranchSwitcher />
+        
         <Routes>
           <Route element={<Layout />}>
             {/* Public routes */}
@@ -56,6 +64,7 @@ export function App() {
             <Route path="/settings/tokens" element={<TokensPage />} />
             <Route path="/new" element={<NewRepoPage />} />
             <Route path="/orgs/new" element={<NewOrgPage />} />
+            <Route path="/search" element={<SearchPage />} />
 
             {/* Organization routes */}
             <Route path="/org/:slug" element={<OrgPage />} />

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   Star,
@@ -10,10 +11,12 @@ import {
   History,
   Loader2,
   Layers,
+  Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Loading } from '@/components/ui/loading';
+import { ChatPanel } from '@/components/ai/chat-panel';
 import { useSession } from '@/lib/auth-client';
 import { trpc } from '@/lib/trpc';
 
@@ -29,6 +32,7 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
   const { data: session } = useSession();
   const authenticated = !!session?.user;
   const utils = trpc.useUtils();
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   // Fetch repository data
   const {
@@ -188,6 +192,19 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Ask AI button */}
+          {authenticated && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={() => setIsChatOpen(true)}
+            >
+              <Sparkles className="h-4 w-4" />
+              Ask AI
+            </Button>
+          )}
+          
           {authenticated && (
             <>
               <Button
@@ -286,6 +303,17 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
 
       {/* Page content */}
       {children}
+
+      {/* AI Chat Panel */}
+      {authenticated && (
+        <ChatPanel
+          repoId={repoInfo.id}
+          repoName={repoInfo.name}
+          owner={owner}
+          isOpen={isChatOpen}
+          onClose={() => setIsChatOpen(false)}
+        />
+      )}
     </div>
   );
 }
