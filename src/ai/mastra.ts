@@ -59,7 +59,7 @@ export function getMemory(): Memory {
  * Default model: Claude Opus 4 (claude-opus-4-5)
  */
 export function createTsgitMastra(config: AIConfig = {}): Mastra {
-  const model = config.model || process.env.WIT_AI_MODEL || 'anthropic:claude-opus-4-5';
+  const model = config.model || process.env.WIT_AI_MODEL || 'anthropic/claude-opus-4-5';
   
   const agent = createTsgitAgent(model);
   const memory = getMemory();
@@ -201,7 +201,7 @@ export async function getAnyApiKeyForRepo(
  * Default: Claude Opus 4
  */
 export function getAIInfo(): { available: boolean; model: string; provider: string } {
-  const model = process.env.WIT_AI_MODEL || 'anthropic:claude-opus-4-5';
+  const model = process.env.WIT_AI_MODEL || 'anthropic/claude-opus-4-5';
   
   return {
     available: isAIAvailable(),
@@ -220,7 +220,7 @@ export async function getAIInfoForRepo(repoId: string): Promise<{
   model: string;
   provider: string;
 }> {
-  const model = process.env.WIT_AI_MODEL || 'anthropic:claude-opus-4-5';
+  const model = process.env.WIT_AI_MODEL || 'anthropic/claude-opus-4-5';
   const defaultProvider = 'anthropic';
   
   // Check repo-level keys first

@@ -90,3 +90,60 @@ export interface CodeReviewIssue {
   message: string;
   suggestion?: string;
 }
+
+/**
+ * Agent modes determine what tools and capabilities are available
+ */
+export type AgentMode = 'questions' | 'pm' | 'code';
+
+/**
+ * Agent mode configuration
+ */
+export interface AgentModeConfig {
+  id: AgentMode;
+  name: string;
+  description: string;
+  icon: string;
+}
+
+/**
+ * Available agent modes
+ */
+export const AGENT_MODES: Record<AgentMode, AgentModeConfig> = {
+  questions: {
+    id: 'questions',
+    name: 'Questions',
+    description: 'Ask questions about the codebase, get explanations and help understanding code',
+    icon: 'help-circle',
+  },
+  pm: {
+    id: 'pm',
+    name: 'PM',
+    description: 'Create and manage issues, pull requests, projects, and cycles',
+    icon: 'clipboard-list',
+  },
+  code: {
+    id: 'code',
+    name: 'Code',
+    description: 'Write code, edit files, create branches, and commit changes',
+    icon: 'code',
+  },
+};
+
+/**
+ * Context passed to agent tools for repo-scoped operations
+ */
+export interface AgentContext {
+  /** Repository ID from the database */
+  repoId: string;
+  /** Repository owner username */
+  owner: string;
+  /** Repository name */
+  repoName: string;
+  /** Path to the repository on disk (server-side) */
+  repoPath: string;
+  /** Current user ID */
+  userId: string;
+  /** Current agent mode */
+  mode: AgentMode;
+}
