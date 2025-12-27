@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   Star,
@@ -11,6 +12,7 @@ import {
   Loader2,
   Layers,
   MoreHorizontal,
+  Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -21,6 +23,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { ChatPanel } from '@/components/ai/chat-panel';
 import { useSession } from '@/lib/auth-client';
 import { trpc } from '@/lib/trpc';
 import { toastSuccess, toastError } from '@/components/ui/use-toast';
@@ -37,6 +40,7 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
   const { data: session } = useSession();
   const authenticated = !!session?.user;
   const utils = trpc.useUtils();
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   // Fetch repository data
   const {
@@ -259,102 +263,117 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
         </div>
 
         {/* Action buttons - responsive layout */}
-        {authenticated && (
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {/* Desktop buttons */}
-            <div className="hidden md:flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-2 h-9"
-                onClick={handleWatch}
-                disabled={isWatchLoading}
-              >
-                {isWatchLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Eye className={`h-4 w-4 ${isWatching ? 'fill-current' : ''}`} />
-                )}
-                {isWatching ? 'Unwatch' : 'Watch'}
-                <Badge variant="secondary" className="ml-1">
-                  {repoInfo.watchersCount}
-                </Badge>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-2 h-9"
-                onClick={handleFork}
-                disabled={isForkLoading || repoInfo.ownerId === session?.user?.id}
-              >
-                {isForkLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <GitFork className="h-4 w-4" />
-                )}
-                Fork
-                <Badge variant="secondary" className="ml-1">
-                  {repoInfo.forksCount}
-                </Badge>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-2 h-9"
-                onClick={handleStar}
-                disabled={isStarLoading}
-              >
-                {isStarLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Star className={`h-4 w-4 ${isStarred ? 'fill-yellow-400 text-yellow-400' : ''}`} />
-                )}
-                {isStarred ? 'Starred' : 'Star'}
-                <Badge variant="secondary" className="ml-1">
-                  {repoInfo.starsCount}
-                </Badge>
-              </Button>
-            </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Ask AI button */}
+          {authenticated && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 h-9"
+              onClick={() => setIsChatOpen(true)}
+            >
+              <Sparkles className="h-4 w-4" />
+              <span className="hidden sm:inline">Ask AI</span>
+            </Button>
+          )}
 
-            {/* Mobile compact buttons */}
-            <div className="flex md:hidden items-center gap-1.5">
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1 h-8 px-2"
-                onClick={handleStar}
-                disabled={isStarLoading}
-              >
-                {isStarLoading ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Star className={`h-3.5 w-3.5 ${isStarred ? 'fill-yellow-400 text-yellow-400' : ''}`} />
-                )}
-                <span className="text-xs">{repoInfo.starsCount}</span>
-              </Button>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-8 w-8 p-0">
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={handleWatch} disabled={isWatchLoading}>
-                    <Eye className="mr-2 h-4 w-4" />
-                    {isWatching ? 'Unwatch' : 'Watch'} ({repoInfo.watchersCount})
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    onClick={handleFork} 
-                    disabled={isForkLoading || repoInfo.ownerId === session?.user?.id}
-                  >
-                    <GitFork className="mr-2 h-4 w-4" />
-                    Fork ({repoInfo.forksCount})
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
-        )}
+          {authenticated && (
+            <>
+              {/* Desktop buttons */}
+              <div className="hidden md:flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 h-9"
+                  onClick={handleWatch}
+                  disabled={isWatchLoading}
+                >
+                  {isWatchLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Eye className={`h-4 w-4 ${isWatching ? 'fill-current' : ''}`} />
+                  )}
+                  {isWatching ? 'Unwatch' : 'Watch'}
+                  <Badge variant="secondary" className="ml-1">
+                    {repoInfo.watchersCount}
+                  </Badge>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 h-9"
+                  onClick={handleFork}
+                  disabled={isForkLoading || repoInfo.ownerId === session?.user?.id}
+                >
+                  {isForkLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <GitFork className="h-4 w-4" />
+                  )}
+                  Fork
+                  <Badge variant="secondary" className="ml-1">
+                    {repoInfo.forksCount}
+                  </Badge>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 h-9"
+                  onClick={handleStar}
+                  disabled={isStarLoading}
+                >
+                  {isStarLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Star className={`h-4 w-4 ${isStarred ? 'fill-yellow-400 text-yellow-400' : ''}`} />
+                  )}
+                  {isStarred ? 'Starred' : 'Star'}
+                  <Badge variant="secondary" className="ml-1">
+                    {repoInfo.starsCount}
+                  </Badge>
+                </Button>
+              </div>
+
+              {/* Mobile compact buttons */}
+              <div className="flex md:hidden items-center gap-1.5">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1 h-8 px-2"
+                  onClick={handleStar}
+                  disabled={isStarLoading}
+                >
+                  {isStarLoading ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Star className={`h-3.5 w-3.5 ${isStarred ? 'fill-yellow-400 text-yellow-400' : ''}`} />
+                  )}
+                  <span className="text-xs">{repoInfo.starsCount}</span>
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-8 w-8 p-0">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={handleWatch} disabled={isWatchLoading}>
+                      <Eye className="mr-2 h-4 w-4" />
+                      {isWatching ? 'Unwatch' : 'Watch'} ({repoInfo.watchersCount})
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={handleFork} 
+                      disabled={isForkLoading || repoInfo.ownerId === session?.user?.id}
+                    >
+                      <GitFork className="mr-2 h-4 w-4" />
+                      Fork ({repoInfo.forksCount})
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Navigation tabs - horizontally scrollable on mobile */}
@@ -397,6 +416,17 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
 
       {/* Page content */}
       {children}
+
+      {/* AI Chat Panel */}
+      {authenticated && (
+        <ChatPanel
+          repoId={repoInfo.id}
+          repoName={repoInfo.name}
+          owner={owner}
+          isOpen={isChatOpen}
+          onClose={() => setIsChatOpen(false)}
+        />
+      )}
     </div>
   );
 }

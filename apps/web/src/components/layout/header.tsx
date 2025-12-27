@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   GitBranch,
@@ -18,7 +19,6 @@ import {
   X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,28 +29,22 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useSession, signOut } from '@/lib/auth-client';
-import { useState } from 'react';
 import { trpc } from '@/lib/trpc';
 import { formatRelativeTime } from '@/lib/utils';
+import { useCommandPaletteStore } from '@/hooks/useCommandPalette';
+import { isMac } from '@/lib/commands';
 
 export function Header() {
   const navigate = useNavigate();
   const { data: session } = useSession();
   const user = session?.user;
   const authenticated = !!user;
-  const [searchQuery, setSearchQuery] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { open: openCommandPalette } = useCommandPaletteStore();
 
   const handleLogout = async () => {
     await signOut();
     navigate('/');
-  };
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      navigate(`/search?q=${encodeURIComponent(searchQuery)}`);
-    }
   };
 
   return (
@@ -100,26 +94,32 @@ export function Header() {
             )}
           </div>
 
-          {/* Center section - Search (hidden on mobile, visible on tablet+) */}
+          {/* Center section - Search (opens command palette) */}
           <div className="hidden sm:flex flex-1 max-w-md mx-4">
-            <form onSubmit={handleSearch} className="w-full">
-              <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="search"
-                  placeholder="Search repositories..."
-                  className="pl-8 w-full h-9"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
-            </form>
+            <button
+              onClick={openCommandPalette}
+              className="flex h-10 w-full items-center gap-2 rounded-full border border-border/40 bg-muted/20 px-4 py-2 text-sm transition-all duration-300 hover:border-muted-foreground/30 hover:bg-muted/30 focus:border-primary/50 focus:bg-card focus:outline-none focus:ring-2 focus:ring-primary/20"
+            >
+              <Search className="h-4 w-4 text-muted-foreground" />
+              <span className="flex-1 text-left text-muted-foreground/50">
+                Search or jump to...
+              </span>
+              <kbd className="kbd hidden sm:inline-flex">
+                {isMac() ? '\u2318' : 'Ctrl'}
+              </kbd>
+              <kbd className="kbd hidden sm:inline-flex">K</kbd>
+            </button>
           </div>
 
           {/* Right section - User actions */}
           <div className="flex items-center gap-1 md:gap-2">
-            {/* Search button for mobile */}
-            <Button variant="ghost" size="icon" className="sm:hidden h-9 w-9">
+            {/* Search button for mobile - opens command palette */}
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="sm:hidden h-9 w-9"
+              onClick={openCommandPalette}
+            >
               <Search className="h-4 w-4" />
             </Button>
 
@@ -222,19 +222,19 @@ export function Header() {
           
           {/* Menu panel */}
           <div className="fixed inset-y-0 left-0 w-72 bg-background border-r border-border p-4 pt-20 animate-slide-in-right">
-            {/* Mobile search */}
-            <form onSubmit={(e) => { handleSearch(e); setMobileMenuOpen(false); }} className="mb-6">
-              <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="search"
-                  placeholder="Search repositories..."
-                  className="pl-8 w-full"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
-            </form>
+            {/* Mobile search - opens command palette */}
+            <button
+              onClick={() => {
+                setMobileMenuOpen(false);
+                openCommandPalette();
+              }}
+              className="flex h-10 w-full items-center gap-2 rounded-lg border border-border/40 bg-muted/20 px-3 py-2 text-sm mb-6"
+            >
+              <Search className="h-4 w-4 text-muted-foreground" />
+              <span className="flex-1 text-left text-muted-foreground/50">
+                Search...
+              </span>
+            </button>
 
             {/* Mobile navigation links */}
             <nav className="space-y-1">
@@ -350,7 +350,7 @@ function NotificationsDropdown() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative">
+        <Button variant="ghost" size="icon" className="relative h-9 w-9">
           <Bell className="h-4 w-4" />
           {unreadCount && unreadCount > 0 && (
             <span className="absolute -top-1 -right-1 h-4 w-4 bg-blue-500 rounded-full text-[10px] flex items-center justify-center text-white font-medium">
