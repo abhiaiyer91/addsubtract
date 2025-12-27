@@ -9,6 +9,7 @@ import { activityRouter } from './activity';
 import { webhooksRouter } from './webhooks';
 import { milestonesRouter } from './milestones';
 import { releasesRouter } from './releases';
+import { organizationsRouter } from './organizations';
 
 /**
  * Main application router
@@ -25,6 +26,7 @@ export const appRouter = router({
   webhooks: webhooksRouter,
   milestones: milestonesRouter,
   releases: releasesRouter,
+  organizations: organizationsRouter,
 });
 
 /**
@@ -44,4 +46,5 @@ export {
   webhooksRouter,
   milestonesRouter,
   releasesRouter,
+  organizationsRouter,
 };
