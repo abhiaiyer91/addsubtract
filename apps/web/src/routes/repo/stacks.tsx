@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { RepoLayout } from './components/repo-layout';
-import { Loading } from '@/components/ui/loading';
+import { Skeleton } from '@/components/ui/loading';
 import { useSession } from '@/lib/auth-client';
 import { trpc } from '@/lib/trpc';
 
@@ -88,14 +88,6 @@ export function StacksPage() {
       });
     }
   };
-
-  if (stacksLoading) {
-    return (
-      <RepoLayout owner={owner!} repo={repo!}>
-        <Loading text="Loading stacks..." />
-      </RepoLayout>
-    );
-  }
 
   return (
     <RepoLayout owner={owner!} repo={repo!}>
@@ -199,7 +191,27 @@ export function StacksPage() {
         )}
 
         {/* Stacks List */}
-        {!stacks || stacks.length === 0 ? (
+        {stacksLoading ? (
+          <div className="grid gap-4">
+            {[1, 2].map((i) => (
+              <Card key={i}>
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-5 w-40" />
+                      <Skeleton className="h-4 w-64" />
+                      <div className="flex items-center gap-4">
+                        <Skeleton className="h-4 w-24" />
+                        <Skeleton className="h-5 w-16" />
+                        <Skeleton className="h-4 w-32" />
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : !stacks || stacks.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground">
             <Layers className="h-12 w-12 mx-auto mb-4 opacity-50" />
             <p className="text-lg font-medium">No stacks found</p>

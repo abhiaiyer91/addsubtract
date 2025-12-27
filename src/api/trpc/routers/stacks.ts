@@ -2,24 +2,11 @@ import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import * as path from 'path';
 import { router, publicProcedure, protectedProcedure } from '../trpc';
-import { repoModel, collaboratorModel } from '../../../db/models';
-import { exists, readFile, writeFile, mkdirp } from '../../../utils/fs';
+import { repoModel, collaboratorModel, stackModel, stackBranchModel, prModel } from '../../../db/models';
+import { exists } from '../../../utils/fs';
 
 /**
- * Stack metadata stored in the repository
- */
-interface StackMetadata {
-  name: string;
-  baseBranch: string;
-  baseCommit: string;
-  branches: string[];
-  createdAt: number;
-  updatedAt: number;
-  description?: string;
-}
-
-/**
- * Stack visualization node
+ * Stack visualization node (for UI rendering)
  */
 export interface StackNode {
   branch: string;
@@ -29,90 +16,12 @@ export interface StackNode {
   status: 'synced' | 'behind' | 'ahead' | 'diverged';
   behindBy?: number;
   aheadBy?: number;
-}
-
-/**
- * Get the stacks directory for a repository
- */
-function getStacksDir(diskPath: string): string {
-  return path.join(diskPath, 'stacks');
-}
-
-/**
- * Get the meta file path for stacks
- */
-function getMetaFile(diskPath: string): string {
-  return path.join(getStacksDir(diskPath), 'stacks.json');
-}
-
-/**
- * Initialize stacks directory
- */
-function initStacksDir(diskPath: string): void {
-  const stacksDir = getStacksDir(diskPath);
-  mkdirp(stacksDir);
-  const metaFile = getMetaFile(diskPath);
-  if (!exists(metaFile)) {
-    writeFile(metaFile, JSON.stringify({ stacks: [] }, null, 2));
-  }
-}
-
-/**
- * Load stacks metadata
- */
-function loadMeta(diskPath: string): { stacks: string[] } {
-  initStacksDir(diskPath);
-  const metaFile = getMetaFile(diskPath);
-  try {
-    const content = readFile(metaFile).toString('utf8');
-    return JSON.parse(content);
-  } catch {
-    return { stacks: [] };
-  }
-}
-
-/**
- * Save stacks metadata
- */
-function saveMeta(diskPath: string, meta: { stacks: string[] }): void {
-  initStacksDir(diskPath);
-  const metaFile = getMetaFile(diskPath);
-  writeFile(metaFile, JSON.stringify(meta, null, 2));
-}
-
-/**
- * Get a specific stack
- */
-function getStack(diskPath: string, name: string): StackMetadata | null {
-  const stackFile = path.join(getStacksDir(diskPath), `${name}.json`);
-  if (!exists(stackFile)) {
-    return null;
-  }
-  try {
-    const content = readFile(stackFile).toString('utf8');
-    return JSON.parse(content) as StackMetadata;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Save a stack
- */
-function saveStack(diskPath: string, stack: StackMetadata): void {
-  initStacksDir(diskPath);
-  const stackFile = path.join(getStacksDir(diskPath), `${stack.name}.json`);
-  writeFile(stackFile, JSON.stringify(stack, null, 2));
-}
-
-/**
- * Delete a stack file
- */
-function deleteStackFile(diskPath: string, name: string): void {
-  const stackFile = path.join(getStacksDir(diskPath), `${name}.json`);
-  if (exists(stackFile)) {
-    require('fs').unlinkSync(stackFile);
-  }
+  pr?: {
+    id: string;
+    number: number;
+    title: string;
+    state: 'open' | 'closed' | 'merged';
+  } | null;
 }
 
 /**
@@ -180,23 +89,18 @@ export const stacksRouter = router({
         }
       }
 
-      const absolutePath = getAbsoluteDiskPath(result.repo.diskPath);
-      const meta = loadMeta(absolutePath);
+      // Get stacks from database
+      const stacks = await stackModel.listByRepoWithCounts(result.repo.id);
       
-      // Get details for each stack
-      const stacks = meta.stacks.map(name => {
-        const stack = getStack(absolutePath, name);
-        return stack ? {
-          name: stack.name,
-          baseBranch: stack.baseBranch,
-          branchCount: stack.branches.length,
-          description: stack.description,
-          createdAt: new Date(stack.createdAt),
-          updatedAt: new Date(stack.updatedAt),
-        } : null;
-      }).filter(Boolean);
-
-      return stacks;
+      return stacks.map(stack => ({
+        id: stack.id,
+        name: stack.name,
+        baseBranch: stack.baseBranch,
+        branchCount: stack.branchCount,
+        description: stack.description,
+        createdAt: stack.createdAt,
+        updatedAt: stack.updatedAt,
+      }));
     }),
 
   /**
@@ -240,10 +144,18 @@ export const stacksRouter = router({
         }
       }
 
-      const absolutePath = getAbsoluteDiskPath(result.repo.diskPath);
-      const stack = getStack(absolutePath, input.name);
+      const stack = await stackModel.findByRepoAndName(result.repo.id, input.name);
 
       if (!stack) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Stack not found',
+        });
+      }
+
+      // Get full stack details
+      const stackDetails = await stackModel.findWithDetails(stack.id);
+      if (!stackDetails) {
         throw new TRPCError({
           code: 'NOT_FOUND',
           message: 'Stack not found',
@@ -257,59 +169,78 @@ export const stacksRouter = router({
       const nodes: StackNode[] = [];
 
       if (bareRepo) {
-        // Add base branch
-        const baseCommit = bareRepo.refs.resolve(stack.baseBranch);
+        // Add base branch node
+        const baseCommit = bareRepo.refs.resolve(stackDetails.baseBranch);
         if (baseCommit) {
           try {
             const commit = bareRepo.objects.readCommit(baseCommit);
             nodes.push({
-              branch: stack.baseBranch,
+              branch: stackDetails.baseBranch,
               commit: baseCommit.slice(0, 8),
               message: commit.message.split('\n')[0],
               isCurrent: false,
               status: 'synced',
+              pr: null,
             });
           } catch {
             nodes.push({
-              branch: stack.baseBranch,
+              branch: stackDetails.baseBranch,
               commit: baseCommit.slice(0, 8),
               message: '',
               isCurrent: false,
               status: 'synced',
+              pr: null,
             });
           }
         }
 
-        // Add stack branches
-        for (const branch of stack.branches) {
-          const branchCommit = bareRepo.refs.resolve(`refs/heads/${branch}`);
+        // Add stack branch nodes
+        for (const branch of stackDetails.branches) {
+          const branchCommit = bareRepo.refs.resolve(`refs/heads/${branch.branchName}`);
           if (branchCommit) {
             try {
               const commit = bareRepo.objects.readCommit(branchCommit);
               nodes.push({
-                branch,
+                branch: branch.branchName,
                 commit: branchCommit.slice(0, 8),
                 message: commit.message.split('\n')[0],
                 isCurrent: false,
-                status: 'synced', // Would need more logic to determine actual status
+                status: 'synced', // TODO: Calculate actual status
+                pr: branch.pr,
               });
             } catch {
               nodes.push({
-                branch,
+                branch: branch.branchName,
                 commit: branchCommit.slice(0, 8),
                 message: '',
                 isCurrent: false,
                 status: 'synced',
+                pr: branch.pr,
               });
             }
+          } else {
+            // Branch doesn't exist in repo (might have been deleted)
+            nodes.push({
+              branch: branch.branchName,
+              commit: '',
+              message: 'Branch not found',
+              isCurrent: false,
+              status: 'synced',
+              pr: branch.pr,
+            });
           }
         }
       }
 
       return {
-        ...stack,
-        createdAt: new Date(stack.createdAt),
-        updatedAt: new Date(stack.updatedAt),
+        id: stackDetails.id,
+        name: stackDetails.name,
+        description: stackDetails.description,
+        baseBranch: stackDetails.baseBranch,
+        branches: stackDetails.branches.map(b => b.branchName),
+        author: stackDetails.author,
+        createdAt: stackDetails.createdAt,
+        updatedAt: stackDetails.updatedAt,
         nodes,
       };
     }),
@@ -348,17 +279,16 @@ export const stacksRouter = router({
         });
       }
 
-      const absolutePath = getAbsoluteDiskPath(result.repo.diskPath);
-
       // Check if stack already exists
-      if (getStack(absolutePath, input.name)) {
+      const existing = await stackModel.findByRepoAndName(result.repo.id, input.name);
+      if (existing) {
         throw new TRPCError({
           code: 'CONFLICT',
           message: 'Stack already exists',
         });
       }
 
-      // Get base branch commit
+      // Verify base branch exists
       const bareRepo = await getBareRepo(result.repo.diskPath);
       if (!bareRepo) {
         throw new TRPCError({
@@ -376,29 +306,21 @@ export const stacksRouter = router({
       }
 
       // Create the stack
-      const stack: StackMetadata = {
+      const stack = await stackModel.create({
+        repoId: result.repo.id,
         name: input.name,
         baseBranch: input.baseBranch,
-        baseCommit,
-        branches: [],
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
         description: input.description,
-      };
-
-      saveStack(absolutePath, stack);
-
-      // Add to meta
-      const meta = loadMeta(absolutePath);
-      if (!meta.stacks.includes(input.name)) {
-        meta.stacks.push(input.name);
-        saveMeta(absolutePath, meta);
-      }
+        authorId: ctx.user.id,
+      });
 
       return {
-        ...stack,
-        createdAt: new Date(stack.createdAt),
-        updatedAt: new Date(stack.updatedAt),
+        id: stack.id,
+        name: stack.name,
+        baseBranch: stack.baseBranch,
+        description: stack.description,
+        createdAt: stack.createdAt,
+        updatedAt: stack.updatedAt,
       };
     }),
 
@@ -435,8 +357,7 @@ export const stacksRouter = router({
         });
       }
 
-      const absolutePath = getAbsoluteDiskPath(result.repo.diskPath);
-      const stack = getStack(absolutePath, input.stackName);
+      const stack = await stackModel.findByRepoAndName(result.repo.id, input.stackName);
 
       if (!stack) {
         throw new TRPCError({
@@ -463,7 +384,8 @@ export const stacksRouter = router({
       }
 
       // Check if already in stack
-      if (stack.branches.includes(input.branchName)) {
+      const branches = await stackBranchModel.listByStack(stack.id);
+      if (branches.some(b => b.branchName === input.branchName)) {
         throw new TRPCError({
           code: 'CONFLICT',
           message: 'Branch is already in this stack',
@@ -471,14 +393,17 @@ export const stacksRouter = router({
       }
 
       // Add branch to stack
-      stack.branches.push(input.branchName);
-      stack.updatedAt = Date.now();
-      saveStack(absolutePath, stack);
+      await stackBranchModel.add(stack.id, input.branchName);
 
+      // Return updated stack
+      const updated = await stackModel.findWithDetails(stack.id);
       return {
-        ...stack,
-        createdAt: new Date(stack.createdAt),
-        updatedAt: new Date(stack.updatedAt),
+        id: updated!.id,
+        name: updated!.name,
+        baseBranch: updated!.baseBranch,
+        branches: updated!.branches.map(b => b.branchName),
+        createdAt: updated!.createdAt,
+        updatedAt: updated!.updatedAt,
       };
     }),
 
@@ -515,8 +440,7 @@ export const stacksRouter = router({
         });
       }
 
-      const absolutePath = getAbsoluteDiskPath(result.repo.diskPath);
-      const stack = getStack(absolutePath, input.stackName);
+      const stack = await stackModel.findByRepoAndName(result.repo.id, input.stackName);
 
       if (!stack) {
         throw new TRPCError({
@@ -526,14 +450,17 @@ export const stacksRouter = router({
       }
 
       // Remove branch from stack
-      stack.branches = stack.branches.filter(b => b !== input.branchName);
-      stack.updatedAt = Date.now();
-      saveStack(absolutePath, stack);
+      await stackBranchModel.remove(stack.id, input.branchName);
 
+      // Return updated stack
+      const updated = await stackModel.findWithDetails(stack.id);
       return {
-        ...stack,
-        createdAt: new Date(stack.createdAt),
-        updatedAt: new Date(stack.updatedAt),
+        id: updated!.id,
+        name: updated!.name,
+        baseBranch: updated!.baseBranch,
+        branches: updated!.branches.map(b => b.branchName),
+        createdAt: updated!.createdAt,
+        updatedAt: updated!.updatedAt,
       };
     }),
 
@@ -570,8 +497,7 @@ export const stacksRouter = router({
         });
       }
 
-      const absolutePath = getAbsoluteDiskPath(result.repo.diskPath);
-      const stack = getStack(absolutePath, input.stackName);
+      const stack = await stackModel.findByRepoAndName(result.repo.id, input.stackName);
 
       if (!stack) {
         throw new TRPCError({
@@ -581,7 +507,8 @@ export const stacksRouter = router({
       }
 
       // Validate that new order contains same branches
-      const currentSet = new Set(stack.branches);
+      const currentBranches = await stackBranchModel.listByStack(stack.id);
+      const currentSet = new Set(currentBranches.map(b => b.branchName));
       const newSet = new Set(input.branches);
 
       if (currentSet.size !== newSet.size) {
@@ -591,29 +518,32 @@ export const stacksRouter = router({
         });
       }
 
-      for (const branch of stack.branches) {
-        if (!newSet.has(branch)) {
+      for (const branch of currentBranches) {
+        if (!newSet.has(branch.branchName)) {
           throw new TRPCError({
             code: 'BAD_REQUEST',
-            message: `Branch '${branch}' is missing from new order`,
+            message: `Branch '${branch.branchName}' is missing from new order`,
           });
         }
       }
 
-      // Update order
-      stack.branches = input.branches;
-      stack.updatedAt = Date.now();
-      saveStack(absolutePath, stack);
+      // Reorder branches
+      await stackBranchModel.reorder(stack.id, input.branches);
 
+      // Return updated stack
+      const updated = await stackModel.findWithDetails(stack.id);
       return {
-        ...stack,
-        createdAt: new Date(stack.createdAt),
-        updatedAt: new Date(stack.updatedAt),
+        id: updated!.id,
+        name: updated!.name,
+        baseBranch: updated!.baseBranch,
+        branches: updated!.branches.map(b => b.branchName),
+        createdAt: updated!.createdAt,
+        updatedAt: updated!.updatedAt,
       };
     }),
 
   /**
-   * Delete a stack (does not delete branches)
+   * Delete a stack (does not delete branches or PRs)
    */
   delete: protectedProcedure
     .input(
@@ -644,8 +574,7 @@ export const stacksRouter = router({
         });
       }
 
-      const absolutePath = getAbsoluteDiskPath(result.repo.diskPath);
-      const stack = getStack(absolutePath, input.name);
+      const stack = await stackModel.findByRepoAndName(result.repo.id, input.name);
 
       if (!stack) {
         throw new TRPCError({
@@ -654,14 +583,158 @@ export const stacksRouter = router({
         });
       }
 
-      // Delete stack file
-      deleteStackFile(absolutePath, input.name);
+      // Get branches before deleting (for response)
+      const branches = await stackBranchModel.listByStack(stack.id);
+      const branchNames = branches.map(b => b.branchName);
 
-      // Remove from meta
-      const meta = loadMeta(absolutePath);
-      meta.stacks = meta.stacks.filter(s => s !== input.name);
-      saveMeta(absolutePath, meta);
+      // Delete stack (cascades to branches due to FK)
+      await stackModel.delete(stack.id);
 
-      return { success: true, deletedBranches: stack.branches };
+      return { success: true, deletedBranches: branchNames };
+    }),
+
+  /**
+   * Submit a stack - creates PRs for all branches that don't have them
+   * Each PR targets the branch below it in the stack (or base branch for the first)
+   */
+  submit: protectedProcedure
+    .input(
+      z.object({
+        owner: z.string(),
+        repo: z.string(),
+        stackName: z.string(),
+        // Optional: create PRs as drafts
+        draft: z.boolean().default(false),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const result = await repoModel.findByPath(input.owner, input.repo);
+
+      if (!result) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Repository not found',
+        });
+      }
+
+      // Check write permission
+      const isOwner = result.repo.ownerId === ctx.user.id;
+      const canWrite = isOwner || (await collaboratorModel.hasPermission(result.repo.id, ctx.user.id, 'write'));
+
+      if (!canWrite) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to submit stacks',
+        });
+      }
+
+      const stack = await stackModel.findByRepoAndName(result.repo.id, input.stackName);
+      if (!stack) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Stack not found',
+        });
+      }
+
+      const stackDetails = await stackModel.findWithDetails(stack.id);
+      if (!stackDetails || stackDetails.branches.length === 0) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Stack has no branches',
+        });
+      }
+
+      // Get bare repo for commit info
+      const bareRepo = await getBareRepo(result.repo.diskPath);
+      if (!bareRepo) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Could not access repository',
+        });
+      }
+
+      const createdPRs: { branch: string; prNumber: number }[] = [];
+
+      // Create PRs for branches that don't have them
+      for (let i = 0; i < stackDetails.branches.length; i++) {
+        const branch = stackDetails.branches[i];
+        
+        // Skip if already has a PR
+        if (branch.pr) {
+          continue;
+        }
+
+        // Determine target branch (previous branch in stack, or base branch)
+        const targetBranch = i === 0 
+          ? stackDetails.baseBranch 
+          : stackDetails.branches[i - 1].branchName;
+
+        // Get commits for SHAs
+        const headSha = bareRepo.refs.resolve(`refs/heads/${branch.branchName}`);
+        const baseSha = bareRepo.refs.resolve(i === 0 ? stackDetails.baseBranch : `refs/heads/${targetBranch}`);
+
+        if (!headSha || !baseSha) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: `Could not resolve branch '${branch.branchName}' or target '${targetBranch}'`,
+          });
+        }
+
+        // Get commit message for PR title
+        let title = branch.branchName;
+        try {
+          const commit = bareRepo.objects.readCommit(headSha);
+          title = commit.message.split('\n')[0];
+        } catch {
+          // Use branch name as fallback
+        }
+
+        // Create PR body with stack context
+        const stackInfo = stackDetails.branches.map((b, idx) => {
+          const marker = idx === i ? '→' : ' ';
+          const prInfo = b.pr ? ` (#${b.pr.number})` : idx < i ? ' (pending)' : '';
+          return `${marker} ${idx + 1}. \`${b.branchName}\`${prInfo}`;
+        }).join('\n');
+
+        const body = `## Stack: ${stackDetails.name}
+
+This PR is part of a stacked diff. Please review and merge PRs in order.
+
+### Stack Structure
+\`\`\`
+${stackInfo}
+\`\`\`
+
+**Base:** \`${stackDetails.baseBranch}\`
+`;
+
+        // Create the PR
+        const pr = await prModel.create({
+          repoId: result.repo.id,
+          title,
+          body,
+          sourceBranch: branch.branchName,
+          targetBranch,
+          headSha,
+          baseSha,
+          authorId: ctx.user.id,
+          isDraft: input.draft,
+          stackId: stack.id,
+        });
+
+        // Link PR to stack branch
+        await stackBranchModel.linkPR(stack.id, branch.branchName, pr.id);
+
+        createdPRs.push({
+          branch: branch.branchName,
+          prNumber: pr.number,
+        });
+      }
+
+      return {
+        stackName: input.stackName,
+        createdPRs,
+        totalBranches: stackDetails.branches.length,
+      };
     }),
 });

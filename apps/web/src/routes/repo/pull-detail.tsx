@@ -12,6 +12,9 @@ import {
   CheckCircle,
   AlertCircle,
   Loader2,
+  Layers,
+  ArrowRight,
+  Circle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -271,6 +274,63 @@ export function PullDetailPage() {
             </Badge>
           ))}
         </div>
+
+        {/* Stack context */}
+        {pr.stack && (
+          <Card className="mt-4 bg-muted/30">
+            <CardContent className="p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <Layers className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Part of stack:</span>
+                <Link 
+                  to={`/${owner}/${repo}/stacks/${pr.stack.name}`}
+                  className="text-sm text-primary hover:underline"
+                >
+                  {pr.stack.name}
+                </Link>
+              </div>
+              <div className="flex items-center gap-1 flex-wrap text-xs">
+                <code className="bg-muted px-1.5 py-0.5 rounded">{pr.stack.baseBranch}</code>
+                {pr.stack.branches.map((branch, idx) => {
+                  const isCurrentPR = branch.isCurrent;
+                  const prState = branch.pr?.state;
+                  
+                  return (
+                    <span key={branch.branchName} className="flex items-center gap-1">
+                      <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                      {branch.pr ? (
+                        <Link 
+                          to={`/${owner}/${repo}/pull/${branch.pr.number}`}
+                          className={`px-1.5 py-0.5 rounded flex items-center gap-1 ${
+                            isCurrentPR 
+                              ? 'bg-primary text-primary-foreground font-medium' 
+                              : prState === 'merged'
+                                ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
+                                : prState === 'closed'
+                                  ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                                  : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                          }`}
+                        >
+                          {prState === 'merged' && <GitMerge className="h-3 w-3" />}
+                          {prState === 'open' && <GitPullRequest className="h-3 w-3" />}
+                          {prState === 'closed' && <Circle className="h-3 w-3" />}
+                          #{branch.pr.number}
+                        </Link>
+                      ) : (
+                        <code className="bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
+                          {branch.branchName}
+                        </code>
+                      )}
+                    </span>
+                  );
+                })}
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Review and merge PRs in order from left to right
+              </p>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Tabs */}
