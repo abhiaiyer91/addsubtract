@@ -96,6 +96,7 @@ export function NewPullPage() {
         <PRForm
           branches={branches}
           defaultBranch={repoData?.repo.defaultBranch || 'main'}
+          repoId={repoData?.repo.id}
           onSubmit={handleSubmit}
           isLoading={createPRMutation.isPending}
           error={createPRMutation.error?.message}
