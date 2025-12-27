@@ -1183,23 +1183,6 @@ export const reposRouter = router({
     .query(async ({ input, ctx }) => {
       const repo = await repoModel.findById(input.repoId);
       if (!repo) {
-   * Update/create a file in a repository (creates a commit)
-   */
-  updateFile: protectedProcedure
-    .input(
-      z.object({
-        owner: z.string(),
-        repo: z.string(),
-        ref: z.string().default('main'),
-        path: z.string(),
-        content: z.string(),
-        message: z.string(),
-      })
-    )
-    .mutation(async ({ input, ctx }) => {
-      const result = await repoModel.findByPath(input.owner, input.repo);
-
-      if (!result) {
         throw new TRPCError({
           code: 'NOT_FOUND',
           message: 'Repository not found',
@@ -1302,6 +1285,32 @@ export const reposRouter = router({
       }
 
       return { success: true };
+    }),
+
+  /**
+   * Update/create a file in a repository (creates a commit)
+   */
+  updateFile: protectedProcedure
+    .input(
+      z.object({
+        owner: z.string(),
+        repo: z.string(),
+        ref: z.string().default('main'),
+        path: z.string(),
+        content: z.string(),
+        message: z.string(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const result = await repoModel.findByPath(input.owner, input.repo);
+
+      if (!result) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Repository not found',
+        });
+      }
+
       // Check write access
       const isOwner = result.repo.ownerId === ctx.user.id;
       const hasWriteAccess = isOwner || (await collaboratorModel.hasPermission(result.repo.id, ctx.user.id, 'write'));
