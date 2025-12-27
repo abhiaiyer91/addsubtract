@@ -3,7 +3,6 @@ import { createTRPCReact } from '@trpc/react-query';
 import { httpBatchLink } from '@trpc/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import superjson from 'superjson';
-import { getAuthToken } from './auth';
 import type { AppRouter } from './api-types';
 
 export const trpc = createTRPCReact<AppRouter>();
@@ -26,9 +25,12 @@ export function TRPCProvider({ children }: { children: React.ReactNode }) {
       links: [
         httpBatchLink({
           url: import.meta.env.VITE_API_URL || '/trpc',
-          headers: () => {
-            const token = getAuthToken();
-            return token ? { Authorization: `Bearer ${token}` } : {};
+          // Use cookies for authentication (better-auth)
+          fetch: (url, options) => {
+            return fetch(url, {
+              ...options,
+              credentials: 'include', // Include cookies in requests
+            });
           },
           transformer: superjson,
         }),

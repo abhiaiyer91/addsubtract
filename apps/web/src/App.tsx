@@ -11,6 +11,7 @@ import { RepoPage } from './routes/repo';
 import { TreePage } from './routes/repo/tree';
 import { BlobPage } from './routes/repo/blob';
 import { CommitsPage } from './routes/repo/commits';
+import { CommitDetailPage } from './routes/repo/commit-detail';
 import { BranchesPage } from './routes/repo/branches';
 import { PullsPage } from './routes/repo/pulls';
 import { PullDetailPage } from './routes/repo/pull-detail';
@@ -42,6 +43,7 @@ export function App() {
             <Route path="/:owner/:repo/blob/:ref/*" element={<BlobPage />} />
             <Route path="/:owner/:repo/commits" element={<CommitsPage />} />
             <Route path="/:owner/:repo/commits/:ref" element={<CommitsPage />} />
+            <Route path="/:owner/:repo/commit/:sha" element={<CommitDetailPage />} />
             <Route path="/:owner/:repo/branches" element={<BranchesPage />} />
 
             {/* Pull requests */}

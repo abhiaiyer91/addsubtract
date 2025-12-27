@@ -632,7 +632,15 @@ async function handleDatabaseIntegration(
           defaultBranch: 'main',
           isPrivate: false,
         });
-        dbUser = user;
+        // Map legacy user to owner type
+        dbUser = {
+          id: user.id,
+          name: user.name ?? '',
+          email: user.email,
+          username: user.username,
+          image: null,
+          avatarUrl: user.avatarUrl,
+        };
         console.log(`[server] Created database record for ${owner}/${repoName}`);
       } else {
         // Create placeholder user if not exists
@@ -650,7 +658,15 @@ async function handleDatabaseIntegration(
           defaultBranch: 'main',
           isPrivate: false,
         });
-        dbUser = newUser;
+        // Map legacy user to owner type
+        dbUser = {
+          id: newUser.id,
+          name: newUser.name ?? '',
+          email: newUser.email,
+          username: newUser.username,
+          image: null,
+          avatarUrl: newUser.avatarUrl,
+        };
         console.log(`[server] Created placeholder user and database record for ${owner}/${repoName}`);
       }
     }

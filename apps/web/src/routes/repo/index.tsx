@@ -3,7 +3,7 @@ import { Copy, Check } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { FileTree } from '@/components/repo/file-tree';
-import { SimpleBranchSelector } from '@/components/repo/branch-selector';
+import { BranchSelector } from '@/components/repo/branch-selector';
 import { Markdown } from '@/components/markdown/renderer';
 import { RepoLayout } from './components/repo-layout';
 import { trpc } from '@/lib/trpc';
@@ -14,6 +14,12 @@ export function RepoPage() {
 
   // Fetch repository data
   const { data: repoData } = trpc.repos.get.useQuery(
+    { owner: owner!, repo: repo! },
+    { enabled: !!owner && !!repo }
+  );
+
+  // Fetch branches
+  const { data: branches } = trpc.repos.getBranches.useQuery(
     { owner: owner!, repo: repo! },
     { enabled: !!owner && !!repo }
   );
@@ -42,7 +48,7 @@ export function RepoPage() {
 
   const repoInfo = repoData?.repo;
   const ownerInfo = repoData?.owner;
-  const ownerUsername = ownerInfo && 'username' in ownerInfo ? ownerInfo.username : owner!;
+  const ownerUsername = (ownerInfo && 'username' in ownerInfo ? ownerInfo.username : null) || owner!;
   const tree = treeData?.entries || [];
   const readme = readmeData?.encoding === 'utf-8' ? readmeData.content : null;
 
@@ -60,11 +66,14 @@ export function RepoPage() {
         {/* Branch selector and actions */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <SimpleBranchSelector
-              defaultBranch={repoInfo?.defaultBranch || 'main'}
-              owner={ownerUsername}
-              repo={repoInfo?.name || repo!}
-            />
+            {branches && branches.length > 0 && (
+              <BranchSelector
+                branches={branches}
+                currentRef={repoInfo?.defaultBranch || 'main'}
+                owner={ownerUsername}
+                repo={repoInfo?.name || repo!}
+              />
+            )}
             <Link
               to={`/${owner}/${repo}/branches`}
               className="text-sm text-muted-foreground hover:text-foreground"

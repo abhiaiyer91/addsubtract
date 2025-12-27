@@ -3,13 +3,22 @@ import { getDb } from '../index';
 import {
   activities,
   watches,
-  users,
   repositories,
   type Activity,
   type NewActivity,
-  type User,
   type Repository,
 } from '../schema';
+import { user } from '../auth-schema';
+
+// Actor type from better-auth user table
+type Actor = {
+  id: string;
+  name: string;
+  email: string;
+  username: string | null;
+  image: string | null;
+  avatarUrl: string | null;
+};
 
 export type ActivityType =
   | 'push'
@@ -96,12 +105,12 @@ export const activityModel = {
     repoId: string,
     limit = 50,
     offset = 0
-  ): Promise<(Activity & { actor: User })[]> {
+  ): Promise<(Activity & { actor: Actor })[]> {
     const db = getDb();
     const result = await db
       .select()
       .from(activities)
-      .innerJoin(users, eq(activities.actorId, users.id))
+      .innerJoin(user, eq(activities.actorId, user.id))
       .where(eq(activities.repoId, repoId))
       .orderBy(desc(activities.createdAt))
       .limit(limit)
@@ -109,7 +118,14 @@ export const activityModel = {
 
     return result.map((r) => ({
       ...r.activities,
-      actor: r.users,
+      actor: {
+        id: r.user.id,
+        name: r.user.name,
+        email: r.user.email,
+        username: r.user.username,
+        image: r.user.image,
+        avatarUrl: r.user.avatarUrl,
+      },
     }));
   },
 
@@ -144,7 +160,7 @@ export const activityModel = {
     userId: string,
     limit = 50,
     offset = 0
-  ): Promise<(Activity & { actor: User; repo?: Repository })[]> {
+  ): Promise<(Activity & { actor: Actor; repo?: Repository })[]> {
     const db = getDb();
 
     // Get watched repo IDs
@@ -162,7 +178,7 @@ export const activityModel = {
     const result = await db
       .select()
       .from(activities)
-      .innerJoin(users, eq(activities.actorId, users.id))
+      .innerJoin(user, eq(activities.actorId, user.id))
       .leftJoin(repositories, eq(activities.repoId, repositories.id))
       .where(inArray(activities.repoId, repoIds))
       .orderBy(desc(activities.createdAt))
@@ -171,7 +187,14 @@ export const activityModel = {
 
     return result.map((r) => ({
       ...r.activities,
-      actor: r.users,
+      actor: {
+        id: r.user.id,
+        name: r.user.name,
+        email: r.user.email,
+        username: r.user.username,
+        image: r.user.image,
+        avatarUrl: r.user.avatarUrl,
+      },
       repo: r.repositories ?? undefined,
     }));
   },
@@ -182,12 +205,12 @@ export const activityModel = {
   async getPublicFeed(
     limit = 50,
     offset = 0
-  ): Promise<(Activity & { actor: User; repo?: Repository })[]> {
+  ): Promise<(Activity & { actor: Actor; repo?: Repository })[]> {
     const db = getDb();
     const result = await db
       .select()
       .from(activities)
-      .innerJoin(users, eq(activities.actorId, users.id))
+      .innerJoin(user, eq(activities.actorId, user.id))
       .innerJoin(repositories, eq(activities.repoId, repositories.id))
       .where(eq(repositories.isPrivate, false))
       .orderBy(desc(activities.createdAt))
@@ -196,7 +219,14 @@ export const activityModel = {
 
     return result.map((r) => ({
       ...r.activities,
-      actor: r.users,
+      actor: {
+        id: r.user.id,
+        name: r.user.name,
+        email: r.user.email,
+        username: r.user.username,
+        image: r.user.image,
+        avatarUrl: r.user.avatarUrl,
+      },
       repo: r.repositories,
     }));
   },

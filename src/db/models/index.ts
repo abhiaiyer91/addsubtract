@@ -1,5 +1,5 @@
-// User models
-export { userModel, sessionModel, oauthAccountModel } from './user';
+// User models (uses better-auth user table)
+export { userModel, type User, type NewUser } from './user';
 
 // SSH Keys model
 export { sshKeyModel } from './ssh-keys';

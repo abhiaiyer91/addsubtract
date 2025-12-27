@@ -474,14 +474,8 @@ export const pullsRouter = router({
         });
       }
 
-      // Get user info for commit author
-      const user = await userModel.findById(ctx.user.id);
-      if (!user) {
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'User not found',
-        });
-      }
+      // Use user info from context (already authenticated via better-auth)
+      const user = ctx.user;
 
       // Resolve disk path
       const reposDir = process.env.REPOS_DIR || './repos';
@@ -511,7 +505,7 @@ export const pullsRouter = router({
         pr.sourceBranch,
         pr.targetBranch,
         {
-          authorName: user.name || user.username,
+          authorName: user.name || user.username || 'Unknown',
           authorEmail: user.email,
           message: mergeMessage,
           strategy: input.strategy,

@@ -7,6 +7,7 @@ import {
   GitPullRequest,
   CircleDot,
   Settings,
+  History,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -56,6 +57,7 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
   // Determine active tab based on current path
   const path = location.pathname;
   const getActiveTab = () => {
+    if (path.includes('/commits')) return 'commits';
     if (path.includes('/issues')) return 'issues';
     if (path.includes('/pulls') || path.includes('/pull/')) return 'pulls';
     if (path.includes('/settings')) return 'settings';
@@ -135,6 +137,10 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
           <Link to={`/${owner}/${repo}`} className={tabClass('code')}>
             <Code className="h-4 w-4" />
             Code
+          </Link>
+          <Link to={`/${owner}/${repo}/commits`} className={tabClass('commits')}>
+            <History className="h-4 w-4" />
+            Commits
           </Link>
           <Link to={`/${owner}/${repo}/issues`} className={tabClass('issues')}>
             <CircleDot className="h-4 w-4" />

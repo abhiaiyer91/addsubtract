@@ -5,7 +5,6 @@ import {
   issueComments,
   issueLabels,
   labels,
-  users,
   repositories,
   type Issue,
   type NewIssue,
@@ -13,9 +12,19 @@ import {
   type NewIssueComment,
   type Label,
   type NewLabel,
-  type User,
 } from '../schema';
+import { user } from '../auth-schema';
 import { repoModel } from './repository';
+
+// Author type from better-auth user table
+type Author = {
+  id: string;
+  name: string;
+  email: string;
+  username: string | null;
+  image: string | null;
+  avatarUrl: string | null;
+};
 
 export const issueModel = {
   /**
@@ -47,19 +56,26 @@ export const issueModel = {
    */
   async findWithAuthor(
     id: string
-  ): Promise<{ issue: Issue; author: User } | undefined> {
+  ): Promise<{ issue: Issue; author: Author } | undefined> {
     const db = getDb();
     const result = await db
       .select()
       .from(issues)
-      .innerJoin(users, eq(issues.authorId, users.id))
+      .innerJoin(user, eq(issues.authorId, user.id))
       .where(eq(issues.id, id));
 
     if (result.length === 0) return undefined;
 
     return {
       issue: result[0].issues,
-      author: result[0].users,
+      author: {
+        id: result[0].user.id,
+        name: result[0].user.name,
+        email: result[0].user.email,
+        username: result[0].user.username,
+        image: result[0].user.image,
+        avatarUrl: result[0].user.avatarUrl,
+      },
     };
   },
 
@@ -307,18 +323,25 @@ export const issueCommentModel = {
    */
   async listByIssue(
     issueId: string
-  ): Promise<(IssueComment & { user: User })[]> {
+  ): Promise<(IssueComment & { user: Author })[]> {
     const db = getDb();
     const result = await db
       .select()
       .from(issueComments)
-      .innerJoin(users, eq(issueComments.userId, users.id))
+      .innerJoin(user, eq(issueComments.userId, user.id))
       .where(eq(issueComments.issueId, issueId))
       .orderBy(issueComments.createdAt);
 
     return result.map((r) => ({
       ...r.issue_comments,
-      user: r.users,
+      user: {
+        id: r.user.id,
+        name: r.user.name,
+        email: r.user.email,
+        username: r.user.username,
+        image: r.user.image,
+        avatarUrl: r.user.avatarUrl,
+      },
     }));
   },
 

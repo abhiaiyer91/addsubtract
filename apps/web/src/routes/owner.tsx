@@ -52,7 +52,7 @@ export function OwnerPage() {
           <Avatar className="h-64 w-64 rounded-lg">
             <AvatarImage src={user.avatarUrl || undefined} />
             <AvatarFallback className="text-6xl rounded-lg">
-              {user.username.slice(0, 2).toUpperCase()}
+              {(user.username || user.name || 'U').slice(0, 2).toUpperCase()}
             </AvatarFallback>
           </Avatar>
 

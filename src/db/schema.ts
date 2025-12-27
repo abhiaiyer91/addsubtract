@@ -190,8 +190,8 @@ export const branchProtectionRules = pgTable('branch_protection_rules', {
 export const repositories = pgTable('repositories', {
   id: uuid('id').primaryKey().defaultRandom(),
 
-  // Owner can be user or org
-  ownerId: uuid('owner_id').notNull(),
+  // Owner can be user or org (references better-auth user.id)
+  ownerId: text('owner_id').notNull(),
   ownerType: ownerTypeEnum('owner_type').notNull(),
 
   name: text('name').notNull(),

@@ -1,4 +1,4 @@
-import { eq, and, desc, sql } from 'drizzle-orm';
+import { eq, and, desc, sql, inArray } from 'drizzle-orm';
 import { getDb } from '../index';
 import {
   pullRequests,
@@ -6,7 +6,6 @@ import {
   prComments,
   prLabels,
   labels,
-  users,
   repositories,
   type PullRequest,
   type NewPullRequest,
@@ -15,9 +14,19 @@ import {
   type PrComment,
   type NewPrComment,
   type Label,
-  type User,
 } from '../schema';
+import { user } from '../auth-schema';
 import { repoModel } from './repository';
+
+// Author type from better-auth user table
+type Author = {
+  id: string;
+  name: string;
+  email: string;
+  username: string | null;
+  image: string | null;
+  avatarUrl: string | null;
+};
 
 export const prModel = {
   /**
@@ -54,19 +63,26 @@ export const prModel = {
    */
   async findWithAuthor(
     id: string
-  ): Promise<{ pr: PullRequest; author: User } | undefined> {
+  ): Promise<{ pr: PullRequest; author: Author } | undefined> {
     const db = getDb();
     const result = await db
       .select()
       .from(pullRequests)
-      .innerJoin(users, eq(pullRequests.authorId, users.id))
+      .innerJoin(user, eq(pullRequests.authorId, user.id))
       .where(eq(pullRequests.id, id));
 
     if (result.length === 0) return undefined;
 
     return {
       pr: result[0].pull_requests,
-      author: result[0].users,
+      author: {
+        id: result[0].user.id,
+        name: result[0].user.name,
+        email: result[0].user.email,
+        username: result[0].user.username,
+        image: result[0].user.image,
+        avatarUrl: result[0].user.avatarUrl,
+      },
     };
   },
 
@@ -131,7 +147,12 @@ export const prModel = {
     const conditions = [eq(pullRequests.repoId, repoId)];
 
     if (options.state) {
-      conditions.push(eq(pullRequests.state, options.state));
+      // "closed" includes both "closed" and "merged" PRs for UI purposes
+      if (options.state === 'closed') {
+        conditions.push(inArray(pullRequests.state, ['closed', 'merged']));
+      } else {
+        conditions.push(eq(pullRequests.state, options.state));
+      }
     }
 
     if (options.authorId) {
@@ -307,18 +328,25 @@ export const prReviewModel = {
   /**
    * List reviews for a PR
    */
-  async listByPr(prId: string): Promise<(PrReview & { user: User })[]> {
+  async listByPr(prId: string): Promise<(PrReview & { user: Author })[]> {
     const db = getDb();
     const result = await db
       .select()
       .from(prReviews)
-      .innerJoin(users, eq(prReviews.userId, users.id))
+      .innerJoin(user, eq(prReviews.userId, user.id))
       .where(eq(prReviews.prId, prId))
       .orderBy(desc(prReviews.createdAt));
 
     return result.map((r) => ({
       ...r.pr_reviews,
-      user: r.users,
+      user: {
+        id: r.user.id,
+        name: r.user.name,
+        email: r.user.email,
+        username: r.user.username,
+        image: r.user.image,
+        avatarUrl: r.user.avatarUrl,
+      },
     }));
   },
 
@@ -381,18 +409,25 @@ export const prCommentModel = {
   /**
    * List comments for a PR
    */
-  async listByPr(prId: string): Promise<(PrComment & { user: User })[]> {
+  async listByPr(prId: string): Promise<(PrComment & { user: Author })[]> {
     const db = getDb();
     const result = await db
       .select()
       .from(prComments)
-      .innerJoin(users, eq(prComments.userId, users.id))
+      .innerJoin(user, eq(prComments.userId, user.id))
       .where(eq(prComments.prId, prId))
       .orderBy(prComments.createdAt);
 
     return result.map((r) => ({
       ...r.pr_comments,
-      user: r.users,
+      user: {
+        id: r.user.id,
+        name: r.user.name,
+        email: r.user.email,
+        username: r.user.username,
+        image: r.user.image,
+        avatarUrl: r.user.avatarUrl,
+      },
     }));
   },
 
@@ -402,18 +437,25 @@ export const prCommentModel = {
   async listByFile(
     prId: string,
     path: string
-  ): Promise<(PrComment & { user: User })[]> {
+  ): Promise<(PrComment & { user: Author })[]> {
     const db = getDb();
     const result = await db
       .select()
       .from(prComments)
-      .innerJoin(users, eq(prComments.userId, users.id))
+      .innerJoin(user, eq(prComments.userId, user.id))
       .where(and(eq(prComments.prId, prId), eq(prComments.path, path)))
       .orderBy(prComments.line, prComments.createdAt);
 
     return result.map((r) => ({
       ...r.pr_comments,
-      user: r.users,
+      user: {
+        id: r.user.id,
+        name: r.user.name,
+        email: r.user.email,
+        username: r.user.username,
+        image: r.user.image,
+        avatarUrl: r.user.avatarUrl,
+      },
     }));
   },
 

@@ -1,7 +1,10 @@
 import { Context, Next } from 'hono';
-import { sessionModel, userModel } from '../../db/models';
-import { isConnected } from '../../db';
-import type { User } from '../../db/schema';
+import { userModel } from '../../db/models';
+import { isConnected, getDb } from '../../db';
+import { session as sessionTable } from '../../db/auth-schema';
+import { user as userTable } from '../../db/auth-schema';
+import { eq, and, gt } from 'drizzle-orm';
+import type { User } from '../../db/models/user';
 
 /**
  * Extended context with user information
@@ -10,6 +13,31 @@ declare module 'hono' {
   interface ContextVariableMap {
     user?: User;
   }
+}
+
+/**
+ * Find session with user from better-auth session table
+ */
+async function findSessionWithUser(token: string): Promise<{ session: any; user: User } | undefined> {
+  const db = getDb();
+  const result = await db
+    .select()
+    .from(sessionTable)
+    .innerJoin(userTable, eq(sessionTable.userId, userTable.id))
+    .where(
+      and(
+        eq(sessionTable.token, token),
+        gt(sessionTable.expiresAt, new Date())
+      )
+    )
+    .limit(1);
+
+  if (result.length === 0) return undefined;
+
+  return {
+    session: result[0].session,
+    user: result[0].user,
+  };
 }
 
 /**
@@ -28,10 +56,10 @@ export async function authMiddleware(c: Context, next: Next): Promise<Response |
     const token = authHeader.slice(7);
     
     try {
-      const session = await sessionModel.findWithUser(token);
+      const result = await findSessionWithUser(token);
 
-      if (session && session.session.expiresAt > new Date()) {
-        c.set('user', session.user);
+      if (result) {
+        c.set('user', result.user);
       }
     } catch (error) {
       // Log error but don't fail the request
@@ -100,10 +128,10 @@ export async function gitAuthMiddleware(c: Context, next: Next): Promise<Respons
     const token = authHeader.slice(7);
     
     try {
-      const session = await sessionModel.findWithUser(token);
+      const result = await findSessionWithUser(token);
 
-      if (session && session.session.expiresAt > new Date()) {
-        c.set('user', session.user);
+      if (result) {
+        c.set('user', result.user);
       }
     } catch (error) {
       console.error('[git-auth] Session lookup failed:', error);

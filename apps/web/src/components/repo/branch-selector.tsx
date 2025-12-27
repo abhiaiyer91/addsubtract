@@ -42,6 +42,9 @@ export function BranchSelector({
       if (filePath) {
         path += `/${filePath}`;
       }
+    } else {
+      // Default to tree view when no basePath is specified
+      path += `/tree/${branch}`;
     }
     navigate(path);
   };
@@ -70,32 +73,5 @@ export function BranchSelector({
         </SelectGroup>
       </SelectContent>
     </Select>
-  );
-}
-
-// Simple version for repo home
-export function SimpleBranchSelector({
-  defaultBranch,
-  owner,
-  repo,
-}: {
-  defaultBranch: string;
-  owner: string;
-  repo: string;
-}) {
-  // Mock branches - would come from tRPC
-  const branches = [
-    { name: defaultBranch, sha: 'abc123', isDefault: true },
-    { name: 'develop', sha: 'def456' },
-    { name: 'feature/new-ui', sha: 'ghi789' },
-  ];
-
-  return (
-    <BranchSelector
-      branches={branches}
-      currentRef={defaultBranch}
-      owner={owner}
-      repo={repo}
-    />
   );
 }

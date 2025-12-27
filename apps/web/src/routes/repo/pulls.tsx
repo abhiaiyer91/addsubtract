@@ -25,13 +25,24 @@ export function PullsPage() {
     { enabled: !!owner && !!repo }
   );
 
-  // Fetch pull requests
+  // Fetch pull requests for current state
+  const stateFilter = currentState === 'open' ? 'open' : currentState === 'closed' ? 'closed' : undefined;
   const { data: pullsData, isLoading: pullsLoading } = trpc.pulls.list.useQuery(
     {
       repoId: repoData?.repo.id!,
-      state: currentState === 'open' ? 'open' : currentState === 'closed' ? 'closed' : undefined,
+      state: stateFilter,
       limit: 50,
     },
+    { enabled: !!repoData?.repo.id }
+  );
+
+  // Fetch counts for both states (for tab badges)
+  const { data: openPullsData } = trpc.pulls.list.useQuery(
+    { repoId: repoData?.repo.id!, state: 'open', limit: 100 },
+    { enabled: !!repoData?.repo.id }
+  );
+  const { data: closedPullsData } = trpc.pulls.list.useQuery(
+    { repoId: repoData?.repo.id!, state: 'closed', limit: 100 },
     { enabled: !!repoData?.repo.id }
   );
 
@@ -47,8 +58,8 @@ export function PullsPage() {
   });
 
   // Count PRs by state
-  const openCount = pullRequests.filter(pr => pr.state === 'open').length;
-  const closedCount = pullRequests.filter(pr => pr.state === 'closed' || pr.state === 'merged').length;
+  const openCount = openPullsData?.length || 0;
+  const closedCount = closedPullsData?.length || 0;
 
   const handleStateChange = (state: string) => {
     setSearchParams({ state });

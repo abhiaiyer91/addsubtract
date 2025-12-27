@@ -1,16 +1,10 @@
 import { eq, or, ilike } from 'drizzle-orm';
 import { getDb } from '../index';
-import {
-  users,
-  sessions,
-  oauthAccounts,
-  type User,
-  type NewUser,
-  type Session,
-  type NewSession,
-  type OAuthAccount,
-  type NewOAuthAccount,
-} from '../schema';
+import { user } from '../auth-schema';
+
+// User type from better-auth schema
+export type User = typeof user.$inferSelect;
+export type NewUser = typeof user.$inferInsert;
 
 export const userModel = {
   /**
@@ -18,8 +12,8 @@ export const userModel = {
    */
   async findById(id: string): Promise<User | undefined> {
     const db = getDb();
-    const [user] = await db.select().from(users).where(eq(users.id, id));
-    return user;
+    const [found] = await db.select().from(user).where(eq(user.id, id));
+    return found;
   },
 
   /**
@@ -27,8 +21,8 @@ export const userModel = {
    */
   async findByUsername(username: string): Promise<User | undefined> {
     const db = getDb();
-    const [user] = await db.select().from(users).where(eq(users.username, username));
-    return user;
+    const [found] = await db.select().from(user).where(eq(user.username, username));
+    return found;
   },
 
   /**
@@ -36,8 +30,8 @@ export const userModel = {
    */
   async findByEmail(email: string): Promise<User | undefined> {
     const db = getDb();
-    const [user] = await db.select().from(users).where(eq(users.email, email));
-    return user;
+    const [found] = await db.select().from(user).where(eq(user.email, email));
+    return found;
   },
 
   /**
@@ -45,13 +39,13 @@ export const userModel = {
    */
   async findByUsernameOrEmail(usernameOrEmail: string): Promise<User | undefined> {
     const db = getDb();
-    const [user] = await db
+    const [found] = await db
       .select()
-      .from(users)
+      .from(user)
       .where(
-        or(eq(users.username, usernameOrEmail), eq(users.email, usernameOrEmail))
+        or(eq(user.username, usernameOrEmail), eq(user.email, usernameOrEmail))
       );
-    return user;
+    return found;
   },
 
   /**
@@ -61,18 +55,32 @@ export const userModel = {
     const db = getDb();
     return db
       .select()
-      .from(users)
-      .where(or(ilike(users.username, `%${query}%`), ilike(users.name, `%${query}%`)))
+      .from(user)
+      .where(or(ilike(user.username, `%${query}%`), ilike(user.name, `%${query}%`)))
       .limit(limit);
   },
 
   /**
-   * Create a new user
+   * Create a new user (for internal use - better-auth handles registration)
    */
-  async create(data: NewUser): Promise<User> {
+  async create(data: { 
+    id?: string;
+    name: string; 
+    email: string; 
+    username?: string;
+    avatarUrl?: string;
+  }): Promise<User> {
     const db = getDb();
-    const [user] = await db.insert(users).values(data).returning();
-    return user;
+    const id = data.id || crypto.randomUUID().replace(/-/g, '').slice(0, 32);
+    const [created] = await db.insert(user).values({
+      id,
+      name: data.name,
+      email: data.email,
+      username: data.username || null,
+      avatarUrl: data.avatarUrl || null,
+      emailVerified: false,
+    }).returning();
+    return created;
   },
 
   /**
@@ -83,179 +91,27 @@ export const userModel = {
     data: Partial<Omit<NewUser, 'id' | 'createdAt'>>
   ): Promise<User | undefined> {
     const db = getDb();
-    const [user] = await db
-      .update(users)
+    const [updated] = await db
+      .update(user)
       .set({ ...data, updatedAt: new Date() })
-      .where(eq(users.id, id))
+      .where(eq(user.id, id))
       .returning();
-    return user;
-  },
-
-  /**
-   * Delete a user
-   */
-  async delete(id: string): Promise<boolean> {
-    const db = getDb();
-    const result = await db.delete(users).where(eq(users.id, id)).returning();
-    return result.length > 0;
+    return updated;
   },
 
   /**
    * Check if username is available
    */
   async isUsernameAvailable(username: string): Promise<boolean> {
-    const user = await this.findByUsername(username);
-    return !user;
+    const found = await this.findByUsername(username);
+    return !found;
   },
 
   /**
    * Check if email is available
    */
   async isEmailAvailable(email: string): Promise<boolean> {
-    const user = await this.findByEmail(email);
-    return !user;
-  },
-};
-
-export const sessionModel = {
-  /**
-   * Find a session by ID
-   */
-  async findById(id: string): Promise<Session | undefined> {
-    const db = getDb();
-    const [session] = await db.select().from(sessions).where(eq(sessions.id, id));
-    return session;
-  },
-
-  /**
-   * Find a session with its user
-   */
-  async findWithUser(
-    id: string
-  ): Promise<{ session: Session; user: User } | undefined> {
-    const db = getDb();
-    const result = await db
-      .select()
-      .from(sessions)
-      .innerJoin(users, eq(sessions.userId, users.id))
-      .where(eq(sessions.id, id));
-
-    if (result.length === 0) return undefined;
-
-    return {
-      session: result[0].sessions,
-      user: result[0].users,
-    };
-  },
-
-  /**
-   * Create a new session
-   */
-  async create(data: NewSession): Promise<Session> {
-    const db = getDb();
-    const [session] = await db.insert(sessions).values(data).returning();
-    return session;
-  },
-
-  /**
-   * Delete a session
-   */
-  async delete(id: string): Promise<boolean> {
-    const db = getDb();
-    const result = await db.delete(sessions).where(eq(sessions.id, id)).returning();
-    return result.length > 0;
-  },
-
-  /**
-   * Delete all sessions for a user
-   */
-  async deleteAllForUser(userId: string): Promise<number> {
-    const db = getDb();
-    const result = await db
-      .delete(sessions)
-      .where(eq(sessions.userId, userId))
-      .returning();
-    return result.length;
-  },
-
-  /**
-   * Delete expired sessions
-   */
-  async deleteExpired(): Promise<number> {
-    const db = getDb();
-    const result = await db
-      .delete(sessions)
-      .where(eq(sessions.expiresAt, new Date()))
-      .returning();
-    return result.length;
-  },
-};
-
-export const oauthAccountModel = {
-  /**
-   * Find OAuth account by provider and provider account ID
-   */
-  async findByProviderAccount(
-    provider: string,
-    providerAccountId: string
-  ): Promise<OAuthAccount | undefined> {
-    const db = getDb();
-    const [account] = await db
-      .select()
-      .from(oauthAccounts)
-      .where(
-        eq(oauthAccounts.provider, provider) &&
-          eq(oauthAccounts.providerAccountId, providerAccountId)
-      );
-    return account;
-  },
-
-  /**
-   * Find all OAuth accounts for a user
-   */
-  async findByUserId(userId: string): Promise<OAuthAccount[]> {
-    const db = getDb();
-    return db.select().from(oauthAccounts).where(eq(oauthAccounts.userId, userId));
-  },
-
-  /**
-   * Create a new OAuth account link
-   */
-  async create(data: NewOAuthAccount): Promise<OAuthAccount> {
-    const db = getDb();
-    const [account] = await db.insert(oauthAccounts).values(data).returning();
-    return account;
-  },
-
-  /**
-   * Update OAuth account tokens
-   */
-  async updateTokens(
-    id: string,
-    tokens: {
-      accessToken?: string;
-      refreshToken?: string;
-      expiresAt?: Date;
-    }
-  ): Promise<OAuthAccount | undefined> {
-    const db = getDb();
-    const [account] = await db
-      .update(oauthAccounts)
-      .set(tokens)
-      .where(eq(oauthAccounts.id, id))
-      .returning();
-    return account;
-  },
-
-  /**
-   * Delete an OAuth account link
-   */
-  async delete(id: string): Promise<boolean> {
-    const db = getDb();
-    const result = await db
-      .delete(oauthAccounts)
-      .where(eq(oauthAccounts.id, id))
-      .returning();
-    return result.length > 0;
+    const found = await this.findByEmail(email);
+    return !found;
   },
 };

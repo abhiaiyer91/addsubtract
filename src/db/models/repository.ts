@@ -5,16 +5,26 @@ import {
   collaborators,
   stars,
   watches,
-  users,
   organizations,
+  users,
   type Repository,
   type NewRepository,
   type Collaborator,
   type NewCollaborator,
   type Star,
   type Watch,
-  type User,
 } from '../schema';
+import { user } from '../auth-schema';
+
+// Owner type - compatible with both old users and better-auth user table
+type Owner = {
+  id: string;
+  name: string;
+  email: string;
+  username: string | null;
+  image: string | null;
+  avatarUrl: string | null;
+};
 
 export const repoModel = {
   /**
@@ -51,13 +61,44 @@ export const repoModel = {
     ownerName: string,
     repoName: string
   ): Promise<
-    | { repo: Repository; owner: User | { id: string; name: string; type: 'organization' } }
+    | { repo: Repository; owner: Owner | { id: string; name: string; type: 'organization' } }
     | undefined
   > {
     const db = getDb();
 
-    // Try user first
-    const userResult = await db
+    // Try better-auth user table first (new users have text IDs)
+    try {
+      const userResult = await db
+        .select()
+        .from(repositories)
+        .innerJoin(user, sql`${repositories.ownerId}::text = ${user.id}`)
+        .where(
+          and(
+            eq(user.username, ownerName),
+            eq(repositories.name, repoName),
+            eq(repositories.ownerType, 'user')
+          )
+        );
+
+      if (userResult.length > 0) {
+        return {
+          repo: userResult[0].repositories,
+          owner: {
+            id: userResult[0].user.id,
+            name: userResult[0].user.name,
+            email: userResult[0].user.email,
+            username: userResult[0].user.username,
+            image: userResult[0].user.image,
+            avatarUrl: userResult[0].user.avatarUrl,
+          },
+        };
+      }
+    } catch {
+      // Ignore errors from type mismatch, try legacy table
+    }
+
+    // Try legacy users table (old users have UUID IDs)
+    const legacyUserResult = await db
       .select()
       .from(repositories)
       .innerJoin(users, eq(repositories.ownerId, users.id))
@@ -69,10 +110,17 @@ export const repoModel = {
         )
       );
 
-    if (userResult.length > 0) {
+    if (legacyUserResult.length > 0) {
       return {
-        repo: userResult[0].repositories,
-        owner: userResult[0].users,
+        repo: legacyUserResult[0].repositories,
+        owner: {
+          id: legacyUserResult[0].users.id,
+          name: legacyUserResult[0].users.name ?? '',
+          email: legacyUserResult[0].users.email,
+          username: legacyUserResult[0].users.username,
+          image: null,
+          avatarUrl: legacyUserResult[0].users.avatarUrl,
+        },
       };
     }
 
@@ -215,7 +263,7 @@ export const repoModel = {
   },
 
   /**
-   * Increment a counter field
+   * Increment a counter field (prevents negative values)
    */
   async incrementCounter(
     id: string,
@@ -223,10 +271,11 @@ export const repoModel = {
     delta: number
   ): Promise<void> {
     const db = getDb();
+    // Use GREATEST to prevent negative values
     await db
       .update(repositories)
       .set({
-        [field]: sql`${repositories[field]} + ${delta}`,
+        [field]: sql`GREATEST(0, ${repositories[field]} + ${delta})`,
         updatedAt: new Date(),
       })
       .where(eq(repositories.id, id));
@@ -273,17 +322,24 @@ export const collaboratorModel = {
   /**
    * List all collaborators for a repository
    */
-  async listByRepo(repoId: string): Promise<(Collaborator & { user: User })[]> {
+  async listByRepo(repoId: string): Promise<(Collaborator & { user: Owner })[]> {
     const db = getDb();
     const result = await db
       .select()
       .from(collaborators)
-      .innerJoin(users, eq(collaborators.userId, users.id))
+      .innerJoin(user, eq(collaborators.userId, user.id))
       .where(eq(collaborators.repoId, repoId));
 
     return result.map((r) => ({
       ...r.collaborators,
-      user: r.users,
+      user: {
+        id: r.user.id,
+        name: r.user.name,
+        email: r.user.email,
+        username: r.user.username,
+        image: r.user.image,
+        avatarUrl: r.user.avatarUrl,
+      },
     }));
   },
 
@@ -414,16 +470,23 @@ export const starModel = {
   /**
    * List users who starred a repo
    */
-  async listByRepo(repoId: string): Promise<User[]> {
+  async listByRepo(repoId: string): Promise<Owner[]> {
     const db = getDb();
     const result = await db
       .select()
       .from(stars)
-      .innerJoin(users, eq(stars.userId, users.id))
+      .innerJoin(user, eq(stars.userId, user.id))
       .where(eq(stars.repoId, repoId))
       .orderBy(desc(stars.createdAt));
 
-    return result.map((r) => r.users);
+    return result.map((r) => ({
+      id: r.user.id,
+      name: r.user.name,
+      email: r.user.email,
+      username: r.user.username,
+      image: r.user.image,
+      avatarUrl: r.user.avatarUrl,
+    }));
   },
 };
 
@@ -479,15 +542,22 @@ export const watchModel = {
   /**
    * List watchers for a repo
    */
-  async listByRepo(repoId: string): Promise<User[]> {
+  async listByRepo(repoId: string): Promise<Owner[]> {
     const db = getDb();
     const result = await db
       .select()
       .from(watches)
-      .innerJoin(users, eq(watches.userId, users.id))
+      .innerJoin(user, eq(watches.userId, user.id))
       .where(eq(watches.repoId, repoId))
       .orderBy(desc(watches.createdAt));
 
-    return result.map((r) => r.users);
+    return result.map((r) => ({
+      id: r.user.id,
+      name: r.user.name,
+      email: r.user.email,
+      username: r.user.username,
+      image: r.user.image,
+      avatarUrl: r.user.avatarUrl,
+    }));
   },
 };

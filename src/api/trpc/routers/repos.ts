@@ -1065,4 +1065,113 @@ export const reposRouter = router({
         return [];
       }
     }),
+
+  /**
+   * Get a single commit with diff
+   */
+  getCommit: publicProcedure
+    .input(
+      z.object({
+        owner: z.string(),
+        repo: z.string(),
+        sha: z.string(),
+      })
+    )
+    .query(async ({ input, ctx }) => {
+      const result = await repoModel.findByPath(input.owner, input.repo);
+
+      if (!result) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Repository not found',
+        });
+      }
+
+      // Check access for private repos
+      if (result.repo.isPrivate) {
+        if (!ctx.user) {
+          throw new TRPCError({
+            code: 'UNAUTHORIZED',
+            message: 'Authentication required',
+          });
+        }
+
+        const isOwner = result.repo.ownerId === ctx.user.id;
+        const hasAccess = isOwner || (await collaboratorModel.hasPermission(result.repo.id, ctx.user.id, 'read'));
+
+        if (!hasAccess) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'You do not have access to this repository',
+          });
+        }
+      }
+
+      // Get the bare repository
+      const bareRepo = getRepoFromDisk(result.repo.diskPath);
+      if (!bareRepo) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Repository not found on disk',
+        });
+      }
+
+      try {
+        const commit = bareRepo.objects.readCommit(input.sha);
+        
+        // Get the diff between this commit and its parent
+        let diff = '';
+        const parentHash = commit.parentHashes[0];
+        
+        if (parentHash) {
+          // Diff against parent
+          const { execSync } = require('child_process');
+          try {
+            diff = execSync(`git diff ${parentHash} ${input.sha}`, {
+              cwd: result.repo.diskPath,
+              encoding: 'utf-8',
+              maxBuffer: 10 * 1024 * 1024, // 10MB
+            });
+          } catch {
+            diff = '';
+          }
+        } else {
+          // First commit - show all files as added
+          const { execSync } = require('child_process');
+          try {
+            diff = execSync(`git show ${input.sha} --format=""`, {
+              cwd: result.repo.diskPath,
+              encoding: 'utf-8',
+              maxBuffer: 10 * 1024 * 1024,
+            });
+          } catch {
+            diff = '';
+          }
+        }
+
+        return {
+          sha: input.sha,
+          message: commit.message,
+          author: {
+            name: commit.author.name,
+            email: commit.author.email,
+            date: new Date(commit.author.timestamp * 1000),
+          },
+          committer: {
+            name: commit.committer.name,
+            email: commit.committer.email,
+            date: new Date(commit.committer.timestamp * 1000),
+          },
+          parents: commit.parentHashes,
+          tree: commit.treeHash,
+          diff,
+        };
+      } catch (error) {
+        console.error('[repos.getCommit] Error:', error);
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Commit not found',
+        });
+      }
+    }),
 });
