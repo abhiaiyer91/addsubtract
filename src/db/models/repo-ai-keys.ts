@@ -286,4 +286,31 @@ export const repoAiKeyModel = {
     
     return repo?.ownerId === userId;
   },
+
+  /**
+   * Check AI availability for a repository
+   * Returns whether AI features can be used (either repo keys or server keys)
+   */
+  async checkAvailability(repoId: string): Promise<{
+    available: boolean;
+    source: 'repository' | 'server' | null;
+    hasRepoKeys: boolean;
+    hasServerKeys: boolean;
+  }> {
+    // Check if repo has its own keys
+    const hasRepoKeys = await this.hasKeys(repoId);
+    
+    // Check if server has global keys
+    const hasServerKeys = !!(
+      process.env.OPENAI_API_KEY || 
+      process.env.ANTHROPIC_API_KEY
+    );
+    
+    return {
+      available: hasRepoKeys || hasServerKeys,
+      source: hasRepoKeys ? 'repository' : hasServerKeys ? 'server' : null,
+      hasRepoKeys,
+      hasServerKeys,
+    };
+  },
 };
