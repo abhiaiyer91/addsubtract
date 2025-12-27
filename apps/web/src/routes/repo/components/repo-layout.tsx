@@ -253,7 +253,7 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
   const path = location.pathname;
   const getActiveTab = () => {
     if (path.includes('/commits')) return 'commits';
-    if (path.includes('/issues')) return 'issues';
+    if (path.includes('/issues') || path.includes('/projects') || path.includes('/cycles')) return 'issues';
     if (path.includes('/pulls') || path.includes('/pull/')) return 'pulls';
     if (path.includes('/stacks')) return 'stacks';
     if (path.includes('/journal')) return 'journal';
