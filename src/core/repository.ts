@@ -4,7 +4,7 @@ import { Index, buildTreeFromIndex } from './index';
 import { Refs } from './refs';
 import { Tree, Commit, Blob } from './object';
 import { Author, TreeEntry, IndexEntry } from './types';
-import { exists, mkdirp, writeFile, readFile, walkDir, readFileText, loadIgnorePatterns } from '../utils/fs';
+import { exists, mkdirp, writeFile, readFile, walkDir, readFileText, loadIgnorePatterns, deleteFile, readDir, isDirectory } from '../utils/fs';
 import { Journal } from './journal';
 import { LargeFileHandler, CHUNK_THRESHOLD } from './large-file';
 import { BranchStateManager } from './branch-state';
@@ -442,10 +442,76 @@ export class Repository {
   private checkoutTree(commitHash: string): void {
     const commit = this.objects.readCommit(commitHash);
     
+    // Get files in the new tree
+    const newTreeFiles = new Map<string, string>();
+    this.flattenTree(commit.treeHash, '', newTreeFiles);
+    
+    // Get currently tracked files (from old index) before clearing
+    const oldTrackedFiles = new Set(this.index.getEntries().map(e => e.path));
+    
     // Clear and rebuild index from tree
     this.index.clear();
     this.checkoutTreeRecursive(commit.treeHash, '');
     this.index.save();
+    
+    // Delete files that were tracked but aren't in the new tree
+    for (const oldFile of oldTrackedFiles) {
+      if (!newTreeFiles.has(oldFile)) {
+        const fullPath = path.join(this.workDir, oldFile);
+        deleteFile(fullPath);
+      }
+    }
+    
+    // Clean up empty directories
+    this.cleanEmptyDirectories();
+  }
+
+  /**
+   * Clean up empty directories in the working directory
+   */
+  private cleanEmptyDirectories(): void {
+    const excludeDirs = ['.wit', 'node_modules', '.git', 'dist', 'build'];
+    
+    const cleanDir = (dir: string): boolean => {
+      if (!exists(dir) || !isDirectory(dir)) return false;
+      
+      const entries = readDir(dir);
+      let isEmpty = true;
+      
+      for (const entry of entries) {
+        const fullPath = path.join(dir, entry);
+        
+        // Skip excluded directories
+        if (excludeDirs.includes(entry)) {
+          isEmpty = false;
+          continue;
+        }
+        
+        if (isDirectory(fullPath)) {
+          // Recursively clean subdirectories
+          const subDirEmpty = cleanDir(fullPath);
+          if (!subDirEmpty) {
+            isEmpty = false;
+          }
+        } else {
+          isEmpty = false;
+        }
+      }
+      
+      // Remove empty directory (but not the workDir itself)
+      if (isEmpty && dir !== this.workDir) {
+        try {
+          require('fs').rmdirSync(dir);
+          return true;
+        } catch {
+          return false;
+        }
+      }
+      
+      return isEmpty;
+    };
+    
+    cleanDir(this.workDir);
   }
 
   /**
