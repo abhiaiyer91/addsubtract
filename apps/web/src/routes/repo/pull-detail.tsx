@@ -11,6 +11,7 @@ import {
   RefreshCw,
   Loader2,
   Edit3,
+  AlertTriangle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -27,6 +28,7 @@ import { AiChat } from '@/components/pr/ai-chat';
 import { BranchStatus } from '@/components/pr/branch-status';
 import { KeyboardShortcutsDialog, KeyboardShortcutsButton } from '@/components/pr/keyboard-shortcuts-dialog';
 import { RichEditor } from '@/components/editor/rich-editor';
+import { ConflictResolver } from '@/components/pr/conflict-resolver';
 import { Markdown } from '@/components/markdown/renderer';
 import { RepoLayout } from './components/repo-layout';
 import { Loading } from '@/components/ui/loading';
@@ -107,6 +109,12 @@ export function PullDetailPage() {
   const { data: mergeabilityData } = trpc.pulls.checkMergeability.useQuery(
     { prId: prData?.id! },
     { enabled: !!prData?.id && prData?.state === 'open' }
+  );
+
+  // Fetch conflict details if not mergeable
+  const { data: conflictsData, isLoading: conflictsLoading } = trpc.pulls.getConflicts.useQuery(
+    { prId: prData?.id! },
+    { enabled: !!prData?.id && mergeabilityData?.canMerge === false }
   );
 
   // Trigger AI review mutation
@@ -413,6 +421,9 @@ export function PullDetailPage() {
 
   const isAuthor = session?.user?.id === pr.authorId;
 
+  // Calculate conflict count
+  const conflictCount = conflictsData?.conflicts?.length || mergeabilityData?.conflicts?.length || 0;
+
   return (
     <RepoLayout owner={owner!} repo={repo!}>
       <div className="flex gap-6">
@@ -489,7 +500,7 @@ export function PullDetailPage() {
                 prState={pr.state}
                 isDraft={pr.isDraft}
                 isMergeable={mergeabilityData?.canMerge}
-                hasConflicts={!mergeabilityData?.canMerge && (mergeabilityData?.conflicts?.length || 0) > 0}
+                hasConflicts={conflictCount > 0}
                 reviewsApproved={approvedCount}
                 reviewsChangesRequested={changesRequestedCount}
                 behindBy={mergeabilityData?.behindBy}
@@ -524,6 +535,13 @@ export function PullDetailPage() {
                   Files changed
                   <Badge variant="secondary" className="ml-1">{diff.length}</Badge>
                 </TabsTrigger>
+                {mergeabilityData?.canMerge === false && conflictCount > 0 && (
+                  <TabsTrigger value="conflicts" className="gap-2">
+                    <AlertTriangle className="h-4 w-4 text-amber-500" />
+                    Conflicts
+                    <Badge variant="warning">{conflictCount}</Badge>
+                  </TabsTrigger>
+                )}
               </TabsList>
 
               {authenticated && pr.state === 'open' && (
@@ -610,7 +628,7 @@ export function PullDetailPage() {
                 <BranchStatus
                   behindBy={mergeabilityData.behindBy || 0}
                   aheadBy={mergeabilityData.aheadBy || 0}
-                  hasConflicts={(mergeabilityData.conflicts?.length || 0) > 0}
+                  hasConflicts={conflictCount > 0}
                   conflictFiles={mergeabilityData.conflicts}
                   targetBranch={pr.targetBranch}
                   sourceBranch={pr.sourceBranch}
@@ -686,6 +704,7 @@ export function PullDetailPage() {
               ) : diff.length > 0 ? (
                 <DiffViewer
                   files={diff}
+                  prId={prData?.id}
                   comments={inlineComments}
                   onAddComment={authenticated ? handleAddInlineComment : undefined}
                   viewMode={viewMode}
@@ -703,6 +722,37 @@ export function PullDetailPage() {
                 </Card>
               )}
             </TabsContent>
+
+            {/* Conflicts Tab - from main */}
+            {mergeabilityData?.canMerge === false && conflictCount > 0 && (
+              <TabsContent value="conflicts">
+                {conflictsLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  </div>
+                ) : conflictsData?.conflicts && conflictsData.conflicts.length > 0 ? (
+                  <ConflictResolver
+                    prId={prData!.id}
+                    conflicts={conflictsData.conflicts}
+                    sourceBranch={pr.sourceBranch}
+                    targetBranch={pr.targetBranch}
+                    onResolved={() => {
+                      utils.pulls.checkMergeability.invalidate({ prId: prData!.id });
+                    }}
+                  />
+                ) : (
+                  <Card>
+                    <CardContent className="p-6 text-center text-muted-foreground">
+                      <AlertTriangle className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>Conflict details could not be loaded</p>
+                      {conflictsData?.error && (
+                        <p className="text-sm mt-2">{conflictsData.error}</p>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+              </TabsContent>
+            )}
           </Tabs>
         </div>
 

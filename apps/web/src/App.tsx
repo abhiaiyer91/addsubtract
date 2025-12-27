@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { TRPCProvider } from './lib/trpc';
 import { Layout } from './components/layout';
+import { CommandPalette, ShortcutsModal } from './components/command';
+import { BranchSwitcher } from './components/branch';
 
 // Routes
 import { HomePage } from './routes/index';
@@ -24,11 +26,17 @@ import { StackDetailPage } from './routes/repo/stack-detail';
 import { WorkflowsPage } from './routes/repo/workflows';
 import { SettingsPage } from './routes/settings';
 import { NewRepoPage } from './routes/new';
+import { SearchPage } from './routes/search';
 
 export function App() {
   return (
     <TRPCProvider>
       <BrowserRouter>
+        {/* Global keyboard-first components */}
+        <CommandPalette />
+        <ShortcutsModal />
+        <BranchSwitcher />
+        
         <Routes>
           <Route element={<Layout />}>
             {/* Public routes */}
@@ -37,6 +45,7 @@ export function App() {
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/new" element={<NewRepoPage />} />
+            <Route path="/search" element={<SearchPage />} />
 
             {/* User/Org profile */}
             <Route path="/:owner" element={<OwnerPage />} />

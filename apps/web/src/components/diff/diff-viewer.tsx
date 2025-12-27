@@ -1,9 +1,11 @@
-import React, { useState, useMemo } from 'react';
-import { ChevronDown, ChevronRight, File, MessageSquare, Columns, AlignJustify } from 'lucide-react';
+import React, { useState, useMemo, useCallback } from 'react';
+import { ChevronDown, ChevronRight, File, MessageSquare, Columns, AlignJustify, Sparkles, Loader2, Lightbulb, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Markdown } from '@/components/markdown/renderer';
+import { trpc } from '@/lib/trpc';
 import {
   InlineComment,
   InlineCommentThread,
@@ -37,6 +39,7 @@ export interface DiffFile {
 export interface DiffViewerProps {
   files?: DiffFile[];
   diff?: string; // Raw diff string
+  prId?: string; // PR ID for AI explanations
   comments?: InlineComment[];
   onAddComment?: (path: string, line: number, side: 'LEFT' | 'RIGHT', body: string) => Promise<void>;
   onReplyToComment?: (commentId: string, body: string) => Promise<void>;
@@ -148,6 +151,7 @@ function parseDiff(diffText: string): DiffFile[] {
 export function DiffViewer({
   files,
   diff,
+  prId,
   comments = [],
   onAddComment,
   onReplyToComment,
@@ -162,6 +166,10 @@ export function DiffViewer({
   const [expandedFiles, setExpandedFiles] = useState<Set<string>>(
     new Set(displayFiles.map((f) => f.path))
   );
+
+  // Check if AI is available
+  const { data: aiStatus } = trpc.ai.status.useQuery();
+  const aiAvailable = aiStatus?.available ?? false;
 
   // Group comments by file path
   const commentsByFile = useMemo(() => {
@@ -236,6 +244,8 @@ export function DiffViewer({
         <DiffFileView
           key={file.path}
           file={file}
+          prId={prId}
+          aiAvailable={aiAvailable}
           isExpanded={expandedFiles.has(file.path)}
           onToggle={() => toggleFile(file.path)}
           comments={commentsByFile[file.path] || []}
@@ -253,6 +263,8 @@ export function DiffViewer({
 
 interface DiffFileViewProps {
   file: DiffFile;
+  prId?: string;
+  aiAvailable?: boolean;
   isExpanded: boolean;
   onToggle: () => void;
   comments: InlineComment[];
@@ -266,6 +278,8 @@ interface DiffFileViewProps {
 
 function DiffFileView({
   file,
+  prId,
+  aiAvailable,
   isExpanded,
   onToggle,
   comments,
@@ -280,6 +294,28 @@ function DiffFileView({
     line: number;
     side: 'LEFT' | 'RIGHT';
   } | null>(null);
+  const [showExplanation, setShowExplanation] = useState(false);
+  const [explanation, setExplanation] = useState<string | null>(null);
+
+  // AI explanation mutation
+  const explainMutation = trpc.ai.explainFileDiff.useMutation({
+    onSuccess: (data) => {
+      setExplanation(data.explanation);
+      setShowExplanation(true);
+    },
+  });
+
+  const handleExplainClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    if (explanation) {
+      // Toggle visibility if we already have an explanation
+      setShowExplanation(!showExplanation);
+    } else if (prId) {
+      // Fetch new explanation
+      explainMutation.mutate({ prId, filePath: file.path });
+    }
+  }, [explanation, showExplanation, prId, file.path, explainMutation]);
 
   const statusColors = {
     added: 'text-green-500 bg-green-500/10',
@@ -344,6 +380,27 @@ function DiffFileView({
           </Badge>
         )}
 
+        {/* AI Explain button */}
+        {aiAvailable && prId && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className={cn(
+              "h-7 px-2 gap-1 text-xs",
+              showExplanation && explanation && "bg-primary/10 text-primary"
+            )}
+            onClick={handleExplainClick}
+            disabled={explainMutation.isPending}
+          >
+            {explainMutation.isPending ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <Sparkles className="h-3 w-3" />
+            )}
+            {explanation ? (showExplanation ? 'Hide' : 'Show') : 'Explain'}
+          </Button>
+        )}
+
         <Badge variant="outline" className={cn('text-xs', statusColors[file.status])}>
           {file.status}
         </Badge>
@@ -369,6 +426,43 @@ function DiffFileView({
           </div>
         )}
       </div>
+
+      {/* AI Explanation panel */}
+      {showExplanation && explanation && (
+        <div className="border-b bg-primary/5">
+          <div className="flex items-start gap-3 p-4">
+            <Lightbulb className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-primary">AI Explanation</span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowExplanation(false);
+                  }}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+              <div className="prose prose-sm dark:prose-invert max-w-none">
+                <Markdown content={explanation} />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Error state */}
+      {explainMutation.isError && (
+        <div className="border-b bg-destructive/5 px-4 py-2">
+          <p className="text-sm text-destructive">
+            Failed to generate explanation. Please try again.
+          </p>
+        </div>
+      )}
 
       {/* File content */}
       {isExpanded && (
@@ -517,5 +611,3 @@ function HunkView({
     </>
   );
 }
-
-
