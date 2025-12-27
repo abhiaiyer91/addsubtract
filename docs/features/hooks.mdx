@@ -1,11 +1,34 @@
 ---
 title: Hooks
-description: "Customize behavior at key points in the workflow - no Husky needed"
+description: "Pre-commit hooks without the npm package soup"
 ---
 
 # Hooks
 
-wit has first-class hook support built-in, eliminating the need for external packages like Husky, lint-staged, or commitlint setup tools.
+In a typical JS project, running a linter before commit requires:
+
+- husky
+- lint-staged  
+- @commitlint/cli
+- @commitlint/config-conventional
+- A `.husky` directory
+- A `prepare` script
+- A `lint-staged` config
+
+wit has hooks built in. One config file.
+
+```json
+{
+  "hooks": {
+    "pre-commit": "npm run lint"
+  },
+  "staged": {
+    "\\.ts$": ["eslint --fix", "prettier --write"]
+  }
+}
+```
+
+That's it.
 
 ## Why wit Hooks Replace Husky
 

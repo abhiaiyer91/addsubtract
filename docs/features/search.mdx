@@ -5,19 +5,28 @@ description: "Ask questions about your codebase in natural language"
 
 # Semantic Search
 
-wit's search feature lets you ask questions about your codebase in natural language. Stop grepping - start asking.
-
-## Overview
-
-Traditional code search is keyword-based. You search for "auth" and get every file with "auth" in it. wit's semantic search understands intent:
+New codebase. Where's the authentication logic?
 
 ```bash
-# Old way: grep for keywords, scroll through results
-grep -r "authentication" .
+grep -r "auth" .
+# 847 results across 200 files
+```
 
-# wit way: ask what you mean
+Good luck.
+
+```bash
 wit search "where do we handle user login"
 ```
+
+```
+src/core/auth.ts (96% match)
+  Token-based authentication, JWT handling
+
+src/server/middleware/auth.ts (91% match)
+  Request authentication middleware
+```
+
+wit understands what you're asking, not just the words you used.
 
 ## Quick Start
 

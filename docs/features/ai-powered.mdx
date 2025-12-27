@@ -5,16 +5,20 @@ description: "AI-generated commit messages, code review, and intelligent assista
 
 # AI-Powered Features
 
-wit includes built-in AI capabilities powered by [Mastra](https://mastra.ai/), supporting OpenAI and Anthropic models.
+You made changes. The AI can see exactly what changed. Why are you still writing commit messages?
 
-## Overview
+```bash
+wit ai commit -a -x
+```
 
-AI features in wit help you:
-- Generate meaningful commit messages from your changes
-- Get intelligent code review suggestions
-- Understand complex commits and diffs
-- Navigate your repository with natural language
-- Resolve merge conflicts with AI assistance
+Done. The AI reads your diff, writes a message that actually describes what you did, and commits.
+
+This is one of several places where wit uses AI to eliminate busywork:
+
+- **Commit messages** - AI reads your diff and writes the message
+- **Code review** - Catch issues before your teammates do
+- **Semantic search** - Ask questions about your codebase in English
+- **Conflict resolution** - Get AI suggestions for merge conflicts
 
 ## Setup
 

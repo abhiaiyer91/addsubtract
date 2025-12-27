@@ -1,269 +1,106 @@
 ---
-title: Getting Started
-description: "From zero to productive with wit in 5 minutes"
+title: Quickstart
+description: "Install wit and start using it in 5 minutes"
 ---
 
-# Getting Started
+# Quickstart
 
-This guide gets you from nothing to using wit. No fluff.
+## Install
 
-## Installation
-
-### Prerequisites
-
-- Node.js 22.13.0 or higher
-- npm
-
-### From Source
+Requires Node.js 22.13.0+.
 
 ```bash
 git clone https://github.com/abhiaiyer91/wit.git
 cd wit
-npm install
-npm run build
-npm link
+npm install && npm run build && npm link
 ```
 
-Now `wit` is available globally.
+Verify it works:
 
-## Initialize a Repository
+```bash
+wit --help
+```
+
+## Your First Repository
 
 ```bash
 mkdir my-project && cd my-project
 wit init
 ```
 
-Done. You have a wit repository.
-
 ## Basic Workflow
 
-This is Git. If you know Git, you know this.
-
 ```bash
-# Stage files
+# Stage and commit
 wit add .
-wit add src/
+wit commit -m "Initial commit"
 
-# Commit
-wit commit -m "Add feature"
-
-# Check what's happening
+# Check status
 wit status
 wit log
-wit diff
 ```
-
-### Stage and Commit Together
-
-```bash
-wit commit -a -m "Fix bug"
-```
-
-The `-a` flag stages all tracked files before committing.
-
-### Quick WIP Save
-
-Don't want to write a message? Don't.
-
-```bash
-wit wip -a
-```
-
-Creates a commit with an auto-generated message like `WIP: 3 files changed`.
 
 ## Branches
 
 ```bash
-# Create and switch
-wit switch -c feature
-
-# Switch back
-wit switch main
-
-# List branches
-wit branch
-
-# Delete
-wit branch -d feature
+wit switch -c feature    # create and switch
+wit switch main          # switch back
+wit branch -d feature    # delete
 ```
 
-<Note>
-When you switch branches, wit automatically saves your uncommitted work and restores it when you come back. No more "you have uncommitted changes" errors.
-</Note>
+Uncommitted changes are automatically saved when switching and restored when you return.
 
 ## Undo Mistakes
 
-This is why wit exists.
-
 ```bash
-# Undo the last thing you did
-wit undo
-
-# Undo the last 3 things
-wit undo --steps 3
-
-# Undo a commit but keep the changes staged
-wit uncommit
+wit undo              # undo last operation
+wit undo --steps 3    # undo last 3 operations
+wit uncommit          # undo commit, keep changes staged
 ```
 
-Every operation is logged. `wit undo` walks that log backwards.
+## AI Features (Optional)
+
+Set an API key:
+
+```bash
+export OPENAI_API_KEY=sk-your-key
+# or
+export ANTHROPIC_API_KEY=sk-ant-your-key
+```
+
+Then:
+
+```bash
+wit ai commit -a -x    # AI writes commit message
+wit ai review          # AI reviews staged changes
+wit search "where is auth handled?"
+```
 
 ## Visual Interfaces
 
-### Web UI
-
 ```bash
-wit web
-```
-
-Opens `http://localhost:3847` with:
-- Visual commit graph
-- Side-by-side diffs
-- One-click staging
-- Search across commits and files
-
-### Terminal UI
-
-```bash
-wit ui
-```
-
-Full-screen terminal interface. Navigate with arrow keys, stage with `a`, commit with `c`.
-
-### ASCII Graph
-
-```bash
-wit graph
-```
-
-```
-● a1b2c3d (main) Latest commit - Alice, today
-● e5f6g7h Add feature - Bob, yesterday
-● i9j0k1l Initial commit - Alice, last week
+wit web    # browser UI at localhost:3847
+wit ui     # terminal UI
+wit graph  # ASCII commit graph
 ```
 
 ## Working with GitHub
 
-wit is fully compatible with GitHub.
-
-### Login
-
-```bash
-wit github login
-```
-
-Opens a browser. Authenticates via OAuth. Stores credentials securely.
-
-### Clone
-
 ```bash
 wit clone https://github.com/user/repo.git
-```
-
-### Push and Pull
-
-```bash
 wit push origin main
 wit pull
 ```
 
-Same as Git. Works with GitHub, GitLab, any Git remote.
-
-## AI Features (Optional)
-
-This is the other reason wit exists. Requires an API key.
-
-### Setup
-
-```bash
-export OPENAI_API_KEY=sk-your-key
-# OR
-export ANTHROPIC_API_KEY=sk-ant-your-key
-
-# Verify setup
-wit ai status
-```
-
-### AI Commit Messages
-
-Stop writing commit messages. Let the AI read your diff.
-
-```bash
-# Stage changes, then:
-wit ai commit
-
-# Or all in one:
-wit ai commit -a -x
-```
-
-The `-x` flag executes the commit. Without it, you review first.
-
-### AI Code Review
-
-```bash
-wit ai review
-```
-
-Reviews your staged changes. Catches obvious issues before your teammates do.
-
-### Semantic Search
-
-Ask questions about your codebase in plain English.
-
-```bash
-wit search "where is authentication handled?"
-wit search "how does the diff algorithm work?"
-```
-
-This uses embeddings to find relevant code, not just text matching.
-
-## Self-Hosted Platform (Optional)
-
-wit includes a self-hosted Git server with PRs and issues.
-
-### Start the Server
-
-```bash
-# Needs PostgreSQL
-export DATABASE_URL=postgres://user:pass@localhost:5432/wit
-wit serve --port 3000 --repos ./repositories
-```
-
-### Push to Your Server
-
-```bash
-wit remote add origin http://localhost:3000/myuser/myproject.git
-wit push -u origin main
-```
-
-### Create PRs and Issues
-
-```bash
-wit pr create -t "Add feature" -b "Description here"
-wit issue create "Bug: login fails"
-```
-
-This is optional. wit works fine as a standalone CLI.
+Full GitHub compatibility. Works with any Git remote.
 
 ## Next Steps
 
 <CardGroup cols={2}>
-  <Card title="Why wit?" icon="lightbulb" href="/why-wit">
-    The problems we're solving
-  </Card>
-  <Card title="Commands Reference" icon="terminal" href="/commands/reference">
-    Every command documented
+  <Card title="Commands" icon="terminal" href="/commands/overview">
+    Full command reference
   </Card>
   <Card title="AI Features" icon="robot" href="/features/ai-powered">
     Deep dive on AI capabilities
-  </Card>
-  <Card title="Platform Setup" icon="server" href="/platform/overview">
-    Full server configuration
-  </Card>
-  <Card title="Agent Primitives" icon="brain" href="/primitives/overview">
-    Build AI agents with git-backed primitives
-  </Card>
-  <Card title="Configuration" icon="gear" href="/configuration/overview">
-    Customize wit behavior
   </Card>
 </CardGroup>

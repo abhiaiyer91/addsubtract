@@ -5,16 +5,21 @@ description: "Handle large files efficiently without external tools"
 
 # Large File Support
 
-wit handles large files natively with automatic chunking - no Git LFS required.
+Git LFS is a workaround for a problem wit doesn't have.
 
-## Overview
+```bash
+# Git + LFS
+git lfs install
+git lfs track "*.psd"
+# Edit .gitattributes
+# Set up LFS on your server
+# Hope your CI has LFS installed
 
-Unlike Git, which struggles with large files and requires Git LFS for efficient handling, wit includes built-in large file support:
+# wit
+wit add large-file.psd
+```
 
-- **Automatic chunking:** Large files are split into manageable chunks
-- **Deduplication:** Identical chunks are stored only once
-- **Streaming:** Large files don't need to fit in memory
-- **No setup required:** Works out of the box
+wit handles large files natively. Automatic chunking, deduplication, no setup.
 
 ## How It Works
 

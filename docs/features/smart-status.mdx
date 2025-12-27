@@ -5,44 +5,34 @@ description: "The intelligent default command that understands your workflow"
 
 # Smart Status
 
-When you run `wit` with no arguments, you get an intelligent status display that understands what you're working on.
+`git status` shows you what changed. `wit` shows you what matters.
 
-## Overview
-
-Smart Status provides:
-
-- **Context awareness** - Infers what you're working on from branch names and changes
-- **Grouped changes** - Organizes files by purpose (tests, docs, API, etc.)
-- **Quick actions** - Suggests next steps based on current state
-- **AI integration** - Optional interactive mode to ask questions about your code
-
----
-
-## Basic Usage
+Run wit with no arguments:
 
 ```bash
 wit
 ```
 
-This shows a concise, intelligent view of your repository:
+You get context, not noise:
 
 ```
-  wit · my-project
-  You're working on: feature: user authentication
+wit · my-project
+You're working on: feature: user authentication
 
-  ● Ready to commit (3 files)
-    API: auth.ts, login.ts
-    Tests: auth.test.ts
+● Ready to commit (3 files)
+  API: auth.ts, login.ts
+  Tests: auth.test.ts
 
-  ● Modified (2 files)
-    Components: LoginForm.tsx, Header.tsx
+● Modified (2 files)
+  Components: LoginForm.tsx, Header.tsx
 
-  ──────────────────────────────────────────────────────
+──────────────────────────────────────────────────────
 
-  wit commit     · commit staged changes
-  wit ai commit  · commit with AI-generated message
-  wit ai "..."   · ask anything about this codebase
+wit commit     · commit staged changes
+wit ai commit  · commit with AI-generated message
 ```
+
+wit understands what you're doing and suggests what to do next.
 
 ---
 

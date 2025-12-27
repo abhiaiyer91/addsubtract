@@ -1,20 +1,23 @@
 ---
 title: "Stacked Diffs"
-description: "Break down large features into smaller, dependent branches with stacked diffs"
+description: "Break down large features into smaller, dependent branches"
 ---
 
 # Stacked Diffs
 
-Stacked diffs allow you to break down large features into smaller, dependent branches that build on top of each other. This makes code review easier and allows for incremental merging.
+Your PR is 2,000 lines. Your reviewer's eyes glaze over. "LGTM" with no real review.
 
-## Overview
+Stacked diffs fix this. Break one big feature into a stack of small, reviewable PRs:
 
-Traditional development often leads to large, monolithic pull requests that are hard to review. Stacked diffs solve this by:
+```
+PR #3: Add login UI          (200 lines, depends on #2)
+   │
+PR #2: Add auth API          (300 lines, depends on #1)
+   │
+PR #1: Add User model        (150 lines)
+```
 
-- Breaking features into logical, reviewable chunks
-- Maintaining dependencies between branches
-- Automating rebasing when base changes
-- Enabling parallel review of dependent changes
+Each PR is small enough to actually review. wit manages the dependencies so you don't have to.
 
 ## Quick Start
 

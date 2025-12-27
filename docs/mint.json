@@ -61,8 +61,12 @@
       "group": "Getting Started",
       "pages": [
         "introduction",
-        "quickstart",
-        "installation",
+        "quickstart"
+      ]
+    },
+    {
+      "group": "About",
+      "pages": [
         "why-wit",
         "contributing"
       ]
@@ -71,14 +75,11 @@
       "group": "Commands",
       "pages": [
         "commands/overview",
-        "commands/smart-status",
-        "commands/reference",
         "commands/basic-workflow",
         "commands/branches",
         "commands/remotes",
-        "commands/stash",
         "commands/merge",
-        "commands/stacked-diffs",
+        "commands/stash",
         "commands/history-rewriting",
         "commands/tags",
         "commands/undo-history",
@@ -97,20 +98,37 @@
       ]
     },
     {
-      "group": "Features",
+      "group": "AI & Intelligence",
       "pages": [
-        "features/github",
+        "features/smart-status",
         "features/ai-powered",
         "features/search",
-        "features/review",
-        "features/collaborators",
-        "features/tokens",
-        "features/ci-cd",
-        "features/monorepo-scopes",
-        "features/large-files",
+        "features/review"
+      ]
+    },
+    {
+      "group": "Workflows",
+      "pages": [
+        "features/stacked-diffs",
         "features/hooks",
+        "features/ci-cd",
+        "features/monorepo-scopes"
+      ]
+    },
+    {
+      "group": "Integrations",
+      "pages": [
+        "features/github",
+        "features/large-files",
         "features/submodules",
         "features/worktrees"
+      ]
+    },
+    {
+      "group": "Team & Access",
+      "pages": [
+        "features/collaborators",
+        "features/tokens"
       ]
     },
     {
@@ -131,14 +149,6 @@
         "platform/self-hosting",
         "platform/pull-requests",
         "platform/issues"
-      ]
-    },
-    {
-      "group": "Primitives",
-      "pages": [
-        "primitives/overview",
-        "primitives/filesystem",
-        "primitives/knowledge"
       ]
     },
     {
