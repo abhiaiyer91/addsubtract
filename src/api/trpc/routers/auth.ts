@@ -1,0 +1,89 @@
+import { z } from 'zod';
+import { TRPCError } from '@trpc/server';
+import { router, publicProcedure, protectedProcedure } from '../trpc';
+import { userModel } from '../../../db/models';
+import { createAuth } from '../../../lib/auth';
+
+export const authRouter = router({
+  /**
+   * Get current authenticated user
+   * This uses the session from context (already validated by better-auth)
+   */
+  me: publicProcedure.query(({ ctx }) => ctx.user),
+
+  /**
+   * Check if username is available
+   */
+  checkUsername: publicProcedure
+    .input(z.object({ username: z.string().min(3).max(39) }))
+    .query(async ({ input }) => {
+      const available = await userModel.isUsernameAvailable(input.username);
+      return { available };
+    }),
+
+  /**
+   * Check if email is available
+   */
+  checkEmail: publicProcedure
+    .input(z.object({ email: z.string().email() }))
+    .query(async ({ input }) => {
+      const available = await userModel.isEmailAvailable(input.email);
+      return { available };
+    }),
+
+  /**
+   * Update current user's profile
+   * Note: This updates fields in the better-auth user table
+   */
+  updateProfile: protectedProcedure
+    .input(
+      z.object({
+        name: z.string().max(255).optional(),
+        bio: z.string().max(256).optional(),
+        location: z.string().max(100).optional(),
+        website: z.string().url().max(255).optional().or(z.literal('')),
+        avatarUrl: z.string().url().max(500).optional().or(z.literal('')),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const updates: Record<string, string | undefined> = {};
+
+      if (input.name !== undefined) updates.name = input.name;
+      if (input.bio !== undefined) updates.bio = input.bio;
+      if (input.location !== undefined) updates.location = input.location;
+      if (input.website !== undefined) updates.website = input.website || undefined;
+      if (input.avatarUrl !== undefined) updates.avatarUrl = input.avatarUrl || undefined;
+
+      const user = await userModel.update(ctx.user.id, updates);
+      return user;
+    }),
+
+  /**
+   * Change password using better-auth
+   * Note: This requires the client to call better-auth's changePassword endpoint directly
+   * This endpoint just validates that the user is authenticated
+   */
+  canChangePassword: protectedProcedure.query(() => {
+    // User is authenticated, they can use better-auth's changePassword endpoint
+    return { canChange: true };
+  }),
+
+  /**
+   * Revoke all sessions for current user
+   * Uses better-auth's session revocation
+   */
+  logoutAll: protectedProcedure.mutation(async ({ ctx }) => {
+    try {
+      const auth = createAuth();
+      await auth.api.revokeOtherSessions({
+        headers: ctx.req.headers,
+      });
+      return { success: true };
+    } catch (error) {
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to revoke sessions',
+      });
+    }
+  }),
+});

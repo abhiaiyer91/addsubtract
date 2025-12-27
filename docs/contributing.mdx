@@ -1,0 +1,400 @@
+---
+title: "Contributing"
+description: "How to contribute to wit"
+---
+
+# Contributing to wit
+
+Thank you for your interest in contributing to wit! This guide will help you get started.
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js >= 22.13.0
+- npm or pnpm
+- Git (for testing compatibility)
+
+### Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/your-org/wit.git
+cd wit
+
+# Install dependencies
+npm install
+
+# Build
+npm run build
+
+# Link for local testing
+npm link
+
+# Now 'wit' command uses your local build
+wit --version
+```
+
+### Development Workflow
+
+```bash
+# Watch mode - rebuilds on changes
+npm run dev
+
+# Run tests
+npm test
+
+# Run a specific test
+npm test -- --grep "commit"
+
+# Type check
+npm run typecheck
+
+# Lint
+npm run lint
+```
+
+## Project Structure
+
+```
+wit/
+├── src/
+│   ├── cli.ts              # Entry point
+│   ├── commands/           # Command implementations
+│   ├── core/               # Core Git functionality
+│   │   ├── repository.ts   # Repository class
+│   │   ├── object-store.ts # Object storage
+│   │   ├── index.ts        # Staging area
+│   │   ├── refs.ts         # References
+│   │   ├── merge.ts        # Merge logic
+│   │   ├── diff.ts         # Diff algorithm
+│   │   └── protocol/       # Git network protocol
+│   ├── ui/                 # Visual interfaces
+│   └── utils/              # Utilities
+├── docs/                   # Documentation (Mintlify)
+├── prompts/                # AI agent prompts
+└── tests/                  # Integration tests
+```
+
+## Making Changes
+
+### 1. Create a Branch
+
+```bash
+git checkout -b feature/my-feature
+# or
+git checkout -b fix/bug-description
+```
+
+### 2. Make Your Changes
+
+Follow the existing code style:
+
+- TypeScript with strict mode
+- Double quotes for strings
+- 2-space indentation
+- Semicolons required
+- Explicit types for function parameters and returns
+
+### 3. Add Tests
+
+Tests go in `__tests__/` directories alongside source files:
+
+```typescript
+// src/core/__tests__/object.test.ts
+import { Blob, Tree } from '../object';
+
+describe('Blob', () => {
+  it('should serialize content correctly', () => {
+    const blob = new Blob(Buffer.from('hello'));
+    expect(blob.serialize().toString()).toBe('hello');
+  });
+});
+```
+
+### 4. Update Documentation
+
+If you're adding a feature:
+
+1. Add/update docs in `docs/`
+2. Update README.md if needed
+3. Add JSDoc comments to public APIs
+
+### 5. Submit a Pull Request
+
+```bash
+# Push your branch
+git push -u origin feature/my-feature
+
+# Open a PR on GitHub
+```
+
+## Code Guidelines
+
+### Adding a New Command
+
+1. Create the command file:
+
+```typescript
+// src/commands/mycommand.ts
+import { Repository } from '../core/repository';
+import { TsgitError, ErrorCode } from '../core/errors';
+import * as colors from '../utils/colors';
+
+export function handleMyCommand(args: string[]): void {
+  // Parse arguments
+  const verbose = args.includes('--verbose') || args.includes('-v');
+  
+  // Open repository
+  const repo = Repository.open('.');
+  
+  // Implement logic
+  try {
+    // Your code here
+    console.log(colors.green('✓'), 'Success!');
+  } catch (error) {
+    if (error instanceof TsgitError) {
+      console.error(colors.red('error:'), error.message);
+      if (error.suggestions.length > 0) {
+        console.log(colors.yellow('hint:'), error.suggestions.join('\n  '));
+      }
+      process.exit(1);
+    }
+    throw error;
+  }
+}
+```
+
+2. Register in CLI:
+
+```typescript
+// src/cli.ts
+import { handleMyCommand } from './commands/mycommand';
+
+// In the switch statement:
+case 'mycommand':
+  handleMyCommand(args.slice(1));
+  break;
+```
+
+3. Add help text:
+
+```typescript
+// In HELP constant
+Mycommand:
+  mycommand [options]    Description here
+```
+
+### Error Handling
+
+Use the custom error class for user-facing errors:
+
+```typescript
+import { TsgitError, ErrorCode } from '../core/errors';
+
+throw new TsgitError(
+  'Branch not found: feature',
+  ErrorCode.REF_NOT_FOUND,
+  ['Did you mean: feature-branch?', 'Run wit branch to see all branches']
+);
+```
+
+### Logging
+
+Use the colors utility for consistent output:
+
+```typescript
+import * as colors from '../utils/colors';
+
+console.log(colors.green('✓'), 'Success');
+console.log(colors.yellow('warning:'), 'Be careful');
+console.log(colors.red('error:'), 'Something went wrong');
+console.log(colors.dim('Verbose info...'));
+```
+
+### Testing Git Compatibility
+
+When implementing Git features, verify compatibility:
+
+```bash
+# Create test repos with both
+mkdir test-git test-wit
+cd test-git && git init
+cd ../test-wit && wit init
+
+# Compare behavior
+cd test-git && git add . && git commit -m "test"
+cd ../test-wit && wit add . && wit commit -m "test"
+
+# Compare objects
+git cat-file -p HEAD
+wit cat-file -p HEAD
+```
+
+## Areas to Contribute
+
+### Good First Issues
+
+- Add missing command options
+- Improve error messages
+- Add tests for edge cases
+- Fix documentation typos
+- Add examples to docs
+
+### Intermediate
+
+- Implement missing Git commands
+- Improve performance
+- Add new AI features
+- Enhance Web UI
+
+### Advanced
+
+- Protocol improvements
+- New hash algorithms
+- Distributed/P2P features
+- CI/CD system
+
+## Testing Strategy
+
+### Unit Tests
+
+Test individual functions and classes:
+
+```typescript
+describe('Tree', () => {
+  it('should sort entries correctly', () => {
+    const tree = new Tree([
+      { mode: '100644', name: 'b.txt', hash: '...' },
+      { mode: '100644', name: 'a.txt', hash: '...' },
+    ]);
+    
+    const serialized = tree.serialize();
+    // Verify a.txt comes before b.txt
+  });
+});
+```
+
+### Integration Tests
+
+Test command flows:
+
+```typescript
+describe('commit workflow', () => {
+  it('should create commit with parent', async () => {
+    // Setup
+    const dir = await createTempDir();
+    Repository.init(dir);
+    
+    // First commit
+    writeFile(path.join(dir, 'file.txt'), 'v1');
+    execSync('wit add file.txt', { cwd: dir });
+    execSync('wit commit -m "First"', { cwd: dir });
+    
+    // Second commit
+    writeFile(path.join(dir, 'file.txt'), 'v2');
+    execSync('wit add file.txt', { cwd: dir });
+    execSync('wit commit -m "Second"', { cwd: dir });
+    
+    // Verify parent chain
+    const log = execSync('wit log --oneline', { cwd: dir }).toString();
+    expect(log.split('\n').length).toBe(2);
+  });
+});
+```
+
+### Compatibility Tests
+
+Test against real Git:
+
+```typescript
+describe('git compatibility', () => {
+  it('should produce same tree hash as git', async () => {
+    const dir = await createTempDir();
+    
+    // Create with git
+    execSync('git init', { cwd: dir });
+    writeFile(path.join(dir, 'file.txt'), 'content');
+    execSync('git add file.txt', { cwd: dir });
+    const gitHash = execSync('git write-tree', { cwd: dir }).toString().trim();
+    
+    // Create with wit
+    execSync('rm -rf .git && wit init', { cwd: dir });
+    execSync('wit add file.txt', { cwd: dir });
+    const witHash = execSync('wit write-tree', { cwd: dir }).toString().trim();
+    
+    expect(witHash).toBe(gitHash);
+  });
+});
+```
+
+## Documentation
+
+### Docs Structure
+
+```
+docs/
+├── introduction.mdx        # Overview
+├── quickstart.mdx          # Getting started
+├── installation.mdx        # Install guide
+├── commands/               # Command reference
+├── features/               # Feature deep-dives
+├── architecture/           # Internals
+└── api-reference/          # Programmatic API
+```
+
+### Writing Docs
+
+Use Mintlify MDX format:
+
+```mdx
+---
+title: "Page Title"
+description: "Brief description"
+---
+
+# Heading
+
+Regular paragraph text.
+
+<Tip>
+Helpful tips go here.
+</Tip>
+
+<Warning>
+Important warnings.
+</Warning>
+
+## Code Examples
+
+\`\`\`bash
+wit command example
+\`\`\`
+
+## Tables
+
+| Column 1 | Column 2 |
+|----------|----------|
+| Value 1  | Value 2  |
+```
+
+## Community
+
+### Getting Help
+
+- Open an issue for bugs
+- Start a discussion for questions
+- Join Discord for chat
+
+### Code of Conduct
+
+Be respectful and inclusive. We welcome contributors of all backgrounds and experience levels.
+
+## License
+
+wit is MIT licensed. By contributing, you agree that your contributions will be licensed under MIT.
+
+---
+
+Thank you for contributing to wit! 🎉
+

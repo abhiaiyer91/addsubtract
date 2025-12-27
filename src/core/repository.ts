@@ -14,6 +14,8 @@ import { PartialCloneManager, SparseCheckoutManager } from './partial-clone';
 import { RemoteManager } from './remote';
 import { setHashAlgorithm, getHashAlgorithm, HashAlgorithm } from '../utils/hash';
 import { HookManager } from './hooks';
+import { BranchProtectionEngine } from './branch-protection';
+import { CollaboratorManager } from './collaborators';
 
 /**
  * Repository configuration
@@ -25,7 +27,8 @@ export interface RepositoryConfig {
 }
 
 const DEFAULT_CONFIG: RepositoryConfig = {
-  hashAlgorithm: 'sha256',
+  // Default to SHA-1 for Git interoperability (GitHub, GitLab, etc.)
+  hashAlgorithm: 'sha1',
   largeFileThreshold: CHUNK_THRESHOLD,
   autoStashOnSwitch: true,
 };
@@ -46,7 +49,7 @@ export class Repository {
   readonly objects: ObjectStore;
   readonly index: Index;
   readonly refs: Refs;
-  
+
   // New features
   readonly journal: Journal;
   readonly largeFiles: LargeFileHandler;
@@ -57,22 +60,37 @@ export class Repository {
   readonly sparseCheckout: SparseCheckoutManager;
   readonly hooks: HookManager;
   readonly remotes: RemoteManager;
+  readonly branchProtection: BranchProtectionEngine;
+  readonly collaborators: CollaboratorManager;
 
   private config: RepositoryConfig;
 
-  constructor(workDir: string, config: Partial<RepositoryConfig> = {}) {
+  constructor(workDir: string, config: Partial<RepositoryConfig> = {}, gitDirOverride?: string) {
     this.workDir = path.resolve(workDir);
-    this.gitDir = path.join(this.workDir, '.wit');
-    this.config = { ...DEFAULT_CONFIG, ...config };
     
+    // Determine which git directory to use
+    // Override is used when find() locates a specific directory
+    // For new repos (init), we always use .wit
+    if (gitDirOverride) {
+      this.gitDir = gitDirOverride;
+    } else {
+      // Default to .wit - this is important for Repository.init()
+      // find() handles the .wit vs .git detection separately
+      this.gitDir = path.join(this.workDir, '.wit');
+    }
+
+    // Load config from existing repo if it exists
+    const loadedConfig = this.loadStoredConfig();
+    this.config = { ...DEFAULT_CONFIG, ...loadedConfig, ...config };
+
     // Set hash algorithm
     setHashAlgorithm(this.config.hashAlgorithm);
-    
+
     // Core components
     this.objects = new ObjectStore(this.gitDir);
     this.index = new Index(this.gitDir);
     this.refs = new Refs(this.gitDir);
-    
+
     // New feature components
     this.journal = new Journal(this.gitDir);
     this.largeFiles = new LargeFileHandler(this.gitDir);
@@ -83,6 +101,43 @@ export class Repository {
     this.sparseCheckout = new SparseCheckoutManager(this.gitDir);
     this.hooks = new HookManager(this.gitDir, this.workDir);
     this.remotes = new RemoteManager(this.gitDir);
+    this.branchProtection = new BranchProtectionEngine(this.gitDir);
+    this.collaborators = new CollaboratorManager(this.gitDir);
+  }
+
+  /**
+   * Load configuration from .wit/config file if it exists
+   */
+  private loadStoredConfig(): Partial<RepositoryConfig> {
+    const configPath = path.join(this.gitDir, 'config');
+    if (!exists(configPath)) {
+      return {};
+    }
+
+    try {
+      const configContent = readFileText(configPath);
+      const config: Partial<RepositoryConfig> = {};
+
+      // Parse simple INI-style config
+      const hashMatch = configContent.match(/hashAlgorithm\s*=\s*(sha1|sha256)/);
+      if (hashMatch) {
+        config.hashAlgorithm = hashMatch[1] as HashAlgorithm;
+      }
+
+      const thresholdMatch = configContent.match(/largeFileThreshold\s*=\s*(\d+)/);
+      if (thresholdMatch) {
+        config.largeFileThreshold = parseInt(thresholdMatch[1], 10);
+      }
+
+      const autoStashMatch = configContent.match(/autoStashOnSwitch\s*=\s*(true|false)/);
+      if (autoStashMatch) {
+        config.autoStashOnSwitch = autoStashMatch[1] === 'true';
+      }
+
+      return config;
+    } catch {
+      return {};
+    }
   }
 
   /**
@@ -126,7 +181,8 @@ export class Repository {
     writeFile(path.join(repo.gitDir, 'HEAD'), 'ref: refs/heads/main\n');
 
     // Create config file with wit improvements
-    const hashAlgo = options.hashAlgorithm || 'sha256';
+    // Default to SHA-1 for Git interoperability
+    const hashAlgo = options.hashAlgorithm || 'sha1';
     const config = `[core]
     repositoryformatversion = 1
     filemode = true
@@ -151,6 +207,8 @@ export class Repository {
     repo.scopeManager.init();
     repo.hooks.init();
     repo.remotes.init();
+    repo.branchProtection.getManager().init();
+    repo.collaborators.init();
 
     console.log(`Initialized wit repository with ${hashAlgo} hashing`);
 
@@ -159,22 +217,52 @@ export class Repository {
 
   /**
    * Find a repository by walking up the directory tree
+   * 
+   * wit can work with both .wit and .git directories. However, for full
+   * functionality with .git repos, wit init should be run to create a .wit
+   * directory (which shares the same object format and can sync with .git).
    */
   static find(startPath: string = process.cwd()): Repository {
     let currentPath = path.resolve(startPath);
+    let foundGitDir: string | null = null;
 
     while (true) {
-      const gitDir = path.join(currentPath, '.wit');
-      if (exists(gitDir)) {
-        return new Repository(currentPath);
+      // Check for .wit first (native wit repo)
+      const witDir = path.join(currentPath, '.wit');
+      if (exists(witDir) && (exists(path.join(witDir, 'HEAD')) || exists(path.join(witDir, 'objects')))) {
+        return new Repository(currentPath, {}, witDir);
+      }
+      
+      // Note if we find a .git directory (we'll report this in error)
+      const gitDir = path.join(currentPath, '.git');
+      if (!foundGitDir && exists(gitDir) && (exists(path.join(gitDir, 'HEAD')) || exists(path.join(gitDir, 'objects')))) {
+        foundGitDir = currentPath;
       }
 
       const parent = path.dirname(currentPath);
       if (parent === currentPath) {
+        // No .wit found, but if we found .git, give helpful message
+        if (foundGitDir) {
+          throw new Error(
+            `Found git repository at ${foundGitDir}, but no wit repository.\n` +
+            `\nTo use wit with this git repo, run:\n` +
+            `  cd ${foundGitDir}\n` +
+            `  wit init\n` +
+            `\nThis creates a .wit directory alongside .git for wit features.`
+          );
+        }
         throw new Error('Not a wit repository (or any parent up to root)');
       }
       currentPath = parent;
     }
+  }
+  
+  /**
+   * Check if a .git directory exists alongside this .wit directory
+   */
+  hasGitDirectory(): boolean {
+    const gitDir = path.join(this.workDir, '.git');
+    return exists(gitDir) && (exists(path.join(gitDir, 'HEAD')) || exists(path.join(gitDir, 'objects')));
   }
 
   /**
@@ -200,14 +288,14 @@ export class Repository {
   addAll(): void {
     const ignorePatterns = loadIgnorePatterns(this.workDir);
     const files = walkDir(this.workDir, ignorePatterns);
-    
+
     for (const file of files) {
       const relativePath = path.relative(this.workDir, file);
       const content = readFile(file);
       const hash = this.objects.writeBlob(content);
       this.index.add(relativePath, hash, this.workDir);
     }
-    
+
     this.index.save();
   }
 
@@ -229,7 +317,14 @@ export class Repository {
     const parentHashes: string[] = [];
     const headHash = this.refs.resolve('HEAD');
     if (headHash) {
-      parentHashes.push(headHash);
+      // Verify the parent commit exists before using it
+      try {
+        this.objects.readCommit(headHash);
+        parentHashes.push(headHash);
+      } catch (error) {
+        // Parent commit doesn't exist - this could happen if objects weren't properly stored
+        console.warn(`Warning: HEAD points to ${headHash} but commit object not found. Creating orphan commit.`);
+      }
     }
 
     // Create commit object
@@ -441,7 +536,7 @@ export class Repository {
    */
   private checkoutTree(commitHash: string): void {
     const commit = this.objects.readCommit(commitHash);
-    
+
     // Clear and rebuild index from tree
     this.index.clear();
     this.checkoutTreeRecursive(commit.treeHash, '');
@@ -465,7 +560,7 @@ export class Repository {
         const blob = this.objects.readBlob(entry.hash);
         mkdirp(path.dirname(fullPath));
         writeFile(fullPath, blob.content);
-        
+
         // Add to index
         this.index.add(relativePath, entry.hash, this.workDir);
       }
@@ -514,11 +609,30 @@ export class Repository {
   }
 
   /**
-   * Get default author info from environment or config
+   * Get default author info from environment, GitHub auth, git config, or defaults
    */
   private getDefaultAuthor(): Author {
-    const name = process.env.WIT_AUTHOR_NAME || process.env.GIT_AUTHOR_NAME || 'Anonymous';
-    const email = process.env.WIT_AUTHOR_EMAIL || process.env.GIT_AUTHOR_EMAIL || 'anonymous@example.com';
+    // Try environment variables first
+    let name = process.env.WIT_AUTHOR_NAME || process.env.GIT_AUTHOR_NAME;
+    let email = process.env.WIT_AUTHOR_EMAIL || process.env.GIT_AUTHOR_EMAIL;
+
+    // If not set, try GitHub credentials (from `wit github login`)
+    if (!name || !email) {
+      const githubInfo = this.readGitHubUserInfo();
+      if (!name) name = githubInfo.name;
+      if (!email) email = githubInfo.email;
+    }
+
+    // If not set, try reading from git config
+    if (!name || !email) {
+      const gitConfig = this.readGitConfig();
+      if (!name) name = gitConfig.name;
+      if (!email) email = gitConfig.email;
+    }
+
+    // Fall back to defaults
+    if (!name) name = 'Anonymous';
+    if (!email) email = 'anonymous@example.com';
 
     return {
       name,
@@ -526,6 +640,76 @@ export class Repository {
       timestamp: Math.floor(Date.now() / 1000),
       timezone: this.getTimezone(),
     };
+  }
+
+  /**
+   * Read user info from stored GitHub credentials
+   */
+  private readGitHubUserInfo(): { name?: string; email?: string } {
+    try {
+      const { loadGitHubCredentials } = require('./github');
+      const creds = loadGitHubCredentials();
+      if (creds) {
+        return {
+          name: creds.name,
+          email: creds.email,
+        };
+      }
+    } catch {
+      // GitHub module not available or no credentials
+    }
+    return {};
+  }
+
+  /**
+   * Read user info from git config (local repo config, then global)
+   */
+  private readGitConfig(): { name?: string; email?: string } {
+    const result: { name?: string; email?: string } = {};
+
+    // Try local .git/config first, then ~/.gitconfig
+    const configPaths = [
+      path.join(this.gitDir, 'config'),
+      path.join(process.env.HOME || '', '.gitconfig'),
+    ];
+
+    for (const configPath of configPaths) {
+      try {
+        if (!exists(configPath)) continue;
+
+        const content = readFileText(configPath);
+        const lines = content.split('\n');
+        let inUserSection = false;
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+
+          if (trimmed.startsWith('[')) {
+            inUserSection = trimmed.toLowerCase() === '[user]';
+            continue;
+          }
+
+          if (inUserSection) {
+            const nameMatch = trimmed.match(/^name\s*=\s*(.+)$/i);
+            if (nameMatch && !result.name) {
+              result.name = nameMatch[1].trim();
+            }
+
+            const emailMatch = trimmed.match(/^email\s*=\s*(.+)$/i);
+            if (emailMatch && !result.email) {
+              result.email = emailMatch[1].trim();
+            }
+          }
+        }
+
+        // Stop if we have both
+        if (result.name && result.email) break;
+      } catch {
+        // Ignore errors reading config
+      }
+    }
+
+    return result;
   }
 
   /**
@@ -569,9 +753,9 @@ export class Repository {
 
     const commit = this.objects.readCommit(hash);
     const blobHash = this.findBlobInTree(commit.treeHash, filePath.split('/'));
-    
+
     if (!blobHash) return null;
-    
+
     const blob = this.objects.readBlob(blobHash);
     return blob.content;
   }
@@ -581,7 +765,7 @@ export class Repository {
    */
   private findBlobInTree(treeHash: string, pathParts: string[]): string | null {
     const tree = this.objects.readTree(treeHash);
-    
+
     for (const entry of tree.entries) {
       if (entry.name === pathParts[0]) {
         if (pathParts.length === 1) {
@@ -592,7 +776,7 @@ export class Repository {
         }
       }
     }
-    
+
     return null;
   }
 }

@@ -1,0 +1,166 @@
+---
+title: Why wit?
+description: "The problems we're solving and how"
+---
+
+# Why wit?
+
+Git is powerful. It's also hostile.
+
+"Detached HEAD state" tells you nothing. The reflog is archaeology. `git checkout` does five different things. Every error message assumes you already know what went wrong.
+
+We fixed this.
+
+## The Problems
+
+### 1. Undo is Broken
+
+Git has undo mechanisms. They're unusable.
+
+```bash
+# What Git expects you to do:
+git reflog
+# decipher timestamps and commit hashes
+git reset --hard HEAD@{3}
+# hope you picked the right one
+```
+
+The reflog is a debugging tool, not an undo system. It's a journal of everything Git did, with no context about what *you* were trying to do.
+
+**What wit does:**
+
+```bash
+wit undo
+```
+
+Every operation you perform is logged with intent. `wit undo` walks backwards through your actions. Made three mistakes? `wit undo --steps 3`.
+
+### 2. Branch Switching Destroys Work
+
+You're in the middle of something. You need to check another branch.
+
+```bash
+git checkout main
+# error: Your local changes to the following files would be overwritten
+```
+
+Now you're stuck manually stashing, hoping you remember to pop it later, or committing half-finished work.
+
+**What wit does:**
+
+When you switch branches, wit automatically saves your uncommitted changes. When you come back, they're restored. No thought required.
+
+```bash
+wit switch main     # work is saved
+# do stuff
+wit switch feature  # work is restored
+```
+
+### 3. Commit Messages Are Busywork
+
+You made changes. Git can see exactly what changed. But it still makes you describe it.
+
+Most commit messages are noise: "fix bug", "update", "wip". The useful information is in the diff, not the message.
+
+**What wit does:**
+
+```bash
+wit ai commit -a -x
+```
+
+AI reads your diff and writes the message. It sees the code. It knows what changed. It writes a better message than you would have.
+
+### 4. Finding Code is Painful
+
+"Where is authentication handled?" 
+
+With Git, you grep. You read file names. You guess. You open ten files before finding the right one.
+
+**What wit does:**
+
+```bash
+wit search "where is authentication handled?"
+```
+
+Semantic search. It understands what you're asking, not just the words. It returns relevant code, not just string matches.
+
+### 5. Error Messages Are Cryptic
+
+```bash
+git checkout foo
+# error: pathspec 'foo' did not match any file(s) known to git
+```
+
+Did you mean a branch? A file? A commit? Git won't say.
+
+**What wit does:**
+
+```bash
+wit checkout foo
+# Error: Branch 'foo' not found
+#
+# Did you mean:
+#   - feature/foo
+#   - fix/foobar
+#
+# Create it with: wit checkout -b foo
+```
+
+Errors explain what went wrong and suggest fixes.
+
+### 6. The Mental Model is Wrong
+
+Git's mental model is refs, objects, trees, blobs. That's implementation detail. Developers think in terms of branches, changes, and history.
+
+Commands like `git checkout` conflate concepts. It switches branches. It restores files. It detaches HEAD. One command, three unrelated operations.
+
+**What wit does:**
+
+- `wit switch` - change branches
+- `wit restore` - restore files
+- `wit checkout` - still works, but we suggest the specific command
+
+Concepts are separated. Commands do one thing.
+
+## The AI Angle
+
+AI isn't a gimmick here. It solves real problems:
+
+**Commit messages**: The AI sees your diff. It writes messages that actually describe what changed. Not "update", not "fix", but "Add rate limiting to API endpoints with 100 req/min default".
+
+**Code review**: Before you push, `wit ai review` catches obvious issues. Forgotten console.logs. Security problems. Logic errors. Your teammates' time is valuable.
+
+**Semantic search**: Ask questions in English. Get answers with file paths and line numbers. Onboard to new codebases faster.
+
+This isn't AI for AI's sake. These are tasks where AI genuinely helps.
+
+## What's Ready
+
+- Full Git compatibility (push/pull to GitHub works)
+- 57 commands covering standard workflows
+- AI commit messages and code review
+- Semantic search over codebases
+- Web UI and Terminal UI
+- Self-hosted server (alpha)
+
+## What's Not
+
+This is early software. We ship fast. Some things are rough:
+
+- Server features are alpha quality
+- Documentation has gaps
+- Some edge cases aren't handled
+
+Check the [ROADMAP](/roadmap) for what's coming.
+
+## Try It
+
+```bash
+git clone https://github.com/abhiaiyer91/wit.git
+cd wit && npm install && npm run build && npm link
+
+wit init
+wit add . && wit ai commit -a -x
+```
+
+Five minutes. See if it fits how you work.

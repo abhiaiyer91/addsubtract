@@ -5,11 +5,11 @@ description: "Handle large files efficiently without external tools"
 
 # Large File Support
 
-tsgit handles large files natively with automatic chunking - no Git LFS required.
+wit handles large files natively with automatic chunking - no Git LFS required.
 
 ## Overview
 
-Unlike Git, which struggles with large files and requires Git LFS for efficient handling, tsgit includes built-in large file support:
+Unlike Git, which struggles with large files and requires Git LFS for efficient handling, wit includes built-in large file support:
 
 - **Automatic chunking:** Large files are split into manageable chunks
 - **Deduplication:** Identical chunks are stored only once
@@ -60,10 +60,10 @@ A manifest file tracks the chunks:
 
 ### Threshold
 
-Set the large file threshold in `.tsgit/config`:
+Set the large file threshold in `.wit/config`:
 
 ```ini
-[tsgit]
+[wit]
     largeFileThreshold = 2097152  # 2MB in bytes
 ```
 
@@ -79,7 +79,7 @@ Set the large file threshold in `.tsgit/config`:
 ### Chunk Size
 
 ```ini
-[tsgit]
+[wit]
     chunkSize = 2097152  # 2MB chunks
 ```
 
@@ -91,10 +91,10 @@ Just use `add` as normal:
 
 ```bash
 # Add a large file - chunking is automatic
-tsgit add large-video.mp4
+wit add large-video.mp4
 ```
 
-tsgit will:
+wit will:
 1. Detect the file is above threshold
 2. Split into chunks
 3. Store chunks efficiently
@@ -103,7 +103,7 @@ tsgit will:
 ### Status with Large Files
 
 ```bash
-tsgit status
+wit status
 
 Staged:
   large-file: assets/video.mp4 (15.2 MB, 8 chunks)
@@ -112,7 +112,7 @@ Staged:
 ### Diff with Large Files
 
 ```bash
-tsgit diff assets/video.mp4
+wit diff assets/video.mp4
 
 Binary file changed
   Before: 15.2 MB (8 chunks)
@@ -124,7 +124,7 @@ Binary file changed
 
 ### Space Efficiency
 
-| Scenario | Git | tsgit |
+| Scenario | Git | wit |
 |----------|-----|-------|
 | 100MB file, 1 byte change | +100MB | +2MB (1 chunk) |
 | Same chunk in 10 files | 10x stored | 1x stored |
@@ -143,14 +143,14 @@ Git LFS requires:
 - Additional setup
 - Separate tracking file
 
-tsgit just works:
+wit just works:
 - Built-in to the format
 - No server changes needed
 - Automatic handling
 
 ## Comparison with Git LFS
 
-| Feature | Git LFS | tsgit |
+| Feature | Git LFS | wit |
 |---------|---------|-------|
 | Setup required | Yes | No |
 | Server support | Required | Not needed |
@@ -182,7 +182,7 @@ tsgit just works:
   <Accordion title="File not being chunked">
     Check the threshold:
     ```bash
-    tsgit config tsgit.largeFileThreshold
+    wit config wit.largeFileThreshold
     ```
     Ensure the file is larger than this value.
   </Accordion>
@@ -190,7 +190,7 @@ tsgit just works:
   <Accordion title="Slow performance with many chunks">
     Try increasing chunk size:
     ```ini
-    [tsgit]
+    [wit]
         chunkSize = 5242880  # 5MB
     ```
   </Accordion>
@@ -198,7 +198,7 @@ tsgit just works:
   <Accordion title="Repository size growing">
     Run garbage collection:
     ```bash
-    tsgit gc --aggressive
+    wit gc --aggressive
     ```
   </Accordion>
 </AccordionGroup>

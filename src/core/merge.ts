@@ -237,7 +237,7 @@ export class MergeManager {
   private fastForwardMerge(sourceBranch: string, sourceHash: string): MergeResult {
     const targetBranch = this.repo.refs.getCurrentBranch()!;
     this.repo.refs.updateBranch(targetBranch, sourceHash);
-    
+
     // Update working directory
     this.repo.checkout(targetBranch);
 
@@ -310,7 +310,7 @@ export class MergeManager {
       }
     }
 
-    // If there are conflicts, save state
+    // If there are conflicts, save state and write to working directory
     if (!result.success) {
       const state: MergeState = {
         inProgress: true,
@@ -325,6 +325,9 @@ export class MergeManager {
       };
       this.saveState(state);
       this.writeConflictFiles(result.conflicts);
+
+      // Write conflict markers to working directory
+      this.writeConflictMarkersToWorkDir(result.conflicts, sourceBranch, targetBranch);
     } else if (!options.noCommit) {
       // Create merge commit
       const message = options.message || `Merge branch '${sourceBranch}' into ${targetBranch}`;
@@ -332,6 +335,39 @@ export class MergeManager {
     }
 
     return result;
+  }
+
+  /**
+   * Write conflict markers to working directory files
+   */
+  private writeConflictMarkersToWorkDir(
+    conflicts: FileConflict[],
+    sourceBranch: string,
+    targetBranch: string
+  ): void {
+    for (const conflict of conflicts) {
+      const workingPath = path.join(this.repo.workDir, conflict.path);
+
+      // Ensure directory exists
+      mkdirp(path.dirname(workingPath));
+
+      // Build content with conflict markers
+      let content = '';
+      const oursLines = conflict.oursContent.split('\n');
+      const theirsLines = conflict.theirsContent.split('\n');
+
+      // Simple approach: show full file conflict
+      // A more sophisticated approach would show only conflicting regions
+      content += `<<<<<<< ${targetBranch} (ours)\n`;
+      content += conflict.oursContent;
+      if (!conflict.oursContent.endsWith('\n')) content += '\n';
+      content += '=======\n';
+      content += conflict.theirsContent;
+      if (!conflict.theirsContent.endsWith('\n')) content += '\n';
+      content += `>>>>>>> ${sourceBranch} (theirs)\n`;
+
+      writeFile(workingPath, content);
+    }
   }
 
   /**
@@ -411,8 +447,8 @@ export class MergeManager {
       // Try to auto-merge
       const oursContent = this.repo.objects.readBlob(oursHash).toString();
       const theirsContent = this.repo.objects.readBlob(theirsHash).toString();
-      const baseContent = baseHash 
-        ? this.repo.objects.readBlob(baseHash).toString() 
+      const baseContent = baseHash
+        ? this.repo.objects.readBlob(baseHash).toString()
         : '';
 
       const mergeResult = this.mergeContent(baseContent, oursContent, theirsContent);
@@ -594,9 +630,9 @@ export class MergeManager {
     }
 
     // Create merge commit
-    const commitMessage = message || 
+    const commitMessage = message ||
       `Merge branch '${state.sourceBranch}' into ${state.targetBranch}`;
-    
+
     const commitHash = this.repo.commit(commitMessage);
     this.clearState();
 
@@ -627,7 +663,7 @@ export function formatConflict(conflict: FileConflict): string {
 export function formatMergeResult(result: MergeResult): string {
   if (result.success) {
     let output = 'Merge completed successfully!\n\n';
-    
+
     if (result.autoMerged.length > 0) {
       output += `Auto-merged: ${result.autoMerged.length} file(s)\n`;
     }
@@ -637,12 +673,12 @@ export function formatMergeResult(result: MergeResult): string {
     if (result.deleted.length > 0) {
       output += `Deleted: ${result.deleted.length} file(s)\n`;
     }
-    
+
     return output;
   }
 
   let output = `Merge failed with ${result.conflicts.length} conflict(s):\n\n`;
-  
+
   for (const conflict of result.conflicts) {
     output += `  ${conflict.path}\n`;
   }
