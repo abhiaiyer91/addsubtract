@@ -206,8 +206,12 @@ describe('Git Server', () => {
 
   describe('CORS Headers', () => {
     it('should include CORS headers in response', async () => {
-      const res = await app.request('/health');
-      expect(res.headers.get('Access-Control-Allow-Origin')).toBe('*');
+      const res = await app.request('/health', {
+        headers: {
+          'Origin': 'http://localhost:5173',
+        },
+      });
+      expect(res.headers.get('Access-Control-Allow-Origin')).toBe('http://localhost:5173');
     });
   });
 
