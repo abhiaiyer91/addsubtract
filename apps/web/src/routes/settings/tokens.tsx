@@ -145,7 +145,7 @@ export function TokensPage() {
   const isLoading = tokensLoading;
 
   return (
-    <div className="container max-w-5xl mx-auto py-8 space-y-6">
+    <div className="container max-w-6xl mx-auto py-8 space-y-6">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm">
         <Link to="/settings" className="text-muted-foreground hover:text-foreground flex items-center gap-1">
