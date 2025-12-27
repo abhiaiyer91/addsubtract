@@ -43,6 +43,7 @@ import { OrgPage } from './routes/org';
 import { OrgSettingsPage } from './routes/org/settings';
 import { OrgMembersPage } from './routes/org/members';
 import { OrgTeamsPage } from './routes/org/teams';
+import { TeamDetailPage } from './routes/org/team-detail';
 import { SearchPage } from './routes/search';
 import { PullsInboxPage } from './routes/pulls';
 import { IssuesInboxPage } from './routes/issues';
@@ -76,6 +77,7 @@ export function App() {
             <Route path="/org/:slug/settings" element={<OrgSettingsPage />} />
             <Route path="/org/:slug/members" element={<OrgMembersPage />} />
             <Route path="/org/:slug/teams" element={<OrgTeamsPage />} />
+            <Route path="/org/:slug/teams/:teamId" element={<TeamDetailPage />} />
 
             {/* User/Org profile */}
             <Route path="/:owner" element={<OwnerPage />} />

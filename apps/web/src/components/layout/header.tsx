@@ -17,6 +17,8 @@ import {
   AtSign,
   Menu,
   X,
+  Building2,
+  Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -138,8 +140,16 @@ export function Header() {
                       <BookOpen className="mr-2 h-4 w-4" />
                       New repository
                     </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => navigate('/orgs/new')}>
+                      <Building2 className="mr-2 h-4 w-4" />
+                      New organization
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
+
+                {/* Organization Switcher */}
+                <OrganizationSwitcher />
 
                 {/* Notifications */}
                 <NotificationsDropdown />
@@ -264,16 +274,24 @@ export function Header() {
                     <CircleDot className="h-4 w-4" />
                     Issues
                   </Link>
-                  <Link
-                    to="/new"
-                    className="flex items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-lg transition-all"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    <Plus className="h-4 w-4" />
-                    New repository
-                  </Link>
-                </>
-              )}
+                    <Link
+                      to="/new"
+                      className="flex items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-lg transition-all"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      <Plus className="h-4 w-4" />
+                      New repository
+                    </Link>
+                    <Link
+                      to="/orgs/new"
+                      className="flex items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-lg transition-all"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      <Building2 className="h-4 w-4" />
+                      New organization
+                    </Link>
+                  </>
+                )}
               {!authenticated && (
                 <>
                   <Link
@@ -297,6 +315,59 @@ export function Header() {
         </div>
       )}
     </>
+  );
+}
+
+function OrganizationSwitcher() {
+  const navigate = useNavigate();
+  const { data: session } = useSession();
+  const { data: userOrgs } = trpc.organizations.listForUser.useQuery(undefined, {
+    enabled: !!session?.user,
+  });
+
+  if (!userOrgs || userOrgs.length === 0) {
+    return null;
+  }
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="sm" className="hidden md:flex gap-1 h-9">
+          <Building2 className="h-4 w-4" />
+          <ChevronDown className="h-3 w-3" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuLabel>Switch context</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => navigate(`/${session?.user?.username}`)}>
+          <User className="mr-2 h-4 w-4" />
+          <div className="flex flex-col">
+            <span className="font-medium">{session?.user?.name || session?.user?.username}</span>
+            <span className="text-xs text-muted-foreground">Personal account</span>
+          </div>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel className="text-xs text-muted-foreground">Organizations</DropdownMenuLabel>
+        {userOrgs.map((membership) => (
+          <DropdownMenuItem
+            key={membership.orgId}
+            onClick={() => navigate(`/org/${membership.org.name}`)}
+          >
+            <Building2 className="mr-2 h-4 w-4" />
+            <div className="flex flex-col">
+              <span className="font-medium">{membership.org.displayName || membership.org.name}</span>
+              <span className="text-xs text-muted-foreground capitalize">{membership.role}</span>
+            </div>
+          </DropdownMenuItem>
+        ))}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => navigate('/orgs/new')}>
+          <Plus className="mr-2 h-4 w-4" />
+          Create organization
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
