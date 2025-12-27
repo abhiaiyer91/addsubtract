@@ -9,6 +9,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Markdown } from '@/components/markdown/renderer';
 import { LabelPicker } from '@/components/issue/label-picker';
+import { ProjectPicker } from '@/components/issue/project-picker';
 import { RepoLayout } from './components/repo-layout';
 import { Loading } from '@/components/ui/loading';
 import { formatRelativeTime, formatDate } from '@/lib/utils';
@@ -69,6 +70,12 @@ export function IssueDetailPage() {
   const { data: cycle } = trpc.cycles.get.useQuery(
     { cycleId: issueData?.cycleId! },
     { enabled: !!issueData?.cycleId }
+  );
+
+  // Fetch available projects for the picker
+  const { data: availableProjects } = trpc.projects.list.useQuery(
+    { repoId: repoData?.repo.id! },
+    { enabled: !!repoData?.repo.id }
   );
 
   // Mutations
@@ -182,6 +189,31 @@ export function IssueDetailPage() {
       utils.issues.inboxSummary.invalidate();
     },
   });
+
+  const assignToProjectMutation = trpc.issues.assignToProject.useMutation({
+    onSuccess: () => {
+      utils.issues.get.invalidate({ repoId: repoData?.repo.id!, number: issueNumber });
+      utils.projects.getProgress.invalidate();
+      toastSuccess({
+        title: 'Project updated',
+        description: 'Issue project assignment has been updated.',
+      });
+    },
+    onError: (error) => {
+      toastError({
+        title: 'Failed to update project',
+        description: error.message,
+      });
+    },
+  });
+
+  const handleProjectChange = (newProject: { id: string; name: string; icon: string | null } | null) => {
+    if (!issueData?.id) return;
+    assignToProjectMutation.mutate({
+      issueId: issueData.id,
+      projectId: newProject?.id ?? null,
+    });
+  };
 
   const isLoading = repoLoading || issueLoading;
 
@@ -426,6 +458,16 @@ export function IssueDetailPage() {
               onLabelsChange={setSelectedLabels}
             />
           </div>
+
+          <Separator />
+
+          {/* Project */}
+          <ProjectPicker
+            availableProjects={availableProjects || []}
+            selectedProject={project || null}
+            onProjectChange={handleProjectChange}
+            isLoading={assignToProjectMutation.isPending}
+          />
 
           <Separator />
 
