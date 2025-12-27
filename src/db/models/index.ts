@@ -145,3 +145,9 @@ export {
   type AIUsageStats,
   type CIStats,
 } from './wrapped';
+
+// Triage Agent models
+export {
+  triageAgentConfigModel,
+  triageAgentRunModel,
+} from './triage-agent';

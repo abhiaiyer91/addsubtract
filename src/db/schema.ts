@@ -1404,6 +1404,81 @@ export const repoAiKeys = pgTable('repo_ai_keys', {
   uniqueProviderPerRepo: unique().on(table.repoId, table.provider),
 }));
 
+// ============ TRIAGE AGENT CONFIGURATION ============
+
+/**
+ * Triage agent configuration per repository
+ * Allows users to configure an AI agent that automatically triages new issues
+ */
+export const triageAgentConfig = pgTable('triage_agent_config', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  repoId: uuid('repo_id')
+    .notNull()
+    .references(() => repositories.id, { onDelete: 'cascade' })
+    .unique(), // One config per repo
+  
+  /** Whether the triage agent is enabled */
+  enabled: boolean('enabled').notNull().default(false),
+  
+  /** Custom prompt/instructions for the triage agent */
+  prompt: text('prompt'),
+  
+  /** Whether to auto-assign labels */
+  autoAssignLabels: boolean('auto_assign_labels').notNull().default(true),
+  
+  /** Whether to auto-assign users */
+  autoAssignUsers: boolean('auto_assign_users').notNull().default(false),
+  
+  /** Whether to auto-set priority */
+  autoSetPriority: boolean('auto_set_priority').notNull().default(true),
+  
+  /** Whether to add a comment explaining the triage decision */
+  addTriageComment: boolean('add_triage_comment').notNull().default(true),
+  
+  /** User who created/updated this config */
+  updatedById: text('updated_by_id').notNull(),
+  
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+/**
+ * Triage agent run history
+ * Logs each time the triage agent runs on an issue
+ */
+export const triageAgentRuns = pgTable('triage_agent_runs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  repoId: uuid('repo_id')
+    .notNull()
+    .references(() => repositories.id, { onDelete: 'cascade' }),
+  issueId: uuid('issue_id')
+    .notNull()
+    .references(() => issues.id, { onDelete: 'cascade' }),
+  
+  /** Whether the run was successful */
+  success: boolean('success').notNull(),
+  
+  /** Error message if failed */
+  errorMessage: text('error_message'),
+  
+  /** Labels that were assigned */
+  assignedLabels: text('assigned_labels'), // JSON array of label names
+  
+  /** User that was assigned (if any) */
+  assignedUserId: text('assigned_user_id'),
+  
+  /** Priority that was set */
+  assignedPriority: text('assigned_priority'),
+  
+  /** The AI's reasoning/explanation */
+  reasoning: text('reasoning'),
+  
+  /** Tokens used for this run */
+  tokensUsed: integer('tokens_used'),
+  
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
 // ============ JOURNAL (Notion-like documentation) ============
 
 /**
@@ -1695,3 +1770,10 @@ export type NewJournalComment = typeof journalComments.$inferInsert;
 
 export type JournalPageHistoryEntry = typeof journalPageHistory.$inferSelect;
 export type NewJournalPageHistoryEntry = typeof journalPageHistory.$inferInsert;
+
+// Triage Agent types
+export type TriageAgentConfig = typeof triageAgentConfig.$inferSelect;
+export type NewTriageAgentConfig = typeof triageAgentConfig.$inferInsert;
+
+export type TriageAgentRun = typeof triageAgentRuns.$inferSelect;
+export type NewTriageAgentRun = typeof triageAgentRuns.$inferInsert;
