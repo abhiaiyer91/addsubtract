@@ -208,7 +208,7 @@ export function UserHomePage() {
   const repos = reposData || [];
 
   return (
-    <div className="container max-w-6xl py-6 space-y-6">
+    <div className="container max-w-[1400px] py-6 space-y-6">
       {/* Profile Header */}
       <div className="flex items-start gap-6">
         <Avatar className="h-20 w-20 rounded-xl">
@@ -238,7 +238,7 @@ export function UserHomePage() {
 
       {/* Quick Stats for own profile */}
       {isOwnProfile && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full">
           <Card>
             <CardContent className="pt-4 pb-4">
               <div className="flex items-center gap-3">
@@ -247,7 +247,7 @@ export function UserHomePage() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold">{repos.length}</p>
-                  <p className="text-xs text-muted-foreground">Repositories</p>
+                  <p className="text-xs text-muted-foreground mt-1">Repositories</p>
                 </div>
               </div>
             </CardContent>
@@ -260,7 +260,7 @@ export function UserHomePage() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold">{(prSummary?.awaitingReview || 0) + (prSummary?.myOpenPrs || 0)}</p>
-                  <p className="text-xs text-muted-foreground">Open PRs</p>
+                  <p className="text-xs text-muted-foreground mt-1">Open PRs</p>
                 </div>
               </div>
             </CardContent>
@@ -273,7 +273,7 @@ export function UserHomePage() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold">{(issueSummary?.assignedToMe || 0) + (issueSummary?.createdByMe || 0)}</p>
-                  <p className="text-xs text-muted-foreground">Open Issues</p>
+                  <p className="text-xs text-muted-foreground mt-1">Open Issues</p>
                 </div>
               </div>
             </CardContent>
@@ -286,7 +286,7 @@ export function UserHomePage() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold">{unreadCount || 0}</p>
-                  <p className="text-xs text-muted-foreground">Notifications</p>
+                  <p className="text-xs text-muted-foreground mt-1">Notifications</p>
                 </div>
               </div>
             </CardContent>

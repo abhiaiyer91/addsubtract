@@ -68,7 +68,7 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-8">
+    <div className="container max-w-[1200px] mx-auto py-8 space-y-8">
       <div>
         <h1 className="text-3xl font-bold">Settings</h1>
         <p className="text-muted-foreground">Manage your account settings</p>
