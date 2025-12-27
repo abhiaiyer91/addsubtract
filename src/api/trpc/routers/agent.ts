@@ -16,8 +16,27 @@ import {
   agentMessageModel,
   agentFileChangeModel,
   repoModel,
+  repoAiKeyModel,
 } from '../../../db/models';
 import { getTsgitAgent, isAIAvailable, getAIInfo } from '../../../ai/mastra';
+
+// Available models configuration
+const AVAILABLE_MODELS = {
+  anthropic: {
+    id: 'anthropic',
+    name: 'Anthropic',
+    model: 'claude-opus-4.5',
+    description: 'Claude Opus 4.5 (Recommended)',
+  },
+  openai: {
+    id: 'openai', 
+    name: 'OpenAI',
+    model: 'gpt-5.2',
+    description: 'GPT 5.2',
+  },
+} as const;
+
+type ProviderId = keyof typeof AVAILABLE_MODELS;
 
 /**
  * Agent router for coding agent functionality
@@ -25,15 +44,70 @@ import { getTsgitAgent, isAIAvailable, getAIInfo } from '../../../ai/mastra';
 export const agentRouter = router({
   /**
    * Check if AI is available and configured
+   * Returns available providers based on both server and repo keys
    */
-  status: publicProcedure.query(async () => {
-    const info = getAIInfo();
-    return {
-      available: info.available,
-      model: info.model,
-      provider: info.provider,
-    };
-  }),
+  status: protectedProcedure
+    .input(z.object({ repoId: z.string().uuid().optional() }).optional())
+    .query(async ({ input }) => {
+      const info = getAIInfo();
+      
+      // Check which providers are available
+      const availableProviders: Array<{
+        id: string;
+        name: string;
+        model: string;
+        description: string;
+        source: 'server' | 'repository';
+      }> = [];
+      
+      // Check server-level keys
+      if (process.env.ANTHROPIC_API_KEY) {
+        availableProviders.push({
+          ...AVAILABLE_MODELS.anthropic,
+          source: 'server',
+        });
+      }
+      if (process.env.OPENAI_API_KEY) {
+        availableProviders.push({
+          ...AVAILABLE_MODELS.openai,
+          source: 'server',
+        });
+      }
+      
+      // Check repo-level keys if repoId provided
+      if (input?.repoId) {
+        const repoKeys = await repoAiKeyModel.listKeys(input.repoId);
+        for (const key of repoKeys) {
+          // Don't add duplicates
+          if (!availableProviders.some(p => p.id === key.provider)) {
+            const modelInfo = AVAILABLE_MODELS[key.provider as ProviderId];
+            if (modelInfo) {
+              availableProviders.push({
+                ...modelInfo,
+                source: 'repository',
+              });
+            }
+          }
+        }
+      }
+      
+      // Sort to prefer Anthropic
+      availableProviders.sort((a, b) => {
+        if (a.id === 'anthropic') return -1;
+        if (b.id === 'anthropic') return 1;
+        return 0;
+      });
+      
+      const defaultProvider = availableProviders[0] || null;
+      
+      return {
+        available: availableProviders.length > 0,
+        model: defaultProvider?.model || info.model,
+        provider: defaultProvider?.id || info.provider,
+        providers: availableProviders,
+        defaultProvider: defaultProvider?.id || null,
+      };
+    }),
 
   /**
    * Create a new agent session
@@ -197,18 +271,11 @@ export const agentRouter = router({
       z.object({
         sessionId: z.string().uuid(),
         message: z.string().min(1).max(32000),
+        provider: z.enum(['anthropic', 'openai']).optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
-      // Check AI availability
-      if (!isAIAvailable()) {
-        throw new TRPCError({
-          code: 'PRECONDITION_FAILED',
-          message: 'AI is not configured. Set OPENAI_API_KEY or ANTHROPIC_API_KEY.',
-        });
-      }
-
-      // Verify session ownership
+      // Get session to check for repoId
       const session = await agentSessionModel.findByIdForUser(
         input.sessionId,
         ctx.user.id
@@ -220,6 +287,72 @@ export const agentRouter = router({
           message: 'Session not found',
         });
       }
+
+      // Determine which provider/key to use
+      let apiKey: string | null = null;
+      let provider = input.provider || 'anthropic'; // Default to Anthropic
+      
+      // Try repo-level keys first if we have a repoId
+      if (session.repoId) {
+        if (input.provider) {
+          // User specified a provider, try to get that key
+          apiKey = await repoAiKeyModel.getDecryptedKey(session.repoId, input.provider);
+        } else {
+          // No provider specified, get any available key (prefers Anthropic)
+          const repoKey = await repoAiKeyModel.getAnyKey(session.repoId);
+          if (repoKey) {
+            apiKey = repoKey.key;
+            provider = repoKey.provider;
+          }
+        }
+      }
+      
+      // Fall back to server-level keys
+      if (!apiKey) {
+        if (provider === 'anthropic' && process.env.ANTHROPIC_API_KEY) {
+          apiKey = process.env.ANTHROPIC_API_KEY;
+        } else if (provider === 'openai' && process.env.OPENAI_API_KEY) {
+          apiKey = process.env.OPENAI_API_KEY;
+        } else if (process.env.ANTHROPIC_API_KEY) {
+          apiKey = process.env.ANTHROPIC_API_KEY;
+          provider = 'anthropic';
+        } else if (process.env.OPENAI_API_KEY) {
+          apiKey = process.env.OPENAI_API_KEY;
+          provider = 'openai';
+        }
+      }
+
+      if (!apiKey) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'AI is not configured. Add an API key in repository settings or set ANTHROPIC_API_KEY.',
+        });
+      }
+
+      // Set the API key in environment for the agent to use
+      // This is a temporary override for this request
+      const originalAnthropicKey = process.env.ANTHROPIC_API_KEY;
+      const originalOpenAIKey = process.env.OPENAI_API_KEY;
+      
+      if (provider === 'anthropic') {
+        process.env.ANTHROPIC_API_KEY = apiKey;
+      } else {
+        process.env.OPENAI_API_KEY = apiKey;
+      }
+
+      // Helper to restore original keys
+      const restoreKeys = () => {
+        if (originalAnthropicKey !== undefined) {
+          process.env.ANTHROPIC_API_KEY = originalAnthropicKey;
+        } else {
+          delete process.env.ANTHROPIC_API_KEY;
+        }
+        if (originalOpenAIKey !== undefined) {
+          process.env.OPENAI_API_KEY = originalOpenAIKey;
+        } else {
+          delete process.env.OPENAI_API_KEY;
+        }
+      };
 
       if (session.status !== 'active') {
         throw new TRPCError({
@@ -271,12 +404,19 @@ export const agentRouter = router({
           await agentSessionModel.update(input.sessionId, { title });
         }
 
+        // Restore original API keys
+        restoreKeys();
+
         return {
           userMessage,
           assistantMessage,
           toolCalls: result.toolCalls,
+          provider, // Return which provider was used
         };
       } catch (error) {
+        // Restore original API keys
+        restoreKeys();
+
         // Save error message
         await agentMessageModel.create({
           sessionId: input.sessionId,

@@ -1,7 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plus, MessageSquare, Trash2, Bot, AlertCircle, Settings } from 'lucide-react';
+import { Plus, MessageSquare, Trash2, Bot, AlertCircle, Settings, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { ChatMessage } from './chat-message';
 import { ChatInput } from './chat-input';
 import { trpc } from '@/lib/trpc';
@@ -23,11 +29,12 @@ export function AgentChat({ repoId }: AgentChatProps) {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [streamingMessage, setStreamingMessage] = useState<string>('');
+  const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const utils = trpc.useUtils();
 
-  // Check AI status from server
-  const { data: aiStatus } = trpc.agent.status.useQuery();
+  // Check AI status from server - pass repoId to get repo-level keys too
+  const { data: aiStatus } = trpc.agent.status.useQuery({ repoId });
   
   // Check repo-level AI keys if we have a repoId
   const { data: repoAiStatus } = trpc.repoAiKeys.hasKeys.useQuery(
@@ -133,11 +140,19 @@ export function AgentChat({ repoId }: AgentChatProps) {
     }
   }, [sessions, sessionsLoading, activeSessionId]);
 
+  // Set default provider when aiStatus loads
+  useEffect(() => {
+    if (aiStatus?.defaultProvider && !selectedProvider) {
+      setSelectedProvider(aiStatus.defaultProvider);
+    }
+  }, [aiStatus?.defaultProvider, selectedProvider]);
+
   const handleSend = async (message: string) => {
+    const provider = selectedProvider as 'anthropic' | 'openai' | undefined;
     if (!activeSessionId) {
       // Create a new session first
       const newSession = await createSession.mutateAsync({});
-      chat.mutate({ sessionId: newSession.id, message });
+      chat.mutate({ sessionId: newSession.id, message, provider });
     } else {
       // Add optimistic user message
       const tempId = `temp-${Date.now()}`;
@@ -150,7 +165,7 @@ export function AgentChat({ repoId }: AgentChatProps) {
           createdAt: new Date(),
         },
       ]);
-      chat.mutate({ sessionId: activeSessionId, message });
+      chat.mutate({ sessionId: activeSessionId, message, provider });
     }
   };
 
@@ -251,15 +266,48 @@ export function AgentChat({ repoId }: AgentChatProps) {
           </div>
         </ScrollArea>
 
-        {/* AI Status footer */}
+        {/* AI Status footer with model switcher */}
         {aiStatus && (
           <div className="p-3 border-t bg-muted/30">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <div className="w-2 h-2 rounded-full bg-green-500" />
-              <span>
-                {aiStatus.provider}: {aiStatus.model}
-              </span>
-            </div>
+            {(aiStatus as any).providers && (aiStatus as any).providers.length > 0 ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="w-full flex items-center justify-between gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1.5 rounded hover:bg-muted">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-green-500" />
+                      <span>
+                        {(aiStatus as any).providers.find((p: { id: string }) => p.id === selectedProvider)?.description || 
+                         (aiStatus as any).providers[0]?.description || 
+                         `${aiStatus.provider}: ${aiStatus.model}`}
+                      </span>
+                    </div>
+                    <ChevronDown className="h-3 w-3" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-56">
+                  {(aiStatus as any).providers.map((provider: { id: string; name: string; description: string; source: string }) => (
+                    <DropdownMenuItem
+                      key={provider.id}
+                      onClick={() => setSelectedProvider(provider.id)}
+                      className={cn(
+                        'flex items-center justify-between',
+                        selectedProvider === provider.id && 'bg-accent'
+                      )}
+                    >
+                      <span>{provider.description}</span>
+                      <span className="text-xs text-muted-foreground capitalize">
+                        {provider.source}
+                      </span>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <div className="w-2 h-2 rounded-full bg-green-500" />
+                <span>{aiStatus.provider}: {aiStatus.model}</span>
+              </div>
+            )}
           </div>
         )}
       </div>
