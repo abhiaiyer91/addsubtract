@@ -167,6 +167,24 @@ export const teamMembers = pgTable(
   })
 );
 
+// ============ BRANCH PROTECTION RULES ============
+
+export const branchProtectionRules = pgTable('branch_protection_rules', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  repoId: uuid('repo_id')
+    .notNull()
+    .references(() => repositories.id, { onDelete: 'cascade' }),
+  pattern: text('pattern').notNull(), // e.g., "main", "release/*"
+  requirePullRequest: boolean('require_pull_request').notNull().default(true),
+  requiredReviewers: integer('required_reviewers').notNull().default(1),
+  requireStatusChecks: boolean('require_status_checks').notNull().default(false),
+  requiredStatusChecks: text('required_status_checks'), // JSON array of check names
+  allowForcePush: boolean('allow_force_push').notNull().default(false),
+  allowDeletion: boolean('allow_deletion').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
 // ============ REPOSITORIES ============
 
 export const repositories = pgTable('repositories', {
@@ -666,6 +684,9 @@ export type NewTeam = typeof teams.$inferInsert;
 
 export type TeamMember = typeof teamMembers.$inferSelect;
 export type NewTeamMember = typeof teamMembers.$inferInsert;
+
+export type BranchProtectionRule = typeof branchProtectionRules.$inferSelect;
+export type NewBranchProtectionRule = typeof branchProtectionRules.$inferInsert;
 
 export type Repository = typeof repositories.$inferSelect;
 export type NewRepository = typeof repositories.$inferInsert;
