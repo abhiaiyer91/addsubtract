@@ -11,10 +11,16 @@ import {
   Tag,
   List,
   LayoutGrid,
+  Inbox,
+  UserCheck,
+  PenLine,
+  MessageSquare,
+  Clock,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,7 +35,7 @@ import { useSession } from '@/lib/auth-client';
 import { trpc } from '@/lib/trpc';
 import { formatRelativeTime, cn } from '@/lib/utils';
 
-type ViewMode = 'list' | 'kanban';
+type ViewMode = 'list' | 'kanban' | 'inbox';
 
 export function IssuesPage() {
   const { owner, repo } = useParams<{ owner: string; repo: string }>();
@@ -41,6 +47,7 @@ export function IssuesPage() {
   // View mode from URL or default to 'list'
   const viewMode = (searchParams.get('view') as ViewMode) || 'list';
   const currentState = searchParams.get('state') || 'open';
+  const isInboxView = viewMode === 'inbox';
 
   // Fetch repository data to get the repo ID
   const { data: repoData, isLoading: repoLoading } = trpc.repos.get.useQuery(
@@ -66,6 +73,27 @@ export function IssuesPage() {
     { enabled: !!repoData?.repo.id && viewMode === 'kanban' }
   );
 
+  // Inbox data (only fetch if in inbox view and authenticated)
+  const { data: inboxSummary } = trpc.issues.inboxSummary.useQuery(
+    { repoId: repoData?.repo.id },
+    { enabled: authenticated && isInboxView && !!repoData?.repo.id }
+  );
+  
+  const { data: assignedToMe, isLoading: assignedLoading } = trpc.issues.inboxAssignedToMe.useQuery(
+    { limit: 20, repoId: repoData?.repo.id },
+    { enabled: authenticated && isInboxView && !!repoData?.repo.id }
+  );
+  
+  const { data: createdByMe, isLoading: createdLoading } = trpc.issues.inboxCreatedByMe.useQuery(
+    { limit: 20, repoId: repoData?.repo.id },
+    { enabled: authenticated && isInboxView && !!repoData?.repo.id }
+  );
+  
+  const { data: participated, isLoading: participatedLoading } = trpc.issues.inboxParticipated.useQuery(
+    { limit: 20, repoId: repoData?.repo.id },
+    { enabled: authenticated && isInboxView && !!repoData?.repo.id }
+  );
+
   // Fetch counts for both states
   const { data: openIssuesData } = trpc.issues.list.useQuery(
     { repoId: repoData?.repo.id!, state: 'open', limit: 100 },
@@ -76,7 +104,7 @@ export function IssuesPage() {
     { enabled: !!repoData?.repo.id }
   );
 
-  const isLoading = repoLoading || (viewMode === 'list' ? issuesLoading : kanbanLoading);
+  const isLoading = repoLoading || (viewMode === 'list' ? issuesLoading : viewMode === 'kanban' ? kanbanLoading : false);
 
   // Get issues with labels
   const issues = issuesData || [];
@@ -134,7 +162,7 @@ export function IssuesPage() {
                 )}
               >
                 <List className="h-4 w-4" />
-                <span>List</span>
+                <span>All</span>
               </button>
               <button
                 onClick={() => handleViewChange('kanban')}
@@ -148,6 +176,20 @@ export function IssuesPage() {
                 <LayoutGrid className="h-4 w-4" />
                 <span>Board</span>
               </button>
+              {authenticated && (
+                <button
+                  onClick={() => handleViewChange('inbox')}
+                  className={cn(
+                    'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-colors',
+                    viewMode === 'inbox'
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  <Inbox className="h-4 w-4" />
+                  <span>Inbox</span>
+                </button>
+              )}
             </div>
 
             {/* State toggle (only for list view) */}
@@ -257,7 +299,20 @@ export function IssuesPage() {
         )}
 
         {/* Content based on view mode */}
-        {viewMode === 'kanban' ? (
+        {viewMode === 'inbox' && authenticated ? (
+          // Inbox view
+          <IssueInboxView
+            assignedToMe={assignedToMe}
+            createdByMe={createdByMe}
+            participated={participated}
+            assignedLoading={assignedLoading}
+            createdLoading={createdLoading}
+            participatedLoading={participatedLoading}
+            inboxSummary={inboxSummary}
+            owner={owner!}
+            repo={repo!}
+          />
+        ) : viewMode === 'kanban' ? (
           // Kanban board view
           repoData?.repo.id && kanbanData ? (
             <KanbanBoard
@@ -430,5 +485,180 @@ function IssueRow({ issue, owner, repo }: IssueRowProps) {
         </div>
       )}
     </div>
+  );
+}
+
+// Inbox View Components
+interface IssueInboxViewProps {
+  assignedToMe: any[] | undefined;
+  createdByMe: any[] | undefined;
+  participated: any[] | undefined;
+  assignedLoading: boolean;
+  createdLoading: boolean;
+  participatedLoading: boolean;
+  inboxSummary: { assignedToMe: number; createdByMe: number; participated: number } | undefined;
+  owner: string;
+  repo: string;
+}
+
+function IssueInboxView({
+  assignedToMe,
+  createdByMe,
+  participated,
+  assignedLoading,
+  createdLoading,
+  participatedLoading,
+  inboxSummary,
+  owner,
+  repo,
+}: IssueInboxViewProps) {
+  return (
+    <Tabs defaultValue="assigned" className="w-full">
+      <TabsList className="w-full justify-start bg-muted/50">
+        <TabsTrigger value="assigned" className="gap-2">
+          <UserCheck className="h-4 w-4" />
+          Assigned
+          {inboxSummary?.assignedToMe ? (
+            <Badge variant="secondary" className="ml-1 h-5 px-1.5">
+              {inboxSummary.assignedToMe}
+            </Badge>
+          ) : null}
+        </TabsTrigger>
+        <TabsTrigger value="created" className="gap-2">
+          <PenLine className="h-4 w-4" />
+          Created
+          {inboxSummary?.createdByMe ? (
+            <Badge variant="secondary" className="ml-1 h-5 px-1.5">
+              {inboxSummary.createdByMe}
+            </Badge>
+          ) : null}
+        </TabsTrigger>
+        <TabsTrigger value="participated" className="gap-2">
+          <MessageSquare className="h-4 w-4" />
+          Participated
+        </TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="assigned" className="mt-4">
+        <InboxIssueList
+          issues={assignedToMe}
+          isLoading={assignedLoading}
+          emptyMessage="No issues assigned to you in this repo"
+          owner={owner}
+          repo={repo}
+        />
+      </TabsContent>
+
+      <TabsContent value="created" className="mt-4">
+        <InboxIssueList
+          issues={createdByMe}
+          isLoading={createdLoading}
+          emptyMessage="You haven't created any open issues in this repo"
+          owner={owner}
+          repo={repo}
+        />
+      </TabsContent>
+
+      <TabsContent value="participated" className="mt-4">
+        <InboxIssueList
+          issues={participated}
+          isLoading={participatedLoading}
+          emptyMessage="No issues you've participated in"
+          owner={owner}
+          repo={repo}
+        />
+      </TabsContent>
+    </Tabs>
+  );
+}
+
+function InboxIssueList({
+  issues,
+  isLoading,
+  emptyMessage,
+  owner,
+  repo,
+}: {
+  issues: any[] | undefined;
+  isLoading: boolean;
+  emptyMessage: string;
+  owner: string;
+  repo: string;
+}) {
+  if (isLoading) {
+    return (
+      <div className="space-y-3">
+        {[...Array(3)].map((_, i) => (
+          <div key={i} className="h-20 rounded-lg bg-muted/50 animate-pulse" />
+        ))}
+      </div>
+    );
+  }
+
+  if (!issues || issues.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 text-center">
+        <Inbox className="h-12 w-12 text-muted-foreground mb-4" />
+        <p className="text-muted-foreground">{emptyMessage}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="border rounded-lg divide-y">
+      {issues.map((issue) => (
+        <InboxIssueCard key={issue.id} issue={issue} owner={owner} repo={repo} />
+      ))}
+    </div>
+  );
+}
+
+function InboxIssueCard({ issue, owner, repo }: { issue: any; owner: string; repo: string }) {
+  const stateIcon = issue.state === 'open' 
+    ? <CircleDot className="h-4 w-4 text-green-500" />
+    : <CheckCircle2 className="h-4 w-4 text-purple-500" />;
+
+  // Status badge config
+  const statusConfig: Record<string, { label: string; color: string }> = {
+    backlog: { label: 'Backlog', color: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300' },
+    todo: { label: 'Todo', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' },
+    in_progress: { label: 'In Progress', color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300' },
+    in_review: { label: 'In Review', color: 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300' },
+    done: { label: 'Done', color: 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' },
+    canceled: { label: 'Canceled', color: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300' },
+  };
+
+  const status = issue.status || 'backlog';
+  const statusInfo = statusConfig[status] || statusConfig.backlog;
+
+  return (
+    <Link
+      to={`/${issue.repoOwner || owner}/${issue.repoName || repo}/issues/${issue.number}`}
+      className="flex items-start gap-3 p-4 hover:bg-muted/50 transition-colors"
+    >
+      <div className="mt-1">{stateIcon}</div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <h3 className="font-medium truncate">{issue.title}</h3>
+          <Badge
+            variant="secondary"
+            className={cn('text-xs font-normal px-2 py-0', statusInfo.color)}
+          >
+            {statusInfo.label}
+          </Badge>
+        </div>
+        <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+          <span className="font-mono">#{issue.number}</span>
+          <span className="flex items-center gap-1">
+            <User className="h-3 w-3" />
+            {issue.authorUsername || issue.author?.username || 'Unknown'}
+          </span>
+          <span className="flex items-center gap-1">
+            <Clock className="h-3 w-3" />
+            {formatRelativeTime(issue.createdAt)}
+          </span>
+        </div>
+      </div>
+    </Link>
   );
 }

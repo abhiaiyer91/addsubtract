@@ -193,23 +193,57 @@ Not grep. Understanding.
 
 ---
 
-## The Anti-Roadmap
+## Strategic Shift (December 27, 2024)
 
-### Things I'm NOT doing
+**We're building a GitHub replacement, not just a better CLI.**
 
-**CI/CD Runner** - GitHub Actions exists. Not our fight.
+The CLI got us here. But people don't switch platforms for a nicer `git status`. They switch when the *platform* is better.
 
-**Web UI parity with GitHub** - The CLI is the product. Web is secondary.
+### Our Moat
 
-**Enterprise features** - SSO, audit logs, compliance. Not yet.
+1. **Open source** - You own it forever
+2. **Self-hostable** - Your code, your infrastructure
+3. **Programmatic core** - CLI, UI, API all call the same TypeScript functions
+4. **AI-native** - Not bolted on, woven in
+5. **Clean slate** - We can rethink everything GitHub calcified
 
-**Local AI models** - Nice to have, not differentiating.
+### The Web App is Now Priority
 
-### Things I might kill
+See `AGENT_TASKS.md` for the full breakdown. Key initiatives:
 
-**The server/platform** - If CLI-only is the path, we should commit to it.
+**AI-First Features (Our Differentiator)**
+- AI-generated PR descriptions
+- "Explain this diff" inline
+- Semantic code search in UI
+- AI conflict resolution
+- Chat with your codebase
 
-**Forking/Issues** - Do we need to replicate GitHub, or complement it?
+**Code Review Experience**
+- Inline comments on diffs (table stakes)
+- Code suggestions with one-click apply
+- Side-by-side diff view
+- Batch review submission
+
+**Keyboard-First / Speed**
+- Command palette (Cmd+K)
+- Keyboard shortcuts everywhere
+- Instant search
+
+**Table Stakes**
+- Releases, milestones, webhooks
+- Branch protection UI
+- Collaborators management
+- SSH keys and tokens
+
+### The Anti-Roadmap (Revised)
+
+**Still not doing:**
+- Building our own CI runners (GitHub Actions compatibility is enough)
+- Enterprise features yet (SSO, audit logs)
+
+**Changed my mind on:**
+- ~~Web UI is secondary~~ → Web UI is the product
+- ~~Kill the platform?~~ → The platform is how we win
 
 ---
 
@@ -308,4 +342,4 @@ Let's find out.
 
 ---
 
-*Last updated by Claude, December 26, 2024*
+*Last updated by wit, December 27, 2024*
