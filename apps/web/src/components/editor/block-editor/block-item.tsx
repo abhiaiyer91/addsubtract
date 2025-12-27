@@ -72,6 +72,7 @@ interface BlockItemProps {
   onSlashCommand: (query: string, cursorPosition: { top: number; left: number }) => void;
   onCloseSlashMenu: () => void;
   dragHandleProps?: any;
+  placeholder?: string;
 }
 
 export function BlockItem({
@@ -88,6 +89,7 @@ export function BlockItem({
   onSlashCommand,
   onCloseSlashMenu,
   dragHandleProps,
+  placeholder: customPlaceholder,
 }: BlockItemProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
@@ -452,7 +454,7 @@ export function BlockItem({
         return (
           <textarea
             {...commonInputProps}
-            placeholder="Type '/' for commands..."
+            placeholder={customPlaceholder || "Type '/' for commands..."}
             className={cn(commonInputProps.className, 'leading-relaxed')}
           />
         );

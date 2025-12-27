@@ -6,7 +6,6 @@ import {
   Clock,
   Star,
   MoreHorizontal,
-  ImagePlus,
   Smile,
   History,
   Copy,
@@ -66,7 +65,6 @@ export function JournalPageDetail() {
   const [editedTitle, setEditedTitle] = useState('');
   const [showIconPicker, setShowIconPicker] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [isHeaderHovered, setIsHeaderHovered] = useState(false);
   const [pendingContent, setPendingContent] = useState<string | null>(null);
 
   const titleRef = useRef<HTMLTextAreaElement>(null);
@@ -205,12 +203,12 @@ export function JournalPageDetail() {
     return (
       <RepoLayout owner={owner!} repo={repo!}>
         <JournalDetailLayout tree={tree || []} owner={owner!} repo={repo!} authenticated={authenticated} currentSlug={slug}>
-          <div className="max-w-3xl mx-auto px-16 py-24">
+          <div className="max-w-2xl mx-auto px-6 py-8">
             <div className="space-y-4">
-              <div className="h-12 w-12 rounded bg-muted animate-pulse" />
-              <div className="h-10 w-2/3 rounded bg-muted animate-pulse" />
-              <div className="space-y-2 pt-8">
-                {[...Array(6)].map((_, i) => (
+              <div className="h-10 w-10 rounded bg-muted animate-pulse" />
+              <div className="h-8 w-2/3 rounded bg-muted animate-pulse" />
+              <div className="space-y-2 pt-4">
+                {[...Array(4)].map((_, i) => (
                   <div
                     key={i}
                     className="h-5 rounded bg-muted/50 animate-pulse"
@@ -229,11 +227,11 @@ export function JournalPageDetail() {
     return (
       <RepoLayout owner={owner!} repo={repo!}>
         <JournalDetailLayout tree={tree || []} owner={owner!} repo={repo!} authenticated={authenticated} currentSlug={slug}>
-          <div className="flex-1 flex items-center justify-center">
+          <div className="flex-1 flex items-center justify-center p-6">
             <div className="text-center">
-              <div className="text-6xl mb-6">🔍</div>
+              <div className="text-5xl mb-4">🔍</div>
               <h2 className="text-xl font-medium mb-2">Page not found</h2>
-              <p className="text-muted-foreground mb-6">
+              <p className="text-muted-foreground mb-4">
                 This page doesn't exist or has been deleted.
               </p>
               <Link to={`/${owner}/${repo}/journal`}>
@@ -259,8 +257,8 @@ export function JournalPageDetail() {
       >
         <div className="flex-1 overflow-y-auto">
           {/* Cover image area */}
-          {page.coverImage ? (
-            <div className="h-48 relative group">
+          {page.coverImage && (
+            <div className="h-32 relative group">
               <img
                 src={page.coverImage}
                 alt=""
@@ -277,32 +275,15 @@ export function JournalPageDetail() {
                 </div>
               )}
             </div>
-          ) : canEdit ? (
-            <div
-              className="h-12 group relative"
-              onMouseEnter={() => setIsHeaderHovered(true)}
-              onMouseLeave={() => setIsHeaderHovered(false)}
-            >
-              {isHeaderHovered && (
-                <div className="absolute top-4 left-16 flex items-center gap-2 text-sm text-muted-foreground">
-                  <button className="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-muted transition-colors">
-                    <ImagePlus className="h-4 w-4" />
-                    Add cover
-                  </button>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="h-12" />
           )}
 
           {/* Main content area */}
-          <div className="max-w-3xl mx-auto px-16 pb-24">
+          <div className="max-w-2xl mx-auto px-6 py-6">
             {/* Icon */}
-            <div className="relative -mt-8 mb-4">
+            <div className="relative mb-4">
               {page.icon ? (
                 <div className="relative inline-block group">
-                  <span className="text-7xl cursor-pointer" onClick={() => canEdit && setShowIconPicker(true)}>
+                  <span className="text-5xl cursor-pointer" onClick={() => canEdit && setShowIconPicker(true)}>
                     {page.icon}
                   </span>
                   {canEdit && (
@@ -358,17 +339,16 @@ export function JournalPageDetail() {
                 onChange={handleTitleChange}
                 onBlur={handleTitleBlur}
                 placeholder="Untitled"
-                className="w-full text-4xl font-bold bg-transparent border-0 outline-none resize-none placeholder:text-muted-foreground/50 mb-2"
+                className="w-full text-3xl font-bold bg-transparent border-0 outline-none resize-none placeholder:text-muted-foreground/50 mb-2"
                 rows={1}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault();
-                    // Let focus move to block editor naturally
                   }
                 }}
               />
             ) : (
-              <h1 className="text-4xl font-bold mb-2">
+              <h1 className="text-3xl font-bold mb-2">
                 {page.title || 'Untitled'}
               </h1>
             )}
@@ -485,22 +465,20 @@ export function JournalPageDetail() {
             </div>
 
             {/* Content - Block Editor */}
-            <div className="relative">
-              <BlockEditor
-                value={editedContent}
-                onChange={handleContentChange}
-                placeholder="Type '/' for commands..."
-                readOnly={!canEdit}
-                autoFocus={false}
-              />
-              
-              {/* Save indicator */}
-              {pendingContent !== null && (
-                <div className="absolute top-0 right-0 text-xs text-muted-foreground">
-                  Saving...
-                </div>
-              )}
-            </div>
+            <BlockEditor
+              value={editedContent}
+              onChange={handleContentChange}
+              placeholder="Start writing or type '/' for commands..."
+              readOnly={!canEdit}
+              autoFocus={false}
+            />
+            
+            {/* Save indicator */}
+            {pendingContent !== null && (
+              <div className="text-xs text-muted-foreground mt-2">
+                Saving...
+              </div>
+            )}
           </div>
         </div>
 
@@ -556,21 +534,25 @@ function JournalDetailLayout({
   currentSlug,
 }: JournalDetailLayoutProps) {
   const navigate = useNavigate();
-  const sidebarWidth = 260;
 
   return (
-    <div className="flex h-[calc(100vh-200px)] -mx-6 -mt-6">
+    <div className="flex min-h-[500px] rounded-lg border bg-card overflow-hidden">
       {/* Sidebar */}
-      <div
-        className="border-r bg-muted/20 flex flex-col"
-        style={{ width: sidebarWidth }}
-      >
+      <div className="w-56 border-r bg-muted/20 flex flex-col flex-shrink-0">
         {/* Sidebar header */}
-        <div className="px-3 py-2 border-b">
+        <div className="px-3 py-2 border-b flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm font-medium text-foreground/80">
             <FileText className="h-4 w-4" />
-            <span>Journal</span>
+            <span>Pages</span>
           </div>
+          {authenticated && (
+            <button
+              onClick={() => navigate(`/${owner}/${repo}/journal/new`)}
+              className="h-6 w-6 flex items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <span className="text-lg leading-none">+</span>
+            </button>
+          )}
         </div>
 
         {/* Page tree */}
@@ -594,21 +576,6 @@ function JournalDetailLayout({
             )}
           </div>
         </div>
-
-        {/* New page button */}
-        {authenticated && (
-          <div className="px-2 py-2 border-t">
-            <button
-              onClick={() => navigate(`/${owner}/${repo}/journal/new`)}
-              className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-            >
-              <span className="flex items-center justify-center w-5 h-5 rounded border border-dashed border-muted-foreground/30">
-                <span className="text-xs">+</span>
-              </span>
-              New page
-            </button>
-          </div>
-        )}
       </div>
 
       {/* Main content */}

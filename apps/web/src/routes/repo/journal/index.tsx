@@ -78,10 +78,10 @@ export function JournalPage() {
   if (isLoading) {
     return (
       <RepoLayout owner={owner!} repo={repo!}>
-        <div className="flex h-[calc(100vh-200px)]">
+        <div className="flex min-h-[400px] rounded-lg border bg-card overflow-hidden">
           {/* Sidebar skeleton */}
-          <div className="w-64 border-r p-3 space-y-2">
-            {[...Array(8)].map((_, i) => (
+          <div className="w-60 border-r p-3 space-y-2">
+            {[...Array(5)].map((_, i) => (
               <div key={i} className="h-7 rounded bg-muted/50 animate-pulse" />
             ))}
           </div>
@@ -99,14 +99,14 @@ export function JournalPage() {
 
   return (
     <RepoLayout owner={owner!} repo={repo!}>
-      <div className="flex h-[calc(100vh-200px)] -mx-6 -mt-6">
-        {/* Notion-style sidebar */}
-        <div className="w-64 border-r bg-muted/30 flex flex-col">
-          {/* Search */}
-          <div className="p-2 border-b">
+      <div className="flex min-h-[500px] rounded-lg border bg-card overflow-hidden">
+        {/* Sidebar */}
+        <div className="w-60 border-r bg-muted/20 flex flex-col">
+          {/* Header with search and new button */}
+          <div className="p-3 border-b flex items-center gap-2">
             <div
               className={cn(
-                'flex items-center gap-2 px-2 py-1.5 rounded-md transition-all cursor-text',
+                'flex-1 flex items-center gap-2 px-2 py-1.5 rounded-md transition-all cursor-text',
                 isSearching
                   ? 'bg-background ring-1 ring-ring'
                   : 'hover:bg-muted/50'
@@ -127,6 +127,16 @@ export function JournalPage() {
                 <span className="text-sm text-muted-foreground">Search</span>
               )}
             </div>
+            {authenticated && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0 flex-shrink-0"
+                onClick={handleNewPage}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            )}
           </div>
 
           {/* Page tree */}
@@ -144,33 +154,16 @@ export function JournalPage() {
                   />
                 ))
               ) : searchQuery ? (
-                <div className="px-2 py-8 text-center">
+                <div className="px-2 py-6 text-center">
                   <p className="text-sm text-muted-foreground">No results</p>
                 </div>
-              ) : (
-                <div className="px-2 py-8 text-center">
-                  <p className="text-sm text-muted-foreground">No pages yet</p>
-                </div>
-              )}
+              ) : null}
             </div>
           </div>
-
-          {/* New page button */}
-          {authenticated && (
-            <div className="p-2 border-t">
-              <button
-                onClick={handleNewPage}
-                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors"
-              >
-                <Plus className="h-4 w-4" />
-                New page
-              </button>
-            </div>
-          )}
         </div>
 
-        {/* Main content area - empty state */}
-        <div className="flex-1 flex items-center justify-center bg-background">
+        {/* Main content area */}
+        <div className="flex-1 flex items-center justify-center bg-background p-6">
           <EmptyStateContent
             owner={owner!}
             repo={repo!}
