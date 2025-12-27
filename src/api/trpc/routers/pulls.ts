@@ -712,6 +712,9 @@ export const pullsRouter = router({
         commitSha: input.commitSha,
       });
 
+      // Mark review request as completed
+      await prReviewerModel.completeReview(input.prId, ctx.user.id);
+
       // Emit pr.reviewed event
       const repo = await repoModel.findById(pr.repoId);
       if (repo) {
@@ -1613,7 +1616,7 @@ export const pullsRouter = router({
     .input(
       z.object({
         prId: z.string().uuid(),
-        reviewerId: z.string().uuid(),
+        reviewerId: z.string(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -1678,7 +1681,7 @@ export const pullsRouter = router({
     .input(
       z.object({
         prId: z.string().uuid(),
-        reviewerId: z.string().uuid(),
+        reviewerId: z.string(),
       })
     )
     .mutation(async ({ input, ctx }) => {

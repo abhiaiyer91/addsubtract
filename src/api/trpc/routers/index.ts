@@ -19,6 +19,7 @@ import { workflowsRouter } from './workflows';
 import { agentRouter } from './agent';
 import { aiRouter } from './ai';
 import { searchRouter } from './search';
+import { collaboratorsRouter } from './collaborators';
 import { projectsRouter } from './projects';
 import { cyclesRouter } from './cycles';
 import { mergeQueueRouter } from './merge-queue';
@@ -52,6 +53,7 @@ export const appRouter = router({
   agent: agentRouter,
   ai: aiRouter,
   search: searchRouter,
+  collaborators: collaboratorsRouter,
   projects: projectsRouter,
   cycles: cyclesRouter,
   mergeQueue: mergeQueueRouter,
@@ -87,6 +89,7 @@ export {
   agentRouter,
   aiRouter,
   searchRouter,
+  collaboratorsRouter,
   projectsRouter,
   cyclesRouter,
   mergeQueueRouter,

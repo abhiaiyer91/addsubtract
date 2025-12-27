@@ -5,7 +5,6 @@ import {
   orgMembers,
   teams,
   teamMembers,
-  users,
   type Organization,
   type NewOrganization,
   type OrgMember,
@@ -13,8 +12,8 @@ import {
   type Team,
   type NewTeam,
   type TeamMember,
-  type User,
 } from '../schema';
+import { user } from '../auth-schema';
 
 export const orgModel = {
   /**
@@ -135,17 +134,17 @@ export const orgMemberModel = {
    */
   async listByOrg(
     orgId: string
-  ): Promise<(OrgMember & { user: User })[]> {
+  ): Promise<(OrgMember & { user: typeof user.$inferSelect })[]> {
     const db = getDb();
     const result = await db
       .select()
       .from(orgMembers)
-      .innerJoin(users, eq(orgMembers.userId, users.id))
+      .innerJoin(user, eq(orgMembers.userId, user.id))
       .where(eq(orgMembers.orgId, orgId));
 
     return result.map((r) => ({
       ...r.org_members,
-      user: r.users,
+      user: r.user,
     }));
   },
 
@@ -237,10 +236,10 @@ export const orgMemberModel = {
     const result = await db
       .select()
       .from(orgMembers)
-      .innerJoin(users, eq(orgMembers.userId, users.id))
+      .innerJoin(user, eq(orgMembers.userId, user.id))
       .where(and(eq(orgMembers.orgId, orgId), eq(orgMembers.role, 'owner')));
 
-    return result.map((r) => r.users);
+    return result.map((r) => r.user);
   },
 };
 
@@ -327,17 +326,17 @@ export const teamMemberModel = {
   /**
    * List members of a team
    */
-  async listByTeam(teamId: string): Promise<(TeamMember & { user: User })[]> {
+  async listByTeam(teamId: string): Promise<(TeamMember & { user: typeof user.$inferSelect })[]> {
     const db = getDb();
     const result = await db
       .select()
       .from(teamMembers)
-      .innerJoin(users, eq(teamMembers.userId, users.id))
+      .innerJoin(user, eq(teamMembers.userId, user.id))
       .where(eq(teamMembers.teamId, teamId));
 
     return result.map((r) => ({
       ...r.team_members,
-      user: r.users,
+      user: r.user,
     }));
   },
 

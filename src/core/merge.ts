@@ -8,7 +8,7 @@ import { Repository } from './repository';
 import { Commit, Tree, Blob } from './object';
 import { TreeEntry } from './types';
 import { diff, DiffLine } from './diff';
-import { exists, readFile, writeFile, mkdirp } from '../utils/fs';
+import { exists, readFile, writeFile, mkdirp, deleteFile } from '../utils/fs';
 import { TsgitError, ErrorCode } from './errors';
 
 /**
@@ -328,10 +328,15 @@ export class MergeManager {
 
       // Write conflict markers to working directory
       this.writeConflictMarkersToWorkDir(result.conflicts, sourceBranch, targetBranch);
-    } else if (!options.noCommit) {
-      // Create merge commit
-      const message = options.message || `Merge branch '${sourceBranch}' into ${targetBranch}`;
-      // Note: Would need to extend commit to support multiple parents
+    } else {
+      // Successful merge - update working directory with merged files
+      this.updateWorkingDirectoryAfterMerge(sourceTree, result);
+      
+      if (!options.noCommit) {
+        // Create merge commit
+        const message = options.message || `Merge branch '${sourceBranch}' into ${targetBranch}`;
+        // Note: Would need to extend commit to support multiple parents
+      }
     }
 
     return result;
@@ -367,6 +372,36 @@ export class MergeManager {
       content += `>>>>>>> ${sourceBranch} (theirs)\n`;
 
       writeFile(workingPath, content);
+    }
+  }
+
+  /**
+   * Update working directory after successful merge
+   */
+  private updateWorkingDirectoryAfterMerge(
+    theirFiles: Map<string, string>,
+    result: MergeResult
+  ): void {
+    // Write added files from their branch
+    for (const filePath of result.added) {
+      const blobHash = theirFiles.get(filePath);
+      if (blobHash) {
+        const blob = this.repo.objects.readBlob(blobHash);
+        const content = blob.content; // Blob.content is already a Buffer
+        const workingPath = path.join(this.repo.workDir, filePath);
+        mkdirp(path.dirname(workingPath));
+        writeFile(workingPath, content);
+      }
+    }
+
+    // Delete files that were deleted
+    for (const filePath of result.deleted) {
+      const workingPath = path.join(this.repo.workDir, filePath);
+      try {
+        deleteFile(workingPath);
+      } catch {
+        // File might not exist, ignore
+      }
     }
   }
 

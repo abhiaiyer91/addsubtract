@@ -214,7 +214,7 @@ export const webhooksRouter = router({
 
       const webhook = await webhookModel.update(input.id, {
         url: input.url,
-        secret: input.secret ?? undefined,
+        secret: input.secret === null ? null : input.secret,
         events: input.events as WebhookEvent[] | undefined,
         isActive: input.isActive,
       });
@@ -226,7 +226,7 @@ export const webhooksRouter = router({
         });
       }
 
-      // Hide secret in response
+      // Hide secret in response (only mask if secret exists)
       return {
         ...webhook,
         secret: webhook.secret ? '********' : null,

@@ -207,7 +207,7 @@ export const organizationsRouter = router({
   checkMembership: publicProcedure
     .input(z.object({
       orgId: z.string().uuid(),
-      userId: z.string().uuid(),
+      userId: z.string(),
     }))
     .query(async ({ input }) => {
       const member = await orgMemberModel.find(input.orgId, input.userId);
@@ -223,7 +223,7 @@ export const organizationsRouter = router({
   addMember: protectedProcedure
     .input(z.object({
       orgId: z.string().uuid(),
-      userId: z.string().uuid(),
+      userId: z.string(),
       role: orgRoleSchema.default('member'),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -260,7 +260,7 @@ export const organizationsRouter = router({
   updateMemberRole: protectedProcedure
     .input(z.object({
       orgId: z.string().uuid(),
-      userId: z.string().uuid(),
+      userId: z.string(),
       role: orgRoleSchema,
     }))
     .mutation(async ({ ctx, input }) => {
@@ -301,7 +301,7 @@ export const organizationsRouter = router({
   removeMember: protectedProcedure
     .input(z.object({
       orgId: z.string().uuid(),
-      userId: z.string().uuid(),
+      userId: z.string(),
     }))
     .mutation(async ({ ctx, input }) => {
       // Members can remove themselves, admins/owners can remove others
@@ -488,7 +488,7 @@ export const organizationsRouter = router({
   addTeamMember: protectedProcedure
     .input(z.object({
       teamId: z.string().uuid(),
-      userId: z.string().uuid(),
+      userId: z.string(),
     }))
     .mutation(async ({ ctx, input }) => {
       const team = await teamModel.findById(input.teamId);
@@ -536,7 +536,7 @@ export const organizationsRouter = router({
   removeTeamMember: protectedProcedure
     .input(z.object({
       teamId: z.string().uuid(),
-      userId: z.string().uuid(),
+      userId: z.string(),
     }))
     .mutation(async ({ ctx, input }) => {
       const team = await teamModel.findById(input.teamId);

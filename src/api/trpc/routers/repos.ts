@@ -567,8 +567,7 @@ export const reposRouter = router({
       })
     )
     .query(async ({ input, ctx }) => {
-      const starred = await starModel.exists(input.repoId, ctx.user.id);
-      return { starred };
+      return starModel.exists(input.repoId, ctx.user.id);
     }),
 
   /**
@@ -609,8 +608,7 @@ export const reposRouter = router({
       })
     )
     .query(async ({ input, ctx }) => {
-      const watching = await watchModel.exists(input.repoId, ctx.user.id);
-      return { watching };
+      return watchModel.exists(input.repoId, ctx.user.id);
     }),
 
   /**
@@ -664,101 +662,6 @@ export const reposRouter = router({
     )
     .query(async ({ input }) => {
       return repoModel.listForks(input.repoId);
-    }),
-
-  /**
-   * Add a collaborator to a repository
-   */
-  addCollaborator: protectedProcedure
-    .input(
-      z.object({
-        repoId: z.string().uuid(),
-        username: z.string().min(1),
-        permission: z.enum(['read', 'write', 'admin']).default('read'),
-      })
-    )
-    .mutation(async ({ input, ctx }) => {
-      const repo = await repoModel.findById(input.repoId);
-
-      if (!repo) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Repository not found',
-        });
-      }
-
-      // Only owner or admin can add collaborators
-      const isOwner = repo.ownerId === ctx.user.id;
-      const isAdmin = await collaboratorModel.hasPermission(input.repoId, ctx.user.id, 'admin');
-
-      if (!isOwner && !isAdmin) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'You do not have permission to add collaborators',
-        });
-      }
-
-      const user = await userModel.findByUsername(input.username);
-
-      if (!user) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'User not found',
-        });
-      }
-
-      return collaboratorModel.add({
-        repoId: input.repoId,
-        userId: user.id,
-        permission: input.permission,
-      });
-    }),
-
-  /**
-   * Remove a collaborator from a repository
-   */
-  removeCollaborator: protectedProcedure
-    .input(
-      z.object({
-        repoId: z.string().uuid(),
-        userId: z.string().uuid(),
-      })
-    )
-    .mutation(async ({ input, ctx }) => {
-      const repo = await repoModel.findById(input.repoId);
-
-      if (!repo) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Repository not found',
-        });
-      }
-
-      // Only owner or admin can remove collaborators
-      const isOwner = repo.ownerId === ctx.user.id;
-      const isAdmin = await collaboratorModel.hasPermission(input.repoId, ctx.user.id, 'admin');
-
-      if (!isOwner && !isAdmin) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'You do not have permission to remove collaborators',
-        });
-      }
-
-      return collaboratorModel.remove(input.repoId, input.userId);
-    }),
-
-  /**
-   * List collaborators
-   */
-  collaborators: publicProcedure
-    .input(
-      z.object({
-        repoId: z.string().uuid(),
-      })
-    )
-    .query(async ({ input }) => {
-      return collaboratorModel.listByRepo(input.repoId);
     }),
 
   /**
@@ -1269,6 +1172,17 @@ export const reposRouter = router({
     }),
 
   /**
+   * List collaborators for a repository
+   */
+  collaborators: protectedProcedure
+    .input(
+      z.object({
+        repoId: z.string().uuid(),
+      })
+    )
+    .query(async ({ input, ctx }) => {
+      const repo = await repoModel.findById(input.repoId);
+      if (!repo) {
    * Update/create a file in a repository (creates a commit)
    */
   updateFile: protectedProcedure
@@ -1292,6 +1206,102 @@ export const reposRouter = router({
         });
       }
 
+      const isOwner = repo.ownerId === ctx.user.id;
+      const hasAccess = isOwner || (await collaboratorModel.hasPermission(input.repoId, ctx.user.id, 'read'));
+
+      if (!hasAccess) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Read permission required',
+        });
+      }
+
+      return collaboratorModel.listByRepo(input.repoId);
+    }),
+
+  /**
+   * Add a collaborator to a repository
+   */
+  addCollaborator: protectedProcedure
+    .input(
+      z.object({
+        repoId: z.string().uuid(),
+        userId: z.string(),
+        permission: z.enum(['read', 'write', 'admin']),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const repo = await repoModel.findById(input.repoId);
+      if (!repo) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Repository not found',
+        });
+      }
+
+      const isOwner = repo.ownerId === ctx.user.id;
+      const hasAdmin = isOwner || (await collaboratorModel.hasPermission(input.repoId, ctx.user.id, 'admin'));
+
+      if (!hasAdmin) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Admin permission required',
+        });
+      }
+
+      const existing = await collaboratorModel.find(input.repoId, input.userId);
+      if (existing) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'User is already a collaborator',
+        });
+      }
+
+      return collaboratorModel.add({
+        repoId: input.repoId,
+        userId: input.userId,
+        permission: input.permission,
+      });
+    }),
+
+  /**
+   * Remove a collaborator from a repository
+   */
+  removeCollaborator: protectedProcedure
+    .input(
+      z.object({
+        repoId: z.string().uuid(),
+        userId: z.string(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const repo = await repoModel.findById(input.repoId);
+      if (!repo) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Repository not found',
+        });
+      }
+
+      const isOwner = repo.ownerId === ctx.user.id;
+      const hasAdmin = isOwner || (await collaboratorModel.hasPermission(input.repoId, ctx.user.id, 'admin'));
+
+      if (!hasAdmin) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Admin permission required',
+        });
+      }
+
+      const removed = await collaboratorModel.remove(input.repoId, input.userId);
+      if (!removed) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Collaborator not found',
+        });
+      }
+
+      return { success: true };
       // Check write access
       const isOwner = result.repo.ownerId === ctx.user.id;
       const hasWriteAccess = isOwner || (await collaboratorModel.hasPermission(result.repo.id, ctx.user.id, 'write'));

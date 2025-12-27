@@ -1,4 +1,4 @@
-import { eq, and, desc, sql, inArray, or, isNull, ne } from 'drizzle-orm';
+import { eq, and, desc, sql, inArray, or, isNull, isNotNull, ne } from 'drizzle-orm';
 import { getDb } from '../index';
 import {
   pullRequests,
@@ -464,12 +464,38 @@ export const prCommentModel = {
   },
 
   /**
+   * List all file comments for a PR (comments with path defined)
+   */
+  async listFileComments(prId: string): Promise<(PrComment & { user: Author })[]> {
+    const db = getDb();
+    const result = await db
+      .select()
+      .from(prComments)
+      .innerJoin(user, eq(prComments.userId, user.id))
+      .where(and(eq(prComments.prId, prId), isNotNull(prComments.path)))
+      .orderBy(prComments.path, prComments.line, prComments.createdAt);
+
+    return result.map((r) => ({
+      ...r.pr_comments,
+      user: {
+        id: r.user.id,
+        name: r.user.name,
+        email: r.user.email,
+        username: r.user.username,
+        image: r.user.image,
+        avatarUrl: r.user.avatarUrl,
+      },
+    }));
+  },
+
+  /**
    * Create a comment
    */
   async create(data: NewPrComment): Promise<PrComment> {
     const db = getDb();
     const [comment] = await db.insert(prComments).values(data).returning();
-    return comment;
+    // Return comment with authorId alias
+    return { ...comment, authorId: comment.userId };
   },
 
   /**
@@ -1038,7 +1064,7 @@ export const inboxModel = {
    */
   async getSummary(userId: string, repoId?: string): Promise<{
     awaitingReview: number;
-    myOpenPrs: number;
+    myPrsOpen: number;
     participated: number;
   }> {
     const db = getDb();
@@ -1094,7 +1120,7 @@ export const inboxModel = {
 
     return {
       awaitingReview: Number(awaitingReviewResult[0]?.count ?? 0),
-      myOpenPrs: Number(myPrsResult[0]?.count ?? 0),
+      myPrsOpen: Number(myPrsResult[0]?.count ?? 0),
       participated: Number(participatedResult[0]?.count ?? 0),
     };
   },

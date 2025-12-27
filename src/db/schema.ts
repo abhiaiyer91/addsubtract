@@ -199,9 +199,8 @@ export const orgMembers = pgTable(
     orgId: uuid('org_id')
       .notNull()
       .references(() => organizations.id, { onDelete: 'cascade' }),
-    userId: uuid('user_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull(),
     role: orgRoleEnum('role').notNull().default('member'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },

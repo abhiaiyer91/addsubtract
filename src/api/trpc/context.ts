@@ -51,22 +51,56 @@ export async function createContext(c: HonoContext): Promise<Context> {
   let user: AuthUser | null = null;
 
   try {
-    // Use better-auth to validate session
-    const auth = createAuth();
-    const session = await auth.api.getSession({
-      headers: req.headers,
-    });
+    // Check for Bearer token first (for API/test usage)
+    const authHeader = req.headers.get('authorization');
+    if (authHeader?.startsWith('Bearer ')) {
+      const token = authHeader.slice(7);
+      
+      console.log('[context] Looking up Bearer token:', token.slice(0, 20) + '...');
+      
+      // Look up session directly in database by token
+      const { session: sessionTable } = await import('../../db/auth-schema');
+      const { eq } = await import('drizzle-orm');
+      const { user: userTable } = await import('../../db/auth-schema');
+      
+      const [sessionRecord] = await db
+        .select({
+          session: sessionTable,
+          user: userTable,
+        })
+        .from(sessionTable)
+        .innerJoin(userTable, eq(sessionTable.userId, userTable.id))
+        .where(eq(sessionTable.token, token))
+        .limit(1);
 
-    if (session?.user) {
-      // Cast to SessionUser to access username from the username plugin
-      const sessionUser = session.user as SessionUser;
-      user = {
-        id: sessionUser.id,
-        email: sessionUser.email,
-        name: sessionUser.name,
-        username: sessionUser.username,
-        image: sessionUser.image,
-      };
+      console.log('[context] Session found:', !!sessionRecord);
+
+      if (sessionRecord && sessionRecord.session.expiresAt > new Date()) {
+        user = {
+          id: sessionRecord.user.id,
+          email: sessionRecord.user.email,
+          name: sessionRecord.user.name,
+          username: sessionRecord.user.username,
+          image: sessionRecord.user.image,
+        };
+      }
+    } else {
+      // Use better-auth to validate session from cookies
+      const auth = createAuth();
+      const session = await auth.api.getSession({
+        headers: req.headers,
+      });
+
+      if (session?.user) {
+        const sessionUser = session.user as SessionUser;
+        user = {
+          id: sessionUser.id,
+          email: sessionUser.email,
+          name: sessionUser.name,
+          username: sessionUser.username,
+          image: sessionUser.image,
+        };
+      }
     }
   } catch {
     // Session lookup failed, user remains null

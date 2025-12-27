@@ -376,6 +376,16 @@ export class CredentialManager {
 
       let stdout = '';
       let stderr = '';
+      let resolved = false;
+
+      // Timeout after 5 seconds
+      const timeout = setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          proc.kill();
+          resolve(null);
+        }
+      }, 5000);
 
       proc.stdout.on('data', (data) => {
         stdout += data.toString();
@@ -386,14 +396,22 @@ export class CredentialManager {
       });
 
       proc.on('error', () => {
-        resolve(null);
+        if (!resolved) {
+          resolved = true;
+          clearTimeout(timeout);
+          resolve(null);
+        }
       });
 
       proc.on('close', (code) => {
-        if (code === 0 && stdout) {
-          resolve(stdout);
-        } else {
-          resolve(null);
+        if (!resolved) {
+          resolved = true;
+          clearTimeout(timeout);
+          if (code === 0 && stdout) {
+            resolve(stdout);
+          } else {
+            resolve(null);
+          }
         }
       });
 
