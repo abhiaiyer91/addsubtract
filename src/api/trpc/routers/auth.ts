@@ -6,6 +6,88 @@ import { createAuth } from '../../../lib/auth';
 
 export const authRouter = router({
   /**
+   * Register a new user
+   */
+  register: publicProcedure
+    .input(
+      z.object({
+        username: z.string().min(3).max(39),
+        email: z.string().email(),
+        password: z.string().min(8),
+        name: z.string().optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const auth = createAuth();
+      
+      const result = await auth.api.signUpEmail({
+        body: {
+          email: input.email,
+          password: input.password,
+          name: input.name || input.username,
+        },
+      });
+
+      if (!result || !result.user) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Registration failed',
+        });
+      }
+
+      // Update username (better-auth doesn't have username field by default)
+      const user = await userModel.update(result.user.id, {
+        username: input.username,
+      });
+
+      return {
+        user,
+        sessionId: result.session?.token || '',
+      };
+    }),
+
+  /**
+   * Login with email and password
+   */
+  login: publicProcedure
+    .input(
+      z.object({
+        email: z.string().email(),
+        password: z.string(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const auth = createAuth();
+      
+      const result = await auth.api.signInEmail({
+        body: {
+          email: input.email,
+          password: input.password,
+        },
+      });
+
+      if (!result || !result.user) {
+        throw new TRPCError({
+          code: 'UNAUTHORIZED',
+          message: 'Invalid credentials',
+        });
+      }
+
+      const user = await userModel.findById(result.user.id);
+      if (!user) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'User not found',
+        });
+      }
+
+      return {
+        user,
+        sessionId: result.session?.token || '',
+      };
+    }),
+
+  /**
    * Get current authenticated user
    * This uses the session from context (already validated by better-auth)
    */
