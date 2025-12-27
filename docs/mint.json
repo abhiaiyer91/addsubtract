@@ -112,23 +112,23 @@
         "features/stacked-diffs",
         "features/hooks",
         "features/ci-cd",
-        "features/monorepo-scopes"
-      ]
-    },
-    {
-      "group": "Integrations",
-      "pages": [
-        "features/github",
-        "features/large-files",
-        "features/submodules",
+        "features/monorepo-scopes",
         "features/worktrees"
       ]
     },
     {
-      "group": "Team & Access",
+      "group": "GitHub & Team",
       "pages": [
+        "features/github",
         "features/collaborators",
         "features/tokens"
+      ]
+    },
+    {
+      "group": "Advanced",
+      "pages": [
+        "features/large-files",
+        "features/submodules"
       ]
     },
     {
