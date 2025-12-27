@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   GitPullRequest,
@@ -9,30 +9,34 @@ import {
   GitCommit,
   Bot,
   RefreshCw,
-  CheckCircle,
-  AlertCircle,
   Loader2,
-  Layers,
-  ArrowRight,
-  Circle,
+  Edit3,
+  AlertTriangle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent } from '@/components/ui/card';
 import { DiffViewer, type DiffFile } from '@/components/diff/diff-viewer';
 import { PrTimeline } from '@/components/pr/pr-timeline';
-import { MergeButton } from '@/components/pr/merge-button';
+import { ActionCard } from '@/components/pr/action-card';
+import { PrSidebar } from '@/components/pr/pr-sidebar';
+import { StackViewer } from '@/components/pr/stack-viewer';
+import { ReviewButton } from '@/components/pr/review-button';
+import { AiChat } from '@/components/pr/ai-chat';
+import { BranchStatus } from '@/components/pr/branch-status';
+import { KeyboardShortcutsDialog, KeyboardShortcutsButton } from '@/components/pr/keyboard-shortcuts-dialog';
+import { RichEditor } from '@/components/editor/rich-editor';
+import { ConflictResolver } from '@/components/pr/conflict-resolver';
 import { Markdown } from '@/components/markdown/renderer';
 import { RepoLayout } from './components/repo-layout';
 import { Loading } from '@/components/ui/loading';
 import { formatRelativeTime } from '@/lib/utils';
 import { useSession } from '@/lib/auth-client';
 import { trpc } from '@/lib/trpc';
-
-
+import { toastSuccess, toastError, toastInfo } from '@/components/ui/use-toast';
+import type { InlineCommentData } from '@/components/diff/inline-comment';
 
 export function PullDetailPage() {
   const { owner, repo, number } = useParams<{
@@ -41,6 +45,9 @@ export function PullDetailPage() {
     number: string;
   }>();
   const [comment, setComment] = useState('');
+  const [viewedFiles, setViewedFiles] = useState<Set<string>>(new Set());
+  const [isEditingDescription, setIsEditingDescription] = useState(false);
+  const [editedBody, setEditedBody] = useState('');
   const { data: session } = useSession();
   const authenticated = !!session?.user;
   const utils = trpc.useUtils();
@@ -92,13 +99,41 @@ export function PullDetailPage() {
     { enabled: !!prData?.id }
   );
 
+  // Fetch reviewers
+  const { data: reviewersData } = trpc.pulls.reviewers.useQuery(
+    { prId: prData?.id! },
+    { enabled: !!prData?.id }
+  );
+
+  // Check mergeability
+  const { data: mergeabilityData } = trpc.pulls.checkMergeability.useQuery(
+    { prId: prData?.id! },
+    { enabled: !!prData?.id && prData?.state === 'open' }
+  );
+
+  // Fetch conflict details if not mergeable
+  const { data: conflictsData, isLoading: conflictsLoading } = trpc.pulls.getConflicts.useQuery(
+    { prId: prData?.id! },
+    { enabled: !!prData?.id && mergeabilityData?.canMerge === false }
+  );
+
   // Trigger AI review mutation
   const triggerReviewMutation = trpc.pulls.triggerAIReview.useMutation({
     onSuccess: () => {
+      toastInfo({
+        title: 'AI Review started',
+        description: 'The review will be ready in a few moments.',
+      });
       // Refetch AI review after a delay to allow processing
       setTimeout(() => {
         refetchAIReview();
       }, 3000);
+    },
+    onError: (error) => {
+      toastError({
+        title: 'Failed to start AI review',
+        description: error.message,
+      });
     },
   });
 
@@ -107,10 +142,110 @@ export function PullDetailPage() {
     onSuccess: () => {
       setComment('');
       utils.pulls.comments.invalidate({ prId: prData?.id! });
+      toastSuccess({
+        title: 'Comment added',
+        description: 'Your comment has been posted.',
+      });
+    },
+    onError: (error) => {
+      toastError({
+        title: 'Failed to add comment',
+        description: error.message,
+      });
     },
   });
 
   const mergeMutation = trpc.pulls.merge.useMutation({
+    onSuccess: () => {
+      utils.pulls.get.invalidate({ repoId: repoData?.repo.id!, number: prNumber });
+      toastSuccess({
+        title: 'Pull request merged',
+        description: `PR #${prNumber} has been successfully merged.`,
+      });
+    },
+    onError: (error) => {
+      toastError({
+        title: 'Failed to merge pull request',
+        description: error.message,
+      });
+    },
+  });
+
+  // Inline comment mutations
+  const addInlineCommentMutation = trpc.pulls.addComment.useMutation({
+    onSuccess: () => {
+      utils.pulls.comments.invalidate({ prId: prData?.id! });
+    },
+  });
+
+  const editCommentMutation = trpc.pulls.updateComment.useMutation({
+    onSuccess: () => {
+      utils.pulls.comments.invalidate({ prId: prData?.id! });
+    },
+  });
+
+  const deleteCommentMutation = trpc.pulls.deleteComment.useMutation({
+    onSuccess: () => {
+      utils.pulls.comments.invalidate({ prId: prData?.id! });
+    },
+  });
+
+  const resolveCommentMutation = trpc.pulls.resolveComment.useMutation({
+    onSuccess: () => {
+      utils.pulls.comments.invalidate({ prId: prData?.id! });
+    },
+  });
+
+  const unresolveCommentMutation = trpc.pulls.unresolveComment.useMutation({
+    onSuccess: () => {
+      utils.pulls.comments.invalidate({ prId: prData?.id! });
+    },
+  });
+
+  const closeMutation = trpc.pulls.close.useMutation({
+    onSuccess: () => {
+      utils.pulls.get.invalidate({ repoId: repoData?.repo.id!, number: prNumber });
+    },
+  });
+
+  const reopenMutation = trpc.pulls.reopen.useMutation({
+    onSuccess: () => {
+      utils.pulls.get.invalidate({ repoId: repoData?.repo.id!, number: prNumber });
+    },
+  });
+
+  const updateMutation = trpc.pulls.update.useMutation({
+    onSuccess: () => {
+      setIsEditingDescription(false);
+      utils.pulls.get.invalidate({ repoId: repoData?.repo.id!, number: prNumber });
+    },
+  });
+
+  const addReviewMutation = trpc.pulls.addReview.useMutation({
+    onSuccess: () => {
+      utils.pulls.reviews.invalidate({ prId: prData?.id! });
+    },
+  });
+
+  const requestReviewMutation = trpc.pulls.requestReview.useMutation({
+    onSuccess: () => {
+      utils.pulls.reviewers.invalidate({ prId: prData?.id! });
+    },
+  });
+
+  const removeReviewerMutation = trpc.pulls.removeReviewRequest.useMutation({
+    onSuccess: () => {
+      utils.pulls.reviewers.invalidate({ prId: prData?.id! });
+    },
+  });
+
+  const addLabelMutation = trpc.pulls.addLabel.useMutation({
+    onSuccess: () => {
+      utils.pulls.get.invalidate({ repoId: repoData?.repo.id!, number: prNumber });
+    },
+  });
+
+  const removeLabelMutation = trpc.pulls.removeLabel.useMutation({
     onSuccess: () => {
       utils.pulls.get.invalidate({ repoId: repoData?.repo.id!, number: prNumber });
     },
@@ -142,26 +277,124 @@ export function PullDetailPage() {
   const pr = prData;
   const reviews = reviewsData || [];
   const comments = commentsData || [];
-  
+  const reviewers = reviewersData || [];
+
   // Transform diff data to match DiffFile type
-  const diff: DiffFile[] = (diffData?.files || []).map(file => ({
+  const diff: DiffFile[] = useMemo(() => (diffData?.files || []).map((file) => ({
     path: file.newPath,
     oldPath: file.oldPath !== file.newPath ? file.oldPath : undefined,
     status: file.status,
     additions: file.additions,
     deletions: file.deletions,
-    hunks: file.hunks.map(hunk => ({
+    hunks: file.hunks.map((hunk) => ({
       oldStart: hunk.oldStart,
       newStart: hunk.newStart,
       oldLines: hunk.oldLines,
       newLines: hunk.newLines,
-      lines: hunk.lines.map(line => ({
-        type: line.type === 'delete' ? 'remove' as const : line.type as 'add' | 'context',
+      lines: hunk.lines.map((line) => ({
+        type: line.type === 'delete' ? ('remove' as const) : (line.type as 'add' | 'context'),
         content: line.content,
       })),
     })),
-  }));
-  
+  })), [diffData]);
+
+  // Transform comments for the diff viewer, grouped by file path
+  const commentsByFile = useMemo(() => {
+    const grouped: Record<string, InlineCommentData[]> = {};
+    
+    // Filter only inline comments (those with a path)
+    const inlineComments = comments.filter((c: any) => c.path);
+    
+    inlineComments.forEach((comment: any) => {
+      const filePath = comment.path;
+      if (!grouped[filePath]) {
+        grouped[filePath] = [];
+      }
+      grouped[filePath].push({
+        id: comment.id,
+        body: comment.body,
+        userId: comment.userId,
+        prId: comment.prId,
+        path: comment.path,
+        line: comment.line,
+        side: comment.side,
+        startLine: comment.startLine || null,
+        endLine: comment.endLine || null,
+        isResolved: comment.isResolved || false,
+        resolvedAt: comment.resolvedAt ? new Date(comment.resolvedAt) : null,
+        resolvedById: comment.resolvedById || null,
+        replyToId: comment.replyToId || null,
+        createdAt: new Date(comment.createdAt),
+        updatedAt: new Date(comment.updatedAt),
+        user: comment.user,
+      });
+    });
+    
+    return grouped;
+  }, [comments]);
+
+  // Inline comment handlers
+  const handleAddInlineComment = useCallback(
+    (filePath: string, line: number, side: 'LEFT' | 'RIGHT', body: string) => {
+      if (!prData?.id) return;
+      addInlineCommentMutation.mutate({
+        prId: prData.id,
+        body,
+        path: filePath,
+        line,
+        side,
+        commitSha: prData.headSha,
+      });
+    },
+    [prData, addInlineCommentMutation]
+  );
+
+  const handleReplyComment = useCallback(
+    (commentId: string, body: string) => {
+      if (!prData?.id) return;
+      // Find the parent comment to get context
+      const parentComment = comments.find((c: any) => c.id === commentId);
+      addInlineCommentMutation.mutate({
+        prId: prData.id,
+        body,
+        path: parentComment?.path,
+        line: parentComment?.line,
+        side: parentComment?.side,
+        commitSha: prData.headSha,
+        replyToId: commentId,
+      });
+    },
+    [prData, comments, addInlineCommentMutation]
+  );
+
+  const handleEditComment = useCallback(
+    (commentId: string, body: string) => {
+      editCommentMutation.mutate({ commentId, body });
+    },
+    [editCommentMutation]
+  );
+
+  const handleDeleteComment = useCallback(
+    (commentId: string) => {
+      deleteCommentMutation.mutate({ commentId });
+    },
+    [deleteCommentMutation]
+  );
+
+  const handleResolveComment = useCallback(
+    (commentId: string) => {
+      resolveCommentMutation.mutate({ commentId });
+    },
+    [resolveCommentMutation]
+  );
+
+  const handleUnresolveComment = useCallback(
+    (commentId: string) => {
+      unresolveCommentMutation.mutate({ commentId });
+    },
+    [unresolveCommentMutation]
+  );
+
   const commits = commitsData?.commits || [];
 
   // Build timeline from reviews and comments
@@ -174,8 +407,8 @@ export function PullDetailPage() {
     reviewState?: 'approved' | 'changes_requested' | 'commented';
   }> = [
     ...reviews
-      .filter(review => review.state !== 'pending')
-      .map(review => ({
+      .filter((review) => review.state !== 'pending')
+      .map((review) => ({
         id: review.id,
         type: 'review' as const,
         author: {
@@ -186,17 +419,34 @@ export function PullDetailPage() {
         body: review.body || undefined,
         createdAt: new Date(review.createdAt),
       })),
-    ...comments.map(comment => ({
-      id: comment.id,
-      type: 'comment' as const,
-      author: {
-        username: comment.user?.username || 'Unknown',
-        avatarUrl: comment.user?.avatarUrl || null,
-      },
-      body: comment.body,
-      createdAt: new Date(comment.createdAt),
-    })),
+    ...comments
+      .filter((c) => !c.path) // Only general comments, not inline
+      .map((comment) => ({
+        id: comment.id,
+        type: 'comment' as const,
+        author: {
+          username: comment.user?.username || 'Unknown',
+          avatarUrl: comment.user?.avatarUrl || null,
+        },
+        body: comment.body,
+        createdAt: new Date(comment.createdAt),
+      })),
   ].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+
+  // Process reviewers for sidebar
+  const sidebarReviewers = reviewers.map((r) => {
+    const latestReview = reviews.find((rev) => rev.userId === r.userId);
+    return {
+      id: r.userId,
+      username: r.user?.username || 'Unknown',
+      avatarUrl: r.user?.avatarUrl || null,
+      status: (latestReview?.state || 'pending') as 'pending' | 'approved' | 'changes_requested' | 'commented',
+    };
+  });
+
+  // Review counts
+  const approvedCount = reviews.filter((r) => r.state === 'approved').length;
+  const changesRequestedCount = reviews.filter((r) => r.state === 'changes_requested').length;
 
   const stateIcon = {
     open: <GitPullRequest className="h-5 w-5 text-green-500" />,
@@ -212,10 +462,20 @@ export function PullDetailPage() {
 
   const handleMerge = async (method: 'merge' | 'squash' | 'rebase') => {
     if (!prData?.id) return;
-    mergeMutation.mutate({
+    await mergeMutation.mutateAsync({
       prId: prData.id,
       strategy: method,
     });
+  };
+
+  const handleClose = async () => {
+    if (!prData?.id) return;
+    await closeMutation.mutateAsync({ prId: prData.id });
+  };
+
+  const handleReopen = async () => {
+    if (!prData?.id) return;
+    await reopenMutation.mutateAsync({ prId: prData.id });
   };
 
   const handleComment = async () => {
@@ -226,321 +486,491 @@ export function PullDetailPage() {
     });
   };
 
+  const handleSubmitReview = async (state: 'approved' | 'changes_requested' | 'commented', body: string) => {
+    if (!prData?.id) return;
+    await addReviewMutation.mutateAsync({
+      prId: prData.id,
+      state,
+      body,
+      commitSha: prData.headSha,
+    });
+  };
+
+  const handleRequestReview = async (userId: string) => {
+    if (!prData?.id) return;
+    await requestReviewMutation.mutateAsync({
+      prId: prData.id,
+      reviewerId: userId,
+    });
+  };
+
+  const handleRemoveReviewer = async (userId: string) => {
+    if (!prData?.id) return;
+    await removeReviewerMutation.mutateAsync({
+      prId: prData.id,
+      reviewerId: userId,
+    });
+  };
+
+  const handleAddLabel = async (labelId: string) => {
+    if (!prData?.id) return;
+    await addLabelMutation.mutateAsync({
+      prId: prData.id,
+      labelId,
+    });
+  };
+
+  const handleRemoveLabel = async (labelId: string) => {
+    if (!prData?.id) return;
+    await removeLabelMutation.mutateAsync({
+      prId: prData.id,
+      labelId,
+    });
+  };
+
+  const handleToggleViewed = (path: string) => {
+    const newViewed = new Set(viewedFiles);
+    if (newViewed.has(path)) {
+      newViewed.delete(path);
+    } else {
+      newViewed.add(path);
+    }
+    setViewedFiles(newViewed);
+  };
+
+  const handleSaveDescription = async () => {
+    if (!prData?.id) return;
+    await updateMutation.mutateAsync({
+      prId: prData.id,
+      body: editedBody,
+    });
+  };
+
+  const isAuthor = session?.user?.id === pr.authorId;
+
+  // Calculate conflict count
+  const conflictCount = conflictsData?.conflicts?.length || mergeabilityData?.conflicts?.length || 0;
+
   return (
     <RepoLayout owner={owner!} repo={repo!}>
-      {/* PR Header */}
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          {pr.title}
-          <span className="text-muted-foreground font-normal">#{pr.number}</span>
-        </h1>
+      <div className="flex gap-6">
+        {/* Main content */}
+        <div className="flex-1 min-w-0">
+          {/* PR Header */}
+          <div className="mb-6">
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              {pr.title}
+              <span className="text-muted-foreground font-normal">#{pr.number}</span>
+            </h1>
 
-        <div className="flex items-center gap-3 mt-3">
-          <Badge
-            variant={pr.state === 'open' ? 'success' : pr.state === 'merged' ? 'purple' : 'secondary'}
-            className="gap-1"
-          >
-            {stateIcon[pr.state]}
-            {stateText[pr.state]}
-          </Badge>
-
-          <span className="text-muted-foreground">
-            <Link to={`/${pr.author?.username}`} className="font-medium hover:text-foreground">
-              {pr.author?.username || 'Unknown'}
-            </Link>{' '}
-            wants to merge{' '}
-            <code className="px-1.5 py-0.5 bg-muted rounded font-mono text-sm">
-              {pr.sourceBranch}
-            </code>{' '}
-            into{' '}
-            <code className="px-1.5 py-0.5 bg-muted rounded font-mono text-sm">
-              {pr.targetBranch}
-            </code>
-          </span>
-        </div>
-
-        <div className="flex items-center gap-2 mt-3">
-          {pr.labels?.map((label) => (
-            <Badge
-              key={label.id}
-              variant="outline"
-              style={{
-                backgroundColor: `#${label.color}20`,
-                borderColor: `#${label.color}`,
-                color: `#${label.color}`,
-              }}
-            >
-              {label.name}
-            </Badge>
-          ))}
-        </div>
-
-        {/* Stack context */}
-        {pr.stack && (
-          <Card className="mt-4 bg-muted/30">
-            <CardContent className="p-3">
-              <div className="flex items-center gap-2 mb-2">
-                <Layers className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium">Part of stack:</span>
-                <Link 
-                  to={`/${owner}/${repo}/stacks/${pr.stack.name}`}
-                  className="text-sm text-primary hover:underline"
-                >
-                  {pr.stack.name}
-                </Link>
-              </div>
-              <div className="flex items-center gap-1 flex-wrap text-xs">
-                <code className="bg-muted px-1.5 py-0.5 rounded">{pr.stack.baseBranch}</code>
-                {pr.stack.branches.map((branch, idx) => {
-                  const isCurrentPR = branch.isCurrent;
-                  const prState = branch.pr?.state;
-                  
-                  return (
-                    <span key={branch.branchName} className="flex items-center gap-1">
-                      <ArrowRight className="h-3 w-3 text-muted-foreground" />
-                      {branch.pr ? (
-                        <Link 
-                          to={`/${owner}/${repo}/pull/${branch.pr.number}`}
-                          className={`px-1.5 py-0.5 rounded flex items-center gap-1 ${
-                            isCurrentPR 
-                              ? 'bg-primary text-primary-foreground font-medium' 
-                              : prState === 'merged'
-                                ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
-                                : prState === 'closed'
-                                  ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                                  : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                          }`}
-                        >
-                          {prState === 'merged' && <GitMerge className="h-3 w-3" />}
-                          {prState === 'open' && <GitPullRequest className="h-3 w-3" />}
-                          {prState === 'closed' && <Circle className="h-3 w-3" />}
-                          #{branch.pr.number}
-                        </Link>
-                      ) : (
-                        <code className="bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
-                          {branch.branchName}
-                        </code>
-                      )}
-                    </span>
-                  );
-                })}
-              </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                Review and merge PRs in order from left to right
-              </p>
-            </CardContent>
-          </Card>
-        )}
-      </div>
-
-      {/* Tabs */}
-      <Tabs defaultValue="conversation">
-        <TabsList>
-          <TabsTrigger value="conversation" className="gap-2">
-            <MessageSquare className="h-4 w-4" />
-            Conversation
-          </TabsTrigger>
-          <TabsTrigger value="ai-review" className="gap-2">
-            <Bot className="h-4 w-4" />
-            AI Review
-            {aiReviewData && (
-              <Badge variant={aiReviewData.state === 'approved' ? 'success' : 'warning'} className="ml-1">
-                {aiReviewData.state === 'approved' ? <CheckCircle className="h-3 w-3" /> : <AlertCircle className="h-3 w-3" />}
+            <div className="flex items-center gap-3 mt-3">
+              <Badge
+                variant={pr.state === 'open' ? 'success' : pr.state === 'merged' ? 'purple' : 'secondary'}
+                className="gap-1"
+              >
+                {stateIcon[pr.state]}
+                {stateText[pr.state]}
+                {pr.isDraft && ' (Draft)'}
               </Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="commits" className="gap-2">
-            <GitCommit className="h-4 w-4" />
-            Commits
-          </TabsTrigger>
-          <TabsTrigger value="files" className="gap-2">
-            <FileCode className="h-4 w-4" />
-            Files changed
-            <Badge variant="secondary">{diff.length}</Badge>
-          </TabsTrigger>
-        </TabsList>
 
-        <TabsContent value="conversation" className="mt-6 space-y-6">
-          {/* PR Description */}
-          <Card>
-            <div className="flex items-center gap-3 px-4 py-2 bg-muted/30 border-b">
-              <Avatar className="h-6 w-6">
-                <AvatarImage src={pr.author?.avatarUrl || undefined} />
-                <AvatarFallback className="text-xs">
-                  {pr.author?.username?.slice(0, 2).toUpperCase() || 'UN'}
-                </AvatarFallback>
-              </Avatar>
-              <span className="font-medium">{pr.author?.username || 'Unknown'}</span>
-              <span className="text-muted-foreground">opened this pull request</span>
               <span className="text-muted-foreground">
-                {formatRelativeTime(new Date(pr.createdAt))}
+                <Link to={`/${pr.author?.username}`} className="font-medium hover:text-foreground">
+                  {pr.author?.username || 'Unknown'}
+                </Link>{' '}
+                wants to merge{' '}
+                <code className="px-1.5 py-0.5 bg-muted rounded font-mono text-sm">
+                  {pr.sourceBranch}
+                </code>{' '}
+                into{' '}
+                <code className="px-1.5 py-0.5 bg-muted rounded font-mono text-sm">
+                  {pr.targetBranch}
+                </code>
               </span>
             </div>
-            <CardContent className="p-4">
-              {pr.body ? (
-                <Markdown content={pr.body} />
-              ) : (
-                <p className="text-muted-foreground italic">No description provided.</p>
-              )}
-            </CardContent>
-          </Card>
 
-          {/* Timeline */}
-          {timeline.length > 0 && <PrTimeline events={timeline} />}
-
-          {/* Merge section */}
-          {pr.state === 'open' && authenticated && (
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    {pr.isMergeable !== false ? (
-                      <p className="text-green-500 font-medium">
-                        ✓ This branch has no conflicts with the base branch
-                      </p>
-                    ) : (
-                      <p className="text-red-500 font-medium">
-                        ✗ This branch has conflicts that must be resolved
-                      </p>
-                    )}
-                  </div>
-                  <MergeButton
-                    isMergeable={pr.isMergeable !== false}
-                    onMerge={handleMerge}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Comment form */}
-          {authenticated && (
-            <Card>
-              <CardContent className="p-4 space-y-4">
-                <Textarea
-                  placeholder="Leave a comment..."
-                  value={comment}
-                  onChange={(e) => setComment(e.target.value)}
-                  rows={4}
-                />
-                <div className="flex justify-end">
-                  <Button
-                    onClick={handleComment}
-                    disabled={!comment.trim() || addCommentMutation.isPending}
+            {/* Labels */}
+            {pr.labels && pr.labels.length > 0 && (
+              <div className="flex items-center gap-2 mt-3">
+                {pr.labels.map((label) => (
+                  <Badge
+                    key={label.id}
+                    variant="outline"
+                    style={{
+                      backgroundColor: `#${label.color}20`,
+                      borderColor: `#${label.color}`,
+                      color: `#${label.color}`,
+                    }}
                   >
-                    {addCommentMutation.isPending ? 'Commenting...' : 'Comment'}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
+                    {label.name}
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </div>
 
-        <TabsContent value="ai-review" className="mt-6">
+          {/* Stack visualization (if part of a stack) */}
+          {pr.stack && (
+            <div className="mb-6">
+              <StackViewer
+                stack={pr.stack}
+                currentPrId={pr.id}
+                owner={owner!}
+                repo={repo!}
+              />
+            </div>
+          )}
+
+          {/* Action Card */}
+          {authenticated && (
+            <div className="mb-6">
+              <ActionCard
+                prState={pr.state}
+                isDraft={pr.isDraft}
+                isMergeable={mergeabilityData?.canMerge}
+                hasConflicts={conflictCount > 0}
+                reviewsApproved={approvedCount}
+                reviewsChangesRequested={changesRequestedCount}
+                behindBy={mergeabilityData?.behindBy}
+                isAuthor={isAuthor}
+                onMerge={pr.state === 'open' && !pr.isDraft ? handleMerge : undefined}
+                onClose={pr.state === 'open' ? handleClose : undefined}
+                onReopen={pr.state === 'closed' ? handleReopen : undefined}
+                stackName={pr.stack?.name}
+                stackPosition={pr.stack?.branches.findIndex((b) => b.pr?.id === pr.id)}
+                stackTotal={pr.stack?.branches.length}
+                owner={owner}
+                repo={repo}
+              />
+            </div>
+          )}
+
+          {/* Tabs */}
+          <Tabs defaultValue="conversation">
+            <div className="flex items-center justify-between mb-4">
+              <TabsList>
+                <TabsTrigger value="conversation" className="gap-2">
+                  <MessageSquare className="h-4 w-4" />
+                  Conversation
+                </TabsTrigger>
+                <TabsTrigger value="commits" className="gap-2">
+                  <GitCommit className="h-4 w-4" />
+                  Commits
+                  <Badge variant="secondary" className="ml-1">{commits.length}</Badge>
+                </TabsTrigger>
+                <TabsTrigger value="files" className="gap-2">
+                  <FileCode className="h-4 w-4" />
+                  Files changed
+                  <Badge variant="secondary" className="ml-1">{diff.length}</Badge>
+                </TabsTrigger>
+                {mergeabilityData?.canMerge === false && conflictCount > 0 && (
+                  <TabsTrigger value="conflicts" className="gap-2">
+                    <AlertTriangle className="h-4 w-4 text-amber-500" />
+                    Conflicts
+                    <Badge variant="warning">{conflictCount}</Badge>
+                  </TabsTrigger>
+                )}
+              </TabsList>
+
+              {authenticated && pr.state === 'open' && (
+                <ReviewButton
+                  onSubmit={handleSubmitReview}
+                  isAuthor={isAuthor}
+                />
+              )}
+            </div>
+
+            <TabsContent value="conversation" className="space-y-6">
+              {/* PR Description */}
+              <Card>
+                <div className="flex items-center justify-between px-4 py-2 bg-muted/30 border-b">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-6 w-6">
+                      <AvatarImage src={pr.author?.avatarUrl || undefined} />
+                      <AvatarFallback className="text-xs">
+                        {pr.author?.username?.slice(0, 2).toUpperCase() || 'UN'}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="font-medium">{pr.author?.username || 'Unknown'}</span>
+                    <span className="text-muted-foreground">opened this pull request</span>
+                    <span className="text-muted-foreground">
+                      {formatRelativeTime(new Date(pr.createdAt))}
+                    </span>
+                  </div>
+                  {isAuthor && !isEditingDescription && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setEditedBody(pr.body || '');
+                        setIsEditingDescription(true);
+                      }}
+                    >
+                      <Edit3 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+                <CardContent className="p-4">
+                  {isEditingDescription ? (
+                    <div className="space-y-3">
+                      <RichEditor
+                        value={editedBody}
+                        onChange={setEditedBody}
+                        placeholder="Add a description..."
+                        minRows={6}
+                        autoFocus
+                      />
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setIsEditingDescription(false)}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={handleSaveDescription}
+                          disabled={updateMutation.isPending}
+                        >
+                          {updateMutation.isPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                          ) : null}
+                          Save
+                        </Button>
+                      </div>
+                    </div>
+                  ) : pr.body ? (
+                    <Markdown content={pr.body} />
+                  ) : (
+                    <p className="text-muted-foreground italic">No description provided.</p>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Timeline */}
+              {timeline.length > 0 && <PrTimeline events={timeline} />}
+
+              {/* Branch status */}
+              {pr.state === 'open' && mergeabilityData && (
+                <BranchStatus
+                  behindBy={mergeabilityData.behindBy || 0}
+                  aheadBy={mergeabilityData.aheadBy || 0}
+                  hasConflicts={conflictCount > 0}
+                  conflictFiles={mergeabilityData.conflicts}
+                  targetBranch={pr.targetBranch}
+                  sourceBranch={pr.sourceBranch}
+                  canUpdateBranch={isAuthor}
+                />
+              )}
+
+              {/* Comment form */}
+              {authenticated && (
+                <Card>
+                  <CardContent className="p-0">
+                    <RichEditor
+                      value={comment}
+                      onChange={setComment}
+                      placeholder="Leave a comment..."
+                      minRows={3}
+                    />
+                    <div className="flex justify-end p-3 border-t">
+                      <Button
+                        onClick={handleComment}
+                        disabled={!comment.trim() || addCommentMutation.isPending}
+                      >
+                        {addCommentMutation.isPending ? 'Commenting...' : 'Comment'}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
+
+            <TabsContent value="commits">
+              {commitsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : commits.length > 0 ? (
+                <Card>
+                  <CardContent className="p-0">
+                    <div className="divide-y">
+                      {commits.map((commit) => (
+                        <div key={commit.sha} className="p-4 hover:bg-muted/50">
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium truncate">{commit.message}</p>
+                              <p className="text-sm text-muted-foreground mt-1">
+                                {commit.author} committed {new Date(commit.date).toLocaleDateString()}
+                              </p>
+                            </div>
+                            <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
+                              {commit.sha.slice(0, 7)}
+                            </code>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card>
+                  <CardContent className="p-6 text-center text-muted-foreground">
+                    <GitCommit className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>No commits found</p>
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
+
+            <TabsContent value="files">
+              {diffLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : diff.length > 0 ? (
+                <DiffViewer
+                  files={diff}
+                  prId={prData?.id}
+                  comments={commentsByFile}
+                  currentUserId={session?.user?.id}
+                  onAddComment={authenticated ? handleAddInlineComment : undefined}
+                  onReplyComment={authenticated ? handleReplyComment : undefined}
+                  onEditComment={authenticated ? handleEditComment : undefined}
+                  onDeleteComment={authenticated ? handleDeleteComment : undefined}
+                  onResolveComment={authenticated ? handleResolveComment : undefined}
+                  onUnresolveComment={authenticated ? handleUnresolveComment : undefined}
+                  isAddingComment={addInlineCommentMutation.isPending}
+                  isEditingComment={editCommentMutation.isPending}
+                  isDeletingComment={deleteCommentMutation.isPending}
+                  isResolvingComment={resolveCommentMutation.isPending || unresolveCommentMutation.isPending}
+                  viewedFiles={viewedFiles}
+                  onToggleViewed={handleToggleViewed}
+                  showViewedToggle={authenticated}
+                />
+              ) : (
+                <Card>
+                  <CardContent className="p-6 text-center text-muted-foreground">
+                    <FileCode className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>No files changed</p>
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
+
+            {/* Conflicts Tab */}
+            {mergeabilityData?.canMerge === false && conflictCount > 0 && (
+              <TabsContent value="conflicts">
+                {conflictsLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  </div>
+                ) : conflictsData?.conflicts && conflictsData.conflicts.length > 0 ? (
+                  <ConflictResolver
+                    prId={prData!.id}
+                    conflicts={conflictsData.conflicts}
+                    sourceBranch={pr.sourceBranch}
+                    targetBranch={pr.targetBranch}
+                    onResolved={() => {
+                      utils.pulls.checkMergeability.invalidate({ prId: prData!.id });
+                    }}
+                  />
+                ) : (
+                  <Card>
+                    <CardContent className="p-6 text-center text-muted-foreground">
+                      <AlertTriangle className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>Conflict details could not be loaded</p>
+                      {conflictsData?.error && (
+                        <p className="text-sm mt-2">{conflictsData.error}</p>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+              </TabsContent>
+            )}
+          </Tabs>
+        </div>
+
+        {/* Sidebar */}
+        <div className="w-64 shrink-0 space-y-6">
+          <PrSidebar
+            reviewers={sidebarReviewers}
+            onRequestReview={authenticated ? handleRequestReview : undefined}
+            onRemoveReviewer={authenticated && isAuthor ? handleRemoveReviewer : undefined}
+            canManageReviewers={authenticated && (isAuthor || false)}
+            checks={[]} // TODO: Add CI checks integration
+            labels={pr.labels || []}
+            onAddLabel={authenticated ? handleAddLabel : undefined}
+            onRemoveLabel={authenticated ? handleRemoveLabel : undefined}
+            canManageLabels={authenticated}
+          />
+
+          {/* AI Review Card */}
           <Card>
             <div className="flex items-center justify-between px-4 py-3 bg-muted/30 border-b">
               <div className="flex items-center gap-2">
                 <Bot className="h-5 w-5 text-primary" />
-                <span className="font-medium">AI Code Review</span>
+                <span className="font-medium text-sm">AI Review</span>
                 {aiReviewData?.state && (
-                  <Badge variant={aiReviewData.state === 'approved' ? 'success' : 'warning'}>
-                    {aiReviewData.state === 'approved' ? 'Approved' : 'Changes Requested'}
+                  <Badge variant={aiReviewData.state === 'approved' ? 'success' : 'warning'} className="text-xs">
+                    {aiReviewData.state === 'approved' ? 'Approved' : 'Changes'}
                   </Badge>
                 )}
               </div>
               {authenticated && (
                 <Button
-                  variant="outline"
-                  size="sm"
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
                   onClick={() => triggerReviewMutation.mutate({ prId: prData!.id })}
                   disabled={triggerReviewMutation.isPending}
-                  className="gap-2"
                 >
                   {triggerReviewMutation.isPending ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <RefreshCw className="h-4 w-4" />
                   )}
-                  {aiReviewData ? 'Re-run Review' : 'Run AI Review'}
                 </Button>
               )}
             </div>
-            <CardContent className="p-4">
+            <CardContent className="p-3">
               {aiReviewLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                 </div>
               ) : aiReviewData?.body ? (
-                <Markdown content={aiReviewData.body} />
+                <div className="text-sm prose prose-sm dark:prose-invert max-w-none">
+                  <Markdown content={aiReviewData.body.slice(0, 300) + (aiReviewData.body.length > 300 ? '...' : '')} />
+                </div>
               ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Bot className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p className="mb-2">No AI review yet</p>
-                  <p className="text-sm">
-                    {authenticated 
-                      ? 'Click "Run AI Review" to analyze this pull request'
-                      : 'Sign in to run an AI review on this pull request'}
+                <div className="text-center py-4 text-muted-foreground">
+                  <Bot className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-xs">
+                    {authenticated ? 'Click refresh to run AI review' : 'Sign in to run AI review'}
                   </p>
                 </div>
               )}
             </CardContent>
           </Card>
-        </TabsContent>
 
-        <TabsContent value="commits" className="mt-6">
-          {commitsLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : commits.length > 0 ? (
-            <Card>
-              <CardContent className="p-0">
-                <div className="divide-y">
-                  {commits.map((commit) => (
-                    <div key={commit.sha} className="p-4 hover:bg-muted/50">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium truncate">{commit.message}</p>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            {commit.author} committed {new Date(commit.date).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
-                          {commit.sha.slice(0, 7)}
-                        </code>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card>
-              <CardContent className="p-6 text-center text-muted-foreground">
-                <GitCommit className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>No commits found</p>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
+          {/* AI Chat */}
+          <AiChat
+            prNumber={pr.number}
+            onSendMessage={authenticated ? async () => {
+              // TODO: Integrate with actual AI endpoint
+              return "AI response coming soon! This feature will allow you to ask questions about the PR.";
+            } : undefined}
+          />
 
-        <TabsContent value="files" className="mt-6">
-          {diffLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : diff.length > 0 ? (
-            <DiffViewer files={diff} />
-          ) : (
-            <Card>
-              <CardContent className="p-6 text-center text-muted-foreground">
-                <FileCode className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>File diff coming soon</p>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-      </Tabs>
+          {/* Keyboard shortcuts button */}
+          <div className="pt-4 border-t">
+            <KeyboardShortcutsButton />
+          </div>
+        </div>
+      </div>
+
+      {/* Keyboard shortcuts dialog */}
+      <KeyboardShortcutsDialog />
     </RepoLayout>
   );
 }

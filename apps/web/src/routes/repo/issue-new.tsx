@@ -4,6 +4,7 @@ import { RepoLayout } from './components/repo-layout';
 import { Loading } from '@/components/ui/loading';
 import { useSession } from '@/lib/auth-client';
 import { trpc } from '@/lib/trpc';
+import { toastSuccess, toastError } from '@/components/ui/use-toast';
 
 export function NewIssuePage() {
   const { owner, repo } = useParams<{ owner: string; repo: string }>();
@@ -20,8 +21,18 @@ export function NewIssuePage() {
   // Create issue mutation
   const createIssueMutation = trpc.issues.create.useMutation({
     onSuccess: (data) => {
+      toastSuccess({
+        title: 'Issue created',
+        description: `Issue #${data.number} has been created successfully.`,
+      });
       // Redirect to the new issue
       navigate(`/${owner}/${repo}/issues/${data.number}`);
+    },
+    onError: (error) => {
+      toastError({
+        title: 'Failed to create issue',
+        description: error.message,
+      });
     },
   });
 

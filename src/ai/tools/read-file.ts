@@ -20,7 +20,7 @@ Can also read binary files and return base64 encoded content.`,
     startLine: z.number().optional().describe('Optional: Start reading from this line (1-indexed)'),
     endLine: z.number().optional().describe('Optional: Stop reading at this line (inclusive)'),
   }),
-outputSchema: z.object({
+  outputSchema: z.object({
     success: z.boolean(),
     content: z.string().optional().describe('File content (text or base64 for binary)'),
     isBinary: z.boolean().optional().describe('Whether the file is binary'),

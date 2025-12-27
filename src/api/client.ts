@@ -169,8 +169,8 @@ export interface PullRequest {
   headSha: string;
   baseSha: string;
   authorId: string;
-  isMergeable?: boolean;
   isDraft?: boolean;
+  isMergeable?: boolean;
   mergedAt?: Date;
   closedAt?: Date;
   createdAt: Date;
