@@ -20,6 +20,7 @@ export const authRouter = router({
     .mutation(async ({ input }) => {
       const auth = createAuth();
       
+      // Register the user
       const result = await auth.api.signUpEmail({
         body: {
           email: input.email,
@@ -35,21 +36,27 @@ export const authRouter = router({
         });
       }
 
-      // Debug: Log what better-auth returns
-      console.log('[auth.register] better-auth result:', {
-        userId: result.user.id,
-        sessionToken: result.session?.token,
-        sessionId: result.session?.id,
-      });
-
       // Update username (better-auth doesn't have username field by default)
       const user = await userModel.update(result.user.id, {
         username: input.username,
       });
 
+      // better-auth signUpEmail doesn't create a session, so sign in to get one
+      const signInResult = await auth.api.signInEmail({
+        body: {
+          email: input.email,
+          password: input.password,
+        },
+      });
+
+      console.log('[auth.register] After sign-in:', {
+        userId: signInResult?.user?.id,
+        sessionToken: signInResult?.session?.token,
+      });
+
       return {
         user,
-        sessionId: result.session?.token || '',
+        sessionId: signInResult?.session?.token || '',
       };
     }),
 
