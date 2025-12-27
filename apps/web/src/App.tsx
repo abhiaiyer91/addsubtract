@@ -29,6 +29,7 @@ import { RepoSettingsPage } from './routes/repo/settings';
 import { CollaboratorsPage } from './routes/repo/settings/collaborators';
 import { BranchProtectionPage } from './routes/repo/settings/branches';
 import { WebhooksPage } from './routes/repo/settings/webhooks';
+import { RepoAISettingsPage } from './routes/repo/settings/ai';
 import { ReleasesPage } from './routes/repo/releases';
 import { NewReleasePage } from './routes/repo/releases/new';
 import { ReleaseDetailPage } from './routes/repo/releases/detail';
@@ -130,6 +131,7 @@ export function App() {
             <Route path="/:owner/:repo/settings/collaborators" element={<CollaboratorsPage />} />
             <Route path="/:owner/:repo/settings/branches" element={<BranchProtectionPage />} />
             <Route path="/:owner/:repo/settings/webhooks" element={<WebhooksPage />} />
+            <Route path="/:owner/:repo/settings/ai" element={<RepoAISettingsPage />} />
           </Route>
         </Routes>
         <Toaster />

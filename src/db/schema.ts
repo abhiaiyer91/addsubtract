@@ -1356,6 +1356,46 @@ export const agentFileChanges = pgTable('agent_file_changes', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+// ============ REPOSITORY AI KEYS ============
+
+export const aiProviderEnum = pgEnum('ai_provider', [
+  'openai',
+  'anthropic',
+]);
+
+/**
+ * Repository AI Keys table
+ * Stores encrypted API keys for AI providers per repository
+ * Only repository owners can view/manage these keys
+ */
+export const repoAiKeys = pgTable('repo_ai_keys', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  
+  // Repository this key belongs to
+  repoId: uuid('repo_id')
+    .notNull()
+    .references(() => repositories.id, { onDelete: 'cascade' }),
+  
+  // AI provider (openai, anthropic)
+  provider: aiProviderEnum('provider').notNull(),
+  
+  // Encrypted API key (we store encrypted, never plain text)
+  encryptedKey: text('encrypted_key').notNull(),
+  
+  // Last 4 characters of the key for display (e.g., "...xyz1")
+  keyHint: text('key_hint').notNull(),
+  
+  // User who added this key
+  createdById: text('created_by_id').notNull(),
+  
+  // Timestamps
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  // Only one key per provider per repo
+  uniqueProviderPerRepo: unique().on(table.repoId, table.provider),
+}));
+
 // ============ JOURNAL (Notion-like documentation) ============
 
 /**
@@ -1458,7 +1498,12 @@ export const journalPageHistory = pgTable('journal_page_history', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+
 // ============ TYPE EXPORTS ============
+
+export type RepoAiKey = typeof repoAiKeys.$inferSelect;
+export type NewRepoAiKey = typeof repoAiKeys.$inferInsert;
+export type AiProvider = (typeof aiProviderEnum.enumValues)[number];
 
 export type AgentSession = typeof agentSessions.$inferSelect;
 export type NewAgentSession = typeof agentSessions.$inferInsert;

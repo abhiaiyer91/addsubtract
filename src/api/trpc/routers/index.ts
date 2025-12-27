@@ -23,6 +23,7 @@ import { projectsRouter } from './projects';
 import { cyclesRouter } from './cycles';
 import { mergeQueueRouter } from './merge-queue';
 import { journalRouter } from './journal';
+import { repoAiKeysRouter } from './repo-ai-keys';
 
 /**
  * Main application router
@@ -53,6 +54,7 @@ export const appRouter = router({
   cycles: cyclesRouter,
   mergeQueue: mergeQueueRouter,
   journal: journalRouter,
+  repoAiKeys: repoAiKeysRouter,
 });
 
 /**
@@ -85,4 +87,5 @@ export {
   cyclesRouter,
   mergeQueueRouter,
   journalRouter,
+  repoAiKeysRouter,
 };
