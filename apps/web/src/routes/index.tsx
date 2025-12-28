@@ -158,7 +158,7 @@ function LandingView() {
               <div className="flex-1 flex justify-center">
                 <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-zinc-800/50 text-[10px] text-zinc-500">
                   <Lock className="h-2.5 w-2.5" />
-                  wit.dev/acme/frontend
+                  wit.sh/acme/frontend
                 </div>
               </div>
             </div>

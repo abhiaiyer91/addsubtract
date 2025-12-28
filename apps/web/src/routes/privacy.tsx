@@ -120,8 +120,8 @@ export function PrivacyPage() {
         <h2>12. Contact Us</h2>
         <p>
           If you have any questions about this Privacy Policy, please contact us at{' '}
-          <a href="mailto:privacy@wit.dev" className="text-primary hover:underline">
-            privacy@wit.dev
+          <a href="mailto:privacy@wit.sh" className="text-primary hover:underline">
+            privacy@wit.sh
           </a>
         </p>
       </div>

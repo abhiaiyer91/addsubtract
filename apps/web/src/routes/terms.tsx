@@ -82,8 +82,8 @@ export function TermsPage() {
         <h2>10. Contact Us</h2>
         <p>
           If you have any questions about these Terms, please contact us at{' '}
-          <a href="mailto:legal@wit.dev" className="text-primary hover:underline">
-            legal@wit.dev
+          <a href="mailto:legal@wit.sh" className="text-primary hover:underline">
+            legal@wit.sh
           </a>
         </p>
       </div>
