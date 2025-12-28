@@ -155,10 +155,6 @@ export function Header() {
                       <User className="mr-2 h-4 w-4" />
                       Your profile
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => navigate(`/${user?.username}?tab=repositories`)}>
-                      <BookOpen className="mr-2 h-4 w-4" />
-                      Your repositories
-                    </DropdownMenuItem>
                     {/* Mobile-only: New repository option */}
                     <DropdownMenuItem onClick={() => navigate('/new')} className="md:hidden">
                       <Plus className="mr-2 h-4 w-4" />
