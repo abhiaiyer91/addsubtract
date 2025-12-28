@@ -14,7 +14,9 @@ import {
   ChevronDown,
   Train,
   Zap,
-  Calendar,
+  Sparkles,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -83,7 +85,7 @@ interface ActionCardProps {
   stackPosition?: number;
   stackTotal?: number;
   stackCanMerge?: boolean;
-  onMerge?: (method: MergeMethod) => Promise<void>;
+  onMerge?: (method: MergeMethod, commitMessage?: string) => Promise<void>;
   onClose?: () => Promise<void>;
   onReopen?: () => Promise<void>;
   onConvertToDraft?: () => Promise<void>;
@@ -247,7 +249,6 @@ export function ActionCard(props: ActionCardProps) {
   const state = getCardState(props, queuePosition as MergeQueuePosition | undefined);
   const config = stateConfig[state];
   const isQueueEnabled = queueConfig?.enabled ?? false;
-  const isInQueue = queuePosition?.inQueue ?? false;
   const canModify = props.isAuthor || props.canWrite;
 
   const handleMerge = async () => {
@@ -435,6 +436,7 @@ export function ActionCard(props: ActionCardProps) {
             {/* Merge Actions */}
             {props.onMerge && props.isMergeable !== false && !props.hasConflicts && (
               <MergeActions
+                prId={props.prId}
                 mergeMethod={mergeMethod}
                 setMergeMethod={setMergeMethod}
                 methodLabels={methodLabels}
@@ -491,6 +493,7 @@ export function ActionCard(props: ActionCardProps) {
             {/* Merge Actions */}
             {props.onMerge && (
               <MergeActions
+                prId={props.prId}
                 mergeMethod={mergeMethod}
                 setMergeMethod={setMergeMethod}
                 methodLabels={methodLabels}
@@ -653,6 +656,7 @@ export function ActionCard(props: ActionCardProps) {
  * MergeActions component - handles the merge button with queue option
  */
 function MergeActions({
+  prId,
   mergeMethod,
   setMergeMethod,
   methodLabels,
@@ -663,27 +667,138 @@ function MergeActions({
   queueStats,
   canWrite,
 }: {
+  prId: string;
   mergeMethod: MergeMethod;
   setMergeMethod: (method: MergeMethod) => void;
   methodLabels: Record<MergeMethod, string>;
   isLoading: boolean;
-  onMerge: () => Promise<void>;
+  onMerge: (commitMessage?: string) => Promise<void>;
   onAddToQueue: (priority?: number) => void;
   isQueueEnabled: boolean;
   queueStats?: { pending: number; avgMergeTimeMinutes: number } | null;
   canWrite?: boolean;
 }) {
+  const [squashMessage, setSquashMessage] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  // AI summarize mutation
+  // @ts-expect-error - summarizeForSquash exists on backend but types not regenerated
+  const summarizeMutation = trpc.ai.summarizeForSquash.useMutation({
+    onSuccess: (data: { fullMessage: string; commitCount: number }) => {
+      setSquashMessage(data.fullMessage);
+      toastSuccess({
+        title: 'Commit message generated',
+        description: `Summarized ${data.commitCount} commits`,
+      });
+    },
+    onError: (error: { message: string }) => {
+      toastError({
+        title: 'Failed to generate summary',
+        description: error.message,
+      });
+    },
+    onSettled: () => {
+      setIsGenerating(false);
+    },
+  });
+
+  const handleSummarize = () => {
+    setIsGenerating(true);
+    summarizeMutation.mutate({ prId });
+  };
+
+  const handleCopyMessage = async () => {
+    if (squashMessage) {
+      await navigator.clipboard.writeText(squashMessage);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleMergeWithMessage = () => {
+    onMerge(mergeMethod === 'squash' ? squashMessage || undefined : undefined);
+  };
+
   if (!canWrite) return null;
 
   return (
     <div className="space-y-2">
+      {/* Squash commit message editor - show when squash is selected */}
+      {mergeMethod === 'squash' && (
+        <div className="space-y-2 p-3 rounded-lg bg-muted/30 border">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">Squash commit message</span>
+            <div className="flex items-center gap-1">
+              {squashMessage && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={handleCopyMessage}
+                      >
+                        {copied ? (
+                          <Check className="h-3.5 w-3.5 text-green-500" />
+                        ) : (
+                          <Copy className="h-3.5 w-3.5" />
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Copy message</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 gap-1.5 text-xs"
+                      onClick={handleSummarize}
+                      disabled={isGenerating || isLoading}
+                    >
+                      {isGenerating ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Sparkles className="h-3.5 w-3.5 text-purple-500" />
+                      )}
+                      {isGenerating ? 'Generating...' : 'AI Summarize'}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Use AI to summarize all commits into one message</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+          </div>
+          {squashMessage && (
+            <textarea
+              value={squashMessage}
+              onChange={(e) => setSquashMessage(e.target.value)}
+              className="w-full min-h-[100px] p-2 text-sm font-mono bg-background border rounded-md resize-y"
+              placeholder="Commit message..."
+            />
+          )}
+          {!squashMessage && (
+            <p className="text-xs text-muted-foreground">
+              Click "AI Summarize" to generate a commit message from all PR commits
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Primary merge button */}
       <div className="flex gap-2">
         <div className="flex flex-1">
           <Button
             variant="success"
             className="flex-1 rounded-r-none gap-2"
-            onClick={onMerge}
+            onClick={handleMergeWithMessage}
             disabled={isLoading}
           >
             {isLoading ? (

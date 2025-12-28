@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   Plus,
   AlertCircle,
@@ -20,6 +20,17 @@ import {
   Copy,
   Check,
   ClipboardList,
+  Terminal,
+  Search,
+  GitBranch,
+  Clock,
+  XCircle,
+  AtSign,
+  Slash,
+  History,
+  MoreHorizontal,
+  FileText,
+  Diff,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -28,7 +39,14 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { Badge } from '@/components/ui/badge';
 import { trpc } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 import { Link } from 'react-router-dom';
@@ -37,16 +55,18 @@ import { useChatStream } from '@/lib/use-chat-stream';
 
 type AgentMode = 'pm' | 'code';
 
-const MODE_CONFIG: Record<AgentMode, { icon: React.ElementType; label: string; description: string }> = {
+const MODE_CONFIG: Record<AgentMode, { icon: React.ElementType; label: string; description: string; color: string }> = {
   pm: {
     icon: ClipboardList,
     label: 'PM',
     description: 'Ask questions, create issues & PRs',
+    color: 'text-blue-500',
   },
   code: {
     icon: FileCode,
     label: 'Code',
     description: 'Write and edit code (auto-commits)',
+    color: 'text-emerald-500',
   },
 };
 
@@ -69,6 +89,8 @@ interface Message {
   content: string;
   createdAt: Date;
   toolCalls?: ToolCall[];
+  isStreaming?: boolean;
+  thinkingTime?: number;
 }
 
 interface AgentPanelProps {
@@ -80,8 +102,23 @@ interface AgentPanelProps {
   embedded?: boolean;
 }
 
-// Simple code block component with copy button
-function CodeBlock({ code, language }: { code: string; language?: string }) {
+// Tool status and icons
+const TOOL_CONFIG: Record<string, { icon: React.ElementType; label: string; color: string }> = {
+  writeFile: { icon: FileCode, label: 'Create file', color: 'text-green-400' },
+  readFile: { icon: Eye, label: 'Read file', color: 'text-blue-400' },
+  editFile: { icon: Pencil, label: 'Edit file', color: 'text-yellow-400' },
+  deleteFile: { icon: Trash2, label: 'Delete file', color: 'text-red-400' },
+  listDirectory: { icon: FolderOpen, label: 'List directory', color: 'text-purple-400' },
+  createBranch: { icon: GitBranch, label: 'Create branch', color: 'text-orange-400' },
+  getHistory: { icon: GitCommit, label: 'Git history', color: 'text-cyan-400' },
+  getStatus: { icon: GitCommit, label: 'Git status', color: 'text-cyan-400' },
+  commit: { icon: GitCommit, label: 'Commit', color: 'text-green-400' },
+  runCommand: { icon: Terminal, label: 'Run command', color: 'text-amber-400' },
+  search: { icon: Search, label: 'Search', color: 'text-indigo-400' },
+};
+
+// Simple code block component with copy button and file path
+function CodeBlock({ code, language, filePath }: { code: string; language?: string; filePath?: string }) {
   const [copied, setCopied] = useState(false);
   
   const handleCopy = async () => {
@@ -90,21 +127,37 @@ function CodeBlock({ code, language }: { code: string; language?: string }) {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const lines = code.split('\n');
+  const lineCount = lines.length;
+
   return (
-    <div className="relative group my-3">
-      <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-6 w-6 bg-background/80"
-          onClick={handleCopy}
-        >
-          {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-        </Button>
+    <div className="relative group my-3 rounded-lg overflow-hidden border border-zinc-800 bg-zinc-900">
+      {/* Header */}
+      <div className="flex items-center justify-between px-3 py-1.5 bg-zinc-800/50 border-b border-zinc-800">
+        <div className="flex items-center gap-2">
+          <FileText className="h-3.5 w-3.5 text-zinc-500" />
+          <span className="text-xs text-zinc-400 font-mono">
+            {filePath || language || 'code'}
+          </span>
+          <span className="text-xs text-zinc-600">{lineCount} lines</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 text-zinc-500 hover:text-zinc-300"
+            onClick={handleCopy}
+          >
+            {copied ? <Check className="h-3 w-3 text-green-400" /> : <Copy className="h-3 w-3" />}
+          </Button>
+        </div>
       </div>
-      <pre className="bg-zinc-900 border border-zinc-800 rounded-lg p-3 overflow-x-auto">
-        <code className="text-sm text-zinc-300 font-mono">{code}</code>
-      </pre>
+      {/* Code */}
+      <div className="overflow-x-auto">
+        <pre className="p-3 text-sm">
+          <code className="text-zinc-300 font-mono">{code}</code>
+        </pre>
+      </div>
     </div>
   );
 }
@@ -112,7 +165,7 @@ function CodeBlock({ code, language }: { code: string; language?: string }) {
 // Simple inline code component
 function InlineCode({ children }: { children: string }) {
   return (
-    <code className="bg-zinc-800 text-zinc-300 px-1.5 py-0.5 rounded text-sm font-mono">
+    <code className="bg-zinc-800 text-emerald-400 px-1.5 py-0.5 rounded text-sm font-mono">
       {children}
     </code>
   );
@@ -148,7 +201,7 @@ function MessageContent({ content }: { content: string }) {
       // Headers
       if (line.startsWith('### ')) {
         result.push(
-          <h3 key={key++} className="text-base font-semibold mt-4 mb-2">
+          <h3 key={key++} className="text-base font-semibold mt-4 mb-2 text-zinc-200">
             {line.slice(4)}
           </h3>
         );
@@ -157,7 +210,7 @@ function MessageContent({ content }: { content: string }) {
       }
       if (line.startsWith('## ')) {
         result.push(
-          <h2 key={key++} className="text-lg font-semibold mt-4 mb-2">
+          <h2 key={key++} className="text-lg font-semibold mt-4 mb-2 text-zinc-100">
             {line.slice(3)}
           </h2>
         );
@@ -166,7 +219,7 @@ function MessageContent({ content }: { content: string }) {
       }
       if (line.startsWith('# ')) {
         result.push(
-          <h1 key={key++} className="text-xl font-bold mt-4 mb-2">
+          <h1 key={key++} className="text-xl font-bold mt-4 mb-2 text-zinc-50">
             {line.slice(2)}
           </h1>
         );
@@ -182,7 +235,7 @@ function MessageContent({ content }: { content: string }) {
           i++;
         }
         result.push(
-          <ul key={key++} className="list-disc list-inside space-y-1 my-2">
+          <ul key={key++} className="list-disc list-inside space-y-1 my-2 text-zinc-300">
             {listItems.map((item, idx) => (
               <li key={idx} className="text-sm">
                 <FormattedText text={item} />
@@ -201,7 +254,7 @@ function MessageContent({ content }: { content: string }) {
           i++;
         }
         result.push(
-          <ol key={key++} className="list-decimal list-inside space-y-1 my-2">
+          <ol key={key++} className="list-decimal list-inside space-y-1 my-2 text-zinc-300">
             {listItems.map((item, idx) => (
               <li key={idx} className="text-sm">
                 <FormattedText text={item} />
@@ -233,7 +286,7 @@ function MessageContent({ content }: { content: string }) {
       }
       if (paragraphLines.length > 0) {
         result.push(
-          <p key={key++} className="text-sm leading-relaxed my-2">
+          <p key={key++} className="text-sm leading-relaxed my-2 text-zinc-300">
             <FormattedText text={paragraphLines.join(' ')} />
           </p>
         );
@@ -265,7 +318,7 @@ function FormattedText({ text }: { text: string }) {
       // Bold
       const boldMatch = remaining.match(/^\*\*([^*]+)\*\*/);
       if (boldMatch) {
-        result.push(<strong key={key++} className="font-semibold">{boldMatch[1]}</strong>);
+        result.push(<strong key={key++} className="font-semibold text-zinc-100">{boldMatch[1]}</strong>);
         remaining = remaining.slice(boldMatch[0].length);
         continue;
       }
@@ -273,7 +326,7 @@ function FormattedText({ text }: { text: string }) {
       // Italic
       const italicMatch = remaining.match(/^\*([^*]+)\*/);
       if (italicMatch) {
-        result.push(<em key={key++}>{italicMatch[1]}</em>);
+        result.push(<em key={key++} className="text-zinc-200">{italicMatch[1]}</em>);
         remaining = remaining.slice(italicMatch[0].length);
         continue;
       }
@@ -282,7 +335,7 @@ function FormattedText({ text }: { text: string }) {
       const linkMatch = remaining.match(/^\[([^\]]+)\]\(([^)]+)\)/);
       if (linkMatch) {
         result.push(
-          <a key={key++} href={linkMatch[2]} className="text-primary hover:underline" target="_blank" rel="noopener noreferrer">
+          <a key={key++} href={linkMatch[2]} className="text-blue-400 hover:text-blue-300 hover:underline" target="_blank" rel="noopener noreferrer">
             {linkMatch[1]}
           </a>
         );
@@ -311,83 +364,206 @@ function FormattedText({ text }: { text: string }) {
   return <>{parts}</>;
 }
 
-// Tool icon mapping
-function getToolIcon(toolName: string) {
-  switch (toolName) {
-    case 'writeFile':
-      return FileCode;
-    case 'readFile':
-      return Eye;
-    case 'editFile':
-      return Pencil;
-    case 'deleteFile':
-      return Trash2;
-    case 'listDirectory':
-      return FolderOpen;
-    case 'createBranch':
-    case 'getHistory':
-      return GitCommit;
-    default:
-      return FileCode;
-  }
-}
-
-// Tool call display component
-function ToolCallBadge({ tool }: { tool: ToolCall }) {
+// Enhanced tool call display component
+function ToolCallDisplay({ tool, isLast }: { tool: ToolCall; isLast?: boolean }) {
   const [expanded, setExpanded] = useState(false);
   const toolName = tool.payload?.toolName || tool.toolName || 'unknown';
   const args = tool.payload?.args || tool.args || {};
-  const Icon = getToolIcon(toolName);
   
-  // Get a summary of the args
-  const getSummary = () => {
-    if (toolName === 'writeFile' || toolName === 'editFile' || toolName === 'readFile' || toolName === 'deleteFile') {
-      return args.path as string || '';
+  const config = TOOL_CONFIG[toolName] || { icon: FileCode, label: toolName, color: 'text-zinc-400' };
+  const Icon = config.icon;
+  
+  // Get file path and content info
+  const filePath = (args.path as string) || '';
+  const content = args.content as string | undefined;
+  const oldText = args.oldText as string | undefined;
+  const newText = args.newText as string | undefined;
+  
+  // Calculate diff stats for edits
+  const getDiffStats = () => {
+    if (toolName === 'writeFile' && content) {
+      const lines = content.split('\n').length;
+      return { added: lines, removed: 0 };
     }
-    if (toolName === 'listDirectory') {
-      return (args.path as string) || '/';
+    if (toolName === 'editFile' && oldText && newText) {
+      const oldLines = oldText.split('\n').length;
+      const newLines = newText.split('\n').length;
+      return { added: newLines, removed: oldLines };
     }
-    if (toolName === 'createBranch') {
-      return args.name as string || '';
+    if (toolName === 'deleteFile') {
+      return { added: 0, removed: 1 };
     }
-    return '';
+    return null;
   };
-
-  const summary = getSummary();
-  const hasDetails = toolName === 'writeFile' || toolName === 'editFile';
+  
+  const diffStats = getDiffStats();
+  const hasExpandableContent = content || (oldText && newText);
 
   return (
-    <div className="group">
+    <div className={cn("relative", !isLast && "pb-2")}>
+      {/* Connection line */}
+      {!isLast && (
+        <div className="absolute left-[11px] top-6 bottom-0 w-px bg-zinc-800" />
+      )}
+      
       <button
-        onClick={() => hasDetails && setExpanded(!expanded)}
+        onClick={() => hasExpandableContent && setExpanded(!expanded)}
         className={cn(
-          "flex items-center gap-2 text-xs rounded-md px-2 py-1.5 w-full text-left transition-colors",
-          "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20",
-          hasDetails && "hover:bg-emerald-500/20 cursor-pointer"
+          "flex items-start gap-2.5 w-full text-left group",
+          hasExpandableContent && "cursor-pointer"
         )}
       >
-        <Icon className="h-3.5 w-3.5 flex-shrink-0" />
-        <span className="font-medium">{toolName}</span>
-        {summary && (
-          <span className="text-emerald-300/70 truncate flex-1 font-mono text-[11px]">
-            {summary}
-          </span>
-        )}
-        {hasDetails && (
-          expanded ? 
-            <ChevronDown className="h-3 w-3 flex-shrink-0 opacity-50" /> : 
-            <ChevronRight className="h-3 w-3 flex-shrink-0 opacity-50" />
-        )}
+        {/* Icon */}
+        <div className={cn(
+          "w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5",
+          "bg-zinc-800 border border-zinc-700"
+        )}>
+          <Icon className={cn("h-3.5 w-3.5", config.color)} />
+        </div>
+        
+        {/* Content */}
+        <div className="flex-1 min-w-0 pt-0.5">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium text-zinc-300">{config.label}</span>
+            {filePath && (
+              <span className="text-xs text-zinc-500 font-mono truncate max-w-[200px]">
+                {filePath}
+              </span>
+            )}
+            {diffStats && (
+              <span className="flex items-center gap-1 text-xs">
+                {diffStats.added > 0 && (
+                  <span className="text-green-400">+{diffStats.added}</span>
+                )}
+                {diffStats.removed > 0 && (
+                  <span className="text-red-400">-{diffStats.removed}</span>
+                )}
+              </span>
+            )}
+            {hasExpandableContent && (
+              <ChevronRight className={cn(
+                "h-3 w-3 text-zinc-600 transition-transform",
+                expanded && "rotate-90"
+              )} />
+            )}
+          </div>
+        </div>
       </button>
       
-      {expanded && hasDetails && args.content && (
-        <div className="mt-1 ml-6 p-2 bg-muted/30 rounded text-xs font-mono overflow-x-auto max-h-32 overflow-y-auto">
-          <pre className="text-muted-foreground whitespace-pre-wrap break-all">
-            {String(args.content).slice(0, 500)}
-            {String(args.content).length > 500 && '...'}
-          </pre>
+      {/* Expanded content */}
+      {expanded && hasExpandableContent && (
+        <div className="ml-8 mt-2 rounded-md overflow-hidden border border-zinc-800 bg-zinc-900/50">
+          {toolName === 'editFile' && oldText && newText ? (
+            <div className="text-xs font-mono">
+              <div className="px-3 py-1.5 bg-red-500/10 border-b border-zinc-800">
+                <div className="flex items-center gap-2 text-red-400 mb-1">
+                  <Diff className="h-3 w-3" />
+                  <span>Removed</span>
+                </div>
+                <pre className="text-red-300/80 whitespace-pre-wrap break-all">
+                  {oldText.slice(0, 300)}{oldText.length > 300 && '...'}
+                </pre>
+              </div>
+              <div className="px-3 py-1.5 bg-green-500/10">
+                <div className="flex items-center gap-2 text-green-400 mb-1">
+                  <Diff className="h-3 w-3" />
+                  <span>Added</span>
+                </div>
+                <pre className="text-green-300/80 whitespace-pre-wrap break-all">
+                  {newText.slice(0, 300)}{newText.length > 300 && '...'}
+                </pre>
+              </div>
+            </div>
+          ) : content ? (
+            <div className="p-3 text-xs font-mono text-zinc-400 whitespace-pre-wrap break-all max-h-32 overflow-y-auto">
+              {content.slice(0, 500)}{content.length > 500 && '...'}
+            </div>
+          ) : null}
         </div>
       )}
+    </div>
+  );
+}
+
+// Tool calls group component
+function ToolCallsGroup({ toolCalls }: { toolCalls: ToolCall[] }) {
+  const [collapsed, setCollapsed] = useState(toolCalls.length > 3);
+  const visibleTools = collapsed ? toolCalls.slice(0, 2) : toolCalls;
+  const hiddenCount = toolCalls.length - 2;
+
+  return (
+    <div className="my-3 p-3 rounded-lg bg-zinc-900/50 border border-zinc-800">
+      <div className="flex items-center gap-2 mb-3">
+        <div className="flex items-center gap-1.5">
+          <Terminal className="h-3.5 w-3.5 text-zinc-500" />
+          <span className="text-xs font-medium text-zinc-400">Actions</span>
+        </div>
+        <Badge variant="secondary" className="h-5 text-[10px] bg-zinc-800 text-zinc-400">
+          {toolCalls.length}
+        </Badge>
+      </div>
+      
+      <div className="space-y-1">
+        {visibleTools.map((tool, i) => (
+          <ToolCallDisplay 
+            key={i} 
+            tool={tool} 
+            isLast={i === visibleTools.length - 1 && !collapsed} 
+          />
+        ))}
+        
+        {collapsed && hiddenCount > 0 && (
+          <button
+            onClick={() => setCollapsed(false)}
+            className="flex items-center gap-2 text-xs text-zinc-500 hover:text-zinc-300 ml-8 mt-2"
+          >
+            <MoreHorizontal className="h-3 w-3" />
+            Show {hiddenCount} more action{hiddenCount > 1 ? 's' : ''}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Thinking indicator component
+function ThinkingIndicator({ startTime }: { startTime?: Date }) {
+  const [elapsed, setElapsed] = useState(0);
+  
+  useEffect(() => {
+    if (!startTime) return;
+    
+    const interval = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - startTime.getTime()) / 1000));
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, [startTime]);
+
+  return (
+    <div className="flex items-center gap-3 py-4 px-4">
+      <div className="relative">
+        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
+          <Bot className="h-4 w-4 text-white" />
+        </div>
+        <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-zinc-900 flex items-center justify-center">
+          <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+        </div>
+      </div>
+      
+      <div className="flex-1">
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-zinc-300">Thinking</span>
+          <div className="flex gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+          </div>
+        </div>
+        {elapsed > 0 && (
+          <span className="text-xs text-zinc-600">{elapsed}s</span>
+        )}
+      </div>
     </div>
   );
 }
@@ -395,19 +571,25 @@ function ToolCallBadge({ tool }: { tool: ToolCall }) {
 // Message component
 function MessageBubble({ 
   message,
-  isStreaming 
+  isStreaming,
+  streamStartTime,
 }: { 
   message: Message;
   isStreaming?: boolean;
+  streamStartTime?: Date;
 }) {
   const isUser = message.role === 'user';
   const isSystem = message.role === 'system';
   const toolCalls = message.toolCalls || [];
 
+  if (isStreaming && !message.content && toolCalls.length === 0) {
+    return <ThinkingIndicator startTime={streamStartTime} />;
+  }
+
   return (
     <div className={cn(
       "px-4 py-4",
-      isUser ? "bg-muted/30" : "bg-transparent"
+      isUser && "bg-zinc-900/30"
     )}>
       <div className="max-w-3xl mx-auto">
         <div className="flex gap-3">
@@ -415,9 +597,9 @@ function MessageBubble({
           <div className={cn(
             "w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0",
             isUser 
-              ? "bg-primary text-primary-foreground" 
+              ? "bg-zinc-700 text-zinc-300" 
               : isSystem 
-                ? "bg-destructive/20 text-destructive" 
+                ? "bg-red-500/20 text-red-400" 
                 : "bg-gradient-to-br from-emerald-500 to-teal-600 text-white"
           )}>
             {isUser ? (
@@ -430,33 +612,35 @@ function MessageBubble({
           </div>
           
           {/* Content */}
-          <div className="flex-1 min-w-0 space-y-2">
-            {/* Role label */}
-            <div className="text-xs font-medium text-muted-foreground">
-              {isUser ? 'You' : isSystem ? 'System' : 'wit AI'}
+          <div className="flex-1 min-w-0 space-y-1">
+            {/* Role label with time */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-zinc-400">
+                {isUser ? 'You' : isSystem ? 'System' : 'wit'}
+              </span>
+              {message.thinkingTime && (
+                <span className="text-[10px] text-zinc-600 flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  {message.thinkingTime}s
+                </span>
+              )}
             </div>
             
-            {/* Tool calls (show before content for assistant) */}
+            {/* Tool calls */}
             {!isUser && toolCalls.length > 0 && (
-              <div className="space-y-1.5 mb-3">
-                {toolCalls.map((tool, i) => (
-                  <ToolCallBadge key={i} tool={tool} />
-                ))}
-              </div>
+              <ToolCallsGroup toolCalls={toolCalls} />
             )}
             
             {/* Message content */}
-            {isStreaming ? (
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span className="text-sm">Thinking...</span>
-              </div>
-            ) : message.content ? (
+            {message.content ? (
               <div className={cn(
-                "text-foreground",
-                isSystem && "text-destructive"
+                isSystem && "text-red-400"
               )}>
                 <MessageContent content={message.content} />
+              </div>
+            ) : isStreaming ? (
+              <div className="flex items-center gap-2">
+                <span className="inline-block w-2 h-4 bg-emerald-500 animate-pulse" />
               </div>
             ) : null}
           </div>
@@ -466,30 +650,40 @@ function MessageBubble({
   );
 }
 
-// Chat input component
+// Enhanced chat input component
 function ChatInput({ 
   onSend, 
   isLoading,
-  disabled 
+  disabled,
+  mode,
 }: { 
   onSend: (message: string) => void; 
   isLoading: boolean;
   disabled?: boolean;
+  mode: AgentMode;
 }) {
   const [value, setValue] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [showHints, setShowHints] = useState(false);
 
-  const handleSubmit = () => {
+  const handleSubmit = useCallback(() => {
     if (!value.trim() || isLoading || disabled) return;
     onSend(value.trim());
     setValue('');
-    // Reset textarea height
+    setShowHints(false);
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
-  };
+  }, [value, isLoading, disabled, onSend]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    // Cmd/Ctrl + Enter to send
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      handleSubmit();
+      return;
+    }
+    // Enter without shift to send
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSubmit();
@@ -504,57 +698,213 @@ function ChatInput({
     }
   }, [value]);
 
+  // Show hints when input starts with @ or /
+  useEffect(() => {
+    setShowHints(value.startsWith('@') || value.startsWith('/'));
+  }, [value]);
+
+  const hints = useMemo(() => {
+    if (value.startsWith('@')) {
+      return [
+        { label: '@file', description: 'Reference a file' },
+        { label: '@codebase', description: 'Search entire codebase' },
+      ];
+    }
+    if (value.startsWith('/')) {
+      return mode === 'code' ? [
+        { label: '/create', description: 'Create a new file' },
+        { label: '/edit', description: 'Edit a file' },
+        { label: '/fix', description: 'Fix an issue' },
+      ] : [
+        { label: '/issue', description: 'Create an issue' },
+        { label: '/pr', description: 'Create a pull request' },
+        { label: '/explain', description: 'Explain code' },
+      ];
+    }
+    return [];
+  }, [value, mode]);
+
   return (
     <div className="relative">
-      <Textarea
-        ref={textareaRef}
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onKeyDown={handleKeyDown}
-        placeholder="Ask wit AI..."
-        disabled={isLoading || disabled}
-        className={cn(
-          "min-h-[44px] max-h-[150px] resize-none pr-12",
-          "bg-muted/50 border-muted-foreground/20",
-          "focus:border-primary/50 focus:ring-1 focus:ring-primary/20",
-          "placeholder:text-muted-foreground/50"
-        )}
-        rows={1}
-      />
-      <Button
-        size="icon"
-        variant="ghost"
-        onClick={handleSubmit}
-        disabled={!value.trim() || isLoading || disabled}
-        className={cn(
-          "absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8",
-          "hover:bg-primary/20 hover:text-primary",
-          value.trim() && !isLoading && "text-primary"
-        )}
-      >
-        {isLoading ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          <Send className="h-4 w-4" />
-        )}
-      </Button>
+      {/* Hints dropdown */}
+      {showHints && hints.length > 0 && (
+        <div className="absolute bottom-full left-0 right-0 mb-2 p-1 bg-zinc-900 border border-zinc-800 rounded-lg shadow-xl">
+          {hints.map((hint) => (
+            <button
+              key={hint.label}
+              onClick={() => {
+                setValue(hint.label + ' ');
+                textareaRef.current?.focus();
+              }}
+              className="flex items-center gap-3 w-full px-3 py-2 text-left rounded-md hover:bg-zinc-800 transition-colors"
+            >
+              <span className="text-sm font-mono text-emerald-400">{hint.label}</span>
+              <span className="text-xs text-zinc-500">{hint.description}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      
+      {/* Input area */}
+      <div className="relative rounded-lg border border-zinc-800 bg-zinc-900/50 focus-within:border-zinc-700 transition-colors">
+        {/* Toolbar */}
+        <div className="flex items-center gap-1 px-2 py-1.5 border-b border-zinc-800/50">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 text-zinc-500 hover:text-zinc-300"
+                onClick={() => setValue('@')}
+              >
+                <AtSign className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              <p className="text-xs">Mention file or codebase</p>
+            </TooltipContent>
+          </Tooltip>
+          
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 text-zinc-500 hover:text-zinc-300"
+                onClick={() => setValue('/')}
+              >
+                <Slash className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              <p className="text-xs">Commands</p>
+            </TooltipContent>
+          </Tooltip>
+          
+          <div className="flex-1" />
+          
+          <span className="text-[10px] text-zinc-600">
+            {navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'}+Enter to send
+          </span>
+        </div>
+        
+        {/* Textarea */}
+        <Textarea
+          ref={textareaRef}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={mode === 'code' ? 'Ask wit to write or edit code...' : 'Ask wit anything...'}
+          disabled={isLoading || disabled}
+          className={cn(
+            "min-h-[60px] max-h-[150px] resize-none border-0 bg-transparent",
+            "focus-visible:ring-0 focus-visible:ring-offset-0",
+            "placeholder:text-zinc-600 text-zinc-200"
+          )}
+          rows={2}
+        />
+        
+        {/* Send button */}
+        <div className="flex items-center justify-end px-2 py-1.5">
+          <Button
+            size="sm"
+            onClick={handleSubmit}
+            disabled={!value.trim() || isLoading || disabled}
+            className={cn(
+              "h-7 px-3 gap-1.5",
+              "bg-emerald-600 hover:bg-emerald-500 text-white",
+              "disabled:bg-zinc-800 disabled:text-zinc-600"
+            )}
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                <span className="text-xs">Thinking...</span>
+              </>
+            ) : (
+              <>
+                <Send className="h-3.5 w-3.5" />
+                <span className="text-xs">Send</span>
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
 
+// Session list dropdown
+function SessionDropdown({ 
+  sessions, 
+  activeSessionId, 
+  onSelect,
+  onNew,
+}: { 
+  sessions: Array<{ id: string; title: string | null; createdAt: Date }>;
+  activeSessionId: string | null;
+  onSelect: (id: string) => void;
+  onNew: () => void;
+}) {
+  const activeSession = sessions.find(s => s.id === activeSessionId);
+  
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-xs max-w-[180px]">
+          <History className="h-3.5 w-3.5 flex-shrink-0" />
+          <span className="truncate">
+            {activeSession?.title || 'New chat'}
+          </span>
+          <ChevronDown className="h-3 w-3 opacity-50 flex-shrink-0" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-64">
+        <DropdownMenuItem onClick={onNew} className="gap-2">
+          <Plus className="h-4 w-4" />
+          <span>New chat</span>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <div className="max-h-64 overflow-y-auto">
+          {sessions.map((session) => (
+            <DropdownMenuItem
+              key={session.id}
+              onClick={() => onSelect(session.id)}
+              className={cn(
+                "gap-2",
+                session.id === activeSessionId && "bg-zinc-800"
+              )}
+            >
+              <FileText className="h-4 w-4 flex-shrink-0 text-zinc-500" />
+              <div className="flex-1 min-w-0">
+                <div className="truncate text-sm">
+                  {session.title || 'Untitled chat'}
+                </div>
+                <div className="text-xs text-zinc-500">
+                  {new Date(session.createdAt).toLocaleDateString()}
+                </div>
+              </div>
+            </DropdownMenuItem>
+          ))}
+        </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 // Mode-specific suggestions
-const MODE_SUGGESTIONS: Record<AgentMode, Array<{ label: string; prompt: string }>> = {
+const MODE_SUGGESTIONS: Record<AgentMode, Array<{ label: string; prompt: string; icon: React.ElementType }>> = {
   pm: [
-    { label: 'Explain this codebase', prompt: 'Give me an overview of this codebase' },
-    { label: 'Create an issue', prompt: 'Create an issue for ' },
-    { label: 'List open issues', prompt: 'List all open issues' },
-    { label: 'Create a PR', prompt: 'Create a pull request for ' },
+    { label: 'Explain codebase', prompt: 'Give me an overview of this codebase', icon: Search },
+    { label: 'Create issue', prompt: 'Create an issue for ', icon: ClipboardList },
+    { label: 'List issues', prompt: 'List all open issues', icon: FileText },
+    { label: 'Create PR', prompt: 'Create a pull request for ', icon: GitBranch },
   ],
   code: [
-    { label: 'Create a new file', prompt: 'Create a new file called ' },
-    { label: 'Edit a file', prompt: 'Edit the file ' },
-    { label: 'Add a feature', prompt: 'Add a feature that ' },
-    { label: 'Fix a bug', prompt: 'Fix the bug where ' },
+    { label: 'Create file', prompt: 'Create a new file called ', icon: FileCode },
+    { label: 'Edit file', prompt: 'Edit the file ', icon: Pencil },
+    { label: 'Add feature', prompt: 'Add a feature that ', icon: Sparkles },
+    { label: 'Fix bug', prompt: 'Fix the bug where ', icon: XCircle },
   ],
 };
 
@@ -566,29 +916,39 @@ function WelcomeScreen({ mode, onPrompt }: { mode: AgentMode; onPrompt: (prompt:
 
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-6">
-      <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center mb-4">
-        <Icon className="h-7 w-7 text-white" />
+      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center mb-5 shadow-lg shadow-emerald-500/20">
+        <Icon className="h-8 w-8 text-white" />
       </div>
-      <h2 className="text-lg font-semibold mb-1">{config.label} Mode</h2>
-      <p className="text-sm text-muted-foreground mb-6 text-center max-w-xs">
+      <h2 className="text-xl font-semibold mb-1 text-zinc-100">
+        {mode === 'code' ? 'Code with wit' : 'Ask wit'}
+      </h2>
+      <p className="text-sm text-zinc-500 mb-8 text-center max-w-xs">
         {config.description}
       </p>
       
       <div className="grid grid-cols-2 gap-2 w-full max-w-sm">
-        {suggestions.map((s, i) => (
-          <button
-            key={i}
-            onClick={() => onPrompt(s.prompt)}
-            className={cn(
-              "px-3 py-2.5 rounded-lg text-left text-sm",
-              "bg-muted/50 hover:bg-muted border border-transparent hover:border-border/50",
-              "transition-colors"
-            )}
-          >
-            {s.label}
-          </button>
-        ))}
+        {suggestions.map((s, i) => {
+          const SuggestionIcon = s.icon;
+          return (
+            <button
+              key={i}
+              onClick={() => onPrompt(s.prompt)}
+              className={cn(
+                "flex items-center gap-2.5 px-3 py-3 rounded-lg text-left",
+                "bg-zinc-900/50 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700",
+                "transition-all duration-200"
+              )}
+            >
+              <SuggestionIcon className="h-4 w-4 text-zinc-500 flex-shrink-0" />
+              <span className="text-sm text-zinc-300">{s.label}</span>
+            </button>
+          );
+        })}
       </div>
+      
+      <p className="text-xs text-zinc-600 mt-8">
+        Type <InlineCode>@</InlineCode> to mention files or <InlineCode>/</InlineCode> for commands
+      </p>
     </div>
   );
 }
@@ -599,6 +959,7 @@ export function AgentPanel({ isOpen, onClose, repoId, repoName, owner, embedded 
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
   const [selectedMode, setSelectedMode] = useState<AgentMode>(embedded ? 'code' : 'pm');
+  const [streamStartTime, setStreamStartTime] = useState<Date | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const utils = trpc.useUtils();
 
@@ -610,12 +971,11 @@ export function AgentPanel({ isOpen, onClose, repoId, repoName, owner, embedded 
   );
   const isAiAvailable = aiStatus?.available || repoAiStatus?.hasKeys;
 
-  // @ts-expect-error - mode parameter exists on backend but types not regenerated
   const { data: sessions } = trpc.agent.listSessions.useQuery({ 
     limit: 50, 
-    mode: selectedMode,
+    mode: selectedMode as string,
     repoId: repoId,
-  });
+  } as Parameters<typeof trpc.agent.listSessions.useQuery>[0]);
   const { data: sessionMessages, isLoading: messagesLoading } = trpc.agent.getMessages.useQuery(
     { sessionId: activeSessionId! },
     { enabled: !!activeSessionId }
@@ -634,10 +994,11 @@ export function AgentPanel({ isOpen, onClose, repoId, repoName, owner, embedded 
         
         const streamingId = `streaming-${Date.now()}`;
         setStreamingMessageId(streamingId);
+        setStreamStartTime(new Date());
         
         // Keep the temp user message and add streaming assistant message
         setMessages((prev) => [
-          ...prev.filter(m => m.id.startsWith('temp-')), // Keep user's temp message
+          ...prev.filter(m => m.id.startsWith('temp-')),
           {
             id: streamingId,
             role: 'assistant',
@@ -652,7 +1013,7 @@ export function AgentPanel({ isOpen, onClose, repoId, repoName, owner, embedded 
             newSession.id,
             message,
             selectedProvider as 'anthropic' | 'openai' | undefined,
-            (chunk, fullContent) => {
+            (_chunk, fullContent) => {
               setMessages((prev) =>
                 prev.map((m) =>
                   m.id === streamingId ? { ...m, content: fullContent } : m
@@ -660,6 +1021,8 @@ export function AgentPanel({ isOpen, onClose, repoId, repoName, owner, embedded 
               );
             }
           );
+
+          const thinkingTime = streamStartTime ? Math.floor((Date.now() - streamStartTime.getTime()) / 1000) : undefined;
 
           if (result) {
             setMessages((prev) =>
@@ -674,6 +1037,7 @@ export function AgentPanel({ isOpen, onClose, repoId, repoName, owner, embedded 
                     content: result.content,
                     toolCalls: result.toolCalls as ToolCall[] | undefined,
                     isStreaming: false,
+                    thinkingTime,
                   };
                 }
                 return m;
@@ -682,9 +1046,9 @@ export function AgentPanel({ isOpen, onClose, repoId, repoName, owner, embedded 
 
             if (embedded && result.toolCalls) {
               processToolCalls(result.toolCalls);
-              const hasFileChanges = result.toolCalls.some((tc: any) => {
+              const hasFileChanges = result.toolCalls.some((tc: ToolCall) => {
                 const toolName = tc.payload?.toolName || tc.toolName;
-                return ['writeFile', 'editFile', 'deleteFile'].includes(toolName);
+                return ['writeFile', 'editFile', 'deleteFile'].includes(toolName || '');
               });
               if (hasFileChanges) {
                 utils.repos.getTree.invalidate();
@@ -694,6 +1058,8 @@ export function AgentPanel({ isOpen, onClose, repoId, repoName, owner, embedded 
           }
         } catch (error) {
           console.error('Pending prompt stream error:', error);
+        } finally {
+          setStreamStartTime(null);
         }
       } else {
         setMessages([]);
@@ -705,15 +1071,14 @@ export function AgentPanel({ isOpen, onClose, repoId, repoName, owner, embedded 
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
 
   // Streaming chat hook
-  const { streamChat, isStreaming, cancelStream } = useChatStream({
+  const { streamChat, isStreaming } = useChatStream({
     onToolCalls: (toolCalls) => {
       if (embedded) {
         processToolCalls(toolCalls);
         
-        // Invalidate file tree cache if agent modified files
-        const hasFileChanges = toolCalls.some((tc: any) => {
+        const hasFileChanges = toolCalls.some((tc: ToolCall) => {
           const toolName = tc.payload?.toolName || tc.toolName;
-          return ['writeFile', 'editFile', 'deleteFile'].includes(toolName);
+          return ['writeFile', 'editFile', 'deleteFile'].includes(toolName || '');
         });
         if (hasFileChanges) {
           utils.repos.getTree.invalidate();
@@ -735,17 +1100,19 @@ export function AgentPanel({ isOpen, onClose, repoId, repoName, owner, embedded 
         ];
       });
       setStreamingMessageId(null);
+      setStreamStartTime(null);
     },
     onComplete: (assistantMessageId) => {
-      // Update the streaming message to have the real ID
+      const thinkingTime = streamStartTime ? Math.floor((Date.now() - streamStartTime.getTime()) / 1000) : undefined;
       setMessages((prev) => 
         prev.map(m => 
           m.id === streamingMessageId 
-            ? { ...m, id: assistantMessageId, isStreaming: false }
+            ? { ...m, id: assistantMessageId, isStreaming: false, thinkingTime }
             : m
         )
       );
       setStreamingMessageId(null);
+      setStreamStartTime(null);
     },
   });
 
@@ -772,14 +1139,12 @@ export function AgentPanel({ isOpen, onClose, repoId, repoName, owner, embedded 
         ];
       });
 
-      // Process tool calls for IDE integration
       if (embedded && result.toolCalls) {
         processToolCalls(result.toolCalls);
         
-        // Invalidate file tree cache if agent modified files
-        const hasFileChanges = result.toolCalls.some((tc: any) => {
+        const hasFileChanges = result.toolCalls.some((tc: ToolCall) => {
           const toolName = tc.payload?.toolName || tc.toolName;
-          return ['writeFile', 'editFile', 'deleteFile'].includes(toolName);
+          return ['writeFile', 'editFile', 'deleteFile'].includes(toolName || '');
         });
         if (hasFileChanges) {
           utils.repos.getTree.invalidate();
@@ -826,11 +1191,10 @@ export function AgentPanel({ isOpen, onClose, repoId, repoName, owner, embedded 
   // Auto-select first session when sessions change (filtered by mode)
   useEffect(() => {
     if (sessions && isAiAvailable) {
-      // If no active session, or active session is not in the filtered list, select first
       const activeInList = activeSessionId && sessions.some(s => s.id === activeSessionId);
       if (!activeInList && sessions.length > 0) {
         setActiveSessionId(sessions[0].id);
-        setMessages([]); // Clear messages when switching sessions
+        setMessages([]);
       } else if (!activeInList) {
         setActiveSessionId(null);
         setMessages([]);
@@ -849,8 +1213,6 @@ export function AgentPanel({ isOpen, onClose, repoId, repoName, owner, embedded 
     const provider = selectedProvider as 'anthropic' | 'openai' | undefined;
     
     if (!activeSessionId) {
-      // Create session first, then send message
-      // Add temp user message
       setMessages((prev) => [
         ...prev,
         {
@@ -865,12 +1227,11 @@ export function AgentPanel({ isOpen, onClose, repoId, repoName, owner, embedded 
       return;
     }
     
-    // Use streaming for chat
     const userTempId = `temp-user-${Date.now()}`;
     const streamingId = `streaming-${Date.now()}`;
     setStreamingMessageId(streamingId);
+    setStreamStartTime(new Date());
     
-    // Add user message and empty streaming assistant message
     setMessages((prev) => [
       ...prev,
       {
@@ -893,8 +1254,7 @@ export function AgentPanel({ isOpen, onClose, repoId, repoName, owner, embedded 
         activeSessionId,
         message,
         provider,
-        (chunk, fullContent) => {
-          // Update the streaming message content as chunks arrive
+        (_chunk, fullContent) => {
           setMessages((prev) =>
             prev.map((m) =>
               m.id === streamingId ? { ...m, content: fullContent } : m
@@ -903,8 +1263,9 @@ export function AgentPanel({ isOpen, onClose, repoId, repoName, owner, embedded 
         }
       );
 
+      const thinkingTime = streamStartTime ? Math.floor((Date.now() - streamStartTime.getTime()) / 1000) : undefined;
+
       if (result) {
-        // Update with final message IDs and tool calls
         setMessages((prev) =>
           prev.map((m) => {
             if (m.id === userTempId) {
@@ -917,19 +1278,19 @@ export function AgentPanel({ isOpen, onClose, repoId, repoName, owner, embedded 
                 content: result.content,
                 toolCalls: result.toolCalls as ToolCall[] | undefined,
                 isStreaming: false,
+                thinkingTime,
               };
             }
             return m;
           })
         );
 
-        // Process tool calls for IDE integration
         if (embedded && result.toolCalls) {
           processToolCalls(result.toolCalls);
           
-          const hasFileChanges = result.toolCalls.some((tc: any) => {
+          const hasFileChanges = result.toolCalls.some((tc: ToolCall) => {
             const toolName = tc.payload?.toolName || tc.toolName;
-            return ['writeFile', 'editFile', 'deleteFile'].includes(toolName);
+            return ['writeFile', 'editFile', 'deleteFile'].includes(toolName || '');
           });
           if (hasFileChanges) {
             utils.repos.getTree.invalidate();
@@ -938,18 +1299,17 @@ export function AgentPanel({ isOpen, onClose, repoId, repoName, owner, embedded 
         }
       }
     } catch (error) {
-      // Error is handled in the hook's onError callback
       console.error('Chat stream error:', error);
     }
   };
 
   const handleNewSession = () => {
-    createSession.mutate({ repoId, mode: selectedMode });
+    setActiveSessionId(null);
+    setMessages([]);
   };
 
   const handleModeChange = (mode: AgentMode) => {
     setSelectedMode(mode);
-    // Clear active session - the useEffect will auto-select from the new mode's sessions
     setActiveSessionId(null);
     setMessages([]);
   };
@@ -964,15 +1324,15 @@ export function AgentPanel({ isOpen, onClose, repoId, repoName, owner, embedded 
       <PanelWrapper embedded={embedded} isOpen={isOpen} onClose={onClose} owner={owner} repoName={repoName}>
         <div className="flex-1 flex items-center justify-center p-6">
           <div className="text-center max-w-xs">
-            <div className="w-12 h-12 rounded-xl bg-destructive/10 flex items-center justify-center mx-auto mb-4">
-              <AlertCircle className="h-6 w-6 text-destructive" />
+            <div className="w-14 h-14 rounded-xl bg-red-500/10 flex items-center justify-center mx-auto mb-4">
+              <AlertCircle className="h-7 w-7 text-red-400" />
             </div>
-            <h3 className="font-semibold mb-2">AI Not Configured</h3>
-            <p className="text-sm text-muted-foreground mb-4">
+            <h3 className="font-semibold mb-2 text-zinc-100">AI Not Configured</h3>
+            <p className="text-sm text-zinc-500 mb-4">
               Add your API key in repository settings to use the AI agent.
             </p>
             {repoId && owner && repoName && (
-              <Button asChild size="sm">
+              <Button asChild size="sm" className="bg-zinc-800 hover:bg-zinc-700">
                 <Link to={`/${owner}/${repoName}/settings/ai`}>
                   <Settings className="h-4 w-4 mr-2" />
                   Configure AI
@@ -988,29 +1348,32 @@ export function AgentPanel({ isOpen, onClose, repoId, repoName, owner, embedded 
   return (
     <PanelWrapper embedded={embedded} isOpen={isOpen} onClose={onClose} owner={owner} repoName={repoName}>
       {/* Header */}
-      <div className="flex items-center justify-between h-11 px-3 border-b bg-muted/20 flex-shrink-0">
+      <div className="flex items-center justify-between h-11 px-3 border-b border-zinc-800 bg-zinc-900/50 flex-shrink-0">
         <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7"
-            onClick={handleNewSession}
-            disabled={createSession.isPending}
-          >
-            <Plus className="h-4 w-4" />
-          </Button>
-          <span className="text-xs text-muted-foreground">
-            {sessions?.length || 0} chats
-          </span>
+          {/* Session selector */}
+          {sessions && sessions.length > 0 && (
+            <SessionDropdown
+              sessions={sessions}
+              activeSessionId={activeSessionId}
+              onSelect={setActiveSessionId}
+              onNew={handleNewSession}
+            />
+          )}
+          {(!sessions || sessions.length === 0) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1.5 text-xs"
+              onClick={handleNewSession}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              New chat
+            </Button>
+          )}
         </div>
         
-        {/* Mode selector - only show when not embedded */}
-        {embedded ? (
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-            <span>Code mode</span>
-          </div>
-        ) : (
+        {/* Mode selector */}
+        {!embedded && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-xs">
@@ -1019,7 +1382,7 @@ export function AgentPanel({ isOpen, onClose, repoId, repoName, owner, embedded 
                   const Icon = config.icon;
                   return (
                     <>
-                      <Icon className="h-3.5 w-3.5" />
+                      <Icon className={cn("h-3.5 w-3.5", config.color)} />
                       {config.label}
                       <ChevronDown className="h-3 w-3 opacity-50" />
                     </>
@@ -1037,13 +1400,13 @@ export function AgentPanel({ isOpen, onClose, repoId, repoName, owner, embedded 
                     onClick={() => handleModeChange(mode)}
                     className={cn(
                       "gap-2",
-                      selectedMode === mode && "bg-accent"
+                      selectedMode === mode && "bg-zinc-800"
                     )}
                   >
-                    <Icon className="h-4 w-4" />
+                    <Icon className={cn("h-4 w-4", config.color)} />
                     <div className="flex-1">
                       <div className="font-medium">{config.label}</div>
-                      <div className="text-xs text-muted-foreground">{config.description}</div>
+                      <div className="text-xs text-zinc-500">{config.description}</div>
                     </div>
                   </DropdownMenuItem>
                 );
@@ -1051,42 +1414,46 @@ export function AgentPanel({ isOpen, onClose, repoId, repoName, owner, embedded 
             </DropdownMenuContent>
           </DropdownMenu>
         )}
+        
+        {embedded && (
+          <div className="flex items-center gap-1.5 text-xs text-zinc-500">
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            <span>Code mode</span>
+          </div>
+        )}
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto min-h-0">
+      <div className="flex-1 overflow-y-auto min-h-0 bg-zinc-950">
         {messagesLoading ? (
           <div className="flex items-center justify-center h-full">
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            <Loader2 className="h-5 w-5 animate-spin text-zinc-500" />
           </div>
         ) : messages.length === 0 ? (
           <WelcomeScreen mode={selectedMode} onPrompt={handleSend} />
         ) : (
-          <div className="divide-y divide-border/30">
+          <div>
             {messages.map((msg) => (
-              <MessageBubble key={msg.id} message={msg} />
+              <MessageBubble 
+                key={msg.id} 
+                message={msg} 
+                isStreaming={msg.isStreaming}
+                streamStartTime={msg.isStreaming ? streamStartTime || undefined : undefined}
+              />
             ))}
             {chat.isPending && (
-              <MessageBubble 
-                message={{ 
-                  id: 'loading', 
-                  role: 'assistant', 
-                  content: '', 
-                  createdAt: new Date() 
-                }} 
-                isStreaming 
-              />
+              <ThinkingIndicator startTime={streamStartTime || undefined} />
             )}
-            <div ref={messagesEndRef} />
+            <div ref={messagesEndRef} className="h-4" />
           </div>
         )}
       </div>
 
       {/* Input */}
-      <div className="border-t p-3 bg-background/80 backdrop-blur-sm flex-shrink-0">
-        <ChatInput onSend={handleSend} isLoading={isLoading} />
-        <p className="text-[10px] text-muted-foreground/50 text-center mt-2">
-          wit AI can make mistakes. Review important changes.
+      <div className="border-t border-zinc-800 p-3 bg-zinc-900/80 backdrop-blur-sm flex-shrink-0">
+        <ChatInput onSend={handleSend} isLoading={isLoading} mode={selectedMode} />
+        <p className="text-[10px] text-zinc-600 text-center mt-2">
+          wit can make mistakes. Review important changes.
         </p>
       </div>
     </PanelWrapper>
@@ -1111,7 +1478,7 @@ function PanelWrapper({
 }) {
   if (embedded) {
     return (
-      <div className="flex flex-col h-full bg-background overflow-hidden">
+      <div className="flex flex-col h-full bg-zinc-950 overflow-hidden">
         {children}
       </div>
     );
@@ -1122,7 +1489,7 @@ function PanelWrapper({
       {/* Backdrop */}
       <div 
         className={cn(
-          "fixed inset-0 bg-black/50 z-[55] transition-opacity",
+          "fixed inset-0 bg-black/60 backdrop-blur-sm z-[55] transition-opacity duration-200",
           isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
         )}
         onClick={onClose}
@@ -1132,25 +1499,27 @@ function PanelWrapper({
       <div
         className={cn(
           "fixed inset-y-0 right-0 z-[60] flex flex-col",
-          "w-full sm:w-[480px] md:w-[540px]",
-          "bg-background border-l",
-          "shadow-2xl",
-          "transform transition-transform duration-200",
+          "w-full sm:w-[500px] md:w-[560px]",
+          "bg-zinc-950 border-l border-zinc-800",
+          "shadow-2xl shadow-black/50",
+          "transform transition-transform duration-200 ease-out",
           isOpen ? "translate-x-0" : "translate-x-full"
         )}
       >
         {/* Panel header */}
-        <div className="flex items-center justify-between h-12 px-4 border-b flex-shrink-0">
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-primary" />
-            <span className="font-semibold text-sm">wit AI</span>
+        <div className="flex items-center justify-between h-12 px-4 border-b border-zinc-800 flex-shrink-0 bg-zinc-900/50">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
+              <Sparkles className="h-4 w-4 text-white" />
+            </div>
+            <span className="font-semibold text-sm text-zinc-100">wit AI</span>
             {repoName && (
-              <span className="text-xs text-muted-foreground">
-                · {owner}/{repoName}
+              <span className="text-xs text-zinc-500">
+                {owner}/{repoName}
               </span>
             )}
           </div>
-          <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8">
+          <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 text-zinc-400 hover:text-zinc-200">
             <PanelRightClose className="h-4 w-4" />
           </Button>
         </div>

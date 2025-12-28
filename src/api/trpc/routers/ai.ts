@@ -477,6 +477,127 @@ EXPLANATION:
     }),
 
   /**
+   * Generate a squash commit message from PR commits
+   * Summarizes all commits in a PR into a single, well-formatted commit message
+   */
+  summarizeForSquash: protectedProcedure
+    .input(z.object({
+      prId: z.string().uuid(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      // Check AI availability
+      if (!isAIAvailable()) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'AI features are not available. Please configure an AI provider.',
+        });
+      }
+
+      const pr = await prModel.findById(input.prId);
+      if (!pr) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Pull request not found',
+        });
+      }
+
+      const repo = await repoModel.findById(pr.repoId);
+      if (!repo) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Repository not found',
+        });
+      }
+
+      // Check if user has read access
+      const isOwner = repo.ownerId === ctx.user.id;
+      const hasAccess = isOwner || 
+        (await collaboratorModel.hasPermission(pr.repoId, ctx.user.id, 'read'));
+
+      if (!hasAccess) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have access to this repository',
+        });
+      }
+
+      // Resolve disk path
+      const diskPath = resolveDiskPath(repo.diskPath);
+
+      if (!exists(diskPath)) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Repository not found on disk',
+        });
+      }
+
+      // Get commits between base and head
+      const commits = getCommitsBetween(diskPath, pr.baseSha, pr.headSha);
+
+      if (commits.length === 0) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'No commits found in this pull request',
+        });
+      }
+
+      // Get the diff for context
+      const diffContent = getDiffBetweenRefs(diskPath, pr.baseSha, pr.headSha);
+
+      // Use the AI agent to summarize
+      try {
+        const agent = getTsgitAgent();
+        const commitList = commits.map((c, i) => `${i + 1}. ${c.message}`).join('\n');
+        
+        const prompt = `You are helping create a squash commit message for a pull request. Analyze the commits and diff to create a clear, concise commit message.
+
+## Pull Request
+- Title: ${pr.title}
+- Description: ${(pr as any).description || '(none)'}
+- Source branch: ${pr.sourceBranch}
+- Target branch: ${pr.targetBranch}
+
+## Commits (${commits.length} total)
+${commitList}
+
+## Diff Summary (truncated)
+\`\`\`diff
+${diffContent.slice(0, 8000)}
+\`\`\`
+
+## Instructions
+Generate a squash commit message following this format:
+1. **Title line**: A clear, concise summary (max 72 chars) that describes the overall change
+2. **Blank line**
+3. **Body**: 
+   - Briefly explain what changes were made and why
+   - Use bullet points for multiple changes
+   - Reference the PR number: (#${pr.number})
+   
+Keep it professional and informative. Focus on the "what" and "why", not the "how".
+
+Respond with ONLY the commit message, no additional commentary.`;
+
+        const response = await agent.generate(prompt);
+
+        const message = response.text?.trim() || `${pr.title} (#${pr.number})`;
+
+        return {
+          title: message.split('\n')[0] || pr.title,
+          body: message.split('\n').slice(2).join('\n').trim(),
+          fullMessage: message,
+          commitCount: commits.length,
+        };
+      } catch (error) {
+        console.error('[ai.summarizeForSquash] Error:', error);
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to generate squash commit message',
+        });
+      }
+    }),
+
+  /**
    * Chat with AI about the repository
    */
   chat: protectedProcedure

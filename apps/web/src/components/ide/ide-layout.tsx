@@ -2,6 +2,7 @@ import { useRef, useCallback, useEffect, useState } from 'react';
 import { useIDEStore } from '@/lib/ide-store';
 import { FileTabs } from './file-tabs';
 import { CodeEditor } from './code-editor';
+import { MarkdownPreview } from './markdown-preview';
 import { IDEFileTree } from './ide-file-tree';
 import { TerminalPanel } from './terminal-panel';
 import { PendingChangesPanel } from './pending-changes-panel';
@@ -464,14 +465,23 @@ export function IDELayout({ owner, repo, repoId, defaultRef }: IDELayoutProps) {
                 )}
                 <div className="flex-1 overflow-hidden">
                   {activeFile && (
-                    <CodeEditor
-                      key={activeFile.path}
-                      content={activeFile.content}
-                      language={activeFile.language}
-                      path={activeFile.path}
-                      onChange={(content) => updateFileContent(activeFile.path, content)}
-                      onSave={handleSave}
-                    />
+                    activeFile.language === 'markdown' ? (
+                      <MarkdownPreview
+                        key={activeFile.path}
+                        content={activeFile.content}
+                        path={activeFile.path}
+                        onChange={(content) => updateFileContent(activeFile.path, content)}
+                      />
+                    ) : (
+                      <CodeEditor
+                        key={activeFile.path}
+                        content={activeFile.content}
+                        language={activeFile.language}
+                        path={activeFile.path}
+                        onChange={(content) => updateFileContent(activeFile.path, content)}
+                        onSave={handleSave}
+                      />
+                    )
                   )}
                 </div>
               </>
