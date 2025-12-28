@@ -127,7 +127,7 @@ export function KanbanBoard({
         
         // Add to the new column
         if (movedIssue) {
-          newData[newStatus] = [...(newData[newStatus] || []), movedIssue];
+          newData[newStatus] = [...(newData[newStatus] || []), movedIssue] as typeof newData[typeof newStatus];
         }
         
         return newData;

@@ -52,8 +52,8 @@ export function LoginPage() {
       }
 
       // Redirect to user dashboard on success
-      if (result.data?.user?.username) {
-        navigate(`/${result.data.user.username}`);
+      if (result.data?.user?.name) {
+        navigate(`/${result.data.user.name}`);
       } else {
         navigate('/');
       }

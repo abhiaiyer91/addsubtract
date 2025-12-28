@@ -14,7 +14,6 @@ import { formatRelativeTime } from '@/lib/utils';
 export function OrgPage() {
   const { slug } = useParams<{ slug: string }>();
   const { data: session } = useSession();
-  const authenticated = !!session?.user;
 
   const { data: org, isLoading: orgLoading } = trpc.organizations.get.useQuery(
     { name: slug! },
@@ -55,7 +54,6 @@ export function OrgPage() {
 
   const isOwner = membership?.role === 'owner';
   const isAdmin = membership?.role === 'admin' || isOwner;
-  const isMember = membership?.isMember;
 
   return (
     <div className="space-y-8">

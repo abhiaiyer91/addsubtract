@@ -54,7 +54,7 @@ export function RepoSettingsPage() {
       setTimeout(() => setSaveSuccess(false), 3000);
       utils.repos.get.invalidate({ owner: owner!, repo: repo! });
       // If name changed, navigate to new URL
-      if (data.name !== repo) {
+      if (data && data.name !== repo) {
         navigate(`/${owner}/${data.name}/settings`);
       }
     },

@@ -95,16 +95,15 @@ export function IDELayout({ owner, repo, repoId, defaultRef }: IDELayoutProps) {
   const branches = branchesData || [];
 
   // Create branch mutation
-  // @ts-expect-error - createBranch exists on backend but types not regenerated
   const createBranch = trpc.repos.createBranch.useMutation({
-    onSuccess: (data: { name: string }) => {
+    onSuccess: (data) => {
       toastSuccess({ title: `Branch '${data.name}' created` });
       setShowCreateBranchDialog(false);
       setNewBranchName('');
       utils.repos.getBranches.invalidate({ owner, repo });
       setCurrentRef(data.name);
     },
-    onError: (error: Error) => {
+    onError: (error) => {
       toastError({ title: 'Failed to create branch', description: error.message });
     },
   });
@@ -127,7 +126,7 @@ export function IDELayout({ owner, repo, repoId, defaultRef }: IDELayoutProps) {
         toastSuccess({ title: 'File saved' });
       }
     },
-    onError: (error: Error) => {
+    onError: (error) => {
       toastError({ title: 'Failed to save', description: error.message });
     },
   });

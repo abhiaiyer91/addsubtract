@@ -1,7 +1,6 @@
 import { useState, useCallback, useMemo } from 'react';
 import { Plus, MessageSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { CommentThread } from './comment-thread';
 import { CommentForm } from './comment-form';

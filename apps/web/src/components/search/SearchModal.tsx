@@ -10,23 +10,18 @@ import {
   X,
   Clock,
   ArrowRight,
-  Hash,
   User,
   Sparkles,
-  Command,
   FileCode,
   Star,
   Lock,
-  GitBranch,
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import { trpc } from '@/lib/trpc';
 import { useSession } from '@/lib/auth-client';
 import { create } from 'zustand';
-import { isMac } from '@/lib/commands';
 
 // ============ STORE ============
 
@@ -133,10 +128,10 @@ export function SearchModal() {
   const debouncedQuery = useDebounce(query, 200);
   const { searches: recentSearches, addSearch, clearSearches } = useRecentSearches();
 
-  // Fetch repositories
+  // Fetch repositories - only when user is logged in
   const { data: repos, isLoading: reposLoading } = trpc.repos.list.useQuery(
-    undefined,
-    { enabled: isOpen, staleTime: 60000 }
+    { owner: session?.user?.name || '' },
+    { enabled: isOpen && !!session?.user?.name, staleTime: 60000 }
   );
 
   // Fetch search results when query changes
@@ -166,17 +161,18 @@ export function SearchModal() {
 
     if (!debouncedQuery || debouncedQuery.length < 2) {
       // Show quick access items when no query
-      if (repos && activeType === 'all') {
+      const ownerName = session?.user?.name || '';
+      if (repos && activeType === 'all' && ownerName) {
         repos.slice(0, 3).forEach(repo => {
           items.push({
             id: `repo-${repo.id}`,
             type: 'repository',
             title: repo.name,
-            subtitle: repo.owner,
+            subtitle: ownerName,
             description: repo.description || undefined,
-            url: `/${repo.owner}/${repo.name}`,
+            url: `/${ownerName}/${repo.name}`,
             metadata: {
-              owner: repo.owner,
+              owner: ownerName,
               isPrivate: repo.isPrivate,
             },
           });
@@ -200,12 +196,13 @@ export function SearchModal() {
     }
 
     // Filter local repos
-    if (repos && (activeType === 'all' || activeType === 'repos')) {
+    const ownerName = session?.user?.name || '';
+    if (repos && ownerName && (activeType === 'all' || activeType === 'repos')) {
       const matchingRepos = repos
         .filter(repo => 
           repo.name.toLowerCase().includes(lowerQuery) ||
           repo.description?.toLowerCase().includes(lowerQuery) ||
-          repo.owner.toLowerCase().includes(lowerQuery)
+          ownerName.toLowerCase().includes(lowerQuery)
         )
         .slice(0, activeType === 'repos' ? 10 : 5);
 
@@ -215,11 +212,11 @@ export function SearchModal() {
           items.push({
             id: `repo-${repo.id}`,
             type: 'repository',
-            title: `${repo.owner}/${repo.name}`,
+            title: `${ownerName}/${repo.name}`,
             description: repo.description || undefined,
-            url: `/${repo.owner}/${repo.name}`,
+            url: `/${ownerName}/${repo.name}`,
             metadata: {
-              owner: repo.owner,
+              owner: ownerName,
               isPrivate: repo.isPrivate,
             },
           });
@@ -274,7 +271,7 @@ export function SearchModal() {
     }
 
     return items;
-  }, [debouncedQuery, searchResults, repos, userIssues, userPrs, activeType]);
+  }, [debouncedQuery, searchResults, repos, userIssues, userPrs, activeType, session?.user?.name]);
 
   // Reset selection when results change
   useEffect(() => {

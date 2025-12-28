@@ -39,6 +39,7 @@ interface WorkflowTrigger {
   pull_request?: { branches?: string[]; types?: string[] };
   workflow_dispatch?: { inputs?: Record<string, any> };
   schedule?: Array<{ cron: string }>;
+  [key: string]: unknown;
 }
 
 interface WorkflowData {
@@ -173,7 +174,7 @@ export function WorkflowEditor() {
   };
 
   return (
-    <RepoLayout>
+    <RepoLayout owner={owner!} repo={repo!}>
       <div className="flex flex-col h-[calc(100vh-200px)]">
         <div className="flex items-center justify-between p-4 border-b">
           <div className="flex items-center gap-4">

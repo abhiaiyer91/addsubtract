@@ -36,12 +36,14 @@ import { formatRelativeTime } from '../lib/utils';
 import { useNavigate } from 'react-router-dom';
 
 // PR Card Component
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function PRCard({ pr }: { pr: any }) {
-  const stateIcon = {
+  const stateIcons: Record<string, React.ReactNode> = {
     open: <GitPullRequest className="h-4 w-4 text-green-500" />,
     closed: <XCircle className="h-4 w-4 text-red-500" />,
     merged: <GitMerge className="h-4 w-4 text-purple-500" />,
-  }[pr.state] || <GitPullRequest className="h-4 w-4" />;
+  };
+  const stateIcon = stateIcons[pr.state as string] || <GitPullRequest className="h-4 w-4" />;
 
   return (
     <Link 
@@ -61,16 +63,16 @@ function PRCard({ pr }: { pr: any }) {
           <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
             <span className="flex items-center gap-1">
               <User className="h-3 w-3" />
-              {pr.authorUsername}
+              {pr.authorUsername || pr.author?.username || 'Unknown'}
             </span>
             <span className="flex items-center gap-1">
               <Clock className="h-3 w-3" />
               {formatRelativeTime(pr.createdAt)}
             </span>
-            {pr.commentCount > 0 && (
+            {(pr.commentCount || pr.comments) > 0 && (
               <span className="flex items-center gap-1">
                 <MessageSquare className="h-3 w-3" />
-                {pr.commentCount}
+                {pr.commentCount || pr.comments}
               </span>
             )}
           </div>
@@ -326,7 +328,7 @@ export function InboxPage() {
     );
   }
 
-  const totalPrCount = (prSummary?.awaitingReview || 0) + (prSummary?.myOpenPrs || 0);
+  const totalPrCount = (prSummary?.awaitingReview || 0) + (prSummary?.myPrsOpen || 0);
   const totalIssueCount = (issueSummary?.assignedToMe || 0) + (issueSummary?.createdByMe || 0);
 
   return (
@@ -466,9 +468,9 @@ export function InboxPage() {
               <TabsTrigger value="mine" className="gap-2">
                 <GitPullRequest className="h-4 w-4" />
                 Your PRs
-                {prSummary?.myOpenPrs ? (
+                {prSummary?.myPrsOpen ? (
                   <Badge variant="secondary" className="ml-1">
-                    {prSummary.myOpenPrs}
+                    {prSummary.myPrsOpen}
                   </Badge>
                 ) : null}
               </TabsTrigger>

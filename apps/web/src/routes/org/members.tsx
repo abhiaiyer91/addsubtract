@@ -39,7 +39,7 @@ import { Loading } from '@/components/ui/loading';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useSession } from '@/lib/auth-client';
 import { trpc } from '@/lib/trpc';
-import { formatRelativeTime } from '@/lib/utils';
+
 
 const ROLE_LEVELS = [
   { value: 'member', label: 'Member', description: 'Can view repositories', icon: User },

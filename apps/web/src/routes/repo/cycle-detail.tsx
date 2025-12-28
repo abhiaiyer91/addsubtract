@@ -1,19 +1,14 @@
 import { useParams, Link } from 'react-router-dom';
 import {
-  RefreshCw,
   ArrowLeft,
   Plus,
   Calendar,
-  CheckCircle2,
-  Clock,
-  Target,
   TrendingUp,
   CircleDot,
   BarChart3,
   MoreHorizontal,
   Edit,
   Trash2,
-  ArrowRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -25,12 +20,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { RepoLayout } from './components/repo-layout';
 import { KanbanBoard } from '@/components/issue/kanban-board';
 import { useSession } from '@/lib/auth-client';
 import { trpc } from '@/lib/trpc';
-import { formatRelativeTime, cn } from '@/lib/utils';
 
 export function CycleDetailPage() {
   const { owner, repo, cycleId } = useParams<{ owner: string; repo: string; cycleId: string }>();
@@ -62,7 +55,7 @@ export function CycleDetailPage() {
   );
 
   // Fetch velocity for repo
-  const { data: velocityData } = trpc.cycles.getVelocity.useQuery(
+  const { data: _velocityData } = trpc.cycles.getVelocity.useQuery(
     { repoId: repoData?.repo.id!, cycleCount: 5 },
     { enabled: !!repoData?.repo.id }
   );
@@ -111,7 +104,7 @@ export function CycleDetailPage() {
   const timeProgressPercent = isCompleted ? 100 : Math.min(100, Math.round((daysElapsed / totalDays) * 100));
 
   const issueProgressPercent = progress
-    ? Math.round((progress.completed / Math.max(progress.total, 1)) * 100)
+    ? Math.round((progress.completedIssues / Math.max(progress.totalIssues, 1)) * 100)
     : 0;
 
   // Group issues by status for Kanban
@@ -207,12 +200,12 @@ export function CycleDetailPage() {
             <div className="text-sm text-muted-foreground mb-1">Velocity</div>
             <div className="flex items-end gap-2">
               <span className="text-2xl font-bold">
-                {velocity?.pointsCompleted || 0}
+                {progress?.completedEstimate || 0}
               </span>
               <span className="text-sm text-muted-foreground mb-0.5">pts</span>
             </div>
             <div className="text-xs text-muted-foreground mt-1">
-              {velocity?.issuesCompleted || 0} issues completed
+              {progress?.completedIssues || 0} issues completed
             </div>
           </div>
 
@@ -220,16 +213,16 @@ export function CycleDetailPage() {
             <div className="text-sm text-muted-foreground mb-1">Issues</div>
             <div className="flex items-center gap-4">
               <div className="text-center">
-                <div className="text-2xl font-bold text-green-500">{progress?.completed || 0}</div>
+                <div className="text-2xl font-bold text-green-500">{progress?.completedIssues || 0}</div>
                 <div className="text-xs text-muted-foreground">Done</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-yellow-500">{progress?.inProgress || 0}</div>
-                <div className="text-xs text-muted-foreground">In Progress</div>
+                <div className="text-2xl font-bold text-yellow-500">{progress?.totalIssues ? progress.totalIssues - progress.completedIssues : 0}</div>
+                <div className="text-xs text-muted-foreground">Remaining</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-blue-500">{progress?.todo || 0}</div>
-                <div className="text-xs text-muted-foreground">Todo</div>
+                <div className="text-2xl font-bold text-blue-500">{progress?.totalIssues || 0}</div>
+                <div className="text-xs text-muted-foreground">Total</div>
               </div>
             </div>
           </div>
@@ -257,7 +250,7 @@ export function CycleDetailPage() {
             <h2 className="text-lg font-semibold flex items-center gap-2">
               <CircleDot className="h-5 w-5" />
               Issues
-              <Badge variant="secondary">{progress?.total || 0}</Badge>
+              <Badge variant="secondary">{progress?.totalIssues || 0}</Badge>
             </h2>
             {authenticated && (
               <Link to={`/${owner}/${repo}/issues/new?cycle=${cycleId}`}>

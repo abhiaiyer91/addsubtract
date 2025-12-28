@@ -21,10 +21,12 @@ export function DiffPage({
   const fileRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   // Count comments per file
-  const commentCounts = (diffProps.comments || []).reduce((acc, comment) => {
-    acc[comment.path] = (acc[comment.path] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
+  const commentCounts: Record<string, number> = {};
+  if (diffProps.comments) {
+    for (const [path, comments] of Object.entries(diffProps.comments)) {
+      commentCounts[path] = comments.length;
+    }
+  }
 
   const fileInfos = files.map((file) => ({
     path: file.path,
@@ -159,7 +161,7 @@ function DiffViewerWithRefs({
         >
           <DiffViewer
             files={[file]}
-            comments={props.comments?.filter((c) => c.path === file.path)}
+            comments={props.comments ? { [file.path]: props.comments[file.path] || [] } : undefined}
             {...props}
           />
         </div>

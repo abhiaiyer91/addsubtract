@@ -30,11 +30,8 @@ export function QuickOpen({ isOpen, onClose, owner, repo, currentRef }: QuickOpe
   const [allFiles, setAllFiles] = useState<FileEntry[]>([]);
   const { openFile } = useIDEStore();
 
-  // Fetch file to open
-  const fetchFile = trpc.repos.getFile.useMutation();
-
-  // Recursively fetch all files
-  const fetchTree = trpc.repos.getTree.useMutation();
+  // Get utils to fetch file and tree
+  const utils = trpc.useUtils();
 
   // Load all files on open
   useEffect(() => {
@@ -42,7 +39,7 @@ export function QuickOpen({ isOpen, onClose, owner, repo, currentRef }: QuickOpe
 
     const loadFiles = async (path: string = ''): Promise<FileEntry[]> => {
       try {
-        const result = await fetchTree.mutateAsync({ owner, repo, ref: currentRef, path });
+        const result = await utils.repos.getTree.fetch({ owner, repo, ref: currentRef, path });
         const entries = result.entries || [];
         
         let files: FileEntry[] = [];
@@ -65,7 +62,7 @@ export function QuickOpen({ isOpen, onClose, owner, repo, currentRef }: QuickOpe
     };
 
     loadFiles().then(setAllFiles);
-  }, [isOpen, owner, repo, currentRef]);
+  }, [isOpen, owner, repo, currentRef, utils]);
 
   // Filter files based on query
   const filteredFiles = useMemo(() => {
@@ -120,7 +117,7 @@ export function QuickOpen({ isOpen, onClose, owner, repo, currentRef }: QuickOpe
 
   const handleSelect = useCallback(async (file: FileEntry) => {
     try {
-      const result = await fetchFile.mutateAsync({
+      const result = await utils.repos.getFile.fetch({
         owner,
         repo,
         ref: currentRef,
@@ -135,7 +132,7 @@ export function QuickOpen({ isOpen, onClose, owner, repo, currentRef }: QuickOpe
     } catch {
       // Handle error
     }
-  }, [owner, repo, currentRef, fetchFile, openFile, onClose]);
+  }, [owner, repo, currentRef, utils, openFile, onClose]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     switch (e.key) {
@@ -183,7 +180,7 @@ export function QuickOpen({ isOpen, onClose, owner, repo, currentRef }: QuickOpe
 
         {/* Results */}
         <ScrollArea className="max-h-80">
-          {fetchTree.isPending ? (
+          {allFiles.length === 0 && !query ? (
             <div className="p-4 text-center text-sm text-muted-foreground">
               Loading files...
             </div>

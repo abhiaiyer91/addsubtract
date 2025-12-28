@@ -242,10 +242,10 @@ export function ProjectDetailPage() {
           <div className="p-4 border rounded-lg">
             <div className="text-sm text-muted-foreground mb-1">Total Issues</div>
             <div className="flex items-end gap-2">
-              <span className="text-2xl font-bold">{progress?.total || 0}</span>
+              <span className="text-2xl font-bold">{progress?.totalIssues || 0}</span>
             </div>
             <div className="text-xs text-muted-foreground mt-1">
-              {progress?.completed || 0} completed, {progress?.inProgress || 0} in progress
+              {progress?.completedIssues || 0} completed, {progress?.totalIssues ? progress.totalIssues - progress.completedIssues : 0} remaining
             </div>
           </div>
 
@@ -269,7 +269,7 @@ export function ProjectDetailPage() {
             <div className="text-sm text-muted-foreground mb-1">Team</div>
             <div className="flex items-center gap-2">
               <div className="flex -space-x-2">
-                {members?.slice(0, 5).map((member: any, i: number) => (
+                {members?.slice(0, 5).map((member: any) => (
                   <div
                     key={member.userId}
                     className="w-8 h-8 rounded-full bg-primary/20 border-2 border-background flex items-center justify-center text-xs font-medium"
@@ -295,7 +295,7 @@ export function ProjectDetailPage() {
               <CircleDot className="h-4 w-4" />
               Issues
               <Badge variant="secondary" className="ml-1 h-5">
-                {progress?.total || 0}
+                {progress?.totalIssues || 0}
               </Badge>
             </TabsTrigger>
             <TabsTrigger value="updates" className="gap-2">

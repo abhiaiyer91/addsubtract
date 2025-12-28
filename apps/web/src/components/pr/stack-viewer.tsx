@@ -32,10 +32,10 @@ interface StackBranch {
     };
     reviewStatus?: 'approved' | 'changes_requested' | 'pending';
     checksStatus?: 'passing' | 'failing' | 'pending';
-  };
+  } | null;
 }
 
-interface StackInfo {
+export interface StackInfo {
   id: string;
   name: string;
   baseBranch: string;
