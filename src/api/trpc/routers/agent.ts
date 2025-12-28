@@ -34,7 +34,9 @@ async function getAgentForMode(mode: AgentMode, context: AgentContext, model: st
  */
 function getRepoDiskPath(ownerUsername: string, repoName: string): string {
   const reposDir = process.env.REPOS_DIR || './repos';
-  return path.join(reposDir, ownerUsername, `${repoName}.git`);
+  const diskPath = path.join(reposDir, ownerUsername, `${repoName}.git`);
+  console.log('[Agent] getRepoDiskPath:', { ownerUsername, repoName, reposDir, diskPath });
+  return diskPath;
 }
 
 // Available models configuration
@@ -132,7 +134,7 @@ export const agentRouter = router({
   getModes: publicProcedure.query(() => {
     return {
       modes: Object.values(AGENT_MODES),
-      defaultMode: 'questions' as AgentMode,
+      defaultMode: 'pm' as AgentMode,
     };
   }),
 
@@ -145,7 +147,7 @@ export const agentRouter = router({
         repoId: z.string().uuid().optional(),
         branch: z.string().optional(),
         title: z.string().optional(),
-        mode: z.enum(['questions', 'pm', 'code']).default('questions'),
+        mode: z.enum(['pm', 'code']).default('pm'),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -201,6 +203,7 @@ export const agentRouter = router({
       z.object({
         repoId: z.string().uuid().optional(),
         status: z.enum(['active', 'completed', 'cancelled']).optional(),
+        mode: z.enum(['pm', 'code']).optional(),
         limit: z.number().min(1).max(100).default(20),
         offset: z.number().min(0).default(0),
       })
@@ -219,6 +222,7 @@ export const agentRouter = router({
         title: z.string().optional(),
         status: z.enum(['active', 'completed', 'cancelled']).optional(),
         branch: z.string().optional(),
+        mode: z.enum(['pm', 'code']).optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -408,7 +412,8 @@ export const agentRouter = router({
               repoName: repo.name,
               repoPath: getRepoDiskPath(ownerUsername, repo.name),
               userId: ctx.user.id,
-              mode: (session.mode || 'questions') as AgentMode,
+              // Treat legacy 'questions' mode as 'pm'
+              mode: (session.mode === 'questions' ? 'pm' : session.mode || 'pm') as AgentMode,
             };
           }
         }
@@ -437,7 +442,8 @@ export const agentRouter = router({
       }
 
       // Get agent based on mode (or fallback to general agent)
-      const sessionMode = (session.mode || 'questions') as AgentMode;
+      // Treat legacy 'questions' mode as 'pm'
+      const sessionMode = (session.mode === 'questions' ? 'pm' : session.mode || 'pm') as AgentMode;
       const modelId = provider === 'anthropic' ? 'anthropic/claude-opus-4-5' : 'openai/gpt-5.2';
       
       // Use mode-based agent if we have a repo context, otherwise fallback to general agent

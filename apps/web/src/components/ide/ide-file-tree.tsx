@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   ChevronRight,
   ChevronDown,
@@ -77,15 +77,17 @@ function TreeNode({ entry, owner, repo, currentRef, level, onCreateFile }: TreeN
   );
 
   // Fetch file content when clicking a file
-  const fetchFile = trpc.repos.getFile.useMutation();
+  const utils = trpc.useUtils();
+  const [isLoadingFile, setIsLoadingFile] = useState(false);
 
   const handleClick = async () => {
     if (entry.type === 'directory') {
       setIsExpanded(!isExpanded);
     } else {
       // Open file in editor
+      setIsLoadingFile(true);
       try {
-        const result = await fetchFile.mutateAsync({
+        const result = await utils.repos.getFile.fetch({
           owner,
           repo,
           ref: currentRef,
@@ -95,8 +97,10 @@ function TreeNode({ entry, owner, repo, currentRef, level, onCreateFile }: TreeN
           const language = getLanguageFromFilename(entry.name);
           openFile(entry.path, result.content, language);
         }
-      } catch {
-        // Handle error (binary file, etc.)
+      } catch (error) {
+        console.error('Failed to load file:', error);
+      } finally {
+        setIsLoadingFile(false);
       }
     }
   };
@@ -145,7 +149,7 @@ function TreeNode({ entry, owner, repo, currentRef, level, onCreateFile }: TreeN
         )}
         <span className="truncate flex-1">{entry.name}</span>
         
-        {fetchFile.isPending && (
+        {isLoadingFile && (
           <RefreshCw className="h-3 w-3 animate-spin" />
         )}
         
@@ -215,14 +219,28 @@ export function IDEFileTree({ owner, repo, currentRef }: IDEFileTreeProps) {
   const [showNewFileDialog, setShowNewFileDialog] = useState(false);
   const [newFilePath, setNewFilePath] = useState('');
   const [newFileParent, setNewFileParent] = useState('');
-  const { openFile } = useIDEStore();
+  const { openFile, setFileTreeRefreshCallback } = useIDEStore();
 
+  const utils = trpc.useUtils();
   const { data: rootTree, isLoading, refetch } = trpc.repos.getTree.useQuery({
     owner,
     repo,
     ref: currentRef,
     path: '',
   });
+
+  // Manual refresh that invalidates cache first
+  const handleRefresh = useCallback(async () => {
+    // Invalidate the cache first to force a fresh fetch
+    await utils.repos.getTree.invalidate({ owner, repo, ref: currentRef, path: '' });
+    refetch();
+  }, [utils, owner, repo, currentRef, refetch]);
+
+  // Register refetch callback for agent file operations
+  useEffect(() => {
+    setFileTreeRefreshCallback(() => handleRefresh());
+    return () => setFileTreeRefreshCallback(null);
+  }, [handleRefresh, setFileTreeRefreshCallback]);
 
   const sortedEntries = rootTree?.entries
     ? [...rootTree.entries].sort((a, b) => {
@@ -279,7 +297,7 @@ export function IDEFileTree({ owner, repo, currentRef }: IDEFileTreeProps) {
                   variant="ghost"
                   size="icon-sm"
                   className="h-6 w-6"
-                  onClick={() => refetch()}
+                  onClick={handleRefresh}
                 >
                   <RefreshCw className={cn('h-3 w-3', isLoading && 'animate-spin')} />
                 </Button>

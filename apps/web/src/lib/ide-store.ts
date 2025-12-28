@@ -57,6 +57,10 @@ interface IDEState {
 
   // Agent tool results
   processAgentToolResult: (result: AgentToolResult) => void;
+  
+  // File tree refresh callback (set by IDE layout)
+  onFileTreeRefreshNeeded: (() => void) | null;
+  setFileTreeRefreshCallback: (callback: (() => void) | null) => void;
 
   // Agent changes
   pendingChanges: PendingChange[];
@@ -178,17 +182,23 @@ export const useIDEStore = create<IDEState>()(
         });
       },
 
+      // File tree refresh callback
+      onFileTreeRefreshNeeded: null,
+      setFileTreeRefreshCallback: (callback) => set({ onFileTreeRefreshNeeded: callback }),
+
       // Process agent tool results
       processAgentToolResult: (result) => {
-        const { openOrUpdateFile, addPendingChange, addTerminalOutput, setShowTerminal } = get();
+        const { openOrUpdateFile, addPendingChange, addTerminalOutput, setShowTerminal, onFileTreeRefreshNeeded } = get();
+
+        // Normalize tool names (handle both wit-* and camelCase variations)
+        const isWriteTool = ['wit-write-file', 'writeFile', 'write-file'].includes(result.toolName);
+        const isEditTool = ['wit-edit-file', 'editFile', 'edit-file'].includes(result.toolName);
+        const isDeleteTool = ['wit-delete-file', 'deleteFile', 'delete-file'].includes(result.toolName);
+        const isReadTool = ['wit-read-file', 'readFile', 'read-file'].includes(result.toolName);
+        const isCommandTool = ['wit-run-command', 'runCommand', 'run-command'].includes(result.toolName);
 
         // Handle file write/edit tools
-        if (
-          (result.toolName === 'wit-write-file' || result.toolName === 'wit-edit-file') &&
-          result.success &&
-          result.filePath &&
-          result.content
-        ) {
+        if ((isWriteTool || isEditTool) && result.success && result.filePath && result.content) {
           // Determine language from file extension
           const ext = result.filePath.split('.').pop()?.toLowerCase() || '';
           const langMap: Record<string, string> = {
@@ -202,17 +212,27 @@ export const useIDEStore = create<IDEState>()(
           // Add as pending change
           addPendingChange({
             path: result.filePath,
-            type: result.toolName === 'wit-write-file' ? 'create' : 'edit',
+            type: isWriteTool ? 'create' : 'edit',
             content: result.content,
             description: result.message,
           });
 
           // Auto-open the file in the editor
           openOrUpdateFile(result.filePath, result.content, language);
+          
+          // Trigger file tree refresh for file changes
+          if (onFileTreeRefreshNeeded) {
+            onFileTreeRefreshNeeded();
+          }
+        }
+
+        // Handle file delete
+        if (isDeleteTool && result.success && onFileTreeRefreshNeeded) {
+          onFileTreeRefreshNeeded();
         }
 
         // Handle command execution
-        if (result.toolName === 'wit-run-command' && result.command) {
+        if (isCommandTool && result.command) {
           addTerminalOutput({
             command: result.command,
             output: result.output || '',
@@ -223,7 +243,7 @@ export const useIDEStore = create<IDEState>()(
         }
 
         // Handle file read (auto-open in editor)
-        if (result.toolName === 'wit-read-file' && result.success && result.filePath && result.content) {
+        if (isReadTool && result.success && result.filePath && result.content) {
           const ext = result.filePath.split('.').pop()?.toLowerCase() || '';
           const langMap: Record<string, string> = {
             ts: 'typescript', tsx: 'typescript', js: 'javascript', jsx: 'javascript',

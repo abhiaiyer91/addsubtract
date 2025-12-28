@@ -14,10 +14,13 @@ import {
   PanelLeft,
   PanelBottom,
   FileCode2,
-  Sparkles,
   Search,
   Save,
   Keyboard,
+  GitBranch,
+  Check,
+  Plus,
+  Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -33,15 +36,26 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 interface IDELayoutProps {
   owner: string;
   repo: string;
   repoId: string;
-  currentRef: string;
+  defaultRef: string;
 }
 
-export function IDELayout({ owner, repo, repoId, currentRef }: IDELayoutProps) {
+export function IDELayout({ owner, repo, repoId, defaultRef }: IDELayoutProps) {
+  const [currentRef, setCurrentRef] = useState(defaultRef);
   const {
     openFiles,
     activeFilePath,
@@ -63,14 +77,46 @@ export function IDELayout({ owner, repo, repoId, currentRef }: IDELayoutProps) {
   } = useIDEStore();
 
   const [quickOpenVisible, setQuickOpenVisible] = useState(false);
+  const [showCreateBranchDialog, setShowCreateBranchDialog] = useState(false);
+  const [newBranchName, setNewBranchName] = useState('');
   const sidebarRef = useRef<HTMLDivElement>(null);
   const chatRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<HTMLDivElement>(null);
   const isResizing = useRef<'sidebar' | 'chat' | 'terminal' | null>(null);
+  const utils = trpc.useUtils();
 
   const activeFile = openFiles.find((f) => f.path === activeFilePath);
   const pendingCount = pendingChanges.filter((c) => c.status === 'pending').length;
   const dirtyFilesCount = openFiles.filter((f) => f.isDirty).length;
+
+  // Fetch branches
+  const { data: branchesData } = trpc.repos.getBranches.useQuery({ owner, repo });
+  const branches = branchesData || [];
+
+  // Create branch mutation
+  // @ts-expect-error - createBranch exists on backend but types not regenerated
+  const createBranch = trpc.repos.createBranch.useMutation({
+    onSuccess: (data: { name: string }) => {
+      toastSuccess({ title: `Branch '${data.name}' created` });
+      setShowCreateBranchDialog(false);
+      setNewBranchName('');
+      utils.repos.getBranches.invalidate({ owner, repo });
+      setCurrentRef(data.name);
+    },
+    onError: (error: Error) => {
+      toastError({ title: 'Failed to create branch', description: error.message });
+    },
+  });
+
+  const handleCreateBranch = () => {
+    if (!newBranchName.trim()) return;
+    createBranch.mutate({
+      owner,
+      repo,
+      name: newBranchName.trim(),
+      fromRef: currentRef,
+    });
+  };
 
   // Save file mutation
   const saveFile = trpc.repos.updateFile.useMutation({
@@ -242,6 +288,40 @@ export function IDELayout({ owner, repo, repoId, currentRef }: IDELayoutProps) {
           <span className="text-sm font-medium text-muted-foreground">
             {owner}/{repo}
           </span>
+
+          {/* Branch selector */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs">
+                <GitBranch className="h-3 w-3" />
+                <span className="max-w-[100px] truncate">{currentRef}</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-48">
+              <div className="max-h-64 overflow-y-auto">
+                {branches.length === 0 ? (
+                  <DropdownMenuItem disabled>No branches</DropdownMenuItem>
+                ) : (
+                  branches.map((branch: { name: string }) => (
+                    <DropdownMenuItem
+                      key={branch.name}
+                      onClick={() => setCurrentRef(branch.name)}
+                      className="gap-2"
+                    >
+                      {branch.name === currentRef && <Check className="h-3 w-3" />}
+                      {branch.name !== currentRef && <span className="w-3" />}
+                      <span className="truncate">{branch.name}</span>
+                    </DropdownMenuItem>
+                  ))
+                )}
+              </div>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setShowCreateBranchDialog(true)} className="gap-2">
+                <Plus className="h-3 w-3" />
+                Create new branch
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           {/* Quick open button */}
           <Button
@@ -451,21 +531,15 @@ export function IDELayout({ owner, repo, repoId, currentRef }: IDELayoutProps) {
           )}
 
           {/* Agent Chat */}
-          <div className="flex-1 flex flex-col overflow-hidden">
-            <div className="flex items-center gap-2 h-10 px-3 border-b bg-muted/20">
-              <Sparkles className="h-4 w-4 text-primary" />
-              <span className="text-sm font-medium">Agent</span>
-            </div>
-            <div className="flex-1 relative">
-              <AgentPanel
-                isOpen={true}
-                onClose={() => {}}
-                repoId={repoId}
-                repoName={repo}
-                owner={owner}
-                embedded
-              />
-            </div>
+          <div className="flex-1 flex flex-col min-h-0">
+            <AgentPanel
+              isOpen={true}
+              onClose={() => {}}
+              repoId={repoId}
+              repoName={repo}
+              owner={owner}
+              embedded
+            />
           </div>
         </div>
       </div>
@@ -478,6 +552,52 @@ export function IDELayout({ owner, repo, repoId, currentRef }: IDELayoutProps) {
         repo={repo}
         currentRef={currentRef}
       />
+
+      {/* Create Branch Dialog */}
+      <Dialog open={showCreateBranchDialog} onOpenChange={setShowCreateBranchDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create a new branch</DialogTitle>
+            <DialogDescription>
+              Create a new branch from <code className="bg-muted px-1 rounded">{currentRef}</code>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="ide-branch-name">Branch name</Label>
+              <Input
+                id="ide-branch-name"
+                placeholder="feature/my-feature"
+                value={newBranchName}
+                onChange={(e) => setNewBranchName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleCreateBranch();
+                  }
+                }}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCreateBranchDialog(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleCreateBranch} 
+              disabled={!newBranchName.trim() || createBranch.isPending}
+            >
+              {createBranch.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                'Create branch'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

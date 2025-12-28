@@ -66,12 +66,13 @@ export const agentSessionModel = {
     options: {
       repoId?: string;
       status?: 'active' | 'completed' | 'cancelled';
+      mode?: 'pm' | 'code';
       limit?: number;
       offset?: number;
     } = {}
   ): Promise<AgentSession[]> {
     const db = getDb();
-    const { repoId, status, limit = 50, offset = 0 } = options;
+    const { repoId, status, mode, limit = 50, offset = 0 } = options;
 
     const conditions = [eq(agentSessions.userId, userId)];
     
@@ -81,6 +82,10 @@ export const agentSessionModel = {
     
     if (status) {
       conditions.push(eq(agentSessions.status, status));
+    }
+    
+    if (mode) {
+      conditions.push(eq(agentSessions.mode, mode));
     }
 
     return db

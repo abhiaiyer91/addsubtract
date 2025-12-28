@@ -31,6 +31,8 @@ function getRepoFromDisk(diskPath: string): BareRepository | null {
     ? path.join(reposDir, relativePath)
     : path.join(process.cwd(), reposDir, relativePath);
   
+  console.log('[getRepoFromDisk] diskPath:', diskPath, 'reposDir:', reposDir, 'cwd:', process.cwd(), 'absolutePath:', absolutePath, 'exists:', exists(absolutePath));
+  
   if (!exists(absolutePath) || !exists(path.join(absolutePath, 'objects'))) {
     return null;
   }
@@ -1005,6 +1007,85 @@ export const reposRouter = router({
       } catch (error) {
         console.error('[repos.getBranches] Error:', error);
         return [];
+      }
+    }),
+
+  /**
+   * Create a new branch in a repository
+   */
+  createBranch: protectedProcedure
+    .input(
+      z.object({
+        owner: z.string(),
+        repo: z.string(),
+        name: z.string().min(1).max(255).regex(/^[a-zA-Z0-9._\/-]+$/, 'Invalid branch name'),
+        fromRef: z.string().default('HEAD'),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const result = await repoModel.findByPath(input.owner, input.repo);
+
+      if (!result) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Repository not found',
+        });
+      }
+
+      // Check write access
+      const isOwner = result.repo.ownerId === ctx.user.id;
+      const hasWriteAccess = isOwner || (await collaboratorModel.hasPermission(result.repo.id, ctx.user.id, 'write'));
+
+      if (!hasWriteAccess) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have write access to this repository',
+        });
+      }
+
+      // Get the bare repository
+      const bareRepo = getRepoFromDisk(result.repo.diskPath);
+      if (!bareRepo) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Repository not found on disk',
+        });
+      }
+
+      try {
+        // Check if branch already exists
+        const existingBranches = bareRepo.refs.listBranches();
+        if (existingBranches.includes(input.name)) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: `Branch '${input.name}' already exists`,
+          });
+        }
+
+        // Resolve the source ref to get the commit hash
+        const commitHash = bareRepo.refs.resolve(input.fromRef);
+        if (!commitHash) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: `Cannot create branch: ref '${input.fromRef}' not found`,
+          });
+        }
+
+        // Create the branch
+        bareRepo.refs.createBranch(input.name, commitHash);
+
+        return {
+          name: input.name,
+          sha: commitHash,
+          fromRef: input.fromRef,
+        };
+      } catch (error) {
+        if (error instanceof TRPCError) throw error;
+        console.error('[repos.createBranch] Error:', error);
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: error instanceof Error ? error.message : 'Failed to create branch',
+        });
       }
     }),
 

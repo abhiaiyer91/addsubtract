@@ -21,9 +21,22 @@ export function useAgentTools() {
       if (!toolCalls || !isIDEMode) return;
 
       for (const call of toolCalls) {
-        // Each tool call has a name and result
-        const toolName = call.toolName || call.name || '';
-        const result = call.result || call.output || {};
+        // Handle different tool call formats from different agents
+        // Format 1: { toolName, result } - from code agent
+        // Format 2: { payload: { toolName, args }, result } - from mastra
+        // Format 3: { type: 'tool-call', payload: { toolName, args } } - event format
+        
+        let toolName = call.toolName || call.name || '';
+        let result = call.result || call.output || {};
+        
+        // Handle payload wrapper format
+        if (call.payload) {
+          toolName = call.payload.toolName || toolName;
+          // Args might contain the result data
+          if (call.payload.args) {
+            result = { ...result, ...call.payload.args };
+          }
+        }
 
         const agentResult: AgentToolResult = {
           toolName,

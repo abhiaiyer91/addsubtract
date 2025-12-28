@@ -93,8 +93,10 @@ export interface CodeReviewIssue {
 
 /**
  * Agent modes determine what tools and capabilities are available
+ * - pm: Ask questions, create issues, PRs, manage projects
+ * - code: Write/edit files, create branches, commit changes
  */
-export type AgentMode = 'questions' | 'pm' | 'code';
+export type AgentMode = 'pm' | 'code';
 
 /**
  * Agent mode configuration
@@ -110,16 +112,10 @@ export interface AgentModeConfig {
  * Available agent modes
  */
 export const AGENT_MODES: Record<AgentMode, AgentModeConfig> = {
-  questions: {
-    id: 'questions',
-    name: 'Questions',
-    description: 'Ask questions about the codebase, get explanations and help understanding code',
-    icon: 'help-circle',
-  },
   pm: {
     id: 'pm',
     name: 'PM',
-    description: 'Create and manage issues, pull requests, projects, and cycles',
+    description: 'Ask questions, create issues, PRs, and manage projects',
     icon: 'clipboard-list',
   },
   code: {

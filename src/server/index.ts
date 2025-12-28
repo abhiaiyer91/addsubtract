@@ -25,7 +25,6 @@ import { createCycleRoutes } from './routes/cycles';
 import { RepoManager } from './storage/repos';
 import { syncReposToDatabase } from './storage/sync';
 import { appRouter, createContext } from '../api/trpc';
-import * as path from 'path';
 import * as fs from 'fs';
 import { initDatabase, healthCheck as dbHealthCheck, isConnected as isDbConnected } from '../db';
 import { SSHServer, generateHostKey, SSHServerOptions } from './ssh';

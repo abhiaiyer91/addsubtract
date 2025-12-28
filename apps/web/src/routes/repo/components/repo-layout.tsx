@@ -235,7 +235,7 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
           owner={ownerUsername}
           repo={repoInfo.name}
           repoId={repoInfo.id}
-          currentRef={repoInfo.defaultBranch || 'main'}
+          defaultRef={repoInfo.defaultBranch || 'main'}
         />
         {/* Floating exit button */}
         <Button

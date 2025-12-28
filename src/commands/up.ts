@@ -296,7 +296,8 @@ async function startServer(options: UpOptions): Promise<void> {
   const dbUrl = process.env.DATABASE_URL || 
     `postgresql://wit:wit@localhost:${options.dbPort}/wit`;
 
-  const reposDir = path.join(options.dataDir, 'repos');
+  // Use REPOS_DIR from env if set, otherwise use dataDir/repos
+  const reposDir = process.env.REPOS_DIR || path.join(options.dataDir, 'repos');
   
   // Ensure log directory exists and clear old logs
   if (!fs.existsSync(LOG_DIR)) {
