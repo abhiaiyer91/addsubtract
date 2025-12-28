@@ -202,8 +202,20 @@ const searchCodebaseStep = createStep({
     
     const relatedFiles: Array<{ path: string; relevance: 'high' | 'medium' | 'low'; reason: string }> = [];
     
+    // Check if repo path exists and is accessible
+    if (!inputData.repoPath || !exists(inputData.repoPath)) {
+      console.log(`[Issue Triage] Repo path not accessible: ${inputData.repoPath}, skipping codebase search`);
+      return { relatedFiles };
+    }
+    
     // Get all files in the repo
-    const allFiles = findFilesInRepo(inputData.repoPath);
+    let allFiles: string[] = [];
+    try {
+      allFiles = findFilesInRepo(inputData.repoPath);
+    } catch (error) {
+      console.log(`[Issue Triage] Could not list repo files: ${error}, skipping codebase search`);
+      return { relatedFiles };
+    }
     
     // Add mentioned files with high relevance
     for (const file of inputData.mentionedFiles) {
