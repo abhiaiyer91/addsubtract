@@ -1,0 +1,313 @@
+---
+title: Code Review
+description: "AI-powered code review before pushing"
+---
+
+Review your code changes before pushing using AI-powered analysis. Powered by [CodeRabbit](https://coderabbit.ai), `wit review` catches issues before they hit the remote repository.
+
+## Overview
+
+The `wit review` command analyzes your changes and provides AI-powered feedback, helping you catch bugs, security issues, and code quality problems before they reach code review.
+
+```bash
+wit review [options]
+```
+
+## Quick Start
+
+```bash
+# Review all uncommitted changes
+wit review
+
+# Review only staged changes
+wit review --staged
+
+# Review branch changes
+wit review --branch
+```
+
+## Options
+
+| Option | Description |
+|--------|-------------|
+| `--staged`, `-s` | Review only staged changes |
+| `--branch`, `-b` | Review all changes since branching from main |
+| `--commits <range>` | Review specific commit range |
+| `--base <branch>` | Compare against specific branch (default: main) |
+| `--json` | Output as JSON |
+| `--verbose`, `-v` | Show detailed output |
+| `--strict` | Exit with error if critical/high issues found |
+| `--configure` | Configure CodeRabbit API key |
+| `--status` | Show configuration status |
+
+---
+
+## Review Modes
+
+### Uncommitted Changes
+
+Review all changes in your working directory (staged and unstaged).
+
+```bash
+wit review
+```
+
+---
+
+### Staged Changes
+
+Review only what's staged for commit. Useful as a pre-commit check.
+
+```bash
+wit review --staged
+```
+
+---
+
+### Branch Changes
+
+Review all changes since branching from the base branch.
+
+```bash
+# Review against main (default)
+wit review --branch
+
+# Review against a specific branch
+wit review --branch --base develop
+```
+
+---
+
+### Commit Range
+
+Review specific commits.
+
+```bash
+# Review last 3 commits
+wit review --commits HEAD~3..
+
+# Review commits between branches
+wit review --commits main..HEAD
+
+# Review a specific commit
+wit review --commits abc123
+```
+
+---
+
+## Example Output
+
+```
+🐰 CodeRabbit Review
+   Reviewing: branch feature/auth vs main
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📊 Summary
+   Files changed: 5
+   Additions: 156
+   Deletions: 23
+
+🔍 Issues Found: 3
+
+🔴 HIGH: SQL Injection Risk
+   src/db/queries.ts:42
+   
+   The query string is constructed using string concatenation
+   which could allow SQL injection attacks.
+   
+   Suggestion: Use parameterized queries instead.
+   
+   - const query = `SELECT * FROM users WHERE id = ${id}`;
+   + const query = 'SELECT * FROM users WHERE id = ?';
+   + db.query(query, [id]);
+
+🟡 MEDIUM: Missing Error Handling
+   src/api/handler.ts:28
+   
+   This async function doesn't have error handling.
+   Consider wrapping in try/catch.
+
+🟢 LOW: Console.log Statement
+   src/utils/debug.ts:15
+   
+   Debug console.log statement should be removed before merge.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✓ Review complete
+  1 high, 1 medium, 1 low issue(s) found
+```
+
+---
+
+## CI Integration
+
+Use `--strict` mode to fail builds when issues are found.
+
+### Pre-push Hook
+
+```bash
+#!/bin/sh
+# .wit/hooks/pre-push
+
+wit review --branch --strict
+```
+
+### CI Pipeline
+
+```yaml
+# .wit/workflows/ci.yml
+name: Code Review
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: AI Code Review
+        run: wit review --branch --strict
+        env:
+          CODERABBIT_API_KEY: ${{ secrets.CODERABBIT_API_KEY }}
+```
+
+---
+
+## Configuration
+
+### Setup CodeRabbit
+
+1. Get an API key from [coderabbit.ai](https://coderabbit.ai)
+2. Configure it:
+
+```bash
+wit review --configure
+```
+
+Or set the environment variable:
+
+```bash
+export CODERABBIT_API_KEY=your-api-key
+```
+
+### Check Status
+
+```bash
+wit review --status
+```
+
+```
+🐰 CodeRabbit Status
+
+API Key:   ✓ Configured
+           cr_abc1...xyz9
+CLI:       ✓ Installed
+           Version: 1.2.3
+
+Ready to review!
+Try: wit review
+```
+
+---
+
+## JSON Output
+
+Get structured output for programmatic use.
+
+```bash
+wit review --json
+```
+
+```json
+{
+  "success": true,
+  "summary": {
+    "filesChanged": 5,
+    "additions": 156,
+    "deletions": 23
+  },
+  "issues": [
+    {
+      "severity": "high",
+      "type": "security",
+      "file": "src/db/queries.ts",
+      "line": 42,
+      "message": "SQL Injection Risk",
+      "description": "The query string is constructed...",
+      "suggestion": "Use parameterized queries..."
+    }
+  ]
+}
+```
+
+---
+
+## Workflow Examples
+
+### Pre-commit Workflow
+
+```bash
+# Make changes
+vim src/feature.ts
+
+# Stage changes
+wit add src/feature.ts
+
+# Review before committing
+wit review --staged
+
+# If issues found, fix them
+vim src/feature.ts
+
+# Review again
+wit review --staged
+
+# Commit when clean
+wit commit -m "Add feature"
+```
+
+### Pre-push Workflow
+
+```bash
+# Before pushing a feature branch
+wit review --branch --strict
+
+# If clean, push
+wit push
+```
+
+### Pull Request Workflow
+
+```bash
+# Create PR
+wit pr create -t "Add feature"
+
+# Get AI review on the PR
+wit pr review 42
+```
+
+---
+
+## Issue Severity Levels
+
+| Level | Description | Action |
+|-------|-------------|--------|
+| 🔴 **Critical** | Security vulnerabilities, data loss risks | Must fix before merge |
+| 🔴 **High** | Bugs, significant logic errors | Should fix before merge |
+| 🟡 **Medium** | Code quality, maintainability | Consider fixing |
+| 🟢 **Low** | Style, minor improvements | Optional |
+
+---
+
+## Related Documentation
+
+- [AI Features](/features/ai-powered) - AI-powered capabilities
+- [PR Command](/commands/pr) - PR management including PR reviews
+- [Hooks](/features/hooks) - Git hooks for automation

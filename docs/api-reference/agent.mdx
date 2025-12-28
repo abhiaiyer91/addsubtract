@@ -1,0 +1,444 @@
+---
+title: Agent API
+description: "API reference for the AI coding agent"
+---
+
+The Agent API provides endpoints for interacting with wit's AI coding assistant. The agent can answer questions about code, implement features, and make changes to your repository.
+
+## Overview
+
+All agent endpoints are available through the tRPC API at `/trpc/agent.*`.
+
+The agent supports multiple modes:
+- **PM Mode**: Product management, planning, and documentation
+- **Code Mode**: Implementation, debugging, and code review
+
+## Status
+
+Check AI availability and configured providers.
+
+```typescript
+// GET /trpc/agent.status
+```
+
+### Response
+
+```typescript
+{
+  available: boolean;
+  providers: Array<{
+    name: string;           // 'openai', 'anthropic', etc.
+    configured: boolean;
+    models: string[];
+  }>;
+  defaultProvider?: string;
+  defaultModel?: string;
+}
+```
+
+---
+
+## Get Modes
+
+Get available agent modes.
+
+```typescript
+// GET /trpc/agent.getModes
+```
+
+### Response
+
+```typescript
+Array<{
+  id: 'pm' | 'code';
+  name: string;
+  description: string;
+  capabilities: string[];
+}>
+```
+
+---
+
+## Sessions
+
+### Create Session
+
+Create a new chat session with the agent.
+
+```typescript
+// POST /trpc/agent.createSession
+{
+  repoId: string;
+  mode: 'pm' | 'code';
+  title?: string;
+}
+```
+
+### Response
+
+```typescript
+{
+  id: string;
+  repoId: string;
+  userId: string;
+  mode: 'pm' | 'code';
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+---
+
+### Get Session
+
+```typescript
+// GET /trpc/agent.getSession
+{ sessionId: string }
+```
+
+---
+
+### List Sessions
+
+List user's chat sessions.
+
+```typescript
+// GET /trpc/agent.listSessions
+{
+  repoId?: string;
+  limit?: number;
+  offset?: number;
+}
+```
+
+---
+
+### Update Session
+
+```typescript
+// POST /trpc/agent.updateSession
+{
+  sessionId: string;
+  title?: string;
+}
+```
+
+---
+
+### Delete Session
+
+```typescript
+// POST /trpc/agent.deleteSession
+{ sessionId: string }
+```
+
+---
+
+## Chat
+
+### Send Message
+
+Send a message and get a response.
+
+```typescript
+// POST /trpc/agent.chat
+{
+  sessionId: string;
+  message: string;
+  context?: {
+    files?: string[];         // Paths to include as context
+    selection?: {             // Code selection context
+      file: string;
+      startLine: number;
+      endLine: number;
+    };
+  };
+}
+```
+
+### Response
+
+```typescript
+{
+  id: string;
+  role: 'assistant';
+  content: string;
+  changes?: Array<{           // Proposed file changes
+    id: string;
+    type: 'create' | 'modify' | 'delete';
+    path: string;
+    content?: string;
+    diff?: string;
+  }>;
+  createdAt: string;
+}
+```
+
+---
+
+### Stream Chat
+
+Stream a chat response in real-time (subscription).
+
+```typescript
+// SUBSCRIPTION /trpc/agent.chatStream
+{
+  sessionId: string;
+  message: string;
+  context?: object;
+}
+```
+
+Streams chunks of the response as they're generated.
+
+---
+
+### Get Messages
+
+Get all messages in a session.
+
+```typescript
+// GET /trpc/agent.getMessages
+{
+  sessionId: string;
+  limit?: number;
+  offset?: number;
+}
+```
+
+### Response
+
+```typescript
+Array<{
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  changes?: object[];
+  createdAt: string;
+}>
+```
+
+---
+
+## File Changes
+
+The agent can propose file changes that need approval before being applied.
+
+### Get Pending Changes
+
+Get proposed changes awaiting approval.
+
+```typescript
+// GET /trpc/agent.getPendingChanges
+{ sessionId: string }
+```
+
+### Response
+
+```typescript
+Array<{
+  id: string;
+  type: 'create' | 'modify' | 'delete';
+  path: string;
+  content?: string;
+  diff?: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+}>
+```
+
+---
+
+### Approve Change
+
+Approve and apply a proposed change.
+
+```typescript
+// POST /trpc/agent.approveChange
+{ changeId: string }
+```
+
+### Response
+
+```typescript
+{
+  success: boolean;
+  path: string;
+  message: string;
+}
+```
+
+---
+
+### Reject Change
+
+Reject a proposed change.
+
+```typescript
+// POST /trpc/agent.rejectChange
+{
+  changeId: string;
+  reason?: string;
+}
+```
+
+---
+
+### Approve All Changes
+
+Approve and apply all pending changes in a session.
+
+```typescript
+// POST /trpc/agent.approveAllChanges
+{ sessionId: string }
+```
+
+### Response
+
+```typescript
+{
+  approved: number;
+  failed: number;
+  results: Array<{
+    changeId: string;
+    success: boolean;
+    message?: string;
+  }>;
+}
+```
+
+---
+
+## Agent Modes
+
+### PM Mode
+
+The PM (Product Manager) agent helps with:
+- Writing documentation
+- Creating project plans
+- Drafting issues and tickets
+- Explaining code architecture
+- Writing specifications
+
+### Code Mode
+
+The Code agent helps with:
+- Implementing features
+- Fixing bugs
+- Refactoring code
+- Writing tests
+- Code review suggestions
+
+---
+
+## Usage Examples
+
+### TypeScript Client
+
+```typescript
+import { createTRPCClient } from '@trpc/client';
+import type { AppRouter } from './api';
+
+const client = createTRPCClient<AppRouter>({
+  url: 'http://localhost:3000/trpc',
+});
+
+// Check agent availability
+const status = await client.agent.status.query();
+if (!status.available) {
+  console.log('AI not configured');
+  return;
+}
+
+// Create a session
+const session = await client.agent.createSession.mutate({
+  repoId: 'repo-uuid',
+  mode: 'code',
+  title: 'Implement user settings',
+});
+
+// Send a message
+const response = await client.agent.chat.mutate({
+  sessionId: session.id,
+  message: 'Add a user settings page with email preferences',
+  context: {
+    files: ['src/pages/index.tsx', 'src/components/Layout.tsx'],
+  },
+});
+
+console.log(response.content);
+
+// Review proposed changes
+if (response.changes?.length) {
+  console.log('Proposed changes:');
+  for (const change of response.changes) {
+    console.log(`  ${change.type}: ${change.path}`);
+    if (change.diff) {
+      console.log(change.diff);
+    }
+  }
+  
+  // Approve all changes
+  const result = await client.agent.approveAllChanges.mutate({
+    sessionId: session.id,
+  });
+  
+  console.log(`Applied ${result.approved} changes`);
+}
+
+// Get conversation history
+const messages = await client.agent.getMessages.query({
+  sessionId: session.id,
+});
+```
+
+### Streaming Example
+
+```typescript
+// Subscribe to streaming response
+const subscription = client.agent.chatStream.subscribe({
+  sessionId: session.id,
+  message: 'Explain this codebase architecture',
+}, {
+  onData: (chunk) => {
+    process.stdout.write(chunk);
+  },
+  onComplete: () => {
+    console.log('\n\nResponse complete');
+  },
+  onError: (err) => {
+    console.error('Error:', err);
+  },
+});
+
+// To cancel
+subscription.unsubscribe();
+```
+
+---
+
+## Streaming Endpoint
+
+For web applications, there's also an HTTP streaming endpoint:
+
+```
+POST /api/agent/stream
+Content-Type: application/json
+
+{
+  "sessionId": "...",
+  "message": "...",
+  "context": {}
+}
+```
+
+Returns a Server-Sent Events (SSE) stream.
+
+---
+
+## Related Documentation
+
+- [Agent CLI](/commands/agent) - Command line interface
+- [AI Agents Feature](/features/ai-agents) - Feature documentation
+- [AI API](/api-reference/ai) - Additional AI endpoints
