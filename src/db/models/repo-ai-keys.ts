@@ -23,11 +23,22 @@ const IV_LENGTH = 16;
 const AUTH_TAG_LENGTH = 16;
 
 /**
- * Get encryption key from environment or generate a default one
- * In production, this should always be set via ENCRYPTION_KEY env var
+ * Get encryption key from environment
+ * In production, this must be set via ENCRYPTION_KEY or BETTER_AUTH_SECRET env var
  */
 function getEncryptionKey(): Buffer {
-  const secret = process.env.ENCRYPTION_KEY || process.env.BETTER_AUTH_SECRET || 'default-dev-key-change-in-production';
+  const secret = process.env.ENCRYPTION_KEY || process.env.BETTER_AUTH_SECRET;
+  
+  if (!secret) {
+    const isProduction = process.env.NODE_ENV === 'production';
+    if (isProduction) {
+      throw new Error('ENCRYPTION_KEY or BETTER_AUTH_SECRET is required in production');
+    }
+    // Only allow default in development
+    console.warn('WARNING: Using default encryption key. Set ENCRYPTION_KEY in production.');
+    return scryptSync('dev-only-insecure-key', 'wit-ai-keys-salt', KEY_LENGTH);
+  }
+  
   return scryptSync(secret, 'wit-ai-keys-salt', KEY_LENGTH);
 }
 

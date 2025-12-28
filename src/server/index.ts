@@ -95,8 +95,13 @@ export function createApp(repoManager: RepoManager, options: { verbose?: boolean
   }
 
   // Enable CORS for web clients
+  // In production, set CORS_ORIGINS env var (comma-separated list)
+  const corsOrigins = process.env.CORS_ORIGINS 
+    ? process.env.CORS_ORIGINS.split(',').map(o => o.trim())
+    : ['http://localhost:5173', 'http://localhost:3000'];
+  
   app.use('*', cors({
-    origin: ['http://localhost:5173', 'http://localhost:3000'],
+    origin: corsOrigins,
     allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowHeaders: ['Content-Type', 'Authorization'],
     credentials: true,

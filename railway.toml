@@ -1,0 +1,25 @@
+# Railway Configuration for Wit
+# https://docs.railway.app/reference/config-as-code
+
+[build]
+builder = "nixpacks"
+buildCommand = "npm ci && npm run build"
+
+[deploy]
+startCommand = "npm run db:migrate && node dist/cli.js serve --port $PORT --repos /data/repos"
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
+
+# Environment variables (set these in Railway dashboard)
+# Required:
+#   DATABASE_URL - Automatically set by Railway Postgres
+#   BETTER_AUTH_SECRET - Generate with: openssl rand -base64 32
+#   NODE_ENV=production
+#
+# Optional:
+#   CORS_ORIGINS - Comma-separated list of allowed origins (e.g., https://wit.example.com)
+#   TRUSTED_ORIGINS - Same as CORS_ORIGINS, for auth
+#   OPENAI_API_KEY - For AI features
+#   ANTHROPIC_API_KEY - Alternative AI provider

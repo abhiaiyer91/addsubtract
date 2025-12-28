@@ -15,12 +15,29 @@ import * as authSchema from '../db/auth-schema';
 let authInstance: ReturnType<typeof betterAuth> | null = null;
 
 /**
+ * Get trusted origins from environment or use defaults
+ * In production, set TRUSTED_ORIGINS env var (comma-separated list)
+ */
+function getTrustedOrigins(): string[] {
+  if (process.env.TRUSTED_ORIGINS) {
+    return process.env.TRUSTED_ORIGINS.split(',').map(o => o.trim());
+  }
+  return ['http://localhost:5173', 'http://localhost:3000'];
+}
+
+/**
  * Create or get the better-auth instance
  * Must be called after database is initialized
  */
 export function createAuth() {
   if (authInstance) {
     return authInstance;
+  }
+
+  // Enforce secret in production
+  const isProduction = process.env.NODE_ENV === 'production';
+  if (isProduction && !process.env.BETTER_AUTH_SECRET) {
+    throw new Error('BETTER_AUTH_SECRET is required in production');
   }
 
   const db = getDb();
@@ -81,11 +98,8 @@ export function createAuth() {
       },
     },
     
-    // Trusted origins for CORS
-    trustedOrigins: [
-      'http://localhost:5173',
-      'http://localhost:3000',
-    ],
+    // Trusted origins for CORS - configurable via TRUSTED_ORIGINS env var
+    trustedOrigins: getTrustedOrigins(),
   });
 
   return authInstance;
