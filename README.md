@@ -71,6 +71,34 @@ wit cleanup              # delete merged branches
 
 Node.js >= 22.13.0
 
+## Built With
+
+wit is built on the shoulders of these excellent open source projects:
+
+### Backend
+- **[Hono](https://github.com/honojs/hono)** - Fast, lightweight web framework
+- **[tRPC](https://github.com/trpc/trpc)** - End-to-end typesafe APIs
+- **[Drizzle ORM](https://github.com/drizzle-team/drizzle-orm)** - TypeScript ORM with great DX
+- **[better-auth](https://github.com/better-auth/better-auth)** - Authentication for TypeScript
+- **[Mastra](https://github.com/mastra-ai/mastra)** - AI agent framework
+- **[Vercel AI SDK](https://github.com/vercel/ai)** - AI/LLM integrations
+
+### Frontend
+- **[React](https://github.com/facebook/react)** - UI library
+- **[Vite](https://github.com/vitejs/vite)** - Build tool and dev server
+- **[Tailwind CSS](https://github.com/tailwindlabs/tailwindcss)** - Utility-first CSS
+- **[Radix UI](https://github.com/radix-ui/primitives)** - Unstyled, accessible components
+- **[shadcn/ui](https://github.com/shadcn-ui/ui)** - Re-usable components built on Radix
+- **[Monaco Editor](https://github.com/microsoft/monaco-editor)** - Code editor that powers VS Code
+- **[Zustand](https://github.com/pmndrs/zustand)** - State management
+- **[TanStack Query](https://github.com/TanStack/query)** - Data fetching and caching
+- **[React Flow](https://github.com/xyflow/xyflow)** - Node-based graph UI
+- **[Lucide](https://github.com/lucide-icons/lucide)** - Icons
+- **[Shiki](https://github.com/shikijs/shiki)** - Syntax highlighting
+
+### CLI & TUI
+- **[Blessed](https://github.com/chjj/blessed)** - Terminal UI library
+
 ## Contributing
 
 We welcome contributions! See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
