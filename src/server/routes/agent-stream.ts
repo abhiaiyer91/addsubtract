@@ -184,7 +184,7 @@ export function createAgentStreamRoutes() {
 
         // Get agent
         const sessionMode = (agentSession.mode === 'questions' ? 'pm' : agentSession.mode || 'pm') as AgentMode;
-        const modelId = provider === 'anthropic' ? 'claude-sonnet-4-20250514' : 'gpt-4o';
+        const modelId = provider === 'anthropic' ? 'anthropic/claude-sonnet-4-20250514' : 'openai/gpt-4o';
 
         let agent: any;
         if (agentContext) {
