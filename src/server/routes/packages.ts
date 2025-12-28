@@ -111,16 +111,29 @@ export function createPackageRoutes(baseUrl: string): Hono {
 
   /**
    * Check if user has required scope
+   * For session tokens (full user auth), always returns true
+   * For personal access tokens, checks if the token has the required scope
    */
   async function checkScope(c: any, requiredScope: 'packages:read' | 'packages:write'): Promise<boolean> {
-    const authHeader = c.req.header('Authorization');
-    if (!authHeader?.startsWith('Bearer ')) return false;
+    // If user is set via session auth middleware, they have full access
+    const user = c.get('user');
+    if (user) {
+      // Check if this is a session-based auth (not a PAT)
+      const authHeader = c.req.header('Authorization');
+      if (authHeader?.startsWith('Bearer ')) {
+        const token = authHeader.slice(7);
+        // Try to verify as a personal access token
+        const tokenRecord = await tokenModel.verify(token);
+        if (tokenRecord) {
+          // It's a PAT, check scopes
+          return hasScope(JSON.parse(tokenRecord.scopes), requiredScope);
+        }
+      }
+      // User is authenticated via session, has full access
+      return true;
+    }
 
-    const token = authHeader.slice(7);
-    const tokenRecord = await tokenModel.verify(token);
-    if (!tokenRecord) return false;
-
-    return hasScope(JSON.parse(tokenRecord.scopes), requiredScope);
+    return false;
   }
 
   // ============ SPECIAL ROUTES (must come before wildcard routes) ============
@@ -309,6 +322,73 @@ export function createPackageRoutes(baseUrl: string): Hono {
     return c.json({ ok: true });
   });
 
+  // ============ TARBALL DOWNLOAD ============
+  // NOTE: Must come before other /:package routes to match /-/ in the middle
+
+  /**
+   * GET /:package/-/:tarball - Download package tarball
+   * Format: @scope/name/-/name-1.0.0.tgz or name/-/name-1.0.0.tgz
+   */
+  app.get('/:package{.+}/-/:tarball', async (c) => {
+    const packageParam = c.req.param('package');
+    const tarball = c.req.param('tarball');
+
+    const { scope, name } = parsePackageFromUrl(packageParam);
+
+    // Parse version from tarball name (name-1.0.0.tgz -> 1.0.0)
+    const versionMatch = tarball.match(/^.+-(.+)\.tgz$/);
+    if (!versionMatch) {
+      return c.json({ error: 'Invalid tarball name' }, 400);
+    }
+    const version = versionMatch[1];
+
+    const pkg = await packageModel.getByName(scope, name);
+    if (!pkg) {
+      return c.json({ error: 'Not found' }, 404);
+    }
+
+    // Check access for private packages
+    if (pkg.visibility === 'private') {
+      const user = await getAuthUser(c);
+      if (!user) {
+        return c.json({ error: 'Authentication required' }, 401);
+      }
+
+      const canAccess = await maintainerModel.canPublish(pkg.id, user.id);
+      if (!canAccess) {
+        return c.json({ error: 'Not authorized' }, 403);
+      }
+    }
+
+    const pkgVersion = await packageVersionModel.getByVersion(pkg.id, version);
+    if (!pkgVersion) {
+      return c.json({ error: 'Version not found' }, 404);
+    }
+
+    // Get tarball from storage
+    const readStream = storage.createReadStream(scope, name, version);
+    if (!readStream) {
+      return c.json({ error: 'Tarball not found' }, 404);
+    }
+
+    // Increment download counts
+    await Promise.all([
+      packageModel.incrementDownloads(pkg.id),
+      packageVersionModel.incrementDownloads(pkgVersion.id),
+    ]);
+
+    // Stream the tarball
+    c.header('Content-Type', 'application/octet-stream');
+    c.header('Content-Disposition', `attachment; filename="${tarball}"`);
+    c.header('Content-Length', String(pkgVersion.tarballSize));
+
+    return stream(c, async (stream) => {
+      for await (const chunk of readStream) {
+        await stream.write(chunk);
+      }
+    });
+  });
+
   // ============ PACKAGE METADATA ============
 
   /**
@@ -417,72 +497,6 @@ export function createPackageRoutes(baseUrl: string): Hono {
       },
       _id: `${fullName}@${pkgVersion.version}`,
       deprecated: pkgVersion.deprecated,
-    });
-  });
-
-  // ============ TARBALL DOWNLOAD ============
-
-  /**
-   * GET /:package/-/:tarball - Download package tarball
-   * Format: @scope/name/-/name-1.0.0.tgz or name/-/name-1.0.0.tgz
-   */
-  app.get('/:package{.+}/-/:tarball', async (c) => {
-    const packageParam = c.req.param('package');
-    const tarball = c.req.param('tarball');
-
-    const { scope, name } = parsePackageFromUrl(packageParam);
-
-    // Parse version from tarball name (name-1.0.0.tgz -> 1.0.0)
-    const versionMatch = tarball.match(/^.+-(.+)\.tgz$/);
-    if (!versionMatch) {
-      return c.json({ error: 'Invalid tarball name' }, 400);
-    }
-    const version = versionMatch[1];
-
-    const pkg = await packageModel.getByName(scope, name);
-    if (!pkg) {
-      return c.json({ error: 'Not found' }, 404);
-    }
-
-    // Check access for private packages
-    if (pkg.visibility === 'private') {
-      const user = await getAuthUser(c);
-      if (!user) {
-        return c.json({ error: 'Authentication required' }, 401);
-      }
-
-      const canAccess = await maintainerModel.canPublish(pkg.id, user.id);
-      if (!canAccess) {
-        return c.json({ error: 'Not authorized' }, 403);
-      }
-    }
-
-    const pkgVersion = await packageVersionModel.getByVersion(pkg.id, version);
-    if (!pkgVersion) {
-      return c.json({ error: 'Version not found' }, 404);
-    }
-
-    // Get tarball from storage
-    const readStream = storage.createReadStream(scope, name, version);
-    if (!readStream) {
-      return c.json({ error: 'Tarball not found' }, 404);
-    }
-
-    // Increment download counts
-    await Promise.all([
-      packageModel.incrementDownloads(pkg.id),
-      packageVersionModel.incrementDownloads(pkgVersion.id),
-    ]);
-
-    // Stream the tarball
-    c.header('Content-Type', 'application/octet-stream');
-    c.header('Content-Disposition', `attachment; filename="${tarball}"`);
-    c.header('Content-Length', String(pkgVersion.tarballSize));
-
-    return stream(c, async (stream) => {
-      for await (const chunk of readStream) {
-        await stream.write(chunk);
-      }
     });
   });
 
