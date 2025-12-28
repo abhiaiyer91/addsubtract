@@ -19,7 +19,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { RepoLayout } from './components/repo-layout';
 import { useSession } from '@/lib/auth-client';
 import { trpc } from '@/lib/trpc';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/components/ui/use-toast';
 import { formatDistanceToNow } from 'date-fns';
 import { MarkdownRenderer } from '@/components/markdown/renderer';
 
@@ -29,15 +29,15 @@ export function PackagePage() {
   const { toast } = useToast();
 
   // Get repository info
-  const { data: repoData, isLoading: repoLoading } = trpc.repo.get.useQuery(
+  const { data: repoData, isLoading: repoLoading } = trpc.repos.get.useQuery(
     { owner: owner!, repo: repo! },
     { enabled: !!owner && !!repo }
   );
 
   // Get package info for this repo
   const { data: packageData, isLoading: packageLoading } = trpc.packages.getByRepoId.useQuery(
-    { repoId: repoData?.id ?? '' },
-    { enabled: !!repoData?.id }
+    { repoId: repoData?.repo.id ?? '' },
+    { enabled: !!repoData?.repo.id }
   );
 
   const copyToClipboard = (text: string) => {
@@ -77,7 +77,7 @@ export function PackagePage() {
           title="No package published"
           description="This repository doesn't have a package published yet."
         >
-          {session?.user?.id === repoData.ownerId && (
+          {session?.user?.id === repoData.repo.ownerId && (
             <Link to={`/${owner}/${repo}/settings/package`}>
               <Button className="mt-4">Enable Package Registry</Button>
             </Link>
@@ -89,7 +89,7 @@ export function PackagePage() {
 
   const fullPackageName = packageData.fullName;
   const latestVersion = packageData.versions?.[0];
-  const isOwner = session?.user?.id === repoData.ownerId;
+  const isOwner = session?.user?.id === repoData.repo.ownerId;
 
   return (
     <RepoLayout owner={owner!} repo={repo!}>

@@ -36,6 +36,13 @@
       "when": 1766951309810,
       "tag": "0004_worthless_captain_flint",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1766956859119,
+      "tag": "0005_clammy_husk",
+      "breakpoints": true
     }
   ]
 }

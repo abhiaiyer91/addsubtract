@@ -17,6 +17,10 @@
   },
   "topbarLinks": [
     {
+      "name": "Website",
+      "url": "https://wit.sh"
+    },
+    {
       "name": "GitHub",
       "url": "https://github.com/abhiaiyer91/wit"
     }
@@ -41,14 +45,14 @@
   ],
   "anchors": [
     {
+      "name": "Website",
+      "icon": "globe",
+      "url": "https://wit.sh"
+    },
+    {
       "name": "GitHub",
       "icon": "github",
       "url": "https://github.com/abhiaiyer91/wit"
-    },
-    {
-      "name": "Community",
-      "icon": "discord",
-      "url": "https://discord.gg/wit"
     },
     {
       "name": "Roadmap",
@@ -208,7 +212,7 @@
     }
   ],
   "footerSocials": {
-    "github": "https://github.com/abhiaiyer91/wit",
-    "discord": "https://discord.gg/wit"
+    "website": "https://wit.sh",
+    "github": "https://github.com/abhiaiyer91/wit"
   }
 }

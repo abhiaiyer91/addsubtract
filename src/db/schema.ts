@@ -958,11 +958,11 @@ export const packageMaintainers = pgTable('package_maintainers', {
   packageId: uuid('package_id')
     .notNull()
     .references(() => packages.id, { onDelete: 'cascade' }),
-  userId: uuid('user_id')
+  userId: text('user_id')
     .notNull()
-    .references(() => users.id, { onDelete: 'cascade' }),
+    .references(() => authUser.id, { onDelete: 'cascade' }),
   addedAt: timestamp('added_at', { withTimezone: true }).defaultNow().notNull(),
-  addedBy: uuid('added_by').references(() => users.id),
+  addedBy: text('added_by').references(() => authUser.id),
 }, (table) => ({
   pk: primaryKey({ columns: [table.packageId, table.userId] }),
 }));
