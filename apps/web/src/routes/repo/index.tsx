@@ -52,7 +52,7 @@ export function RepoPage() {
   const tree = treeData?.entries || [];
   const readme = readmeData?.encoding === 'utf-8' ? readmeData.content : null;
 
-  const cloneUrl = `http://localhost:3000/${ownerUsername}/${repoInfo?.name || repo}.git`;
+  const cloneUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/${ownerUsername}/${repoInfo?.name || repo}.git`;
 
   const handleCopyCloneUrl = async () => {
     await navigator.clipboard.writeText(cloneUrl);
