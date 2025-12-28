@@ -158,6 +158,16 @@ export function createIssueRoutes(): Hono {
       await issueModel.reopen(issue.id);
     }
 
+    // Handle assignee changes
+    if (body.assignee !== undefined || body.assigneeId !== undefined) {
+      const assigneeId = body.assigneeId ?? body.assignee;
+      if (assigneeId) {
+        await issueModel.assign(issue.id, assigneeId);
+      } else {
+        await issueModel.unassign(issue.id);
+      }
+    }
+
     // Handle other updates
     const updates: Parameters<typeof issueModel.update>[1] = {};
     if (body.title !== undefined) updates.title = body.title;

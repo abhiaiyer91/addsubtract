@@ -270,7 +270,7 @@ export const projectsRouter = router({
     .input(
       z.object({
         projectId: z.string().uuid(),
-        userId: z.string().uuid(),
+        userId: z.string(), // User IDs are text, not UUIDs
         role: z.string().default('member'),
       })
     )
@@ -305,7 +305,7 @@ export const projectsRouter = router({
     .input(
       z.object({
         projectId: z.string().uuid(),
-        userId: z.string().uuid(),
+        userId: z.string(), // User IDs are text, not UUIDs
       })
     )
     .mutation(async ({ input, ctx }) => {
