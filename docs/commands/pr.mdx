@@ -1,0 +1,298 @@
+---
+title: Pull Requests
+description: "Manage pull requests from the command line"
+---
+
+Create, review, and manage pull requests directly from your terminal without leaving your workflow.
+
+## Overview
+
+The `wit pr` command provides a complete pull request workflow from the CLI, including creating PRs, viewing details, managing reviews, and merging.
+
+```bash
+wit pr <command> [options]
+```
+
+## Commands
+
+### create
+
+Create a new pull request from the current branch.
+
+```bash
+wit pr create [options]
+```
+
+#### Options
+
+| Option | Description |
+|--------|-------------|
+| `-b, --base <branch>` | Target branch (default: main) |
+| `-t, --title <text>` | PR title (default: last commit message) |
+| `-m, --body <text>` | PR description/body |
+
+#### Examples
+
+```bash
+# Create PR from current branch to main
+wit pr create
+
+# Create PR with custom title
+wit pr create -t "Add user authentication"
+
+# Create PR targeting a different branch
+wit pr create -b develop
+
+# Create PR with title and description
+wit pr create -t "Fix login bug" -m "Resolves issue with OAuth callback"
+```
+
+---
+
+### list
+
+List pull requests in the repository.
+
+```bash
+wit pr list [options]
+```
+
+#### Options
+
+| Option | Description |
+|--------|-------------|
+| `--state <state>` | Filter by state: `open`, `closed`, `merged`, or `all` |
+
+#### Examples
+
+```bash
+# List open PRs (default)
+wit pr list
+
+# List closed PRs
+wit pr list --state closed
+
+# List all PRs
+wit pr list --state all
+```
+
+#### Example Output
+
+```
+Open pull requests:
+
+● #42 Add user authentication
+  feature/auth → main by alice
+
+● #41 Fix database connection
+  fix/db-connection → main by bob
+```
+
+---
+
+### view
+
+View details of a specific pull request.
+
+```bash
+wit pr view <number>
+```
+
+#### Examples
+
+```bash
+wit pr view 42
+```
+
+#### Example Output
+
+```
+[OPEN] Add user authentication #42
+────────────────────────────────────────────────────────
+Author:  alice
+Branch:  feature/auth → main
+Created: Jan 15, 2024
+
+This PR adds OAuth2 authentication support including:
+- Login/logout functionality
+- Session management
+- Token refresh
+
+View online: http://localhost:3000/user/repo/pulls/42
+```
+
+---
+
+### checkout
+
+Fetch and checkout a pull request locally for testing or review.
+
+```bash
+wit pr checkout <number>
+```
+
+This creates a local branch named `pr-<number>` pointing to the PR's head commit.
+
+#### Examples
+
+```bash
+# Checkout PR #42
+wit pr checkout 42
+```
+
+---
+
+### merge
+
+Merge a pull request.
+
+```bash
+wit pr merge <number> [options]
+```
+
+#### Options
+
+| Option | Description |
+|--------|-------------|
+| `--method <method>` | Merge method: `merge`, `squash`, or `rebase` |
+
+#### Examples
+
+```bash
+# Merge with default method
+wit pr merge 42
+
+# Squash merge
+wit pr merge 42 --method squash
+
+# Rebase merge
+wit pr merge 42 --method rebase
+```
+
+---
+
+### close
+
+Close a pull request without merging.
+
+```bash
+wit pr close <number>
+```
+
+---
+
+### reopen
+
+Reopen a previously closed pull request.
+
+```bash
+wit pr reopen <number>
+```
+
+---
+
+### review
+
+Review a pull request using AI-powered code review (CodeRabbit).
+
+```bash
+wit pr review <number> [options]
+```
+
+#### Options
+
+| Option | Description |
+|--------|-------------|
+| `--json` | Output review results as JSON |
+| `--verbose` | Show detailed review output |
+| `--configure` | Configure CodeRabbit API key |
+
+#### Examples
+
+```bash
+# AI review of PR #42
+wit pr review 42
+
+# Output as JSON (for CI integration)
+wit pr review 42 --json
+
+# Configure CodeRabbit API key
+wit pr review --configure
+```
+
+---
+
+### review-status
+
+Check CodeRabbit configuration and installation status.
+
+```bash
+wit pr review-status
+```
+
+#### Example Output
+
+```
+🐰 CodeRabbit Status
+
+Installed: ✓ Yes
+Version:   1.2.3
+API Key:   ✓ Configured
+```
+
+---
+
+## Workflow Example
+
+A typical PR workflow from the command line:
+
+```bash
+# 1. Create a feature branch
+wit switch -c feature/new-feature
+
+# 2. Make changes and commit
+wit add .
+wit commit -m "Implement new feature"
+
+# 3. Push to remote
+wit push -u origin feature/new-feature
+
+# 4. Create pull request
+wit pr create -t "Add new feature" -m "Description of changes"
+
+# 5. View PR details
+wit pr view 42
+
+# 6. Get AI code review
+wit pr review 42
+
+# 7. After approval, merge
+wit pr merge 42 --method squash
+
+# 8. Clean up local branch
+wit switch main
+wit pull
+wit branch -d feature/new-feature
+```
+
+## Integration with wit serve
+
+The PR commands require a running wit server for full functionality. Start the server with:
+
+```bash
+wit serve
+```
+
+Or connect to a remote wit platform instance.
+
+## CodeRabbit Integration
+
+wit integrates with [CodeRabbit](https://coderabbit.ai) for AI-powered code reviews. To set up:
+
+1. Get an API key from https://coderabbit.ai
+2. Configure it: `wit pr review --configure`
+3. Or set the environment variable: `export CODERABBIT_API_KEY=your-key`
+
+<Tip>
+You can also review local changes before creating a PR using `wit review`. See the [Code Review](/commands/review) documentation.
+</Tip>

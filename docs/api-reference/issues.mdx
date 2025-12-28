@@ -1,0 +1,762 @@
+---
+title: Issues API
+description: "API reference for Linear-style issue management"
+---
+
+The Issues API provides comprehensive endpoints for managing issues with Linear-style features including priorities, estimates, sub-issues, relations, triage, and activity tracking.
+
+## Overview
+
+All issue endpoints are available through the tRPC API at `/trpc/issues.*`.
+
+## List Issues
+
+List issues with powerful filtering options.
+
+```typescript
+// GET /trpc/issues.list
+{
+  repoId: string;
+  state?: 'open' | 'closed';
+  status?: string;           // e.g., 'triage', 'backlog', 'in_progress'
+  priority?: string;         // 'urgent' | 'high' | 'medium' | 'low' | 'none'
+  assignee?: string;         // User ID
+  project?: string;          // Project name
+  cycle?: number;            // Cycle number
+  overdue?: boolean;
+  dueSoon?: boolean;
+  limit?: number;
+  offset?: number;
+}
+```
+
+### Response
+
+```typescript
+Array<{
+  id: string;
+  number: number;
+  title: string;
+  body?: string;
+  state: 'open' | 'closed';
+  status?: string;
+  priority?: string;
+  dueDate?: string;
+  estimate?: number;
+  parentNumber?: number;
+  projectId?: string;
+  cycleId?: string;
+  authorId: string;
+  author: User | null;
+  assigneeId?: string;
+  labels: Label[];
+  subIssueCount?: number;
+  subIssueProgress?: number;
+  createdAt: string;
+  updatedAt: string;
+  closedAt?: string;
+}>
+```
+
+---
+
+## Get Issue
+
+Get a single issue with full details.
+
+```typescript
+// GET /trpc/issues.get
+{
+  repoId: string;
+  number: number;
+}
+```
+
+### Response
+
+Includes relations if available:
+
+```typescript
+{
+  ...issue,
+  relations?: {
+    blocking: number[];
+    blockedBy: number[];
+    related: number[];
+    duplicates: number[];
+    duplicatedBy: number[];
+  };
+}
+```
+
+---
+
+## Create Issue
+
+Create a new issue with optional Linear-style fields.
+
+```typescript
+// POST /trpc/issues.create
+{
+  repoId: string;
+  title: string;
+  body?: string;
+  labels?: string[];
+  priority?: 'urgent' | 'high' | 'medium' | 'low' | 'none';
+  dueDate?: string;          // ISO date string
+  estimate?: number;         // Story points
+  parentNumber?: number;     // Create as sub-issue
+  project?: string;          // Project name
+  cycle?: number;            // Cycle number
+  assigneeId?: string;
+  templateId?: string;       // Use issue template
+}
+```
+
+---
+
+## Update Issue
+
+Update issue fields.
+
+```typescript
+// POST /trpc/issues.update
+{
+  issueId: string;
+  title?: string;
+  body?: string;
+  status?: string;
+  priority?: string;
+  dueDate?: string;
+  estimate?: number;
+  assigneeId?: string;
+}
+```
+
+---
+
+## Close / Reopen
+
+```typescript
+// POST /trpc/issues.close
+{ repoId: string; number: number }
+
+// POST /trpc/issues.reopen
+{ repoId: string; number: number }
+```
+
+---
+
+## Priority & Estimates
+
+### Update Priority
+
+```typescript
+// POST /trpc/issues.updatePriority
+{
+  repoId: string;
+  number: number;
+  priority: 'urgent' | 'high' | 'medium' | 'low' | 'none';
+}
+```
+
+### Set Due Date
+
+```typescript
+// POST /trpc/issues.setDueDate
+{
+  repoId: string;
+  number: number;
+  dueDate: string;           // ISO date string
+}
+
+// POST /trpc/issues.clearDueDate
+{
+  repoId: string;
+  number: number;
+}
+```
+
+### Set Estimate
+
+```typescript
+// POST /trpc/issues.setEstimate
+{
+  repoId: string;
+  number: number;
+  estimate: number;          // Story points
+}
+
+// POST /trpc/issues.clearEstimate
+{
+  repoId: string;
+  number: number;
+}
+```
+
+### List by Due Date
+
+```typescript
+// GET /trpc/issues.listOverdue
+{ repoId: string }
+
+// GET /trpc/issues.listDueSoon
+{ repoId: string; days?: number }  // Default: 7 days
+```
+
+### Get Total Estimate
+
+Get total story points for filtered issues.
+
+```typescript
+// GET /trpc/issues.getTotalEstimate
+{
+  repoId: string;
+  projectId?: string;
+  cycleId?: string;
+}
+```
+
+---
+
+## Hierarchy (Sub-issues)
+
+### Set Parent
+
+Create a parent-child relationship.
+
+```typescript
+// POST /trpc/issues.setParent
+{
+  repoId: string;
+  number: number;
+  parentNumber: number;
+}
+
+// POST /trpc/issues.removeParent
+{
+  repoId: string;
+  number: number;
+}
+```
+
+### Get Sub-issues
+
+```typescript
+// GET /trpc/issues.getSubIssues
+{
+  repoId: string;
+  number: number;
+}
+```
+
+### Get Sub-issue Progress
+
+```typescript
+// GET /trpc/issues.getSubIssueProgress
+{
+  repoId: string;
+  number: number;
+}
+```
+
+### Response
+
+```typescript
+{
+  total: number;
+  completed: number;
+  percentage: number;
+}
+```
+
+### Create Sub-issue
+
+```typescript
+// POST /trpc/issues.createSubIssue
+{
+  repoId: string;
+  parentNumber: number;
+  title: string;
+  body?: string;
+  priority?: string;
+}
+```
+
+---
+
+## Relations
+
+### Add Relation
+
+```typescript
+// POST /trpc/issues.addRelation
+{
+  repoId: string;
+  sourceNumber: number;
+  targetNumber: number;
+  type: 'blocks' | 'relates_to' | 'duplicates';
+}
+```
+
+### Remove Relation
+
+```typescript
+// POST /trpc/issues.removeRelation
+{
+  repoId: string;
+  sourceNumber: number;
+  targetNumber: number;
+  type: 'blocks' | 'relates_to' | 'duplicates';
+}
+```
+
+### Get Relations
+
+```typescript
+// GET /trpc/issues.getRelations
+{
+  repoId: string;
+  number: number;
+}
+```
+
+### Response
+
+```typescript
+{
+  blocking: number[];
+  blockedBy: number[];
+  related: number[];
+  duplicates: number[];
+  duplicatedBy: number[];
+}
+```
+
+### Check if Blocked
+
+```typescript
+// GET /trpc/issues.isBlocked
+{
+  repoId: string;
+  number: number;
+}
+```
+
+### Mark as Duplicate
+
+Marks an issue as duplicate and closes it.
+
+```typescript
+// POST /trpc/issues.markAsDuplicate
+{
+  repoId: string;
+  duplicateNumber: number;
+  canonicalNumber: number;
+}
+```
+
+---
+
+## Comments
+
+### Add Comment
+
+```typescript
+// POST /trpc/issues.addComment
+{
+  repoId: string;
+  number: number;
+  body: string;
+}
+```
+
+### List Comments
+
+```typescript
+// GET /trpc/issues.comments
+{
+  repoId: string;
+  number: number;
+}
+```
+
+### Update / Delete Comment
+
+```typescript
+// POST /trpc/issues.updateComment
+{ commentId: string; body: string }
+
+// POST /trpc/issues.deleteComment
+{ commentId: string }
+```
+
+---
+
+## Labels
+
+### List Repository Labels
+
+```typescript
+// GET /trpc/issues.listLabels
+{ repoId: string }
+```
+
+### Create / Update / Delete Label
+
+```typescript
+// POST /trpc/issues.createLabel
+{
+  repoId: string;
+  name: string;
+  color: string;
+  description?: string;
+}
+
+// POST /trpc/issues.updateLabel
+{
+  labelId: string;
+  name?: string;
+  color?: string;
+  description?: string;
+}
+
+// POST /trpc/issues.deleteLabel
+{ labelId: string }
+```
+
+### Add / Remove Label from Issue
+
+```typescript
+// POST /trpc/issues.addLabel
+{ repoId: string; number: number; labelId: string }
+
+// POST /trpc/issues.removeLabel
+{ repoId: string; number: number; labelId: string }
+```
+
+---
+
+## Kanban / Status
+
+### List Grouped by Status
+
+Get issues organized by status for Kanban board display.
+
+```typescript
+// GET /trpc/issues.listGroupedByStatus
+{
+  repoId: string;
+  projectId?: string;
+  cycleId?: string;
+}
+```
+
+### Response
+
+```typescript
+{
+  [status: string]: Issue[];
+}
+```
+
+### Update Status
+
+Move issue to a different status (Kanban drag-and-drop).
+
+```typescript
+// POST /trpc/issues.updateStatus
+{
+  repoId: string;
+  number: number;
+  status: string;
+}
+```
+
+### Get Statuses
+
+Get available statuses for a repository.
+
+```typescript
+// GET /trpc/issues.statuses
+{ repoId: string }
+```
+
+### Get Priorities
+
+Get available priorities.
+
+```typescript
+// GET /trpc/issues.priorities
+```
+
+---
+
+## Triage
+
+### List Triage
+
+Get issues awaiting triage.
+
+```typescript
+// GET /trpc/issues.listTriage
+{ repoId: string }
+```
+
+### Accept Triage
+
+Accept a triage item and move to backlog.
+
+```typescript
+// POST /trpc/issues.acceptTriage
+{
+  repoId: string;
+  number: number;
+  targetStatus?: string;     // Default: 'backlog'
+  priority?: string;
+}
+```
+
+### Reject Triage
+
+Reject and close a triage item.
+
+```typescript
+// POST /trpc/issues.rejectTriage
+{
+  repoId: string;
+  number: number;
+  reason: string;
+}
+```
+
+---
+
+## Activity
+
+### Get Issue Activity
+
+Get activity log for a specific issue.
+
+```typescript
+// GET /trpc/issues.getActivity
+{
+  repoId: string;
+  number: number;
+  limit?: number;
+}
+```
+
+### Response
+
+```typescript
+Array<{
+  id: string;
+  issueNumber: number;
+  action: string;
+  field?: string;
+  oldValue?: string;
+  newValue?: string;
+  actor: string;
+  createdAt: string;
+}>
+```
+
+Actions include:
+- `created`
+- `status_changed`
+- `priority_changed`
+- `assigned` / `unassigned`
+- `labeled` / `unlabeled`
+- `due_date_set` / `due_date_cleared`
+- `estimate_set`
+- `parent_set` / `parent_removed`
+- `relation_added` / `relation_removed`
+- `commented`
+
+### Get Repository Activity
+
+Get activity log for all issues in a repository.
+
+```typescript
+// GET /trpc/issues.getRepoActivity
+{
+  repoId: string;
+  limit?: number;
+}
+```
+
+---
+
+## Templates
+
+### List Templates
+
+```typescript
+// GET /trpc/issues.listTemplates
+{ repoId: string }
+```
+
+### Get Template
+
+```typescript
+// GET /trpc/issues.getTemplate
+{ templateId: string }
+```
+
+### Create / Update / Delete Template
+
+```typescript
+// POST /trpc/issues.createTemplate
+{
+  repoId: string;
+  name: string;
+  title?: string;
+  body?: string;
+  labels?: string[];
+  priority?: string;
+}
+
+// POST /trpc/issues.updateTemplate
+{
+  templateId: string;
+  name?: string;
+  title?: string;
+  body?: string;
+  labels?: string[];
+  priority?: string;
+}
+
+// POST /trpc/issues.deleteTemplate
+{ templateId: string }
+```
+
+---
+
+## Custom Views
+
+### List Views
+
+```typescript
+// GET /trpc/issues.listViews
+{ repoId: string }
+```
+
+### Get View
+
+```typescript
+// GET /trpc/issues.getView
+{ viewId: string }
+```
+
+### Create / Update / Delete View
+
+```typescript
+// POST /trpc/issues.createView
+{
+  repoId: string;
+  name: string;
+  filters: {
+    status?: string[];
+    priority?: string[];
+    assignee?: string[];
+    labels?: string[];
+    dueDate?: 'overdue' | 'due_soon' | 'no_date';
+  };
+  sort?: {
+    field: string;
+    direction: 'asc' | 'desc';
+  };
+}
+
+// POST /trpc/issues.updateView
+{
+  viewId: string;
+  name?: string;
+  filters?: object;
+  sort?: object;
+}
+
+// POST /trpc/issues.deleteView
+{ viewId: string }
+```
+
+### Get Issues by View
+
+```typescript
+// GET /trpc/issues.getIssuesByView
+{ viewId: string }
+```
+
+---
+
+## Usage Examples
+
+### TypeScript Client
+
+```typescript
+import { createTRPCClient } from '@trpc/client';
+import type { AppRouter } from './api';
+
+const client = createTRPCClient<AppRouter>({
+  url: 'http://localhost:3000/trpc',
+});
+
+// Create an issue with Linear-style fields
+const issue = await client.issues.create.mutate({
+  repoId: 'repo-uuid',
+  title: 'Implement user settings',
+  body: 'Add user preferences page',
+  priority: 'high',
+  dueDate: '2024-02-01',
+  estimate: 5,
+});
+
+// Create sub-issues
+await client.issues.createSubIssue.mutate({
+  repoId: 'repo-uuid',
+  parentNumber: issue.number,
+  title: 'Design settings UI',
+});
+
+await client.issues.createSubIssue.mutate({
+  repoId: 'repo-uuid',
+  parentNumber: issue.number,
+  title: 'Implement backend API',
+});
+
+// Add a blocking relation
+await client.issues.addRelation.mutate({
+  repoId: 'repo-uuid',
+  sourceNumber: 43,
+  targetNumber: 44,
+  type: 'blocks',
+});
+
+// Get Kanban board data
+const kanban = await client.issues.listGroupedByStatus.query({
+  repoId: 'repo-uuid',
+});
+
+// Move issue on Kanban board
+await client.issues.updateStatus.mutate({
+  repoId: 'repo-uuid',
+  number: issue.number,
+  status: 'in_progress',
+});
+
+// Get activity feed
+const activity = await client.issues.getRepoActivity.query({
+  repoId: 'repo-uuid',
+  limit: 50,
+});
+```
+
+---
+
+## Related Documentation
+
+- [Issues CLI](/commands/issue) - Command line interface
+- [Platform Issues](/platform/issues) - Platform features
+- [Cycles API](/api-reference/cycles) - Sprint management
+- [Projects API](/api-reference/projects) - Project management

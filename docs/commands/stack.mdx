@@ -1,0 +1,363 @@
+---
+title: Stacked Diffs
+description: "Manage stacked diffs for incremental code review"
+---
+
+Break down large features into smaller, dependent branches that build on top of each other. Stacked diffs make code review easier and allow for incremental merging.
+
+## Overview
+
+The `wit stack` command helps you manage chains of dependent branches (stacks) that build on each other. This workflow is popular at companies like Meta and Google.
+
+```bash
+wit stack <command> [options]
+```
+
+## Why Stacked Diffs?
+
+Traditional branching creates large, hard-to-review PRs. Stacked diffs let you:
+
+- **Break down features** into reviewable chunks
+- **Get faster reviews** with smaller PRs
+- **Merge incrementally** as each piece is approved
+- **Keep working** while waiting for reviews
+
+## Commands
+
+### create
+
+Start a new stack from the current branch.
+
+```bash
+wit stack create <name> [-d <description>]
+```
+
+#### Examples
+
+```bash
+# Create a new stack
+wit stack create auth-feature
+
+# With description
+wit stack create auth-feature -d "User authentication system"
+```
+
+#### Output
+
+```
+✓ Created stack 'auth-feature'
+  Base branch: main
+  Description: User authentication system
+
+Next steps:
+  wit stack push     # Create first branch in stack
+  wit commit -m "..."  # Make your changes
+  wit stack push     # Create next branch
+```
+
+---
+
+### push
+
+Create a new branch on top of the stack.
+
+```bash
+wit stack push [branch-name]
+```
+
+If no name is provided, a name is auto-generated based on the stack name.
+
+```bash
+wit stack push
+# Creates: auth-feature/part-1
+
+wit stack push login-form
+# Creates: auth-feature/login-form
+```
+
+---
+
+### pop
+
+Remove the top branch from the stack (keeps the branch itself).
+
+```bash
+wit stack pop
+```
+
+---
+
+### list
+
+Show all stacks in the repository.
+
+```bash
+wit stack list
+```
+
+#### Example Output
+
+```
+Stacks:
+
+* auth-feature (current)
+    Base: main
+    Branches: 3
+    Add user authentication system
+
+  backend-refactor
+    Base: main
+    Branches: 2
+```
+
+---
+
+### show
+
+Display a visual representation of the current stack.
+
+```bash
+wit stack show [stack-name]
+```
+
+#### Example Output
+
+```
+Stack: auth-feature
+
+● auth-feature/part-3 ✓
+  a1b2c3d Add session management
+
+  │
+● auth-feature/part-2 ↑2
+  d4e5f6g Add login form
+
+  │
+● auth-feature/part-1 ✓ (current)
+  h7i8j9k Add user model
+
+Legend: ✓ synced | ↓ behind | ↑ ahead | ✗ diverged
+```
+
+---
+
+### sync
+
+Rebase the entire stack when the base branch changes.
+
+```bash
+wit stack sync
+```
+
+This rebases each branch in the stack onto its parent, ensuring the entire chain is up-to-date.
+
+#### Example Output
+
+```
+Syncing stack...
+
+✓ Stack synced successfully
+
+Rebased branches:
+  ✓ auth-feature/part-1
+  ✓ auth-feature/part-2
+  ✓ auth-feature/part-3
+```
+
+#### Handling Conflicts
+
+If conflicts occur during sync:
+
+```
+✗ Sync failed
+  Conflicts in auth-feature/part-2
+
+Conflicts in:
+  auth-feature/part-2
+    - src/auth/login.ts
+    - src/auth/session.ts
+
+Resolve conflicts and run:
+  wit rebase --continue
+  wit stack sync
+```
+
+---
+
+### submit
+
+Push all stack branches to the remote for review.
+
+```bash
+wit stack submit [--force]
+```
+
+```bash
+# Push all branches
+wit stack submit
+
+# Force push (use with caution)
+wit stack submit --force
+```
+
+---
+
+### delete
+
+Delete a stack (keeps the branches).
+
+```bash
+wit stack delete <name>
+```
+
+---
+
+## Navigation
+
+### up
+
+Move to the child branch (up the stack).
+
+```bash
+wit stack up
+```
+
+---
+
+### down
+
+Move to the parent branch (down the stack).
+
+```bash
+wit stack down
+```
+
+---
+
+### goto
+
+Jump to a specific branch in the stack.
+
+```bash
+wit stack goto <branch|index>
+```
+
+```bash
+# By index (1-based)
+wit stack goto 2
+
+# By branch name
+wit stack goto auth-feature/login-form
+```
+
+---
+
+### reorder
+
+Reorder branches in the stack.
+
+```bash
+wit stack reorder <branch1> <branch2> ...
+```
+
+```bash
+wit stack reorder auth-feature/part-2 auth-feature/part-1 auth-feature/part-3
+```
+
+<Warning>
+After reordering, run `wit stack sync` to rebase branches to the new order.
+</Warning>
+
+---
+
+## Complete Workflow Example
+
+Here's a complete stacked diffs workflow:
+
+```bash
+# 1. Start on main
+wit switch main
+wit pull
+
+# 2. Create a new stack for your feature
+wit stack create user-settings
+
+# 3. Create first branch and implement database schema
+wit stack push db-schema
+# ... make changes ...
+wit add .
+wit commit -m "Add user settings table"
+
+# 4. Create second branch for the API
+wit stack push api-endpoints
+# ... make changes ...
+wit add .
+wit commit -m "Add settings API endpoints"
+
+# 5. Create third branch for the UI
+wit stack push ui-components
+# ... make changes ...
+wit add .
+wit commit -m "Add settings UI"
+
+# 6. View your stack
+wit stack show
+
+# 7. Push all branches for review
+wit stack submit
+
+# 8. Create PRs (each targets the previous branch)
+wit pr create -t "Add user settings schema"
+wit stack up
+wit pr create -t "Add settings API" -b user-settings/db-schema
+wit stack up
+wit pr create -t "Add settings UI" -b user-settings/api-endpoints
+
+# 9. When main updates, sync the stack
+wit stack sync
+
+# 10. As PRs are approved and merged, the stack shrinks
+# When db-schema merges to main:
+wit stack sync  # Rebases remaining branches onto main
+
+# 11. Clean up when done
+wit stack delete user-settings
+```
+
+---
+
+## Best Practices
+
+### Keep Branches Small
+
+Each branch should be a logical, reviewable unit:
+- 200-400 lines of changes
+- Single concern or feature aspect
+- Self-contained tests if applicable
+
+### Name Branches Descriptively
+
+Use meaningful names that describe the change:
+
+```bash
+wit stack push add-user-model      # ✓ Good
+wit stack push part-1              # ✗ Not descriptive
+```
+
+### Sync Regularly
+
+Run `wit stack sync` frequently to:
+- Keep your stack up-to-date with main
+- Catch conflicts early
+- Make merging easier
+
+### Review in Order
+
+PRs in a stack should be reviewed and merged in order (bottom to top) to maintain dependencies.
+
+---
+
+## Related Documentation
+
+- [Stacked Diffs Feature Guide](/features/stacked-diffs) - Detailed workflow guide
+- [Stacks API Reference](/api-reference/stacks) - API documentation

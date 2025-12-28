@@ -1,0 +1,341 @@
+---
+title: Search
+description: "Semantic and text search across your codebase"
+---
+
+Ask questions about your codebase in natural language or search for specific patterns. Semantic search uses AI embeddings to understand the meaning of your queries.
+
+## Overview
+
+The `wit search` command provides both AI-powered semantic search and traditional text search.
+
+```bash
+wit search [query] [options]
+```
+
+## Quick Start
+
+```bash
+# Ask a question about your code
+wit search "where do we handle authentication"
+
+# Find specific patterns
+wit search "find all API endpoints"
+
+# Interactive mode
+wit search -i
+```
+
+## Commands
+
+### Search Query
+
+Search your codebase with a natural language query.
+
+```bash
+wit search "query"
+```
+
+#### Examples
+
+```bash
+# Semantic questions
+wit search "how does the database connection work"
+wit search "where are errors handled"
+wit search "find the main entry point"
+
+# Specific patterns
+wit search "find all TODO comments"
+wit search "functions that use async/await"
+```
+
+---
+
+### index
+
+Index the repository for semantic search.
+
+```bash
+wit search index [options]
+```
+
+#### Options
+
+| Option | Description |
+|--------|-------------|
+| `--force`, `-f` | Force reindex all files |
+
+Indexing analyzes your code files and creates embeddings for semantic search.
+
+```bash
+# Index repository
+wit search index
+
+# Force full reindex
+wit search index --force
+```
+
+#### Example Output
+
+```
+wit search index · Indexing repository for semantic search
+
+Scanning files...
+
+✓ Indexing complete
+
+    Files indexed:  156
+    Files skipped:  23
+    Code chunks:    1,234
+    Duration:       12.34s
+```
+
+---
+
+### status
+
+Check the health of the search index.
+
+```bash
+wit search status
+```
+
+#### Example Output
+
+```
+wit search status · Index health
+
+✓ API key configured
+✓ Index is ready
+
+    Vectors:     1,234
+    Files:       156
+    Dimensions:  1536
+    Last update: 2 hours ago
+```
+
+---
+
+### files
+
+Search for files by glob pattern.
+
+```bash
+wit search files "<pattern>"
+```
+
+```bash
+# Find all TypeScript files
+wit search files "*.ts"
+
+# Find test files
+wit search files "**/*.test.ts"
+
+# Find config files
+wit search files "*config*"
+```
+
+---
+
+## Search Options
+
+### Text Search
+
+Force text search instead of semantic search.
+
+```bash
+wit search --text "pattern"
+wit search -t "pattern"
+```
+
+### Files Only
+
+Search only file names (not contents).
+
+```bash
+wit search --files "pattern"
+```
+
+### Content Only
+
+Search only file contents (not names).
+
+```bash
+wit search --content "pattern"
+wit search -c "pattern"
+```
+
+### Filter by File Type
+
+Search within specific file types.
+
+```bash
+wit search "query" --in "*.ts"
+wit search "query" --file "*.py"
+wit search "query" -f "src/**/*.js"
+```
+
+---
+
+## Interactive Mode
+
+Launch an interactive search session.
+
+```bash
+wit search -i
+wit search --interactive
+```
+
+```
+wit search · Interactive mode
+Ask questions about your codebase. Press Ctrl+C to exit.
+
+→ where do we handle user auth
+  ...results...
+
+→ how does caching work
+  ...results...
+
+→ exit
+```
+
+---
+
+## Search Results
+
+### Semantic Search Results
+
+```
+wit search · "where do we handle authentication"
+Using AI-powered semantic search
+
+  ● src/auth/handler.ts:45-89 (92% match)
+    function: handleAuthentication
+    │  45 │ export async function handleAuthentication(req: Request) {
+    │  46 │   const token = extractToken(req);
+    │  47 │   if (!token) {
+    │  48 │     throw new AuthError('No token provided');
+    │  49 │   }
+    │  50 │   const user = await validateToken(token);
+    │ ... │ (38 more lines)
+
+  ● src/middleware/auth.ts:12-35 (85% match)
+    function: authMiddleware
+    │  12 │ export function authMiddleware() {
+    │  13 │   return async (req, res, next) => {
+    ...
+
+──────────────────────────────────────────────────
+Found 5 results in 0.34s · Index: 156 files
+```
+
+### Text Search Results
+
+```
+wit search · "TODO"
+Using text search
+
+  Files
+    ● src/index.ts
+    ● src/utils/helpers.ts
+    ● tests/setup.ts
+
+  Content
+  ● src/index.ts:42
+    │ // TODO: Add error handling
+    │ const result = processData(input);
+
+  ● src/utils/helpers.ts:15
+    │ // TODO: Optimize this loop
+    │ for (const item of items) {
+
+──────────────────────────────────────────────────
+Found 8 results in 0.02s
+```
+
+---
+
+## Configuration
+
+### API Key
+
+Semantic search requires an OpenAI API key for generating embeddings.
+
+```bash
+# Set environment variable
+export OPENAI_API_KEY=sk-...
+
+# Or use Anthropic
+export ANTHROPIC_API_KEY=...
+```
+
+Without an API key, wit falls back to text search.
+
+### Index Location
+
+The search index is stored in `.wit/search/` and includes:
+- Vector embeddings
+- File metadata
+- Index statistics
+
+---
+
+## Best Practices
+
+### When to Use Semantic Search
+
+- Understanding how something works
+- Finding related code across the codebase
+- Exploring unfamiliar code
+- Finding implementations of concepts
+
+### When to Use Text Search
+
+- Finding exact strings or patterns
+- Looking for specific identifiers
+- Finding TODO comments
+- Searching for error messages
+
+### Index Maintenance
+
+```bash
+# Reindex after major changes
+wit search index
+
+# Check index health
+wit search status
+
+# Force full reindex if issues occur
+wit search index --force
+```
+
+---
+
+## Workflow Example
+
+```bash
+# 1. First time: index the repository
+wit search index
+
+# 2. Search for concepts
+wit search "how does error handling work"
+
+# 3. Search for specific patterns
+wit search --text "catch (error)"
+
+# 4. Find related files
+wit search files "**/*error*"
+
+# 5. Search in specific files
+wit search "throw" --in "src/**/*.ts"
+
+# 6. Interactive exploration
+wit search -i
+```
+
+---
+
+## Related Documentation
+
+- [Search Feature Guide](/features/search) - Detailed feature documentation
+- [Search API Reference](/api-reference/search) - API documentation

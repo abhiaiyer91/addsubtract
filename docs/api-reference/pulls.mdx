@@ -1,0 +1,614 @@
+---
+title: Pull Requests API
+description: "API reference for pull request management"
+---
+
+The Pull Requests API provides comprehensive endpoints for managing pull requests, reviews, comments, and code suggestions.
+
+## Overview
+
+All pull request endpoints are available through the tRPC API at `/trpc/pulls.*`.
+
+## List Pull Requests
+
+List pull requests for a repository.
+
+```typescript
+// GET /trpc/pulls.list
+{
+  repoId: string;        // UUID of the repository
+  state?: 'open' | 'closed' | 'merged';
+  authorId?: string;     // Filter by author UUID
+  limit?: number;        // 1-100, default 20
+  offset?: number;       // Default 0
+}
+```
+
+### Response
+
+```typescript
+Array<{
+  id: string;
+  number: number;
+  title: string;
+  body?: string;
+  state: 'open' | 'closed' | 'merged';
+  sourceBranch: string;
+  targetBranch: string;
+  headSha: string;
+  baseSha: string;
+  authorId: string;
+  author: { id: string; username: string; name?: string } | null;
+  labels: Array<{ id: string; name: string; color: string }>;
+  isDraft: boolean;
+  createdAt: string;
+  updatedAt: string;
+  mergedAt?: string;
+  closedAt?: string;
+}>
+```
+
+---
+
+## Get Pull Request
+
+Get a single pull request by repository and number.
+
+```typescript
+// GET /trpc/pulls.get
+{
+  repoId: string;
+  number: number;
+}
+```
+
+### Response
+
+Includes full PR details plus stack information if part of a stacked diff:
+
+```typescript
+{
+  ...pr,
+  author: User | null;
+  labels: Label[];
+  stack?: {
+    id: string;
+    name: string;
+    baseBranch: string;
+    branches: Array<{
+      branchName: string;
+      position: number;
+      pr: { id: string; number: number; title: string; state: string } | null;
+      isCurrent: boolean;
+    }>;
+  };
+}
+```
+
+---
+
+## Create Pull Request
+
+Create a new pull request.
+
+```typescript
+// POST /trpc/pulls.create
+{
+  repoId: string;
+  title: string;          // 1-256 characters
+  body?: string;
+  sourceBranch: string;
+  targetBranch: string;
+  headSha: string;
+  baseSha: string;
+  isDraft?: boolean;      // Default false
+  sourceRepoId?: string;  // For cross-repo PRs (forks)
+}
+```
+
+<Note>
+Creating a non-draft PR automatically triggers an async AI review.
+</Note>
+
+---
+
+## Update Pull Request
+
+Update PR title, body, or draft status.
+
+```typescript
+// POST /trpc/pulls.update
+{
+  prId: string;
+  title?: string;
+  body?: string;
+  isDraft?: boolean;
+}
+```
+
+---
+
+## Check Mergeability
+
+Check if a PR can be merged without conflicts.
+
+```typescript
+// GET /trpc/pulls.checkMergeability
+{
+  prId: string;
+}
+```
+
+### Response
+
+```typescript
+{
+  canMerge: boolean;
+  conflicts: string[];    // List of conflicting file paths
+  behindBy: number;       // Commits behind target
+  aheadBy: number;        // Commits ahead of target
+  error?: string;
+}
+```
+
+---
+
+## Merge Pull Request
+
+Merge a pull request using the specified strategy.
+
+```typescript
+// POST /trpc/pulls.merge
+{
+  prId: string;
+  strategy?: 'merge' | 'squash' | 'rebase';  // Default: merge
+  message?: string;       // Custom merge commit message
+}
+```
+
+### Response
+
+```typescript
+{
+  ...mergedPr,
+  mergeSha: string;       // SHA of the merge commit
+}
+```
+
+---
+
+## Close / Reopen
+
+```typescript
+// POST /trpc/pulls.close
+{ prId: string }
+
+// POST /trpc/pulls.reopen
+{ prId: string }
+```
+
+---
+
+## Reviews
+
+### Add Review
+
+Submit a review on a pull request.
+
+```typescript
+// POST /trpc/pulls.addReview
+{
+  prId: string;
+  state: 'approved' | 'changes_requested' | 'commented';
+  body?: string;
+  commitSha: string;      // SHA being reviewed
+}
+```
+
+### List Reviews
+
+```typescript
+// GET /trpc/pulls.reviews
+{ prId: string }
+```
+
+---
+
+## Comments
+
+### Add Comment
+
+Add a comment to a pull request. Supports inline file comments.
+
+```typescript
+// POST /trpc/pulls.addComment
+{
+  prId: string;
+  body: string;
+  path?: string;          // File path for inline comments
+  line?: number;          // Line number
+  side?: 'LEFT' | 'RIGHT';
+  startLine?: number;     // For multi-line selection
+  endLine?: number;
+  commitSha?: string;
+  reviewId?: string;
+  replyToId?: string;     // For threaded replies
+}
+```
+
+### List Comments
+
+```typescript
+// GET /trpc/pulls.comments
+{ prId: string }
+```
+
+### Get File Comments
+
+Get inline comments for a specific file.
+
+```typescript
+// GET /trpc/pulls.getFileComments
+{
+  prId: string;
+  path: string;
+}
+```
+
+### Update / Delete Comment
+
+```typescript
+// POST /trpc/pulls.updateComment
+{ commentId: string; body: string }
+
+// POST /trpc/pulls.deleteComment
+{ commentId: string }
+```
+
+### Resolve / Unresolve Comment Thread
+
+```typescript
+// POST /trpc/pulls.resolveComment
+{ commentId: string }
+
+// POST /trpc/pulls.unresolveComment
+{ commentId: string }
+```
+
+---
+
+## Code Suggestions
+
+### Add Suggestion
+
+Add a comment with a code suggestion that can be applied directly.
+
+```typescript
+// POST /trpc/pulls.addSuggestion
+{
+  prId: string;
+  body: string;           // Comment explaining the suggestion
+  suggestion: string;     // The suggested code
+  path: string;
+  line: number;
+  side?: 'LEFT' | 'RIGHT';
+  startLine?: number;
+  endLine?: number;
+  commitSha?: string;
+  reviewId?: string;
+}
+```
+
+### Apply Suggestion
+
+Apply a code suggestion, creating a commit with the change.
+
+```typescript
+// POST /trpc/pulls.applySuggestion
+{ commentId: string }
+```
+
+### Response
+
+```typescript
+{
+  success: boolean;
+  commitSha: string;
+  message: string;
+}
+```
+
+---
+
+## Labels
+
+### Get Labels
+
+```typescript
+// GET /trpc/pulls.labels
+{ prId: string }
+```
+
+### Add / Remove Label
+
+```typescript
+// POST /trpc/pulls.addLabel
+{ prId: string; labelId: string }
+
+// POST /trpc/pulls.removeLabel
+{ prId: string; labelId: string }
+```
+
+---
+
+## Reviewer Management
+
+### Request Review
+
+Request a review from a user.
+
+```typescript
+// POST /trpc/pulls.requestReview
+{
+  prId: string;
+  reviewerId: string;
+}
+```
+
+### Remove Review Request
+
+```typescript
+// POST /trpc/pulls.removeReviewRequest
+{
+  prId: string;
+  reviewerId: string;
+}
+```
+
+### List Reviewers
+
+```typescript
+// GET /trpc/pulls.reviewers
+{ prId: string }
+```
+
+---
+
+## Inbox Endpoints
+
+### Get Inbox Summary
+
+Get counts for each inbox section.
+
+```typescript
+// GET /trpc/pulls.inboxSummary
+{ repoId?: string }
+```
+
+### Response
+
+```typescript
+{
+  awaitingReview: number;
+  myPrs: number;
+  participated: number;
+}
+```
+
+### PRs Awaiting Review
+
+Get PRs where you've been requested as a reviewer.
+
+```typescript
+// GET /trpc/pulls.inboxAwaitingReview
+{
+  limit?: number;
+  offset?: number;
+  repoId?: string;
+}
+```
+
+### My Open PRs
+
+Get your own open PRs awaiting reviews from others.
+
+```typescript
+// GET /trpc/pulls.inboxMyPrs
+{
+  limit?: number;
+  offset?: number;
+  repoId?: string;
+}
+```
+
+### Participated PRs
+
+Get PRs you've commented on or reviewed.
+
+```typescript
+// GET /trpc/pulls.inboxParticipated
+{
+  limit?: number;
+  offset?: number;
+  state?: 'open' | 'closed' | 'all';
+  repoId?: string;
+}
+```
+
+---
+
+## Diff & Commits
+
+### Get PR Diff
+
+Get parsed file changes with hunks.
+
+```typescript
+// GET /trpc/pulls.getDiff
+{ prId: string }
+```
+
+### Response
+
+```typescript
+{
+  files: Array<{
+    oldPath: string;
+    newPath: string;
+    status: 'added' | 'deleted' | 'modified' | 'renamed';
+    additions: number;
+    deletions: number;
+    hunks: Array<{
+      oldStart: number;
+      oldLines: number;
+      newStart: number;
+      newLines: number;
+      lines: Array<{
+        type: 'context' | 'add' | 'delete';
+        content: string;
+      }>;
+    }>;
+  }>;
+  totalAdditions: number;
+  totalDeletions: number;
+  totalFiles: number;
+}
+```
+
+### Get PR Commits
+
+Get commits included in the pull request.
+
+```typescript
+// GET /trpc/pulls.getCommits
+{ prId: string }
+```
+
+### Response
+
+```typescript
+{
+  commits: Array<{
+    sha: string;
+    message: string;
+    author: string;
+    authorEmail: string;
+    date: string;
+  }>;
+  totalCommits: number;
+}
+```
+
+---
+
+## AI Review
+
+### Get AI Review
+
+Get the most recent AI-generated review.
+
+```typescript
+// GET /trpc/pulls.getAIReview
+{ prId: string }
+```
+
+### Response
+
+```typescript
+{
+  id: string;
+  type: 'review' | 'comment';
+  body: string;
+  state?: 'approved' | 'changes_requested' | 'commented';
+  createdAt: string;
+} | null
+```
+
+### Trigger AI Review
+
+Manually trigger an AI review (useful for drafts or re-reviews).
+
+```typescript
+// POST /trpc/pulls.triggerAIReview
+{ prId: string }
+```
+
+---
+
+## Conflicts
+
+### Get Conflict Details
+
+Get detailed conflict information for a PR.
+
+```typescript
+// GET /trpc/pulls.getConflicts
+{ prId: string }
+```
+
+### Response
+
+```typescript
+{
+  hasConflicts: boolean;
+  files: Array<{
+    path: string;
+    ours: string;      // Your version
+    theirs: string;    // Their version
+    base: string;      // Common ancestor
+  }>;
+}
+```
+
+---
+
+## Usage Examples
+
+### TypeScript Client
+
+```typescript
+import { createTRPCClient } from '@trpc/client';
+import type { AppRouter } from './api';
+
+const client = createTRPCClient<AppRouter>({
+  url: 'http://localhost:3000/trpc',
+});
+
+// List open PRs
+const prs = await client.pulls.list.query({
+  repoId: 'repo-uuid',
+  state: 'open',
+});
+
+// Create a PR
+const newPr = await client.pulls.create.mutate({
+  repoId: 'repo-uuid',
+  title: 'Add new feature',
+  body: 'This PR adds...',
+  sourceBranch: 'feature/new-feature',
+  targetBranch: 'main',
+  headSha: 'abc123...',
+  baseSha: 'def456...',
+});
+
+// Add a review
+await client.pulls.addReview.mutate({
+  prId: newPr.id,
+  state: 'approved',
+  body: 'LGTM!',
+  commitSha: 'abc123...',
+});
+
+// Merge the PR
+const merged = await client.pulls.merge.mutate({
+  prId: newPr.id,
+  strategy: 'squash',
+});
+```
+
+---
+
+## Related Documentation
+
+- [Pull Requests CLI](/commands/pr) - Command line interface
+- [Platform Pull Requests](/platform/pull-requests) - Platform features

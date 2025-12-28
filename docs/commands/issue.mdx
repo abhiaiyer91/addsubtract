@@ -1,0 +1,449 @@
+---
+title: Issues
+description: "Manage issues with Linear-style features from the command line"
+---
+
+Create, track, and manage issues directly from your terminal with Linear-style project management features including priorities, due dates, estimates, sub-issues, and triage workflows.
+
+## Overview
+
+The `wit issue` command provides comprehensive issue management from the CLI, inspired by Linear's workflow.
+
+```bash
+wit issue <command> [options]
+```
+
+## Basic Commands
+
+### create
+
+Create a new issue.
+
+```bash
+wit issue create <title> [options]
+wit issue create -t <title> [options]
+```
+
+#### Options
+
+| Option | Description |
+|--------|-------------|
+| `-t, --title <text>` | Issue title |
+| `-m, --body <text>` | Issue body/description |
+| `-l, --labels <l,l>` | Comma-separated labels |
+| `-p, --priority <p>` | Priority: `urgent`, `high`, `medium`, `low`, `none` |
+| `-d, --due <date>` | Due date (ISO or relative) |
+| `-e, --estimate <n>` | Estimate in story points |
+| `-P, --parent <num>` | Parent issue number (creates as sub-issue) |
+| `--project <name>` | Assign to project |
+| `--cycle <num>` | Assign to cycle/sprint |
+
+#### Examples
+
+```bash
+# Create a simple issue
+wit issue create "Bug: Login fails on Safari"
+
+# Create with priority and due date
+wit issue create "Fix authentication" -p high -d tomorrow
+
+# Create with estimate and project
+wit issue create -t "Implement feature" -e 5 --project "Q1 Launch"
+
+# Create as sub-issue
+wit issue create "Write tests" -P 42
+```
+
+---
+
+### list
+
+List issues with powerful filtering.
+
+```bash
+wit issue list [options]
+```
+
+#### Options
+
+| Option | Description |
+|--------|-------------|
+| `--state <s>` | Filter by state: `open`, `closed`, `all` |
+| `--priority <p>` | Filter by priority |
+| `--overdue` | Show only overdue issues |
+| `--due-soon` | Show issues due within 7 days |
+| `--assignee <user>` | Filter by assignee |
+| `--project <name>` | Filter by project |
+| `--cycle <num>` | Filter by cycle |
+| `--triage` | Show only triage items |
+
+#### Examples
+
+```bash
+# List open issues (default)
+wit issue list
+
+# List urgent priority issues
+wit issue list --priority urgent
+
+# List overdue issues
+wit issue list --overdue
+
+# List issues due soon
+wit issue list --due-soon
+
+# List issues in a project
+wit issue list --project "Backend Refactor"
+```
+
+---
+
+### view
+
+View detailed information about an issue.
+
+```bash
+wit issue view <number>
+```
+
+#### Example Output
+
+```
+[OPEN] Fix authentication timeout #42
+────────────────────────────────────────────────────────
+Author:   alice
+Created:  Jan 15, 2024
+Priority: 🟠 high
+Due:      Jan 20, 2024 (5d)
+Estimate: 3 points
+Labels:   bug, backend
+
+Description:
+Users are experiencing session timeouts after 5 minutes
+of inactivity. Expected timeout is 30 minutes.
+
+Relations:
+  Blocking: #43, #44
+  Related: #38
+```
+
+---
+
+### close / reopen
+
+Close or reopen an issue.
+
+```bash
+wit issue close <number>
+wit issue reopen <number>
+```
+
+---
+
+### comment
+
+Add a comment to an issue.
+
+```bash
+wit issue comment <number> "Comment text"
+```
+
+---
+
+## Priority & Estimates
+
+### priority
+
+Set the priority of an issue.
+
+```bash
+wit issue priority <number> <priority>
+```
+
+Valid priorities: `urgent`, `high`, `medium`, `low`, `none`
+
+```bash
+wit issue priority 42 urgent
+```
+
+---
+
+### due
+
+Set or clear the due date for an issue.
+
+```bash
+wit issue due <number> <date>
+wit issue due <number> --clear
+```
+
+Supported date formats:
+- ISO format: `2024-12-31`
+- Relative: `today`, `tomorrow`, `next week`
+- Shorthand: `+3d` (3 days), `+2w` (2 weeks)
+
+```bash
+wit issue due 42 tomorrow
+wit issue due 42 "2024-06-15"
+wit issue due 42 +1w
+wit issue due 42 --clear
+```
+
+---
+
+### estimate
+
+Set the estimate (story points) for an issue.
+
+```bash
+wit issue estimate <number> <points>
+```
+
+```bash
+wit issue estimate 42 5
+```
+
+---
+
+## Hierarchy (Sub-issues)
+
+### parent
+
+Set or remove the parent of an issue to create hierarchies.
+
+```bash
+wit issue parent <number> <parent-number>
+wit issue parent <number> --rm
+```
+
+```bash
+# Make #43 a sub-issue of #42
+wit issue parent 43 42
+
+# Remove parent relationship
+wit issue parent 43 --rm
+```
+
+---
+
+### subs
+
+List sub-issues of an issue.
+
+```bash
+wit issue subs <number>
+```
+
+#### Example Output
+
+```
+Sub-issues of #42: (3)
+
+  ○ #43 Write unit tests
+  ○ #44 Update documentation
+  ● #45 Add integration tests (closed)
+
+Progress: 1/3 (33%)
+```
+
+---
+
+### sub
+
+Create a new sub-issue under a parent.
+
+```bash
+wit issue sub <parent-number> -t "Title"
+```
+
+```bash
+wit issue sub 42 -t "Write unit tests"
+```
+
+---
+
+## Relations
+
+### block / unblock
+
+Mark issues as blocking other issues.
+
+```bash
+wit issue block <blocking> <blocked>
+wit issue unblock <blocking> <blocked>
+```
+
+```bash
+# #41 blocks #42
+wit issue block 41 42
+
+# Remove blocking relationship
+wit issue unblock 41 42
+```
+
+---
+
+### relate / unrelate
+
+Mark issues as related to each other.
+
+```bash
+wit issue relate <issue-a> <issue-b>
+wit issue unrelate <issue-a> <issue-b>
+```
+
+---
+
+### duplicate
+
+Mark an issue as a duplicate of another (closes the duplicate).
+
+```bash
+wit issue duplicate <duplicate> <canonical>
+```
+
+```bash
+# Mark #43 as duplicate of #42 (closes #43)
+wit issue duplicate 43 42
+```
+
+---
+
+## Triage Workflow
+
+### triage
+
+List issues in the triage queue awaiting review.
+
+```bash
+wit issue triage
+```
+
+#### Example Output
+
+```
+Triage Queue: 3 items
+
+◇ #45 Bug report from user
+  by anonymous on Jan 16, 2024
+  Suggested priority: 🟡 medium
+
+◇ #46 Feature request: dark mode
+  by bob on Jan 16, 2024
+
+Use `wit issue accept <number>` to move to backlog
+Use `wit issue reject <number> [reason]` to close
+```
+
+---
+
+### accept
+
+Accept a triage item and move it to the backlog.
+
+```bash
+wit issue accept <number> [options]
+```
+
+#### Options
+
+| Option | Description |
+|--------|-------------|
+| `--status <status>` | Target status (default: backlog) |
+| `--priority <p>` | Set priority when accepting |
+
+```bash
+wit issue accept 45
+wit issue accept 45 --priority high
+```
+
+---
+
+### reject
+
+Reject a triage item and close it with a reason.
+
+```bash
+wit issue reject <number> [reason]
+```
+
+```bash
+wit issue reject 46 "Duplicate of #12"
+```
+
+---
+
+## Activity
+
+### activity
+
+View the activity log for an issue or the entire repository.
+
+```bash
+wit issue activity [number] [--limit <n>]
+```
+
+```bash
+# View activity for issue #42
+wit issue activity 42
+
+# View recent repository activity
+wit issue activity
+
+# Limit to last 10 entries
+wit issue activity --limit 10
+```
+
+---
+
+## Workflow Example
+
+A complete issue workflow:
+
+```bash
+# 1. Create a new issue
+wit issue create "Implement user settings page" -p medium -e 5
+
+# 2. Break it down into sub-issues
+wit issue sub 42 -t "Design settings UI"
+wit issue sub 42 -t "Implement backend API"
+wit issue sub 42 -t "Write tests"
+
+# 3. Set due date
+wit issue due 42 "next week"
+
+# 4. Mark blocking relationships
+wit issue block 43 44  # UI blocks API implementation
+
+# 5. Work through sub-issues
+wit issue close 43  # Design complete
+wit issue close 44  # API complete
+
+# 6. Check progress
+wit issue subs 42
+
+# 7. Complete the parent issue
+wit issue close 42
+```
+
+## Integration with Projects & Cycles
+
+Issues integrate with wit's project management features:
+
+```bash
+# Assign to a project
+wit issue create "New feature" --project "Q1 Release"
+
+# Assign to a sprint/cycle
+wit issue create "Sprint task" --cycle 3
+
+# See project documentation
+wit project --help
+
+# See cycle documentation
+wit cycle --help
+```
+
+<Tip>
+Use `wit issue list --triage` regularly to keep your triage queue clean and prioritize incoming issues.
+</Tip>

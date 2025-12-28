@@ -1,0 +1,346 @@
+---
+title: CI/CD
+description: "Run and manage CI/CD workflows from the command line"
+---
+
+Run GitHub Actions-compatible workflows locally, validate workflow files, and manage CI/CD pipelines directly from your terminal.
+
+## Overview
+
+The `wit ci` command provides local workflow execution and management, compatible with GitHub Actions YAML syntax.
+
+```bash
+wit ci <command> [options]
+```
+
+## Commands
+
+### run
+
+Run workflows locally on your machine.
+
+```bash
+wit ci run [workflow] [options]
+```
+
+#### Options
+
+| Option | Description |
+|--------|-------------|
+| `--job <name>` | Run only a specific job |
+| `--dry-run` | Show what would run without executing |
+| `--verbose` | Show detailed output |
+
+#### Examples
+
+```bash
+# Run all matching workflows
+wit ci run
+
+# Run a specific workflow
+wit ci run ci.yml
+
+# Run only the 'build' job
+wit ci run --job build
+
+# Preview without executing
+wit ci run --dry-run
+
+# Verbose output
+wit ci run ci.yml --verbose
+```
+
+#### Example Output
+
+```
+Running CI workflows (main @ a1b2c3d)
+
+▶ CI
+  .wit/workflows/ci.yml
+
+  Jobs to run:
+    ○ lint (3 steps)
+    ○ test (4 steps)
+    ○ build (2 steps)
+
+  ✓ Completed in 45.23s
+
+All workflows completed successfully
+```
+
+---
+
+### list
+
+List all available workflows in the repository.
+
+```bash
+wit ci list
+```
+
+#### Example Output
+
+```
+Available Workflows
+
+● CI
+  File: .wit/workflows/ci.yml
+  Triggers: push, pull_request
+  Jobs: 3
+    - lint (3 steps)
+    - test (4 steps)
+    - build (2 steps)
+
+● Deploy
+  File: .wit/workflows/deploy.yml
+  Triggers: push
+  Jobs: 2
+    - build (4 steps)
+    - deploy (3 steps)
+```
+
+---
+
+### validate
+
+Validate workflow YAML syntax and structure.
+
+```bash
+wit ci validate [file]
+```
+
+#### Examples
+
+```bash
+# Validate all workflows
+wit ci validate
+
+# Validate specific file
+wit ci validate .wit/workflows/ci.yml
+```
+
+#### Example Output
+
+```
+Validating Workflows
+
+✓ ci.yml
+✓ deploy.yml
+✗ test.yml
+  - Job 'build' is missing required field 'runs-on'
+  - Step 3 has invalid 'uses' format
+
+Validation failed
+```
+
+---
+
+### runs
+
+Show recent workflow runs (requires server connection).
+
+```bash
+wit ci runs
+```
+
+This command requires a connection to the wit server. View runs in the web UI or use the API directly.
+
+---
+
+### view
+
+View details of a specific workflow run (requires server connection).
+
+```bash
+wit ci view <run-id>
+```
+
+---
+
+## Workflow Configuration
+
+Workflows are defined in `.wit/workflows/` using GitHub Actions-compatible YAML syntax.
+
+### Directory Structure
+
+```
+.wit/
+└── workflows/
+    ├── ci.yml
+    ├── deploy.yml
+    └── test.yml
+```
+
+### Example Workflow
+
+```yaml
+# .wit/workflows/ci.yml
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Install dependencies
+        run: npm install
+      
+      - name: Run linter
+        run: npm run lint
+
+  test:
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Install dependencies
+        run: npm install
+      
+      - name: Run tests
+        run: npm test
+      
+      - name: Upload coverage
+        run: npm run coverage
+
+  build:
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Build
+        run: npm run build
+```
+
+### Supported Triggers
+
+| Trigger | Description |
+|---------|-------------|
+| `push` | Triggered on push to specified branches |
+| `pull_request` | Triggered on PR events |
+| `workflow_dispatch` | Manual trigger |
+
+### Job Dependencies
+
+Use `needs` to specify job dependencies:
+
+```yaml
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    needs: lint  # Runs after lint
+    
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [lint, test]  # Runs after both
+```
+
+---
+
+## Local Execution
+
+When running workflows locally, wit executes steps directly on your machine.
+
+### Environment
+
+- Commands run in your repository's working directory
+- Environment variables from your shell are available
+- Secrets should be set via environment variables
+
+### Setting Secrets Locally
+
+```bash
+# Set secrets as environment variables
+export MY_SECRET="secret-value"
+export DEPLOY_KEY="..."
+
+# Run workflow
+wit ci run deploy.yml
+```
+
+---
+
+## Pre-commit/Pre-push Integration
+
+Run CI checks before committing or pushing:
+
+### Pre-commit Hook
+
+```bash
+# .wit/hooks/pre-commit
+#!/bin/sh
+wit ci run --job lint
+```
+
+### Pre-push Hook
+
+```bash
+# .wit/hooks/pre-push
+#!/bin/sh
+wit ci run --dry-run && wit ci run
+```
+
+---
+
+## Workflow Example
+
+A typical development workflow with CI:
+
+```bash
+# 1. Check available workflows
+wit ci list
+
+# 2. Validate before running
+wit ci validate
+
+# 3. Run linting only (fast feedback)
+wit ci run --job lint
+
+# 4. Run full CI suite
+wit ci run
+
+# 5. If issues, check verbose output
+wit ci run --verbose
+
+# 6. Once passing, commit and push
+wit commit -m "feat: add new feature"
+wit push
+```
+
+---
+
+## Server Integration
+
+For full CI/CD capabilities including:
+- Remote workflow execution
+- Build artifacts
+- Job logs and history
+- PR status checks
+
+Start the wit server:
+
+```bash
+wit serve
+```
+
+Then view workflow runs in the web UI at `http://localhost:3000/:owner/:repo/actions`
+
+<Tip>
+Use `wit ci run --dry-run` to preview which jobs and steps would run before actually executing them. This is useful for understanding complex workflows with dependencies.
+</Tip>
+
+## Related Documentation
+
+- [CI/CD Feature Guide](/features/ci-cd) - Full CI/CD feature documentation
+- [Hooks](/features/hooks) - Git hooks integration

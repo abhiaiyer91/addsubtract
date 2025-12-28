@@ -1,0 +1,390 @@
+---
+title: AI API
+description: "API reference for AI-powered features"
+---
+
+The AI API provides endpoints for various AI-powered features including PR descriptions, code explanations, conflict resolution suggestions, and semantic search.
+
+## Overview
+
+All AI endpoints are available through the tRPC API at `/trpc/ai.*`.
+
+## Status
+
+Check AI availability and configuration.
+
+```typescript
+// GET /trpc/ai.status
+```
+
+### Response
+
+```typescript
+{
+  available: boolean;
+  providers: {
+    openai: boolean;
+    anthropic: boolean;
+  };
+  features: {
+    prDescription: boolean;
+    codeExplanation: boolean;
+    conflictResolution: boolean;
+    semanticSearch: boolean;
+    chat: boolean;
+  };
+}
+```
+
+---
+
+## PR Description
+
+Generate AI-powered PR title and description based on the diff.
+
+```typescript
+// POST /trpc/ai.generatePRDescription
+{
+  repoId: string;
+  sourceBranch: string;
+  targetBranch: string;
+  existingTitle?: string;    // Refine existing title
+  existingBody?: string;     // Refine existing body
+  style?: 'concise' | 'detailed' | 'conventional';
+}
+```
+
+### Response
+
+```typescript
+{
+  title: string;
+  body: string;
+  summary: string;           // One-line summary
+  changes: Array<{           // Categorized changes
+    category: 'feature' | 'fix' | 'refactor' | 'docs' | 'test' | 'chore';
+    description: string;
+  }>;
+  breakingChanges?: string[];
+}
+```
+
+### Example Usage
+
+```typescript
+const description = await client.ai.generatePRDescription.mutate({
+  repoId: 'repo-uuid',
+  sourceBranch: 'feature/auth',
+  targetBranch: 'main',
+  style: 'detailed',
+});
+
+// Use for PR creation
+await client.pulls.create.mutate({
+  repoId: 'repo-uuid',
+  title: description.title,
+  body: description.body,
+  sourceBranch: 'feature/auth',
+  targetBranch: 'main',
+  // ...
+});
+```
+
+---
+
+## Explain File Diff
+
+Get an AI explanation of changes to a file.
+
+```typescript
+// POST /trpc/ai.explainFileDiff
+{
+  repoId: string;
+  prId?: string;
+  path: string;
+  oldContent: string;
+  newContent: string;
+  context?: {
+    commitMessage?: string;
+    prTitle?: string;
+    prBody?: string;
+  };
+}
+```
+
+### Response
+
+```typescript
+{
+  summary: string;           // Brief summary of changes
+  explanation: string;       // Detailed explanation
+  impact: 'low' | 'medium' | 'high';
+  suggestions?: string[];    // Improvement suggestions
+  concerns?: string[];       // Potential issues
+}
+```
+
+---
+
+## Conflict Resolution
+
+Get AI suggestions for resolving merge conflicts.
+
+```typescript
+// POST /trpc/ai.suggestConflictResolution
+{
+  repoId: string;
+  path: string;
+  ours: string;              // Our version of the file
+  theirs: string;            // Their version
+  base: string;              // Common ancestor
+  context?: {
+    ourBranch?: string;
+    theirBranch?: string;
+    commitMessages?: string[];
+  };
+}
+```
+
+### Response
+
+```typescript
+{
+  resolved: string;          // Suggested resolved content
+  explanation: string;       // Why this resolution
+  confidence: 'low' | 'medium' | 'high';
+  alternatives?: Array<{
+    content: string;
+    description: string;
+  }>;
+  warnings?: string[];
+}
+```
+
+---
+
+## Squash Commit Message
+
+Generate a squash commit message summarizing multiple commits.
+
+```typescript
+// POST /trpc/ai.summarizeForSquash
+{
+  repoId: string;
+  commits: Array<{
+    sha: string;
+    message: string;
+    author: string;
+  }>;
+  prTitle?: string;
+  prBody?: string;
+  style?: 'conventional' | 'simple';
+}
+```
+
+### Response
+
+```typescript
+{
+  message: string;           // Commit message
+  title: string;             // First line
+  body: string;              // Rest of message
+  coAuthors?: string[];      // Co-authored-by lines
+}
+```
+
+---
+
+## Chat
+
+Have a conversation about the repository.
+
+```typescript
+// POST /trpc/ai.chat
+{
+  repoId: string;
+  message: string;
+  history?: Array<{
+    role: 'user' | 'assistant';
+    content: string;
+  }>;
+  context?: {
+    files?: string[];        // File paths for context
+    branch?: string;
+  };
+}
+```
+
+### Response
+
+```typescript
+{
+  response: string;
+  references?: Array<{       // Referenced files
+    path: string;
+    lines?: { start: number; end: number };
+    relevance: string;
+  }>;
+}
+```
+
+---
+
+## Semantic Search
+
+Search the codebase using natural language.
+
+```typescript
+// POST /trpc/ai.semanticSearch
+{
+  repoId: string;
+  query: string;
+  options?: {
+    limit?: number;          // Default: 10
+    minSimilarity?: number;  // 0-1, default: 0.4
+    fileTypes?: string[];    // Filter by extension
+    paths?: string[];        // Filter by path patterns
+  };
+}
+```
+
+### Response
+
+```typescript
+{
+  results: Array<{
+    path: string;
+    startLine: number;
+    endLine: number;
+    content: string;
+    score: number;           // Similarity score 0-1
+    chunkType: 'function' | 'class' | 'method' | 'block';
+    chunkName?: string;
+    language: string;
+  }>;
+  query: string;
+  totalResults: number;
+  searchTime: number;        // Milliseconds
+}
+```
+
+---
+
+## Usage Examples
+
+### Generate PR Description
+
+```typescript
+import { createTRPCClient } from '@trpc/client';
+
+const client = createTRPCClient<AppRouter>({
+  url: 'http://localhost:3000/trpc',
+});
+
+// Check AI availability
+const status = await client.ai.status.query();
+if (!status.features.prDescription) {
+  console.log('PR description generation not available');
+  return;
+}
+
+// Generate description
+const desc = await client.ai.generatePRDescription.mutate({
+  repoId: 'repo-uuid',
+  sourceBranch: 'feature/auth',
+  targetBranch: 'main',
+  style: 'conventional',
+});
+
+console.log('Title:', desc.title);
+console.log('Body:', desc.body);
+console.log('Changes:');
+for (const change of desc.changes) {
+  console.log(`  [${change.category}] ${change.description}`);
+}
+```
+
+### Resolve Conflicts
+
+```typescript
+const resolution = await client.ai.suggestConflictResolution.mutate({
+  repoId: 'repo-uuid',
+  path: 'src/config.ts',
+  ours: '// our version...',
+  theirs: '// their version...',
+  base: '// original version...',
+  context: {
+    ourBranch: 'feature/auth',
+    theirBranch: 'main',
+  },
+});
+
+if (resolution.confidence === 'high') {
+  // Apply the suggestion
+  await fs.writeFile('src/config.ts', resolution.resolved);
+} else {
+  // Show alternatives to user
+  console.log('Manual review recommended');
+  console.log('Suggestion:', resolution.explanation);
+  for (const alt of resolution.alternatives || []) {
+    console.log(`Alternative: ${alt.description}`);
+  }
+}
+```
+
+### Semantic Code Search
+
+```typescript
+const results = await client.ai.semanticSearch.mutate({
+  repoId: 'repo-uuid',
+  query: 'how is user authentication handled',
+  options: {
+    limit: 5,
+    fileTypes: ['.ts', '.tsx'],
+  },
+});
+
+for (const result of results.results) {
+  console.log(`${result.path}:${result.startLine}-${result.endLine}`);
+  console.log(`  Score: ${(result.score * 100).toFixed(0)}%`);
+  console.log(`  ${result.chunkType}: ${result.chunkName || 'unnamed'}`);
+  console.log(`  ${result.content.slice(0, 100)}...`);
+  console.log();
+}
+```
+
+---
+
+## Configuration
+
+AI features require API keys for the underlying providers:
+
+```bash
+# OpenAI (recommended)
+export OPENAI_API_KEY=sk-...
+
+# Or Anthropic
+export ANTHROPIC_API_KEY=...
+```
+
+Repository-specific keys can be set via the `repoAiKeys` API.
+
+---
+
+## Rate Limiting
+
+AI endpoints have the following rate limits:
+- PR Description: 10/minute
+- File Explanation: 30/minute
+- Conflict Resolution: 20/minute
+- Chat: 30/minute
+- Semantic Search: 60/minute
+
+---
+
+## Related Documentation
+
+- [AI Agents API](/api-reference/agent) - Coding agent API
+- [AI-Powered Features](/features/ai-powered) - Feature overview
+- [Search Command](/commands/search) - CLI search
+- [Review Command](/commands/review) - Code review
