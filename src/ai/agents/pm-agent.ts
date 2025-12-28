@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * PM Mode Agent
  * 
@@ -56,9 +55,9 @@ function createIssueTool(context: AgentContext) {
     outputSchema: z.object({
       issueNumber: z.number().optional(),
       url: z.string().optional(),
-      error: z.string().optional(),
+      errorMessage: z.string().optional(),
     }),
-    execute: async ({ title, body, priority }): Promise<{ issueNumber?: number; url?: string; error?: string }> => {
+    execute: async ({ title, body, priority }) => {
       try {
         // Import the issue model dynamically to avoid circular deps
         const { issueModel } = await import('../../db/models/index.js');
@@ -74,10 +73,9 @@ function createIssueTool(context: AgentContext) {
         return {
           issueNumber: issue.number,
           url: `/${context.owner}/${context.repoName}/issues/${issue.number}`,
-          error: undefined,
         };
       } catch (error) {
-        return { issueNumber: undefined, url: undefined, error: error instanceof Error ? error.message : 'Failed to create issue' };
+        return { errorMessage: error instanceof Error ? error.message : 'Failed to create issue' };
       }
     },
   });
@@ -102,9 +100,9 @@ function createListIssuesTool(context: AgentContext) {
         author: z.string().optional(),
         labels: z.array(z.string()),
       })).optional(),
-      error: z.string().optional(),
+      errorMessage: z.string().optional(),
     }),
-    execute: async ({ state, limit }): Promise<{ issues?: Array<{ number: number; title: string; state: string; labels: string[] }>; error?: string }> => {
+    execute: async ({ state, limit }) => {
       try {
         const { issueModel } = await import('../../db/models/index.js');
         
@@ -120,10 +118,9 @@ function createListIssuesTool(context: AgentContext) {
             state: i.state,
             labels: [],
           })),
-          error: undefined,
         };
       } catch (error) {
-        return { issues: undefined, error: error instanceof Error ? error.message : 'Failed to list issues' };
+        return { errorMessage: error instanceof Error ? error.message : 'Failed to list issues' };
       }
     },
   });
@@ -146,9 +143,9 @@ function createPRTool(context: AgentContext) {
     outputSchema: z.object({
       prNumber: z.number().optional(),
       url: z.string().optional(),
-      error: z.string().optional(),
+      errorMessage: z.string().optional(),
     }),
-    execute: async ({ title, body, head, base, draft }): Promise<{ prNumber?: number; url?: string; error?: string }> => {
+    execute: async ({ title, body, head, base, draft }) => {
       try {
         const { prModel } = await import('../../db/models/index.js');
         
@@ -157,18 +154,19 @@ function createPRTool(context: AgentContext) {
           authorId: context.userId,
           title,
           body: body || '',
-          headBranch: head,
-          baseBranch: base,
+          sourceBranch: head,
+          targetBranch: base,
           isDraft: draft,
+          headSha: '', // Will be filled in by the system
+          baseSha: '', // Will be filled in by the system
         });
         
         return {
           prNumber: pr.number,
           url: `/${context.owner}/${context.repoName}/pull/${pr.number}`,
-          error: undefined,
         };
       } catch (error) {
-        return { prNumber: undefined, url: undefined, error: error instanceof Error ? error.message : 'Failed to create PR' };
+        return { errorMessage: error instanceof Error ? error.message : 'Failed to create PR' };
       }
     },
   });
@@ -194,9 +192,9 @@ function createListPRsTool(context: AgentContext) {
         head: z.string(),
         base: z.string(),
       })).optional(),
-      error: z.string().optional(),
+      errorMessage: z.string().optional(),
     }),
-    execute: async ({ state, limit }): Promise<{ prs?: Array<{ number: number; title: string; state: string; head: string; base: string }>; error?: string }> => {
+    execute: async ({ state, limit }) => {
       try {
         const { prModel } = await import('../../db/models/index.js');
         
@@ -206,17 +204,16 @@ function createListPRsTool(context: AgentContext) {
         });
         
         return {
-          prs: prs.map((p: any) => ({
+          prs: prs.map(p => ({
             number: p.number,
             title: p.title,
             state: p.state,
-            head: p.headBranch,
-            base: p.baseBranch,
+            head: p.sourceBranch,
+            base: p.targetBranch,
           })),
-          error: undefined,
         };
       } catch (error) {
-        return { prs: undefined, error: error instanceof Error ? error.message : 'Failed to list PRs' };
+        return { errorMessage: error instanceof Error ? error.message : 'Failed to list PRs' };
       }
     },
   });

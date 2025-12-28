@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Triage Agent
  * 
@@ -39,7 +38,7 @@ export interface TriageResult {
   assigneeUsername?: string;
   priority?: 'none' | 'low' | 'medium' | 'high' | 'urgent';
   reasoning?: string;
-  error?: string;
+  errorMessage?: string;
   tokensUsed?: number;
 }
 
@@ -86,9 +85,9 @@ function createGetLabelsTool(context: TriageContext) {
         description: z.string().optional(),
         color: z.string(),
       })),
-      error: z.string().optional(),
+      errorMessage: z.string().optional(),
     }),
-    execute: async (): Promise<{ labels: Array<{ id: string; name: string; description?: string; color: string }>; error?: string }> => {
+    execute: async () => {
       try {
         const { labelModel } = await import('../../db/models/index.js');
         const labels = await labelModel.listByRepo(context.repoId);
@@ -99,10 +98,9 @@ function createGetLabelsTool(context: TriageContext) {
             description: l.description || undefined,
             color: l.color,
           })),
-          error: undefined,
         };
       } catch (error) {
-        return { labels: [], error: error instanceof Error ? error.message : 'Failed to get labels' };
+        return { labels: [], errorMessage: error instanceof Error ? error.message : 'Failed to get labels' };
       }
     },
   });
@@ -123,9 +121,9 @@ function createGetCollaboratorsTool(context: TriageContext) {
         name: z.string().optional(),
         permission: z.string(),
       })),
-      error: z.string().optional(),
+      errorMessage: z.string().optional(),
     }),
-    execute: async (): Promise<{ collaborators: Array<{ id: string; username: string; name?: string; permission: string }>; error?: string }> => {
+    execute: async (): Promise<{ collaborators: Array<{ id: string; username: string; name?: string; permission: string }>; errorMessage?: string }> => {
       try {
         const { collaboratorModel } = await import('../../db/models/index.js');
         const collaborators = await collaboratorModel.listByRepo(context.repoId);
@@ -136,10 +134,9 @@ function createGetCollaboratorsTool(context: TriageContext) {
             name: c.user.name || undefined,
             permission: c.permission,
           })),
-          error: undefined,
         };
       } catch (error) {
-        return { collaborators: [], error: error instanceof Error ? error.message : 'Failed to get collaborators' };
+        return { collaborators: [], errorMessage: error instanceof Error ? error.message : 'Failed to get collaborators' };
       }
     },
   });
@@ -158,17 +155,17 @@ function createApplyLabelsTool(context: TriageContext) {
     outputSchema: z.object({
       success: z.boolean(),
       appliedLabels: z.array(z.string()).optional(),
-      error: z.string().optional(),
+      errorMessage: z.string().optional(),
     }),
-    execute: async ({ labelNames }): Promise<{ success: boolean; appliedLabels?: string[]; error?: string }> => {
+    execute: async ({ labelNames }): Promise<{ success: boolean; appliedLabels?: string[]; errorMessage?: string }> => {
       if (!context.autoAssignLabels) {
-        return { success: false, appliedLabels: undefined, error: 'Auto-assign labels is not enabled' };
+        return { success: false, appliedLabels: undefined, errorMessage: 'Auto-assign labels is not enabled' };
       }
-      
+
       try {
         const { labelModel, issueLabelModel } = await import('../../db/models/index.js');
         const appliedLabels: string[] = [];
-        
+
         for (const name of labelNames) {
           const label = await labelModel.findByName(context.repoId, name);
           if (label) {
@@ -176,10 +173,10 @@ function createApplyLabelsTool(context: TriageContext) {
             appliedLabels.push(name);
           }
         }
-        
-        return { success: true, appliedLabels, error: undefined };
+
+        return { success: true, appliedLabels, errorMessage: undefined };
       } catch (error) {
-        return { success: false, appliedLabels: undefined, error: error instanceof Error ? error.message : 'Failed to apply labels' };
+        return { success: false, appliedLabels: undefined, errorMessage: error instanceof Error ? error.message : 'Failed to apply labels' };
       }
     },
   });
@@ -197,19 +194,19 @@ function createSetPriorityTool(context: TriageContext) {
     }),
     outputSchema: z.object({
       success: z.boolean(),
-      error: z.string().optional(),
+      errorMessage: z.string().optional(),
     }),
-    execute: async ({ priority }): Promise<{ success: boolean; error?: string }> => {
+    execute: async ({ priority }) => {
       if (!context.autoSetPriority) {
-        return { success: false, error: 'Auto-set priority is not enabled' };
+        return { success: false, errorMessage: 'Auto-set priority is not enabled' };
       }
-      
+
       try {
         const { issueModel } = await import('../../db/models/index.js');
         await issueModel.updatePriority(context.issueId, priority);
-        return { success: true, error: undefined };
+        return { success: true, errorMessage: undefined };
       } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : 'Failed to set priority' };
+        return { success: false, errorMessage: error instanceof Error ? error.message : 'Failed to set priority' };
       }
     },
   });
@@ -227,19 +224,19 @@ function createAssignUserTool(context: TriageContext) {
     }),
     outputSchema: z.object({
       success: z.boolean(),
-      error: z.string().optional(),
+      errorMessage: z.string().optional(),
     }),
-    execute: async ({ userId }): Promise<{ success: boolean; error?: string }> => {
+    execute: async ({ userId }) => {
       if (!context.autoAssignUsers) {
-        return { success: false, error: 'Auto-assign users is not enabled' };
+        return { success: false, errorMessage: 'Auto-assign users is not enabled' };
       }
-      
+
       try {
         const { issueModel } = await import('../../db/models/index.js');
         await issueModel.assign(context.issueId, userId);
-        return { success: true, error: undefined };
+        return { success: true, errorMessage: undefined };
       } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : 'Failed to assign user' };
+        return { success: false, errorMessage: error instanceof Error ? error.message : 'Failed to assign user' };
       }
     },
   });
@@ -257,13 +254,13 @@ function createAddCommentTool(context: TriageContext) {
     }),
     outputSchema: z.object({
       success: z.boolean(),
-      error: z.string().optional(),
+      errorMessage: z.string().optional(),
     }),
-    execute: async ({ comment }): Promise<{ success: boolean; error?: string }> => {
+    execute: async ({ comment }) => {
       if (!context.addTriageComment) {
-        return { success: false, error: 'Add triage comment is not enabled' };
+        return { success: false, errorMessage: 'Add triage comment is not enabled' };
       }
-      
+
       try {
         const { issueCommentModel } = await import('../../db/models/index.js');
         // Use a system user ID for triage comments or the repo owner
@@ -272,9 +269,9 @@ function createAddCommentTool(context: TriageContext) {
           userId: context.userId, // This will be set to a bot user or repo owner
           body: `**Triage Agent Analysis**\n\n${comment}`,
         });
-        return { success: true, error: undefined };
+        return { success: true, errorMessage: undefined };
       } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : 'Failed to add comment' };
+        return { success: false, errorMessage: error instanceof Error ? error.message : 'Failed to add comment' };
       }
     },
   });
@@ -284,7 +281,7 @@ function createAddCommentTool(context: TriageContext) {
  * Create a Triage Agent for analyzing and categorizing issues
  */
 export function createTriageAgent(context: TriageContext, model: string = 'anthropic/claude-sonnet-4-20250514'): Agent {
-  const customInstructions = context.customPrompt 
+  const customInstructions = context.customPrompt
     ? `${TRIAGE_AGENT_INSTRUCTIONS}\n\n## Custom Instructions from Repository Owner\n${context.customPrompt}`
     : TRIAGE_AGENT_INSTRUCTIONS;
 
@@ -311,13 +308,13 @@ export function createTriageAgent(context: TriageContext, model: string = 'anthr
 export async function runTriageAgent(context: TriageContext, model?: string): Promise<TriageResult> {
   try {
     const agent = createTriageAgent(context, model);
-    
+
     const enabledActions: string[] = [];
     if (context.autoAssignLabels) enabledActions.push('apply labels');
     if (context.autoSetPriority) enabledActions.push('set priority');
     if (context.autoAssignUsers) enabledActions.push('assign to a team member');
     if (context.addTriageComment) enabledActions.push('add a comment explaining your decisions');
-    
+
     const prompt = `Please triage this new issue:
 
 **Issue #${context.issueNumber}: ${context.issueTitle}**
@@ -332,7 +329,7 @@ First, get the available labels${context.autoAssignUsers ? ' and collaborators' 
 Then analyze the issue and take appropriate actions based on what you find.`;
 
     const response = await agent.generate(prompt);
-    
+
     // Parse the result - the agent will have called tools to apply labels, etc.
     // The response text contains the reasoning
     return {
@@ -344,7 +341,7 @@ Then analyze the issue and take appropriate actions based on what you find.`;
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error during triage',
+      errorMessage: error instanceof Error ? error.message : 'Unknown error during triage',
     };
   }
 }
