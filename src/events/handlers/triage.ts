@@ -1,27 +1,32 @@
 /**
  * Triage Agent Event Handler
  * 
- * Listens for new issues and triggers the triage workflow when enabled.
+ * Listens for new and reopened issues and triggers the triage workflow when enabled.
  * Uses Mastra workflows for multi-step, orchestrated triage analysis.
  */
 
 import { eventBus } from '../bus';
-import type { IssueCreatedEvent } from '../types';
+import type { IssueCreatedEvent, IssueReopenedEvent } from '../types';
 import { 
   triageAgentConfigModel, 
   triageAgentRunModel,
   issueModel,
   repoModel,
   userModel,
+  issueLabelModel,
 } from '../../db/models';
 import { runIssueTriageWorkflow, type IssueTriageInput } from '../../ai/index.js';
 import { repoAiKeyModel } from '../../db/models/repo-ai-keys';
+
+// Label name that indicates an issue has already been triaged
+const AI_TRIAGE_LABEL = 'ai-triage';
 
 /**
  * Register triage agent handlers
  */
 export function registerTriageHandlers(): void {
   eventBus.on('issue.created', handleIssueCreated);
+  eventBus.on('issue.reopened', handleIssueReopened);
   console.log('[EventBus] Triage workflow handlers registered');
 }
 
@@ -29,9 +34,39 @@ export function registerTriageHandlers(): void {
  * Handle new issue creation - trigger triage workflow if enabled
  */
 async function handleIssueCreated(event: IssueCreatedEvent): Promise<void> {
-  const { issueId, issueNumber, issueTitle, repoId, repoFullName } = event.payload;
-  
+  const { issueNumber, repoFullName } = event.payload;
   console.log(`[TriageHandler] Received issue.created event for ${repoFullName}#${issueNumber}`);
+  await handleIssueTriage(event.payload, 'created');
+}
+
+/**
+ * Handle issue reopened - trigger triage only if not already triaged
+ */
+async function handleIssueReopened(event: IssueReopenedEvent): Promise<void> {
+  const { issueId, issueNumber, repoFullName } = event.payload;
+  
+  console.log(`[TriageHandler] Received issue.reopened event for ${repoFullName}#${issueNumber}`);
+  
+  // Check if the issue already has the ai-triage label
+  const labels = await issueLabelModel.listByIssue(issueId);
+  const hasTriageLabel = labels.some(label => label.name.toLowerCase() === AI_TRIAGE_LABEL);
+  
+  if (hasTriageLabel) {
+    console.log(`[TriageHandler] Issue ${repoFullName}#${issueNumber} already has '${AI_TRIAGE_LABEL}' label, skipping triage`);
+    return;
+  }
+  
+  await handleIssueTriage(event.payload, 'reopened');
+}
+
+/**
+ * Common handler for issue triage (for both created and reopened events)
+ */
+async function handleIssueTriage(
+  payload: { issueId: string; issueNumber: number; issueTitle: string; repoId: string; repoFullName: string },
+  trigger: 'created' | 'reopened'
+): Promise<void> {
+  const { issueId, issueNumber, issueTitle, repoId, repoFullName } = payload;
   
   try {
     // Check if triage agent is enabled for this repo

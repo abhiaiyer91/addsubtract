@@ -382,7 +382,21 @@ export const issuesRouter = router({
         });
       }
 
-      return issueModel.reopen(input.issueId);
+      const reopenedIssue = await issueModel.reopen(input.issueId);
+      
+      // Emit issue.reopened event
+      if (reopenedIssue && repo) {
+        const repoFullName = `${ctx.user.username || ctx.user.name}/${repo.name}`;
+        await eventBus.emit('issue.reopened', ctx.user.id, {
+          issueId: reopenedIssue.id,
+          issueNumber: reopenedIssue.number,
+          issueTitle: reopenedIssue.title,
+          repoId: issue.repoId,
+          repoFullName,
+        });
+      }
+      
+      return reopenedIssue;
     }),
 
   /**

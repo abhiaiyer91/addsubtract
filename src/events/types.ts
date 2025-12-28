@@ -195,6 +195,17 @@ export interface IssueClosedEvent extends BaseEvent {
   };
 }
 
+export interface IssueReopenedEvent extends BaseEvent {
+  type: 'issue.reopened';
+  payload: {
+    issueId: string;
+    issueNumber: number;
+    issueTitle: string;
+    repoId: string;
+    repoFullName: string;
+  };
+}
+
 export interface IssueCommentedEvent extends BaseEvent {
   type: 'issue.commented';
   payload: {
@@ -330,6 +341,7 @@ export type AppEvent =
   | IssueCreatedEvent
   | IssueAssignedEvent
   | IssueClosedEvent
+  | IssueReopenedEvent
   | IssueCommentedEvent
   | CiRunCompletedEvent
   | MentionEvent
