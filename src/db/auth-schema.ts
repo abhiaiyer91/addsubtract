@@ -1,9 +1,6 @@
 import { relations } from "drizzle-orm";
 import { pgTable, text, timestamp, boolean, index } from "drizzle-orm/pg-core";
 
-// User roles for admin portal
-export type UserRole = 'user' | 'admin' | 'superadmin';
-
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
@@ -21,11 +18,6 @@ export const user = pgTable("user", {
   location: text("location"),
   website: text("website"),
   avatarUrl: text("avatar_url"),
-  // Admin portal fields
-  role: text("role").$type<UserRole>().default('user').notNull(),
-  suspended: boolean("suspended").default(false).notNull(),
-  suspendedAt: timestamp("suspended_at"),
-  suspendedReason: text("suspended_reason"),
 });
 
 export const session = pgTable(
