@@ -870,6 +870,103 @@ export const releaseAssets = pgTable('release_assets', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+// ============ PACKAGES (NPM REGISTRY) ============
+
+/**
+ * Package visibility enum
+ */
+export const packageVisibilityEnum = pgEnum('package_visibility', ['public', 'private']);
+
+/**
+ * Packages table - npm package metadata
+ * Each package is scoped to a repository - the repo is the source of truth
+ */
+export const packages = pgTable('packages', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull(),                    // Package name (can differ from repo name)
+  scope: text('scope'),                            // Scope without @, e.g., "wit" (defaults to owner username)
+  repoId: uuid('repo_id')
+    .notNull()
+    .references(() => repositories.id, { onDelete: 'cascade' }),
+  description: text('description'),
+  visibility: packageVisibilityEnum('visibility').notNull().default('public'),
+  keywords: text('keywords'),                      // JSON array
+  license: text('license'),
+  homepage: text('homepage'),
+  readme: text('readme'),                          // README content (updated on publish)
+  downloadCount: integer('download_count').notNull().default(0),
+  deprecated: text('deprecated'),                  // Deprecation message (null = not deprecated)
+  publishOnRelease: boolean('publish_on_release').notNull().default(false), // Auto-publish on git release
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  uniqueName: unique().on(table.scope, table.name),
+  uniqueRepo: unique().on(table.repoId), // One package per repo
+}));
+
+/**
+ * Package versions table - each published version
+ */
+export const packageVersions = pgTable('package_versions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  packageId: uuid('package_id')
+    .notNull()
+    .references(() => packages.id, { onDelete: 'cascade' }),
+  version: text('version').notNull(),              // Semver: "1.2.3"
+  tagName: text('tag_name'),                       // Git tag this version was published from
+  tarballUrl: text('tarball_url').notNull(),       // URL/path to download .tgz
+  tarballSha512: text('tarball_sha512').notNull(), // Integrity hash (sha512)
+  tarballSize: integer('tarball_size').notNull(),  // Size in bytes
+  manifest: text('manifest').notNull(),            // Full package.json as JSON string
+  dependencies: text('dependencies'),              // JSON object
+  devDependencies: text('dev_dependencies'),       // JSON object
+  peerDependencies: text('peer_dependencies'),     // JSON object
+  optionalDependencies: text('optional_dependencies'), // JSON object
+  engines: text('engines'),                        // JSON object (node version, etc.)
+  bin: text('bin'),                                // JSON object (binary entry points)
+  publishedBy: uuid('published_by')
+    .notNull()
+    .references(() => users.id),
+  deprecated: text('deprecated'),                  // Per-version deprecation message
+  downloadCount: integer('download_count').notNull().default(0),
+  publishedAt: timestamp('published_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  uniqueVersion: unique().on(table.packageId, table.version),
+}));
+
+/**
+ * Package dist-tags - latest, beta, next, etc.
+ */
+export const packageDistTags = pgTable('package_dist_tags', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  packageId: uuid('package_id')
+    .notNull()
+    .references(() => packages.id, { onDelete: 'cascade' }),
+  tag: text('tag').notNull(),                      // "latest", "beta", "next", etc.
+  versionId: uuid('version_id')
+    .notNull()
+    .references(() => packageVersions.id, { onDelete: 'cascade' }),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  uniqueTag: unique().on(table.packageId, table.tag),
+}));
+
+/**
+ * Package maintainers - users who can publish new versions
+ */
+export const packageMaintainers = pgTable('package_maintainers', {
+  packageId: uuid('package_id')
+    .notNull()
+    .references(() => packages.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  addedAt: timestamp('added_at', { withTimezone: true }).defaultNow().notNull(),
+  addedBy: uuid('added_by').references(() => users.id),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.packageId, table.userId] }),
+}));
+
 // ============ ACTIVITY ============
 
 export const activities = pgTable('activities', {
@@ -2044,6 +2141,21 @@ export type NewTriageAgentConfig = typeof triageAgentConfig.$inferInsert;
 
 export type TriageAgentRun = typeof triageAgentRuns.$inferSelect;
 export type NewTriageAgentRun = typeof triageAgentRuns.$inferInsert;
+
+// Package registry types
+export type PackageVisibility = (typeof packageVisibilityEnum.enumValues)[number];
+
+export type Package = typeof packages.$inferSelect;
+export type NewPackage = typeof packages.$inferInsert;
+
+export type PackageVersion = typeof packageVersions.$inferSelect;
+export type NewPackageVersion = typeof packageVersions.$inferInsert;
+
+export type PackageDistTag = typeof packageDistTags.$inferSelect;
+export type NewPackageDistTag = typeof packageDistTags.$inferInsert;
+
+export type PackageMaintainer = typeof packageMaintainers.$inferSelect;
+export type NewPackageMaintainer = typeof packageMaintainers.$inferInsert;
 
 // OAuth App types
 export type OAuthAppScope = (typeof oauthAppScopeEnum.enumValues)[number];

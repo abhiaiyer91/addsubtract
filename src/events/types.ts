@@ -281,6 +281,38 @@ export interface MergeQueueFailedEvent extends BaseEvent {
   };
 }
 
+// ============ PACKAGE EVENTS ============
+
+export interface PackagePublishedEvent extends BaseEvent {
+  type: 'package.published';
+  payload: {
+    packageId: string;
+    packageName: string; // Full name including scope
+    version: string;
+    repoId?: string;
+    repoFullName?: string;
+  };
+}
+
+export interface PackageDeprecatedEvent extends BaseEvent {
+  type: 'package.deprecated';
+  payload: {
+    packageId: string;
+    packageName: string;
+    version?: string; // If specific version, otherwise whole package
+    message: string;
+  };
+}
+
+export interface PackageUnpublishedEvent extends BaseEvent {
+  type: 'package.unpublished';
+  payload: {
+    packageId: string;
+    packageName: string;
+    version?: string; // If specific version, otherwise whole package
+  };
+}
+
 // ============ UNION TYPE ============
 
 export type AppEvent =
@@ -304,7 +336,10 @@ export type AppEvent =
   | MergeQueueAddedEvent
   | MergeQueueProcessEvent
   | MergeQueueCompletedEvent
-  | MergeQueueFailedEvent;
+  | MergeQueueFailedEvent
+  | PackagePublishedEvent
+  | PackageDeprecatedEvent
+  | PackageUnpublishedEvent;
 
 export type EventType = AppEvent['type'];
 
