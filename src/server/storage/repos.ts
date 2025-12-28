@@ -74,8 +74,13 @@ export class RepoManager {
    * Get the full path for a repository
    */
   private getRepoPath(owner: string, name: string): string {
-    // Normalize name - add .git suffix if not present
-    const repoName = name.endsWith('.git') ? name : `${name}.git`;
+    // Normalize name - strip .wit/.git suffix and add .git for internal storage
+    let repoName = name;
+    if (repoName.endsWith('.wit')) {
+      repoName = repoName.slice(0, -4) + '.git';
+    } else if (!repoName.endsWith('.git')) {
+      repoName = `${repoName}.git`;
+    }
     return path.join(this.baseDir, owner, repoName);
   }
 

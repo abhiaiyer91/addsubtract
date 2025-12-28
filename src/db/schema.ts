@@ -924,9 +924,9 @@ export const packageVersions = pgTable('package_versions', {
   optionalDependencies: text('optional_dependencies'), // JSON object
   engines: text('engines'),                        // JSON object (node version, etc.)
   bin: text('bin'),                                // JSON object (binary entry points)
-  publishedBy: uuid('published_by')
+  publishedBy: text('published_by')
     .notNull()
-    .references(() => users.id),
+    .references(() => authUser.id),
   deprecated: text('deprecated'),                  // Per-version deprecation message
   downloadCount: integer('download_count').notNull().default(0),
   publishedAt: timestamp('published_at', { withTimezone: true }).defaultNow().notNull(),
@@ -1573,6 +1573,38 @@ export const repoAiKeys = pgTable('repo_ai_keys', {
 }, (table) => ({
   // Only one key per provider per repo
   uniqueProviderPerRepo: unique().on(table.repoId, table.provider),
+}));
+
+// ============ USER AI KEYS ============
+
+/**
+ * User AI Keys table
+ * Stores encrypted API keys for AI providers per user
+ * Users can set their own keys to use across all repositories
+ */
+export const userAiKeys = pgTable('user_ai_keys', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  
+  // User this key belongs to
+  userId: text('user_id')
+    .notNull()
+    .references(() => authUser.id, { onDelete: 'cascade' }),
+  
+  // AI provider (openai, anthropic)
+  provider: aiProviderEnum('provider').notNull(),
+  
+  // Encrypted API key (we store encrypted, never plain text)
+  encryptedKey: text('encrypted_key').notNull(),
+  
+  // Last 4 characters of the key for display (e.g., "...xyz1")
+  keyHint: text('key_hint').notNull(),
+  
+  // Timestamps
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  // Only one key per provider per user
+  uniqueProviderPerUser: unique().on(table.userId, table.provider),
 }));
 
 // ============ TRIAGE AGENT CONFIGURATION ============

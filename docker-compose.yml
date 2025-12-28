@@ -58,6 +58,35 @@ services:
     networks:
       - wit-network
 
+  # Web UI
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    ports:
+      - "5173:3000"
+    environment:
+      VITE_API_URL: http://server:3000
+    depends_on:
+      - server
+    networks:
+      - wit-network
+
+  # Admin Portal
+  admin:
+    build:
+      context: .
+      dockerfile: apps/admin/Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      VITE_API_URL: http://server:3000
+      VITE_WEB_URL: http://web:3000
+    depends_on:
+      - server
+    networks:
+      - wit-network
+
   # Redis Commander for debugging (optional, development only)
   redis-commander:
     image: rediscommander/redis-commander:latest

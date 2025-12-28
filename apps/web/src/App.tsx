@@ -42,8 +42,7 @@ import { RepoSettingsPage } from './routes/repo/settings';
 import { CollaboratorsPage } from './routes/repo/settings/collaborators';
 import { BranchProtectionPage } from './routes/repo/settings/branches';
 import { WebhooksPage } from './routes/repo/settings/webhooks';
-import { RepoAISettingsPage } from './routes/repo/settings/ai';
-import { TriageAgentSettingsPage } from './routes/repo/settings/triage';
+import { AgentsSettingsPage } from './routes/repo/settings/agents';
 import { PackageSettingsPage } from './routes/repo/settings/package';
 import { PackagePage } from './routes/repo/package';
 import { ReleasesPage } from './routes/repo/releases';
@@ -58,6 +57,7 @@ import { SettingsPage } from './routes/settings';
 import { SSHKeysPage } from './routes/settings/keys';
 import { TokensPage } from './routes/settings/tokens';
 import { NotificationSettingsPage } from './routes/settings/notifications';
+import { UserAIKeysPage } from './routes/settings/ai-keys';
 import { OAuthAppsPage } from './routes/settings/oauth-apps';
 import { OAuthAppDetailPage } from './routes/settings/oauth-app-detail';
 import { AuthorizedAppsPage } from './routes/settings/authorized-apps';
@@ -71,6 +71,7 @@ import { OrgTeamsPage } from './routes/org/teams';
 import { TeamDetailPage } from './routes/org/team-detail';
 import { SearchPage } from './routes/search';
 import { InboxPage } from './routes/inbox';
+import { WrappedPage } from './routes/wrapped';
 
 // Scroll to top on route change
 function ScrollToTop() {
@@ -109,6 +110,7 @@ export function App() {
             <Route path="/settings/keys" element={<SSHKeysPage />} />
             <Route path="/settings/tokens" element={<TokensPage />} />
             <Route path="/settings/notifications" element={<NotificationSettingsPage />} />
+            <Route path="/settings/ai" element={<UserAIKeysPage />} />
             <Route path="/settings/oauth-apps" element={<OAuthAppsPage />} />
             <Route path="/settings/oauth-apps/:id" element={<OAuthAppDetailPage />} />
             <Route path="/settings/authorized-apps" element={<AuthorizedAppsPage />} />
@@ -126,6 +128,7 @@ export function App() {
             <Route path="/org/:slug/teams/:teamId" element={<TeamDetailPage />} />
 
             {/* User/Org profile - Unified dashboard */}
+            <Route path="/:username/wrapped" element={<WrappedPage />} />
             <Route path="/:owner" element={<UserHomePage />} />
 
             {/* Repository routes */}
@@ -187,8 +190,7 @@ export function App() {
             <Route path="/:owner/:repo/settings/collaborators" element={<CollaboratorsPage />} />
             <Route path="/:owner/:repo/settings/branches" element={<BranchProtectionPage />} />
             <Route path="/:owner/:repo/settings/webhooks" element={<WebhooksPage />} />
-            <Route path="/:owner/:repo/settings/ai" element={<RepoAISettingsPage />} />
-            <Route path="/:owner/:repo/settings/triage" element={<TriageAgentSettingsPage />} />
+            <Route path="/:owner/:repo/settings/agents" element={<AgentsSettingsPage />} />
             <Route path="/:owner/:repo/settings/package" element={<PackageSettingsPage />} />
           </Route>
         </Routes>

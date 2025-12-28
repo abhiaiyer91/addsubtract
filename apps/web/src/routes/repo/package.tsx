@@ -76,13 +76,14 @@ export function PackagePage() {
           icon={Package}
           title="No package published"
           description="This repository doesn't have a package published yet."
-        >
-          {session?.user?.id === repoData.repo.ownerId && (
-            <Link to={`/${owner}/${repo}/settings/package`}>
-              <Button className="mt-4">Enable Package Registry</Button>
-            </Link>
-          )}
-        </EmptyState>
+          action={
+            session?.user?.id === repoData.repo.ownerId ? (
+              <Link to={`/${owner}/${repo}/settings/package`}>
+                <Button>Enable Package Registry</Button>
+              </Link>
+            ) : undefined
+          }
+        />
       </RepoLayout>
     );
   }

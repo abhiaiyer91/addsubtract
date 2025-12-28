@@ -111,6 +111,9 @@ export {
 // Repository AI Keys model
 export { repoAiKeyModel, type RepoAiKeyInfo } from './repo-ai-keys';
 
+// User AI Keys model
+export { userAiKeyModel, type UserAiKeyInfo } from './user-ai-keys';
+
 // User Stats model (dashboard data)
 export {
   userStatsModel,
@@ -165,3 +168,12 @@ export {
   getFullPackageName,
   generatePackageMetadata,
 } from './packages';
+
+// Admin portal models
+export {
+  adminModel,
+  type SystemStats,
+  type UserWithStats,
+  type AuditLogEntry,
+  type AdminContext,
+} from './admin';

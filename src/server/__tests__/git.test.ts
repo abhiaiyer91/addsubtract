@@ -61,7 +61,7 @@ describe('Git Server', () => {
       expect(data.repositories[0]).toEqual({
         owner: 'testuser',
         name: 'testrepo',
-        url: '/testuser/testrepo.git',
+        url: '/testuser/testrepo.wit',
       });
     });
   });

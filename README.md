@@ -33,7 +33,7 @@ That's it. You're using wit.
 - AI commit messages and code review
 - Semantic search over your codebase
 - Web UI (`wit web`) and Terminal UI (`wit ui`)
-- Self-hosted server with PRs and issues
+- Self-hosted server (`wit serve`) for Git hosting with PRs, issues, and API
 
 ## What's Not (Yet)
 
@@ -65,11 +65,66 @@ wit search "how does X work?"
 wit wip -a               # quick save with auto-message
 wit amend -m "fix typo"  # fix last commit
 wit cleanup              # delete merged branches
+
+# Visual interfaces
+wit web                  # browser UI for current repo
+wit ui                   # terminal UI
+wit graph                # commit graph in terminal
 ```
+
+## Self-Hosting
+
+wit can run as a self-hosted Git server with a full web interface:
+
+```bash
+# Start the server
+wit serve --port 3000 --repos ./repos
+
+# In another terminal, start the web app
+cd apps/web && npm run dev
+```
+
+This gives you:
+- Git HTTP/SSH hosting at `http://localhost:3000`
+- Web UI at `http://localhost:5173`
+- Pull requests, issues, and code review
+- tRPC API for building integrations
+
+**`wit web` vs `wit serve`:**
+- `wit web` - Quick browser UI for your current repository (like GitKraken). No server setup needed.
+- `wit serve` - Full Git hosting platform for multiple repositories with PRs, issues, auth, and API.
 
 ## Requirements
 
 Node.js >= 22.13.0
+
+## Built With
+
+wit is built on the shoulders of these excellent open source projects:
+
+### Backend
+- **[Hono](https://github.com/honojs/hono)** - Fast, lightweight web framework
+- **[tRPC](https://github.com/trpc/trpc)** - End-to-end typesafe APIs
+- **[Drizzle ORM](https://github.com/drizzle-team/drizzle-orm)** - TypeScript ORM with great DX
+- **[better-auth](https://github.com/better-auth/better-auth)** - Authentication for TypeScript
+- **[Mastra](https://github.com/mastra-ai/mastra)** - AI agent framework
+- **[Vercel AI SDK](https://github.com/vercel/ai)** - AI/LLM integrations
+
+### Frontend
+- **[React](https://github.com/facebook/react)** - UI library
+- **[Vite](https://github.com/vitejs/vite)** - Build tool and dev server
+- **[Tailwind CSS](https://github.com/tailwindlabs/tailwindcss)** - Utility-first CSS
+- **[Radix UI](https://github.com/radix-ui/primitives)** - Unstyled, accessible components
+- **[shadcn/ui](https://github.com/shadcn-ui/ui)** - Re-usable components built on Radix
+- **[Monaco Editor](https://github.com/microsoft/monaco-editor)** - Code editor that powers VS Code
+- **[Zustand](https://github.com/pmndrs/zustand)** - State management
+- **[TanStack Query](https://github.com/TanStack/query)** - Data fetching and caching
+- **[React Flow](https://github.com/xyflow/xyflow)** - Node-based graph UI
+- **[Lucide](https://github.com/lucide-icons/lucide)** - Icons
+- **[Shiki](https://github.com/shikijs/shiki)** - Syntax highlighting
+
+### CLI & TUI
+- **[Blessed](https://github.com/chjj/blessed)** - Terminal UI library
 
 ## Contributing
 

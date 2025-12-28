@@ -68,7 +68,7 @@ export function RepoPage() {
   const readme = readmeData?.encoding === 'utf-8' ? readmeData.content : null;
   const isOwner = session?.user?.id === repoInfo?.ownerId;
 
-  const cloneUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/${ownerUsername}/${repoInfo?.name || repo}.git`;
+  const cloneUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/${ownerUsername}/${repoInfo?.name || repo}.wit`;
 
   const handleCopyCloneUrl = async () => {
     await navigator.clipboard.writeText(cloneUrl);

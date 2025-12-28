@@ -44,6 +44,7 @@ import {
 import {
   Tooltip,
   TooltipContent,
+  TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
@@ -750,37 +751,41 @@ function ChatInput({
       <div className="relative rounded-lg border border-zinc-800 bg-zinc-900/50 focus-within:border-zinc-700 transition-colors">
         {/* Toolbar */}
         <div className="flex items-center gap-1 px-2 py-1.5 border-b border-zinc-800/50">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 text-zinc-500 hover:text-zinc-300"
-                onClick={() => setValue('@')}
-              >
-                <AtSign className="h-3.5 w-3.5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="top">
-              <p className="text-xs">Mention file or codebase</p>
-            </TooltipContent>
-          </Tooltip>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-zinc-500 hover:text-zinc-300"
+                  onClick={() => setValue('@')}
+                >
+                  <AtSign className="h-3.5 w-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                <p className="text-xs">Mention file or codebase</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 text-zinc-500 hover:text-zinc-300"
-                onClick={() => setValue('/')}
-              >
-                <Slash className="h-3.5 w-3.5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="top">
-              <p className="text-xs">Commands</p>
-            </TooltipContent>
-          </Tooltip>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-zinc-500 hover:text-zinc-300"
+                  onClick={() => setValue('/')}
+                >
+                  <Slash className="h-3.5 w-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                <p className="text-xs">Commands</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           
           <div className="flex-1" />
           
@@ -861,7 +866,7 @@ function SessionDropdown({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-64">
-        <DropdownMenuItem onClick={onNew} className="gap-2">
+        <DropdownMenuItem onSelect={onNew} className="gap-2">
           <Plus className="h-4 w-4" />
           <span>New chat</span>
         </DropdownMenuItem>
@@ -870,7 +875,7 @@ function SessionDropdown({
           {sessions.map((session) => (
             <DropdownMenuItem
               key={session.id}
-              onClick={() => onSelect(session.id)}
+              onSelect={() => onSelect(session.id)}
               className={cn(
                 "gap-2",
                 session.id === activeSessionId && "bg-zinc-800"
@@ -1484,6 +1489,20 @@ function PanelWrapper({
   owner?: string;
   repoName?: string;
 }) {
+  // Handle escape key to close panel
+  useEffect(() => {
+    if (!isOpen || embedded) return;
+    
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, embedded, onClose]);
+
   if (embedded) {
     return (
       <div className="flex flex-col h-full bg-zinc-950 overflow-hidden">
@@ -1515,19 +1534,17 @@ function PanelWrapper({
         )}
       >
         {/* Panel header */}
-        <div className="flex items-center justify-between h-12 px-4 border-b border-zinc-800 flex-shrink-0 bg-zinc-900/50">
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
+        <div className="flex items-center justify-between h-12 px-4 border-b border-zinc-800 flex-shrink-0 bg-zinc-900/50 m-0">
+          <div className="flex items-center gap-2.5 m-0">
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center m-0">
               <Sparkles className="h-4 w-4 text-white" />
             </div>
-            <span className="font-semibold text-sm text-zinc-100">wit AI</span>
+            <span className="font-semibold text-sm text-zinc-100 m-0">wit AI</span>
             {repoName && (
-              <span className="text-xs text-zinc-500">
-                {owner}/{repoName}
-              </span>
+              <span className="text-xs text-zinc-500 m-0">{owner}/{repoName}</span>
             )}
           </div>
-          <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 text-zinc-400 hover:text-zinc-200">
+          <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 text-zinc-400 hover:text-zinc-200 m-0">
             <PanelRightClose className="h-4 w-4" />
           </Button>
         </div>

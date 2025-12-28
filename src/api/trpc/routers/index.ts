@@ -25,6 +25,7 @@ import { cyclesRouter } from './cycles';
 import { mergeQueueRouter } from './merge-queue';
 import { journalRouter } from './journal';
 import { repoAiKeysRouter } from './repo-ai-keys';
+import { userAiKeysRouter } from './user-ai-keys';
 import { dashboardRouter } from './dashboard';
 import { wrappedRouter } from './wrapped';
 import { triageAgentRouter } from './triage-agent';
@@ -32,6 +33,7 @@ import { ideRouter } from './ide';
 import { completionRouter } from './completion';
 import { packagesRouter } from './packages';
 import { oauthAppsRouter } from './oauth-apps';
+import { adminRouter } from './admin';
 
 /**
  * Main application router
@@ -64,6 +66,7 @@ export const appRouter = router({
   mergeQueue: mergeQueueRouter,
   journal: journalRouter,
   repoAiKeys: repoAiKeysRouter,
+  userAiKeys: userAiKeysRouter,
   dashboard: dashboardRouter,
   wrapped: wrappedRouter,
   triageAgent: triageAgentRouter,
@@ -71,6 +74,7 @@ export const appRouter = router({
   completion: completionRouter,
   packages: packagesRouter,
   oauthApps: oauthAppsRouter,
+  admin: adminRouter,
 });
 
 /**
@@ -105,6 +109,7 @@ export {
   mergeQueueRouter,
   journalRouter,
   repoAiKeysRouter,
+  userAiKeysRouter,
   dashboardRouter,
   wrappedRouter,
   triageAgentRouter,
@@ -112,4 +117,5 @@ export {
   completionRouter,
   packagesRouter,
   oauthAppsRouter,
+  adminRouter,
 };

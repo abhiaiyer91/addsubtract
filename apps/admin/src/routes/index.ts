@@ -1,0 +1,9 @@
+export { DashboardPage } from './dashboard';
+export { UsersPage } from './users';
+export { UserDetailPage } from './user-detail';
+export { RepositoriesPage } from './repositories';
+export { AuditLogsPage } from './audit-logs';
+export { FeatureFlagsPage } from './feature-flags';
+export { SettingsPage } from './settings';
+export { HealthPage } from './health';
+export { LoginPage } from './login';

@@ -37,7 +37,8 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
     setIsStreaming(true);
 
     try {
-      const response = await fetch('/api/agent/chat/stream', {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      const response = await fetch(`${apiUrl}/api/agent/chat/stream`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
