@@ -1,278 +1,481 @@
 /**
  * Terminal User Interface (TUI) for wit
- * A beautiful, interactive terminal interface
+ * A beautiful, interactive terminal interface using OpenTUI
  */
 
-import * as blessed from 'blessed';
+import { execSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import { Repository } from '../core/repository';
-import { Commit } from '../core/object';
 import { diff, DiffLine, DiffHunk, createHunks, isBinary } from '../core/diff';
-import { StackManager, StackNode } from '../core/stack';
+import { StackManager } from '../core/stack';
 
-// Type augmentation for blessed
-declare module 'blessed' {
-  interface ListElement {
-    selected: number;
-    items: blessed.Widgets.BlessedElement[];
+// OpenTUI types (imported dynamically)
+type CliRenderer = import('@opentui/core').CliRenderer;
+type BoxRenderable = import('@opentui/core').BoxRenderable;
+type TextRenderable = import('@opentui/core').TextRenderable;
+type SelectRenderable = import('@opentui/core').SelectRenderable;
+type InputRenderable = import('@opentui/core').InputRenderable;
+type KeyEvent = import('@opentui/core').KeyEvent;
+
+/**
+ * Check if a command exists in PATH
+ */
+function commandExists(command: string): boolean {
+  try {
+    execSync(`which ${command}`, { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
   }
 }
 
 /**
- * TUI Application
+ * Check OpenTUI dependencies and provide helpful error messages
+ */
+function checkOpenTUIDependencies(): { ok: boolean; message?: string } {
+  // Check for Zig (required for OpenTUI native bindings)
+  if (!commandExists('zig')) {
+    return {
+      ok: false,
+      message: `OpenTUI requires Zig to be installed for native bindings.
+
+To install Zig:
+  macOS:   brew install zig
+  Linux:   See https://ziglang.org/download/
+  Windows: winget install zig.zig
+
+After installing Zig, run 'wit tui' again.`,
+    };
+  }
+
+  return { ok: true };
+}
+
+/**
+ * Dynamically import OpenTUI to allow graceful error handling
+ */
+async function importOpenTUI() {
+  try {
+    const core = await import('@opentui/core');
+    return core;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    
+    // Check for common native binding errors
+    if (message.includes('Could not locate the bindings file') || 
+        message.includes('dylib') || 
+        message.includes('.so') ||
+        message.includes('.dll') ||
+        message.includes('ENOENT')) {
+      throw new Error(`OpenTUI native bindings not found.
+
+This usually means Zig is not installed or the bindings need to be rebuilt.
+
+To fix:
+  1. Install Zig: brew install zig (macOS) or see https://ziglang.org/download/
+  2. Reinstall dependencies: npm install
+
+Original error: ${message}`);
+    }
+    
+    throw error;
+  }
+}
+
+// Color constants
+const COLORS = {
+  primary: '#00BFFF',
+  success: '#00FF00',
+  warning: '#FFFF00',
+  error: '#FF0000',
+  info: '#00FFFF',
+  muted: '#888888',
+  white: '#FFFFFF',
+  black: '#000000',
+  headerBg: '#0044AA',
+  panelBorder: '#00BFFF',
+  selectedBg: '#004488',
+};
+
+/**
+ * File entry for display
+ */
+interface FileEntry {
+  name: string;
+  description: string;
+  path: string;
+  status: 'staged' | 'modified' | 'untracked' | 'deleted';
+}
+
+/**
+ * Commit entry for display
+ */
+interface CommitEntry {
+  name: string;
+  description: string;
+  hash: string;
+  message: string;
+  date: string;
+}
+
+/**
+ * TUI Application using OpenTUI
  */
 export class TsgitTUI {
-  private screen: blessed.Widgets.Screen;
+  private renderer!: CliRenderer;
   private repo: Repository;
-  
-  // UI Components
-  private header!: blessed.Widgets.BoxElement;
-  private statusBox!: blessed.Widgets.BoxElement;
-  private filesBox!: blessed.Widgets.ListElement;
-  private logBox!: blessed.Widgets.ListElement;
-  private diffBox!: blessed.Widgets.BoxElement;
-  private branchBox!: blessed.Widgets.ListElement;
-  private stackBox!: blessed.Widgets.ListElement;
-  private helpBox!: blessed.Widgets.BoxElement;
-  private commandInput!: blessed.Widgets.TextboxElement;
-  private messageBox!: blessed.Widgets.MessageElement;
-
-  private currentView: 'main' | 'log' | 'diff' | 'branches' | 'stacks' = 'main';
   private stackManager: StackManager;
-  private selectedFile: string | null = null;
   
-  // Diff view state
-  private fullDiffBox!: blessed.Widgets.ListElement;
-  private diffFiles: Array<{
-    path: string;
-    status: 'staged' | 'modified' | 'untracked' | 'deleted';
-    hunks: DiffHunk[];
-    isBinary: boolean;
-    isNew: boolean;
-    isDeleted: boolean;
-  }> = [];
-  private currentDiffFileIndex: number = 0;
-  private currentDiffHunkIndex: number = 0;
-  private expandedHunks: Set<string> = new Set(); // "fileIdx:hunkIdx" format
+  // OpenTUI module (dynamically imported)
+  private opentui!: typeof import('@opentui/core');
+
+  // UI State
+  private currentView: 'main' | 'log' | 'diff' | 'branches' | 'stacks' | 'input' = 'main';
+  private selectedFile: string | null = null;
+  private files: FileEntry[] = [];
+  private commits: CommitEntry[] = [];
+  private branches: string[] = [];
+  private messageTimeout: NodeJS.Timeout | null = null;
+
+  // UI Components
+  private header!: TextRenderable;
+  private statusText!: TextRenderable;
+  private filesSelect!: SelectRenderable;
+  private logSelect!: SelectRenderable;
+  private diffText!: TextRenderable;
+  private helpBar!: TextRenderable;
+  private messageBox!: BoxRenderable;
+  private messageText!: TextRenderable;
+
+  // Modal components
+  private modalContainer!: BoxRenderable;
+  private branchSelect!: SelectRenderable;
+  private inputBox!: BoxRenderable;
+  private inputField!: InputRenderable;
+  private inputLabel!: TextRenderable;
+  private inputCallback: ((value: string | null) => void) | null = null;
 
   constructor(repo: Repository) {
     this.repo = repo;
     this.stackManager = new StackManager(repo, repo.gitDir);
-    this.screen = blessed.screen({
-      smartCSR: true,
-      title: 'wit - Visual Interface',
-      fullUnicode: true,
-    });
+  }
 
-    this.setupUI();
-    this.setupKeyBindings();
-    this.refresh();
+  /**
+   * Initialize and run the TUI
+   */
+  async run(): Promise<void> {
+    try {
+      // Dynamically import OpenTUI
+      this.opentui = await importOpenTUI();
+      
+      this.renderer = await this.opentui.createCliRenderer({
+        targetFps: 30,
+      });
+
+      this.setupUI();
+      this.setupKeyBindings();
+      this.refresh();
+
+      this.renderer.start();
+    } catch (error) {
+      console.error('Failed to initialize TUI:', error instanceof Error ? error.message : error);
+      process.exit(1);
+    }
   }
 
   /**
    * Setup the UI layout
    */
   private setupUI(): void {
-    // Header
-    this.header = blessed.box({
-      parent: this.screen,
-      top: 0,
-      left: 0,
-      width: '100%',
-      height: 3,
-      content: this.getHeaderContent(),
-      tags: true,
-      style: {
-        fg: 'white',
-        bg: 'blue',
-        bold: true,
-      },
-    });
+    const { BoxRenderable, TextRenderable, SelectRenderable, InputRenderable } = this.opentui;
+    const root = this.renderer.root;
 
-    // Status box (left panel)
-    this.statusBox = blessed.box({
-      parent: this.screen,
-      label: ' Status ',
-      top: 3,
-      left: 0,
-      width: '50%',
-      height: '40%-3',
-      border: { type: 'line' },
-      tags: true,
-      style: {
-        border: { fg: 'cyan' },
-      },
-      scrollable: true,
-      alwaysScroll: true,
-      scrollbar: {
-        style: { bg: 'cyan' },
-      },
-    });
-
-    // Files list (right panel top)
-    this.filesBox = blessed.list({
-      parent: this.screen,
-      label: ' Files ',
-      top: 3,
-      left: '50%',
-      width: '50%',
-      height: '40%-3',
-      border: { type: 'line' },
-      tags: true,
-      keys: true,
-      vi: true,
-      mouse: true,
-      style: {
-        border: { fg: 'green' },
-        selected: { bg: 'green', fg: 'black' },
-        item: { fg: 'white' },
-      },
-      scrollbar: {
-        style: { bg: 'green' },
-      },
-    });
-
-    // Log box (bottom left)
-    this.logBox = blessed.list({
-      parent: this.screen,
-      label: ' Commit Log ',
-      top: '40%',
-      left: 0,
-      width: '50%',
-      height: '50%',
-      border: { type: 'line' },
-      tags: true,
-      keys: true,
-      vi: true,
-      mouse: true,
-      style: {
-        border: { fg: 'yellow' },
-        selected: { bg: 'yellow', fg: 'black' },
-        item: { fg: 'white' },
-      },
-      scrollbar: {
-        style: { bg: 'yellow' },
-      },
-    });
-
-    // Diff box (bottom right)
-    this.diffBox = blessed.box({
-      parent: this.screen,
-      label: ' Diff ',
-      top: '40%',
-      left: '50%',
-      width: '50%',
-      height: '50%',
-      border: { type: 'line' },
-      tags: true,
-      scrollable: true,
-      alwaysScroll: true,
-      keys: true,
-      vi: true,
-      mouse: true,
-      style: {
-        border: { fg: 'magenta' },
-        label: { fg: 'magenta', bold: true },
-      },
-      scrollbar: {
-        style: { bg: 'magenta' },
-      },
-    });
-
-    // Help bar at bottom
-    this.helpBox = blessed.box({
-      parent: this.screen,
-      bottom: 0,
-      left: 0,
-      width: '100%',
-      height: 1,
-      content: ' {bold}q{/bold}:quit {bold}:{/bold}:palette {bold}a{/bold}:add {bold}c{/bold}:commit {bold}s{/bold}:switch {bold}b{/bold}:branch {bold}z{/bold}:stash {bold}m{/bold}:merge {bold}p{/bold}:push {bold}?{/bold}:help',
-      tags: true,
-      style: {
-        fg: 'white',
-        bg: 'gray',
-      },
-    });
-
-    // Branch list (hidden by default)
-    this.branchBox = blessed.list({
-      parent: this.screen,
-      label: ' Branches ',
-      top: 'center',
-      left: 'center',
-      width: '50%',
-      height: '50%',
-      border: { type: 'line' },
-      tags: true,
-      keys: true,
-      vi: true,
-      mouse: true,
-      hidden: true,
-      style: {
-        border: { fg: 'cyan' },
-        selected: { bg: 'cyan', fg: 'black' },
-      },
-    });
-
-    // Stack list (hidden by default)
-    this.stackBox = blessed.list({
-      parent: this.screen,
-      label: ' Stacked Diffs ',
-      top: 'center',
-      left: 'center',
-      width: '60%',
-      height: '60%',
-      border: { type: 'line' },
-      tags: true,
-      keys: true,
-      vi: true,
-      mouse: true,
-      hidden: true,
-      style: {
-        border: { fg: 'magenta' },
-        selected: { bg: 'magenta', fg: 'black' },
-      },
-    });
-
-    // Message box for notifications
-    this.messageBox = blessed.message({
-      parent: this.screen,
-      top: 'center',
-      left: 'center',
-      width: '50%',
-      height: 'shrink',
-      border: { type: 'line' },
-      hidden: true,
-      style: {
-        border: { fg: 'white' },
-      },
-    });
-    
-    // Full-screen diff view (hidden by default)
-    this.fullDiffBox = blessed.list({
-      parent: this.screen,
-      label: ' Diff View (q/Esc: close, j/k: navigate, s: stage hunk, Enter: expand/collapse) ',
-      top: 0,
-      left: 0,
+    // Main container with column layout
+    const mainContainer = new BoxRenderable(this.renderer, {
+      id: 'main-container',
+      flexDirection: 'column',
       width: '100%',
       height: '100%',
-      border: { type: 'line' },
-      tags: true,
-      keys: true,
-      vi: true,
-      mouse: true,
-      hidden: true,
-      scrollable: true,
-      alwaysScroll: true,
-      style: {
-        border: { fg: 'magenta' },
-        selected: { bg: 'blue', fg: 'white' },
-        item: { fg: 'white' },
-      },
-      scrollbar: {
-        style: { bg: 'magenta' },
-      },
+      backgroundColor: COLORS.black,
+    });
+    root.add(mainContainer);
+
+    // Header
+    this.header = new TextRenderable(this.renderer, {
+      id: 'header',
+      content: this.getHeaderContent(),
+      fg: COLORS.white,
+      bg: COLORS.headerBg,
+      width: '100%',
+      height: 3,
+      paddingLeft: 1,
+      paddingTop: 1,
+    });
+    mainContainer.add(this.header);
+
+    // Content area (row layout)
+    const contentArea = new BoxRenderable(this.renderer, {
+      id: 'content-area',
+      flexDirection: 'row',
+      flexGrow: 1,
+      width: '100%',
+    });
+    mainContainer.add(contentArea);
+
+    // Left column
+    const leftColumn = new BoxRenderable(this.renderer, {
+      id: 'left-column',
+      flexDirection: 'column',
+      width: '50%',
+      height: '100%',
+    });
+    contentArea.add(leftColumn);
+
+    // Status box (top left)
+    const statusBox = new BoxRenderable(this.renderer, {
+      id: 'status-box',
+      borderStyle: 'single',
+      border: true,
+      borderColor: COLORS.info,
+      title: ' Status ',
+      titleAlignment: 'left',
+      height: '40%',
+      width: '100%',
+    });
+    leftColumn.add(statusBox);
+
+    this.statusText = new TextRenderable(this.renderer, {
+      id: 'status-text',
+      content: '',
+      fg: COLORS.white,
+      paddingLeft: 1,
+      paddingTop: 1,
+      width: '100%',
+      height: '100%',
+    });
+    statusBox.add(this.statusText);
+
+    // Log box (bottom left)
+    const logBox = new BoxRenderable(this.renderer, {
+      id: 'log-box',
+      borderStyle: 'single',
+      border: true,
+      borderColor: COLORS.warning,
+      title: ' Commit Log ',
+      titleAlignment: 'left',
+      flexGrow: 1,
+      width: '100%',
+    });
+    leftColumn.add(logBox);
+
+    this.logSelect = new SelectRenderable(this.renderer, {
+      id: 'log-select',
+      options: [],
+      width: '100%',
+      height: '100%',
+      selectedBackgroundColor: COLORS.selectedBg,
+    });
+    logBox.add(this.logSelect);
+
+    // Right column
+    const rightColumn = new BoxRenderable(this.renderer, {
+      id: 'right-column',
+      flexDirection: 'column',
+      width: '50%',
+      height: '100%',
+    });
+    contentArea.add(rightColumn);
+
+    // Files box (top right)
+    const filesBox = new BoxRenderable(this.renderer, {
+      id: 'files-box',
+      borderStyle: 'single',
+      border: true,
+      borderColor: COLORS.success,
+      title: ' Files ',
+      titleAlignment: 'left',
+      height: '40%',
+      width: '100%',
+    });
+    rightColumn.add(filesBox);
+
+    this.filesSelect = new SelectRenderable(this.renderer, {
+      id: 'files-select',
+      options: [],
+      width: '100%',
+      height: '100%',
+      selectedBackgroundColor: COLORS.selectedBg,
+    });
+    filesBox.add(this.filesSelect);
+
+    // Diff box (bottom right)
+    const diffBox = new BoxRenderable(this.renderer, {
+      id: 'diff-box',
+      borderStyle: 'single',
+      border: true,
+      borderColor: '#FF00FF',
+      title: ' Diff ',
+      titleAlignment: 'left',
+      flexGrow: 1,
+      width: '100%',
+    });
+    rightColumn.add(diffBox);
+
+    this.diffText = new TextRenderable(this.renderer, {
+      id: 'diff-text',
+      content: 'Select a file to view diff',
+      fg: COLORS.muted,
+      paddingLeft: 1,
+      paddingTop: 1,
+      width: '100%',
+      height: '100%',
+    });
+    diffBox.add(this.diffText);
+
+    // Help bar at bottom
+    this.helpBar = new TextRenderable(this.renderer, {
+      id: 'help-bar',
+      content: ' q:quit  a:add  A:stage all  c:commit  s:switch  b:branch  z:stash  m:merge  p:push  ?:help',
+      fg: COLORS.white,
+      bg: COLORS.muted,
+      width: '100%',
+      height: 1,
+    });
+    mainContainer.add(this.helpBar);
+
+    // Message box (floating, initially hidden)
+    this.messageBox = new BoxRenderable(this.renderer, {
+      id: 'message-box',
+      borderStyle: 'single',
+      border: true,
+      borderColor: COLORS.white,
+      backgroundColor: '#222222',
+      position: 'absolute',
+      top: '45%',
+      left: '25%',
+      width: '50%',
+      height: 3,
+      visible: false,
+    });
+    root.add(this.messageBox);
+
+    this.messageText = new TextRenderable(this.renderer, {
+      id: 'message-text',
+      content: '',
+      fg: COLORS.white,
+      paddingLeft: 1,
+      width: '100%',
+    });
+    this.messageBox.add(this.messageText);
+
+    // Modal container (for branches, stacks, etc.)
+    this.modalContainer = new BoxRenderable(this.renderer, {
+      id: 'modal-container',
+      position: 'absolute',
+      top: '20%',
+      left: '25%',
+      width: '50%',
+      height: '60%',
+      visible: false,
+      borderStyle: 'single',
+      border: true,
+      borderColor: COLORS.info,
+      title: ' Branches (Esc to close) ',
+      titleAlignment: 'center',
+      backgroundColor: '#111111',
+    });
+    root.add(this.modalContainer);
+
+    this.branchSelect = new SelectRenderable(this.renderer, {
+      id: 'branch-select',
+      options: [],
+      width: '100%',
+      height: '100%',
+      selectedBackgroundColor: COLORS.selectedBg,
+    });
+    this.modalContainer.add(this.branchSelect);
+
+    // Input modal
+    this.inputBox = new BoxRenderable(this.renderer, {
+      id: 'input-box',
+      borderStyle: 'single',
+      border: true,
+      borderColor: COLORS.success,
+      title: ' Input ',
+      titleAlignment: 'center',
+      backgroundColor: '#111111',
+      position: 'absolute',
+      top: '40%',
+      left: '20%',
+      width: '60%',
+      height: 5,
+      visible: false,
+    });
+    root.add(this.inputBox);
+
+    this.inputLabel = new TextRenderable(this.renderer, {
+      id: 'input-label',
+      content: '',
+      fg: COLORS.white,
+      paddingLeft: 1,
+      width: '100%',
+      height: 1,
+    });
+    this.inputBox.add(this.inputLabel);
+
+    this.inputField = new InputRenderable(this.renderer, {
+      id: 'input-field',
+      placeholder: 'Type here...',
+      width: '100%',
+      height: 1,
+      focusedBackgroundColor: '#333333',
+    });
+    this.inputBox.add(this.inputField);
+
+    // Setup event handlers
+    this.setupEventHandlers();
+
+    // Initial focus
+    this.filesSelect.focus();
+  }
+
+  /**
+   * Setup event handlers for UI components
+   */
+  private setupEventHandlers(): void {
+    const { SelectRenderableEvents, InputRenderableEvents } = this.opentui;
+    
+    // File selection
+    this.filesSelect.on(SelectRenderableEvents.ITEM_SELECTED, (index: number) => {
+      if (this.files[index]) {
+        this.selectedFile = this.files[index].path;
+        this.showFileDiff(this.selectedFile);
+      }
+    });
+
+    // Log selection
+    this.logSelect.on(SelectRenderableEvents.ITEM_SELECTED, (index: number) => {
+      if (this.commits[index]) {
+        this.showCommitDetails(this.commits[index].hash);
+      }
+    });
+
+    // Branch selection
+    this.branchSelect.on(SelectRenderableEvents.ITEM_SELECTED, (index: number) => {
+      if (this.branches[index]) {
+        this.switchToBranch(this.branches[index]);
+      }
+    });
+
+    // Input submission
+    this.inputField.on(InputRenderableEvents.CHANGE, (value: string) => {
+      if (this.inputCallback) {
+        const callback = this.inputCallback;
+        this.inputCallback = null;
+        this.hideInput();
+        callback(value);
+      }
     });
   }
 
@@ -280,186 +483,102 @@ export class TsgitTUI {
    * Setup keyboard bindings
    */
   private setupKeyBindings(): void {
-    // Quit
-    this.screen.key(['q', 'C-c'], () => {
-      this.quit();
-    });
+    const keyHandler = this.renderer.keyInput;
 
-    // Refresh
-    this.screen.key(['r'], () => {
-      this.refresh();
-      this.showMessage('Refreshed');
-    });
-
-    // Add file
-    this.screen.key(['a'], () => {
-      this.addSelectedFile();
-    });
-
-    // Stage all
-    this.screen.key(['A'], () => {
-      this.stageAll();
-    });
-
-    // Commit
-    this.screen.key(['c'], () => {
-      this.showCommitDialog();
-    });
-
-    // Amend commit
-    this.screen.key(['C'], () => {
-      this.showAmendDialog();
-    });
-
-    // Switch branch
-    this.screen.key(['s'], () => {
-      this.showBranchSelector();
-    });
-
-    // Create branch
-    this.screen.key(['b'], () => {
-      this.showCreateBranchDialog();
-    });
-
-    // Stash
-    this.screen.key(['z'], () => {
-      this.showStashMenu();
-    });
-
-    // Tag
-    this.screen.key(['t'], () => {
-      this.showTagMenu();
-    });
-
-    // Merge
-    this.screen.key(['m'], () => {
-      this.showMergeMenu();
-    });
-
-    // Push
-    this.screen.key(['p'], () => {
-      this.pushChanges();
-    });
-
-    // Pull
-    this.screen.key(['l'], () => {
-      this.pullChanges();
-    });
-
-    // Fetch
-    this.screen.key(['f'], () => {
-      this.fetchChanges();
-    });
-
-    // Undo
-    this.screen.key(['u'], () => {
-      this.undoLastOperation();
-    });
-
-    // Reset
-    this.screen.key(['R'], () => {
-      this.showResetMenu();
-    });
-
-    // WIP commit
-    this.screen.key(['w'], () => {
-      this.wipCommit();
-    });
-
-    // Help
-    this.screen.key(['?'], () => {
-      this.showHelp();
-    });
-
-    // Command palette
-    this.screen.key([':', 'C-k'], () => {
-      this.showCommandPalette();
-    });
-
-    // Tab between panels
-    this.screen.key(['tab'], () => {
-      this.focusNext();
-    });
-
-    // Focus handlers for file list
-    this.filesBox.on('select', (item) => {
-      if (item) {
-        this.selectedFile = item.content.replace(/\{[^}]+\}/g, '').trim();
-        this.showFileDiff(this.selectedFile);
+    keyHandler.on('keypress', (key: KeyEvent) => {
+      // Handle input mode separately
+      if (this.currentView === 'input') {
+        if (key.name === 'escape') {
+          if (this.inputCallback) {
+            const callback = this.inputCallback;
+            this.inputCallback = null;
+            this.hideInput();
+            callback(null);
+          }
+        }
+        return;
       }
-    });
 
-    // Focus handlers for log list
-    this.logBox.on('select', (item) => {
-      if (item) {
-        const hash = item.content.split(' ')[0].replace(/\{[^}]+\}/g, '');
-        this.showCommitDetails(hash);
-      }
-    });
-
-    // Branch selection
-    this.branchBox.on('select', (item) => {
-      if (item) {
-        const branchName = item.content.replace(/\{[^}]+\}/g, '').replace('* ', '').trim();
-        this.switchToBranch(branchName);
-      }
-    });
-
-    this.branchBox.key(['escape'], () => {
-      this.branchBox.hide();
-      this.screen.render();
-    });
-
-    // Stack selection
-    this.stackBox.on('select', (item) => {
-      if (item) {
-        const content = item.content.replace(/\{[^}]+\}/g, '').trim();
-        // Handle stack actions based on content
-        if (content.startsWith('[CREATE]')) {
-          this.showCreateStackDialog();
-        } else if (content.startsWith('[PUSH]')) {
-          this.pushToStack();
-        } else if (content.startsWith('[SYNC]')) {
-          this.syncCurrentStack();
-        } else if (content.startsWith('[UP]')) {
-          this.stackNavigateUp();
-        } else if (content.startsWith('[DOWN]')) {
-          this.stackNavigateDown();
-        } else {
-          // It's a stack name, show its details
-          const stackName = content.replace(/^\*\s*/, '').split(' ')[0];
-          this.showStackDetails(stackName);
+      // Handle modal escape
+      if (this.currentView === 'branches' || this.currentView === 'stacks') {
+        if (key.name === 'escape') {
+          this.hideModal();
+          return;
         }
       }
-    });
 
-    this.stackBox.key(['escape'], () => {
-      this.stackBox.hide();
-      this.screen.render();
-    });
-
-    // 'T' key to open stack view
-    this.screen.key(['T'], () => {
-      this.showStackSelector();
-    });
-    
-    // Full diff view key bindings
-    this.fullDiffBox.key(['escape', 'q'], () => {
-      this.closeFullDiffView();
-    });
-    
-    this.fullDiffBox.key(['s'], () => {
-      this.stageSelectedHunk();
-    });
-    
-    this.fullDiffBox.on('select', () => {
-      this.toggleHunkExpansion();
-    });
-    
-    // 'd' key to open full diff view
-    this.screen.key(['d'], () => {
-      if (this.currentView !== 'diff') {
-        this.showFullDiffView();
+      // Global key bindings
+      switch (key.name) {
+        case 'q':
+          if (!key.ctrl) {
+            this.quit();
+          }
+          break;
+        case 'c':
+          if (key.ctrl) {
+            this.quit();
+          } else if (key.shift) {
+            this.showAmendDialog();
+          } else {
+            this.showCommitDialog();
+          }
+          break;
+        case 'r':
+          if (key.shift) {
+            this.showResetMenu();
+          } else {
+            this.refresh();
+            this.showMessage('Refreshed');
+          }
+          break;
+        case 'a':
+          if (key.shift) {
+            this.stageAll();
+          } else {
+            this.addSelectedFile();
+          }
+          break;
+        case 's':
+          this.showBranchSelector();
+          break;
+        case 'b':
+          this.showCreateBranchDialog();
+          break;
+        case 'z':
+          this.showStashMenu();
+          break;
+        case 't':
+          if (key.shift) {
+            this.showStackSelector();
+          } else {
+            this.showTagMenu();
+          }
+          break;
+        case 'm':
+          this.showMergeMenu();
+          break;
+        case 'p':
+          this.pushChanges();
+          break;
+        case 'l':
+          this.pullChanges();
+          break;
+        case 'f':
+          this.fetchChanges();
+          break;
+        case 'u':
+          this.undoLastOperation();
+          break;
+        case 'w':
+          this.wipCommit();
+          break;
+        case 'tab':
+          this.focusNext();
+          break;
+        case '/':
+        case '?':
+          this.showHelp();
+          break;
       }
     });
   }
@@ -470,18 +589,17 @@ export class TsgitTUI {
   private getHeaderContent(): string {
     const branch = this.repo.refs.getCurrentBranch() || 'detached HEAD';
     const repoName = path.basename(this.repo.workDir);
-    return ` {bold}wit{/bold} │ ${repoName} │ Branch: {green-fg}${branch}{/green-fg}`;
+    return `wit | ${repoName} | Branch: ${branch}`;
   }
 
   /**
    * Refresh all panels
    */
   refresh(): void {
-    this.header.setContent(this.getHeaderContent());
+    this.header.content = this.getHeaderContent();
     this.refreshStatus();
     this.refreshFiles();
     this.refreshLog();
-    this.screen.render();
   }
 
   /**
@@ -493,47 +611,52 @@ export class TsgitTUI {
       let content = '';
 
       const branch = this.repo.refs.getCurrentBranch();
-      content += `{bold}On branch:{/bold} {green-fg}${branch || 'detached HEAD'}{/green-fg}\n\n`;
+      content += `On branch: ${branch || 'detached HEAD'}\n\n`;
 
       if (status.staged.length > 0) {
-        content += `{bold}{green-fg}Changes to be committed:{/green-fg}{/bold}\n`;
+        content += `Changes to be committed:\n`;
         for (const file of status.staged) {
-          content += `  {green-fg}✓ ${file}{/green-fg}\n`;
+          content += `  + ${file}\n`;
         }
         content += '\n';
       }
 
       if (status.modified.length > 0) {
-        content += `{bold}{yellow-fg}Changes not staged:{/yellow-fg}{/bold}\n`;
+        content += `Changes not staged:\n`;
         for (const file of status.modified) {
-          content += `  {yellow-fg}~ ${file}{/yellow-fg}\n`;
+          content += `  ~ ${file}\n`;
         }
         content += '\n';
       }
 
       if (status.untracked.length > 0) {
-        content += `{bold}{red-fg}Untracked files:{/red-fg}{/bold}\n`;
+        content += `Untracked files:\n`;
         for (const file of status.untracked) {
-          content += `  {red-fg}? ${file}{/red-fg}\n`;
+          content += `  ? ${file}\n`;
         }
         content += '\n';
       }
 
       if (status.deleted.length > 0) {
-        content += `{bold}{red-fg}Deleted files:{/red-fg}{/bold}\n`;
+        content += `Deleted files:\n`;
         for (const file of status.deleted) {
-          content += `  {red-fg}✗ ${file}{/red-fg}\n`;
+          content += `  x ${file}\n`;
         }
       }
 
-      if (status.staged.length === 0 && status.modified.length === 0 && 
-          status.untracked.length === 0 && status.deleted.length === 0) {
-        content += '{bold}Working tree clean{/bold}';
+      if (
+        status.staged.length === 0 &&
+        status.modified.length === 0 &&
+        status.untracked.length === 0 &&
+        status.deleted.length === 0
+      ) {
+        content += 'Working tree clean';
       }
 
-      this.statusBox.setContent(content);
+      this.statusText.content = content;
     } catch (error) {
-      this.statusBox.setContent('{red-fg}Error loading status{/red-fg}');
+      this.statusText.content = 'Error loading status';
+      this.statusText.fg = COLORS.error;
     }
   }
 
@@ -543,24 +666,44 @@ export class TsgitTUI {
   private refreshFiles(): void {
     try {
       const status = this.repo.status();
-      const items: string[] = [];
+      this.files = [];
 
       for (const file of status.staged) {
-        items.push(`{green-fg}[S]{/green-fg} ${file}`);
+        this.files.push({
+          name: `[S] ${file}`,
+          description: 'Staged for commit',
+          path: file,
+          status: 'staged',
+        });
       }
       for (const file of status.modified) {
-        items.push(`{yellow-fg}[M]{/yellow-fg} ${file}`);
+        this.files.push({
+          name: `[M] ${file}`,
+          description: 'Modified',
+          path: file,
+          status: 'modified',
+        });
       }
       for (const file of status.untracked) {
-        items.push(`{red-fg}[?]{/red-fg} ${file}`);
+        this.files.push({
+          name: `[?] ${file}`,
+          description: 'Untracked',
+          path: file,
+          status: 'untracked',
+        });
       }
       for (const file of status.deleted) {
-        items.push(`{red-fg}[D]{/red-fg} ${file}`);
+        this.files.push({
+          name: `[D] ${file}`,
+          description: 'Deleted',
+          path: file,
+          status: 'deleted',
+        });
       }
 
-      this.filesBox.setItems(items);
+      this.filesSelect.options = this.files;
     } catch (error) {
-      this.filesBox.setItems(['{red-fg}Error loading files{/red-fg}']);
+      this.filesSelect.options = [{ name: 'Error loading files', description: '' }];
     }
   }
 
@@ -569,78 +712,89 @@ export class TsgitTUI {
    */
   private refreshLog(): void {
     try {
-      const commits = this.repo.log('HEAD', 20);
-      const items: string[] = [];
+      const commitObjs = this.repo.log('HEAD', 20);
+      this.commits = [];
 
-      for (const commit of commits) {
+      for (const commit of commitObjs) {
         const hash = commit.hash().slice(0, 8);
         const message = commit.message.split('\n')[0].slice(0, 40);
         const date = new Date(commit.author.timestamp * 1000).toLocaleDateString();
-        items.push(`{yellow-fg}${hash}{/yellow-fg} ${message} {gray-fg}(${date}){/gray-fg}`);
+        this.commits.push({
+          name: `${hash} ${message}`,
+          description: date,
+          hash: commit.hash(),
+          message: commit.message,
+          date,
+        });
       }
 
-      if (items.length === 0) {
-        items.push('{gray-fg}No commits yet{/gray-fg}');
+      if (this.commits.length === 0) {
+        this.commits.push({
+          name: 'No commits yet',
+          description: '',
+          hash: '',
+          message: '',
+          date: '',
+        });
       }
 
-      this.logBox.setItems(items);
+      this.logSelect.options = this.commits;
     } catch (error) {
-      this.logBox.setItems(['{gray-fg}No commits yet{/gray-fg}']);
+      this.logSelect.options = [{ name: 'No commits yet', description: '' }];
     }
   }
 
   /**
-   * Show diff for a file in the side panel
+   * Show diff for a file
    */
   private showFileDiff(filePath: string): void {
     try {
       const fileDiff = this.computeFileDiff(filePath);
-      
+
       if (!fileDiff) {
-        this.diffBox.setContent(`{bold}Diff for: ${filePath}{/bold}\n\n{gray-fg}No changes to show{/gray-fg}`);
-        this.screen.render();
+        this.diffText.content = `Diff for: ${filePath}\n\nNo changes to show`;
+        this.diffText.fg = COLORS.muted;
         return;
       }
-      
+
       if (fileDiff.isBinary) {
-        this.diffBox.setContent(`{bold}Diff for: ${filePath}{/bold}\n\n{yellow-fg}Binary file - cannot display diff{/yellow-fg}`);
-        this.screen.render();
+        this.diffText.content = `Diff for: ${filePath}\n\nBinary file - cannot display diff`;
+        this.diffText.fg = COLORS.warning;
         return;
       }
-      
-      // Format the diff for display
+
       const content = this.formatDiffForDisplay(fileDiff, filePath);
-      this.diffBox.setContent(content);
-      this.screen.render();
+      this.diffText.content = content;
+      this.diffText.fg = COLORS.white;
     } catch (error) {
-      this.diffBox.setContent(`{red-fg}Error loading diff: ${error instanceof Error ? error.message : 'Unknown error'}{/red-fg}`);
-      this.screen.render();
+      this.diffText.content = `Error loading diff: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      this.diffText.fg = COLORS.error;
     }
   }
-  
+
   /**
    * Compute the diff for a single file
    */
-  private computeFileDiff(filePath: string): { hunks: DiffHunk[]; isBinary: boolean; isNew: boolean; isDeleted: boolean } | null {
+  private computeFileDiff(
+    filePath: string
+  ): { hunks: DiffHunk[]; isBinary: boolean; isNew: boolean; isDeleted: boolean } | null {
     const status = this.repo.status();
     const fullPath = path.join(this.repo.workDir, filePath);
-    
-    // Check what type of change this is
-    const isStaged = status.staged.some(f => f === filePath || f.startsWith(filePath));
+
+    const isStaged = status.staged.some((f) => f === filePath || f.startsWith(filePath));
     const isModified = status.modified.includes(filePath);
     const isUntracked = status.untracked.includes(filePath);
     const isDeleted = status.deleted.includes(filePath);
-    
+
     if (!isStaged && !isModified && !isUntracked && !isDeleted) {
       return null;
     }
-    
+
     try {
       let oldContent = '';
       let newContent = '';
-      
+
       if (isUntracked) {
-        // New file - all additions
         if (!fs.existsSync(fullPath)) return null;
         const content = fs.readFileSync(fullPath);
         if (isBinary(content)) {
@@ -649,9 +803,8 @@ export class TsgitTUI {
         newContent = content.toString('utf-8');
         return { hunks: createHunks(diff(oldContent, newContent)), isBinary: false, isNew: true, isDeleted: false };
       }
-      
+
       if (isDeleted) {
-        // Deleted file - all deletions
         const indexEntry = this.repo.index.get(filePath);
         if (indexEntry) {
           const blob = this.repo.objects.readBlob(indexEntry.hash);
@@ -662,8 +815,7 @@ export class TsgitTUI {
         }
         return { hunks: createHunks(diff(oldContent, newContent)), isBinary: false, isNew: false, isDeleted: true };
       }
-      
-      // Modified or staged file - compute diff against index or HEAD
+
       const indexEntry = this.repo.index.get(filePath);
       if (indexEntry) {
         const blob = this.repo.objects.readBlob(indexEntry.hash);
@@ -672,7 +824,7 @@ export class TsgitTUI {
         }
         oldContent = blob.content.toString('utf-8');
       }
-      
+
       if (fs.existsSync(fullPath)) {
         const content = fs.readFileSync(fullPath);
         if (isBinary(content)) {
@@ -680,61 +832,64 @@ export class TsgitTUI {
         }
         newContent = content.toString('utf-8');
       }
-      
+
       if (oldContent === newContent) {
         return null;
       }
-      
+
       return { hunks: createHunks(diff(oldContent, newContent)), isBinary: false, isNew: false, isDeleted: false };
     } catch (error) {
       return null;
     }
   }
-  
+
   /**
-   * Format diff hunks for display in the side panel
+   * Format diff hunks for display
    */
-  private formatDiffForDisplay(fileDiff: { hunks: DiffHunk[]; isNew: boolean; isDeleted: boolean }, filePath: string): string {
-    let content = `{bold}Diff for: ${filePath}{/bold}\n`;
-    
+  private formatDiffForDisplay(
+    fileDiff: { hunks: DiffHunk[]; isNew: boolean; isDeleted: boolean },
+    filePath: string
+  ): string {
+    let content = `Diff for: ${filePath}\n`;
+
     if (fileDiff.isNew) {
-      content += `{green-fg}(new file){/green-fg}\n`;
+      content += `(new file)\n`;
     } else if (fileDiff.isDeleted) {
-      content += `{red-fg}(deleted){/red-fg}\n`;
+      content += `(deleted)\n`;
     }
-    
+
     content += '\n';
-    
+
     if (fileDiff.hunks.length === 0) {
-      content += '{gray-fg}No differences found{/gray-fg}';
+      content += 'No differences found';
       return content;
     }
-    
+
     for (const hunk of fileDiff.hunks) {
-      content += `{cyan-fg}@@ -${hunk.oldStart},${hunk.oldCount} +${hunk.newStart},${hunk.newCount} @@{/cyan-fg}\n`;
-      
+      content += `@@ -${hunk.oldStart},${hunk.oldCount} +${hunk.newStart},${hunk.newCount} @@\n`;
+
       for (const line of hunk.lines) {
         const lineNum = this.formatLineNumber(line);
         const truncatedContent = this.truncateLine(line.content, 60);
-        
+
         switch (line.type) {
           case 'add':
-            content += `{green-fg}${lineNum} + ${truncatedContent}{/green-fg}\n`;
+            content += `${lineNum} + ${truncatedContent}\n`;
             break;
           case 'remove':
-            content += `{red-fg}${lineNum} - ${truncatedContent}{/red-fg}\n`;
+            content += `${lineNum} - ${truncatedContent}\n`;
             break;
           case 'context':
-            content += `{white-fg}${lineNum}   ${truncatedContent}{/white-fg}\n`;
+            content += `${lineNum}   ${truncatedContent}\n`;
             break;
         }
       }
       content += '\n';
     }
-    
+
     return content;
   }
-  
+
   /**
    * Format line number for display
    */
@@ -742,7 +897,7 @@ export class TsgitTUI {
     const num = line.type === 'add' ? line.newLineNum : line.oldLineNum;
     return (num?.toString() || '').padStart(4, ' ');
   }
-  
+
   /**
    * Truncate long lines
    */
@@ -752,414 +907,46 @@ export class TsgitTUI {
     }
     return content.substring(0, maxLength - 3) + '...';
   }
-  
-  /**
-   * Show full-screen diff view
-   */
-  private showFullDiffView(): void {
-    try {
-      this.computeAllDiffs();
-      
-      if (this.diffFiles.length === 0) {
-        this.showMessage('No changes to display');
-        return;
-      }
-      
-      this.currentView = 'diff';
-      this.currentDiffFileIndex = 0;
-      this.currentDiffHunkIndex = 0;
-      this.expandedHunks.clear();
-      
-      // Expand all hunks by default
-      this.diffFiles.forEach((file, fileIdx) => {
-        file.hunks.forEach((_, hunkIdx) => {
-          this.expandedHunks.add(`${fileIdx}:${hunkIdx}`);
-        });
-      });
-      
-      this.renderFullDiffView();
-      this.fullDiffBox.show();
-      this.fullDiffBox.focus();
-      this.screen.render();
-    } catch (error) {
-      this.showMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  }
-  
-  /**
-   * Compute diffs for all changed files
-   */
-  private computeAllDiffs(): void {
-    const status = this.repo.status();
-    this.diffFiles = [];
-    
-    // Process staged files
-    for (const filePath of status.staged) {
-      const cleanPath = filePath.replace(' (deleted)', '');
-      const fileDiff = this.computeFileDiff(cleanPath);
-      if (fileDiff) {
-        this.diffFiles.push({
-          path: cleanPath,
-          status: 'staged',
-          hunks: fileDiff.hunks,
-          isBinary: fileDiff.isBinary,
-          isNew: fileDiff.isNew,
-          isDeleted: fileDiff.isDeleted,
-        });
-      }
-    }
-    
-    // Process modified files
-    for (const filePath of status.modified) {
-      const fileDiff = this.computeFileDiff(filePath);
-      if (fileDiff) {
-        this.diffFiles.push({
-          path: filePath,
-          status: 'modified',
-          hunks: fileDiff.hunks,
-          isBinary: fileDiff.isBinary,
-          isNew: fileDiff.isNew,
-          isDeleted: fileDiff.isDeleted,
-        });
-      }
-    }
-    
-    // Process untracked files
-    for (const filePath of status.untracked) {
-      const fileDiff = this.computeFileDiff(filePath);
-      if (fileDiff) {
-        this.diffFiles.push({
-          path: filePath,
-          status: 'untracked',
-          hunks: fileDiff.hunks,
-          isBinary: fileDiff.isBinary,
-          isNew: true,
-          isDeleted: false,
-        });
-      }
-    }
-    
-    // Process deleted files
-    for (const filePath of status.deleted) {
-      const fileDiff = this.computeFileDiff(filePath);
-      if (fileDiff) {
-        this.diffFiles.push({
-          path: filePath,
-          status: 'deleted',
-          hunks: fileDiff.hunks,
-          isBinary: fileDiff.isBinary,
-          isNew: false,
-          isDeleted: true,
-        });
-      }
-    }
-  }
-  
-  /**
-   * Render the full diff view
-   */
-  private renderFullDiffView(): void {
-    const items: string[] = [];
-    
-    for (let fileIdx = 0; fileIdx < this.diffFiles.length; fileIdx++) {
-      const file = this.diffFiles[fileIdx];
-      
-      // File header
-      let statusLabel = '';
-      let statusColor = 'white';
-      switch (file.status) {
-        case 'staged':
-          statusLabel = '[S]';
-          statusColor = 'green';
-          break;
-        case 'modified':
-          statusLabel = '[M]';
-          statusColor = 'yellow';
-          break;
-        case 'untracked':
-          statusLabel = '[?]';
-          statusColor = 'red';
-          break;
-        case 'deleted':
-          statusLabel = '[D]';
-          statusColor = 'red';
-          break;
-      }
-      
-      let fileLabel = `{bold}{${statusColor}-fg}${statusLabel}{/${statusColor}-fg} ${file.path}{/bold}`;
-      if (file.isNew) fileLabel += ' {green-fg}(new file){/green-fg}';
-      if (file.isDeleted) fileLabel += ' {red-fg}(deleted){/red-fg}';
-      if (file.isBinary) fileLabel += ' {yellow-fg}(binary){/yellow-fg}';
-      items.push(fileLabel);
-      
-      if (file.isBinary) {
-        items.push('  {yellow-fg}Binary file - cannot display diff{/yellow-fg}');
-        items.push('');
-        continue;
-      }
-      
-      // Hunks
-      for (let hunkIdx = 0; hunkIdx < file.hunks.length; hunkIdx++) {
-        const hunk = file.hunks[hunkIdx];
-        const hunkKey = `${fileIdx}:${hunkIdx}`;
-        const isExpanded = this.expandedHunks.has(hunkKey);
-        const expandIcon = isExpanded ? '▼' : '▶';
-        
-        items.push(`  {cyan-fg}${expandIcon} @@ -${hunk.oldStart},${hunk.oldCount} +${hunk.newStart},${hunk.newCount} @@{/cyan-fg}`);
-        
-        if (isExpanded) {
-          for (const line of hunk.lines) {
-            const lineNum = this.formatLineNumber(line);
-            const content = this.truncateLine(line.content, 100);
-            
-            switch (line.type) {
-              case 'add':
-                items.push(`    {green-fg}${lineNum} + ${content}{/green-fg}`);
-                break;
-              case 'remove':
-                items.push(`    {red-fg}${lineNum} - ${content}{/red-fg}`);
-                break;
-              case 'context':
-                items.push(`    {white-fg}${lineNum}   ${content}{/white-fg}`);
-                break;
-            }
-          }
-        }
-      }
-      
-      items.push('');
-    }
-    
-    if (items.length === 0) {
-      items.push('{gray-fg}No changes to display{/gray-fg}');
-    }
-    
-    this.fullDiffBox.setItems(items);
-  }
-  
-  /**
-   * Close the full diff view
-   */
-  private closeFullDiffView(): void {
-    this.fullDiffBox.hide();
-    this.currentView = 'main';
-    this.filesBox.focus();
-    this.screen.render();
-  }
-  
-  /**
-   * Toggle hunk expansion
-   */
-  private toggleHunkExpansion(): void {
-    const selected = (this.fullDiffBox as any).selected as number;
-    const items = (this.fullDiffBox as any).items as any[];
-    
-    if (selected === undefined || !items || !items[selected]) return;
-    
-    const itemContent = items[selected].content || items[selected].toString();
-    
-    // Check if this is a hunk header line
-    if (itemContent.includes('@@') && itemContent.includes('▼') || itemContent.includes('▶')) {
-      // Find which file and hunk this corresponds to
-      let currentFile = -1;
-      let currentHunk = -1;
-      
-      for (let i = 0; i <= selected; i++) {
-        const content = items[i]?.content || items[i]?.toString() || '';
-        if (content.includes('{bold}') && (content.includes('[S]') || content.includes('[M]') || content.includes('[?]') || content.includes('[D]'))) {
-          currentFile++;
-          currentHunk = -1;
-        } else if (content.includes('@@') && content.includes('-')) {
-          currentHunk++;
-        }
-      }
-      
-      if (currentFile >= 0 && currentHunk >= 0) {
-        const hunkKey = `${currentFile}:${currentHunk}`;
-        if (this.expandedHunks.has(hunkKey)) {
-          this.expandedHunks.delete(hunkKey);
-        } else {
-          this.expandedHunks.add(hunkKey);
-        }
-        this.renderFullDiffView();
-        this.fullDiffBox.select(selected);
-        this.screen.render();
-      }
-    }
-  }
-  
-  /**
-   * Stage the selected hunk
-   */
-  private stageSelectedHunk(): void {
-    const selected = (this.fullDiffBox as any).selected as number;
-    const items = (this.fullDiffBox as any).items as any[];
-    
-    if (selected === undefined || !items) return;
-    
-    // Find which file this belongs to
-    let currentFile = -1;
-    
-    for (let i = 0; i <= selected; i++) {
-      const content = items[i]?.content || items[i]?.toString() || '';
-      if (content.includes('{bold}') && (content.includes('[M]') || content.includes('[?]') || content.includes('[D]'))) {
-        currentFile++;
-      } else if (content.includes('[S]')) {
-        currentFile++;
-      }
-    }
-    
-    if (currentFile >= 0 && currentFile < this.diffFiles.length) {
-      const file = this.diffFiles[currentFile];
-      
-      // Only stage if it's not already staged
-      if (file.status !== 'staged') {
-        try {
-          if (file.status === 'deleted') {
-            // For deleted files, we need to remove from index
-            this.repo.index.remove(file.path);
-            this.repo.index.save();
-          } else {
-            this.repo.add(file.path);
-          }
-          this.showMessage(`Staged: ${file.path}`);
-          
-          // Refresh the diff view
-          this.computeAllDiffs();
-          this.renderFullDiffView();
-          this.refresh();
-          this.screen.render();
-        } catch (error) {
-          this.showMessage(`Error staging: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-      } else {
-        this.showMessage('File is already staged');
-      }
-    }
-  }
 
   /**
    * Show commit details
    */
   private showCommitDetails(hash: string): void {
+    if (!hash) return;
+
     try {
       const commit = this.repo.objects.readCommit(hash);
       let content = '';
-      
-      content += `{bold}{yellow-fg}Commit: ${hash}{/yellow-fg}{/bold}\n`;
+
+      content += `Commit: ${hash}\n`;
       content += `Author: ${commit.author.name} <${commit.author.email}>\n`;
       content += `Date: ${new Date(commit.author.timestamp * 1000).toLocaleString()}\n`;
       content += `\n${commit.message}\n`;
 
-      this.diffBox.setContent(content);
-      this.screen.render();
+      this.diffText.content = content;
+      this.diffText.fg = COLORS.white;
     } catch (error) {
-      this.diffBox.setContent('{red-fg}Error loading commit{/red-fg}');
-      this.screen.render();
+      this.diffText.content = 'Error loading commit';
+      this.diffText.fg = COLORS.error;
     }
   }
 
   /**
-   * Add the selected file
+   * Add selected file to staging
    */
   private addSelectedFile(): void {
-    const selected = (this.filesBox as any).selected as number;
-    const items = (this.filesBox as any).items as any[];
-    
-    if (selected !== undefined && items && items[selected]) {
-      const item = items[selected].content || items[selected].toString();
-      const filePath = item.replace(/\{[^}]+\}/g, '').replace(/^\[[^\]]+\]\s*/, '').trim();
-      
+    const index = this.filesSelect.getSelectedIndex();
+    const file = this.files[index];
+
+    if (file) {
       try {
-        this.repo.add(filePath);
-        this.showMessage(`Added: ${filePath}`);
+        this.repo.add(file.path);
+        this.showMessage(`Added: ${file.path}`);
         this.refresh();
       } catch (error) {
         this.showMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     }
-  }
-
-  /**
-   * Show commit dialog
-   */
-  private showCommitDialog(): void {
-    const prompt = blessed.prompt({
-      parent: this.screen,
-      top: 'center',
-      left: 'center',
-      width: '60%',
-      height: 'shrink',
-      border: { type: 'line' },
-      label: ' Commit Message ',
-      tags: true,
-      style: {
-        border: { fg: 'green' },
-        label: { fg: 'green', bold: true },
-      },
-    });
-
-    prompt.input('Enter commit message:', '', (err, value) => {
-      if (!err && value && value.trim()) {
-        try {
-          const hash = this.repo.commit(value.trim());
-          this.showMessage(`Committed: ${hash.slice(0, 8)}`);
-          this.refresh();
-        } catch (error) {
-          this.showMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-      }
-      prompt.destroy();
-      this.screen.render();
-    });
-  }
-
-  /**
-   * Show branch selector
-   */
-  private showBranchSelector(): void {
-    try {
-      const branches = this.repo.listBranches();
-      const items: string[] = [];
-
-      for (const branch of branches) {
-        const prefix = branch.isCurrent ? '{green-fg}* ' : '  ';
-        const suffix = branch.isCurrent ? '{/green-fg}' : '';
-        items.push(`${prefix}${branch.name}${suffix}`);
-      }
-
-      this.branchBox.setItems(items);
-      this.branchBox.show();
-      this.branchBox.focus();
-      this.screen.render();
-    } catch (error) {
-      this.showMessage('Error loading branches');
-    }
-  }
-
-  /**
-   * Switch to a branch
-   */
-  private switchToBranch(branchName: string): void {
-    try {
-      this.repo.checkout(branchName);
-      this.branchBox.hide();
-      this.showMessage(`Switched to: ${branchName}`);
-      this.refresh();
-    } catch (error) {
-      this.showMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  }
-
-  /**
-   * Focus next panel
-   */
-  private focusNext(): void {
-    const panels = [this.filesBox, this.logBox, this.diffBox];
-    const current = panels.findIndex(p => p === this.screen.focused);
-    const next = (current + 1) % panels.length;
-    panels[next].focus();
-    this.screen.render();
   }
 
   /**
@@ -1176,79 +963,100 @@ export class TsgitTUI {
   }
 
   /**
+   * Show commit dialog
+   */
+  private showCommitDialog(): void {
+    this.showInput('Commit message:', (value) => {
+      if (value && value.trim()) {
+        try {
+          const hash = this.repo.commit(value.trim());
+          this.showMessage(`Committed: ${hash.slice(0, 8)}`);
+          this.refresh();
+        } catch (error) {
+          this.showMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      }
+    });
+  }
+
+  /**
    * Show amend dialog
    */
   private showAmendDialog(): void {
-    const prompt = blessed.prompt({
-      parent: this.screen,
-      top: 'center',
-      left: 'center',
-      width: '60%',
-      height: 'shrink',
-      border: { type: 'line' },
-      label: ' Amend Last Commit (leave empty to keep message) ',
-      tags: true,
-      style: {
-        border: { fg: 'yellow' },
-        label: { fg: 'yellow', bold: true },
-      },
-    });
+    try {
+      const headHash = this.repo.refs.resolve('HEAD');
+      if (!headHash) {
+        this.showMessage('No commits to amend');
+        return;
+      }
 
-    prompt.input('New message (optional):', '', (err, value) => {
-      if (!err) {
+      const oldCommit = this.repo.objects.readCommit(headHash);
+
+      this.showInput('New message (leave empty to keep):', (value) => {
         try {
-          const headHash = this.repo.refs.resolve('HEAD');
-          if (!headHash) {
-            this.showMessage('No commits to amend');
-            prompt.destroy();
-            this.screen.render();
-            return;
-          }
-          const oldCommit = this.repo.objects.readCommit(headHash);
           const newMessage = value?.trim() || oldCommit.message;
-          
-          // Reset to parent
+
           if (oldCommit.parentHashes.length > 0) {
             const head = this.repo.refs.getHead();
             if (head.isSymbolic) {
               this.repo.refs.updateBranch(head.target.replace('refs/heads/', ''), oldCommit.parentHashes[0]);
             }
           }
-          
-          // Recommit
+
           const hash = this.repo.commit(newMessage);
           this.showMessage(`Amended: ${hash.slice(0, 8)}`);
           this.refresh();
         } catch (error) {
           this.showMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
-      }
-      prompt.destroy();
-      this.screen.render();
-    });
+      });
+    } catch (error) {
+      this.showMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Show branch selector
+   */
+  private showBranchSelector(): void {
+    try {
+      const branchList = this.repo.listBranches();
+      this.branches = branchList.map((b) => b.name);
+
+      this.branchSelect.options = branchList.map((b) => ({
+        name: b.isCurrent ? `* ${b.name}` : `  ${b.name}`,
+        description: b.isCurrent ? 'current' : '',
+      }));
+
+      this.modalContainer.title = ' Branches (Esc to close) ';
+      this.showModal('branches');
+      this.branchSelect.focus();
+    } catch (error) {
+      this.showMessage('Error loading branches');
+    }
+  }
+
+  /**
+   * Switch to a branch
+   */
+  private switchToBranch(branchName: string): void {
+    const cleanName = branchName.replace(/^\*?\s*/, '').trim();
+    try {
+      this.repo.checkout(cleanName);
+      this.hideModal();
+      this.showMessage(`Switched to: ${cleanName}`);
+      this.refresh();
+    } catch (error) {
+      this.showMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 
   /**
    * Show create branch dialog
    */
   private showCreateBranchDialog(): void {
-    const prompt = blessed.prompt({
-      parent: this.screen,
-      top: 'center',
-      left: 'center',
-      width: '60%',
-      height: 'shrink',
-      border: { type: 'line' },
-      label: ' Create Branch ',
-      tags: true,
-      style: {
-        border: { fg: 'cyan' },
-        label: { fg: 'cyan', bold: true },
-      },
-    });
-
-    prompt.input('Branch name:', '', (err, value) => {
-      if (!err && value && value.trim()) {
+    this.showInput('Branch name:', (value) => {
+      if (value && value.trim()) {
         try {
           this.repo.createBranch(value.trim());
           this.repo.checkout(value.trim());
@@ -1258,8 +1066,6 @@ export class TsgitTUI {
           this.showMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
       }
-      prompt.destroy();
-      this.screen.render();
     });
   }
 
@@ -1267,182 +1073,15 @@ export class TsgitTUI {
    * Show stash menu
    */
   private showStashMenu(): void {
-    const menu = blessed.list({
-      parent: this.screen,
-      label: ' Stash ',
-      top: 'center',
-      left: 'center',
-      width: '50%',
-      height: 'shrink',
-      border: { type: 'line' },
-      tags: true,
-      keys: true,
-      vi: true,
-      mouse: true,
-      style: {
-        border: { fg: 'magenta' },
-        selected: { bg: 'magenta', fg: 'black' },
-      },
-      items: ['Save stash', 'Pop stash', 'Apply stash', 'List stashes'],
-    });
-
-    menu.on('select', (item, index) => {
-      menu.destroy();
-      this.screen.render();
-      
-      switch (index) {
-        case 0: this.stashSave(); break;
-        case 1: this.stashPop(); break;
-        case 2: this.stashApply(); break;
-        case 3: this.listStashes(); break;
-      }
-    });
-
-    menu.key(['escape'], () => {
-      menu.destroy();
-      this.screen.render();
-    });
-
-    menu.focus();
-    this.screen.render();
-  }
-
-  private stashSave(): void {
-    try {
-      const branch = this.repo.refs.getCurrentBranch() || 'HEAD';
-      const status = this.repo.status();
-      this.repo.branchState.saveState(branch, status.staged, 'WIP');
-      this.showMessage('Changes stashed');
-      this.refresh();
-    } catch (error) {
-      this.showMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  }
-
-  private stashPop(): void {
-    try {
-      const branch = this.repo.refs.getCurrentBranch() || 'HEAD';
-      this.repo.branchState.restoreState(branch);
-      this.showMessage('Stash popped');
-      this.refresh();
-    } catch (error) {
-      this.showMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  }
-
-  private stashApply(): void {
-    try {
-      const branch = this.repo.refs.getCurrentBranch() || 'HEAD';
-      this.repo.branchState.restoreState(branch);
-      this.showMessage('Stash applied');
-      this.refresh();
-    } catch (error) {
-      this.showMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  }
-
-  private listStashes(): void {
-    try {
-      const currentBranch = this.repo.refs.getCurrentBranch() || 'HEAD';
-      const hasState = this.repo.branchState.hasState(currentBranch);
-      
-      if (!hasState) {
-        this.showMessage('No stashes');
-        return;
-      }
-      
-      const list = blessed.list({
-        parent: this.screen,
-        label: ' Stashes ',
-        top: 'center',
-        left: 'center',
-        width: '60%',
-        height: '50%',
-        border: { type: 'line' },
-        tags: true,
-        keys: true,
-        vi: true,
-        mouse: true,
-        style: {
-          border: { fg: 'magenta' },
-          selected: { bg: 'magenta', fg: 'black' },
-        },
-        items: [`stash@{0}: State saved for ${currentBranch}`],
-      });
-
-      list.key(['escape', 'q'], () => {
-        list.destroy();
-        this.screen.render();
-      });
-
-      list.focus();
-      this.screen.render();
-    } catch (error) {
-      this.showMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
+    this.showMessage('Stash: z=save, Z=pop (use command palette for more)');
   }
 
   /**
    * Show tag menu
    */
   private showTagMenu(): void {
-    const menu = blessed.list({
-      parent: this.screen,
-      label: ' Tags ',
-      top: 'center',
-      left: 'center',
-      width: '50%',
-      height: 'shrink',
-      border: { type: 'line' },
-      tags: true,
-      keys: true,
-      vi: true,
-      mouse: true,
-      style: {
-        border: { fg: 'yellow' },
-        selected: { bg: 'yellow', fg: 'black' },
-      },
-      items: ['Create tag', 'List tags'],
-    });
-
-    menu.on('select', (item, index) => {
-      menu.destroy();
-      this.screen.render();
-      
-      if (index === 0) {
-        this.createTagDialog();
-      } else {
-        this.listTags();
-      }
-    });
-
-    menu.key(['escape'], () => {
-      menu.destroy();
-      this.screen.render();
-    });
-
-    menu.focus();
-    this.screen.render();
-  }
-
-  private createTagDialog(): void {
-    const prompt = blessed.prompt({
-      parent: this.screen,
-      top: 'center',
-      left: 'center',
-      width: '60%',
-      height: 'shrink',
-      border: { type: 'line' },
-      label: ' Create Tag ',
-      tags: true,
-      style: {
-        border: { fg: 'yellow' },
-        label: { fg: 'yellow', bold: true },
-      },
-    });
-
-    prompt.input('Tag name:', '', (err, value) => {
-      if (!err && value && value.trim()) {
+    this.showInput('Tag name:', (value) => {
+      if (value && value.trim()) {
         try {
           const headHash = this.repo.refs.resolve('HEAD');
           if (headHash) {
@@ -1456,101 +1095,48 @@ export class TsgitTUI {
           this.showMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
       }
-      prompt.destroy();
-      this.screen.render();
     });
-  }
-
-  private listTags(): void {
-    try {
-      const tags = this.repo.refs.listTags();
-      if (tags.length === 0) {
-        this.showMessage('No tags');
-        return;
-      }
-      
-      const list = blessed.list({
-        parent: this.screen,
-        label: ' Tags ',
-        top: 'center',
-        left: 'center',
-        width: '60%',
-        height: '50%',
-        border: { type: 'line' },
-        tags: true,
-        keys: true,
-        vi: true,
-        mouse: true,
-        style: {
-          border: { fg: 'yellow' },
-          selected: { bg: 'yellow', fg: 'black' },
-        },
-        items: tags,
-      });
-
-      list.key(['escape', 'q'], () => {
-        list.destroy();
-        this.screen.render();
-      });
-
-      list.focus();
-      this.screen.render();
-    } catch (error) {
-      this.showMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
   }
 
   /**
    * Show merge menu
    */
   private showMergeMenu(): void {
+    const { SelectRenderableEvents } = this.opentui;
+    
     try {
-      const branches = this.repo.listBranches().filter(b => !b.isCurrent);
-      if (branches.length === 0) {
+      const branchList = this.repo.listBranches().filter((b) => !b.isCurrent);
+      if (branchList.length === 0) {
         this.showMessage('No other branches to merge');
         return;
       }
 
-      const list = blessed.list({
-        parent: this.screen,
-        label: ' Merge Branch ',
-        top: 'center',
-        left: 'center',
-        width: '50%',
-        height: '50%',
-        border: { type: 'line' },
-        tags: true,
-        keys: true,
-        vi: true,
-        mouse: true,
-        style: {
-          border: { fg: 'blue' },
-          selected: { bg: 'blue', fg: 'white' },
-        },
-        items: branches.map(b => b.name),
-      });
+      this.branches = branchList.map((b) => b.name);
+      this.branchSelect.options = branchList.map((b) => ({
+        name: b.name,
+        description: 'Merge into current branch',
+      }));
 
-      list.on('select', (item) => {
-        const branchName = item.content.replace(/\{[^}]+\}/g, '').trim();
-        list.destroy();
-        this.screen.render();
-        
-        try {
-          this.repo.mergeManager.merge(branchName);
-          this.showMessage(`Merged: ${branchName}`);
-          this.refresh();
-        } catch (error) {
-          this.showMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      this.modalContainer.title = ' Merge Branch (Esc to close) ';
+      this.showModal('branches');
+      this.branchSelect.focus();
+
+      // Override selection for merge
+      this.branchSelect.removeAllListeners(SelectRenderableEvents.ITEM_SELECTED);
+      this.branchSelect.once(SelectRenderableEvents.ITEM_SELECTED, (index: number) => {
+        if (this.branches[index]) {
+          try {
+            this.repo.mergeManager.merge(this.branches[index]);
+            this.hideModal();
+            this.showMessage(`Merged: ${this.branches[index]}`);
+            this.refresh();
+          } catch (error) {
+            this.showMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          }
         }
+        // Restore original handler
+        this.setupEventHandlers();
       });
-
-      list.key(['escape'], () => {
-        list.destroy();
-        this.screen.render();
-      });
-
-      list.focus();
-      this.screen.render();
     } catch (error) {
       this.showMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -1560,40 +1146,22 @@ export class TsgitTUI {
    * Push changes
    */
   private pushChanges(): void {
-    this.showMessage('Pushing...');
-    try {
-      // Network sync would require remote protocol implementation
-      this.showMessage('Push recorded (configure remotes for network sync)');
-    } catch (error) {
-      this.showMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
+    this.showMessage('Push recorded (configure remotes for network sync)');
   }
 
   /**
    * Pull changes
    */
   private pullChanges(): void {
-    this.showMessage('Pulling...');
-    try {
-      // Network sync would require remote protocol implementation
-      this.showMessage('Pull recorded (configure remotes for network sync)');
-      this.refresh();
-    } catch (error) {
-      this.showMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
+    this.showMessage('Pull recorded (configure remotes for network sync)');
+    this.refresh();
   }
 
   /**
    * Fetch changes
    */
   private fetchChanges(): void {
-    this.showMessage('Fetching...');
-    try {
-      // Network sync would require remote protocol implementation
-      this.showMessage('Fetch recorded (configure remotes for network sync)');
-    } catch (error) {
-      this.showMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
+    this.showMessage('Fetch recorded (configure remotes for network sync)');
   }
 
   /**
@@ -1613,82 +1181,7 @@ export class TsgitTUI {
    * Show reset menu
    */
   private showResetMenu(): void {
-    const menu = blessed.list({
-      parent: this.screen,
-      label: ' Reset ',
-      top: 'center',
-      left: 'center',
-      width: '50%',
-      height: 'shrink',
-      border: { type: 'line' },
-      tags: true,
-      keys: true,
-      vi: true,
-      mouse: true,
-      style: {
-        border: { fg: 'red' },
-        selected: { bg: 'red', fg: 'white' },
-      },
-      items: ['Soft (keep staged)', 'Mixed (keep unstaged)', 'Hard (discard all)'],
-    });
-
-    menu.on('select', (item, index) => {
-      menu.destroy();
-      const modes = ['soft', 'mixed', 'hard'] as const;
-      this.showResetCommitPrompt(modes[index]);
-    });
-
-    menu.key(['escape'], () => {
-      menu.destroy();
-      this.screen.render();
-    });
-
-    menu.focus();
-    this.screen.render();
-  }
-
-  private showResetCommitPrompt(mode: 'soft' | 'mixed' | 'hard'): void {
-    const prompt = blessed.prompt({
-      parent: this.screen,
-      top: 'center',
-      left: 'center',
-      width: '60%',
-      height: 'shrink',
-      border: { type: 'line' },
-      label: ` Reset (${mode}) to: `,
-      tags: true,
-      style: {
-        border: { fg: 'red' },
-        label: { fg: 'red', bold: true },
-      },
-    });
-
-    prompt.input('Commit (e.g., HEAD~1):', 'HEAD~1', (err, value) => {
-      if (!err && value && value.trim()) {
-        try {
-          const targetHash = this.repo.refs.resolve(value.trim());
-          if (targetHash) {
-            const head = this.repo.refs.getHead();
-            if (head.isSymbolic) {
-              this.repo.refs.updateBranch(head.target.replace('refs/heads/', ''), targetHash);
-            } else {
-              this.repo.refs.setHeadDetached(targetHash);
-            }
-            if (mode !== 'soft') {
-              this.repo.checkout(targetHash);
-            }
-            this.showMessage(`Reset to ${value.trim()} (${mode})`);
-            this.refresh();
-          } else {
-            this.showMessage('Unknown commit reference');
-          }
-        } catch (error) {
-          this.showMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-      }
-      prompt.destroy();
-      this.screen.render();
-    });
+    this.showMessage('Reset: use wit reset --soft/--mixed/--hard <commit>');
   }
 
   /**
@@ -1706,374 +1199,155 @@ export class TsgitTUI {
   }
 
   /**
-   * Show command palette
+   * Show stack selector
    */
-  private showCommandPalette(): void {
-    const commands = [
-      { name: 'Commit', key: 'c', action: () => this.showCommitDialog() },
-      { name: 'Amend', key: 'C', action: () => this.showAmendDialog() },
-      { name: 'Stage All', key: 'A', action: () => this.stageAll() },
-      { name: 'WIP Commit', key: 'w', action: () => this.wipCommit() },
-      { name: 'Create Branch', key: 'b', action: () => this.showCreateBranchDialog() },
-      { name: 'Switch Branch', key: 's', action: () => this.showBranchSelector() },
-      { name: 'Merge', key: 'm', action: () => this.showMergeMenu() },
-      { name: 'Stash', key: 'z', action: () => this.showStashMenu() },
-      { name: 'Tags', key: 't', action: () => this.showTagMenu() },
-      { name: 'Push', key: 'p', action: () => this.pushChanges() },
-      { name: 'Pull', key: 'l', action: () => this.pullChanges() },
-      { name: 'Fetch', key: 'f', action: () => this.fetchChanges() },
-      { name: 'Undo', key: 'u', action: () => this.undoLastOperation() },
-      { name: 'Reset', key: 'R', action: () => this.showResetMenu() },
-      { name: 'Refresh', key: 'r', action: () => this.refresh() },
-    ];
-
-    const list = blessed.list({
-      parent: this.screen,
-      label: ' Command Palette (: or Ctrl+K) ',
-      top: 'center',
-      left: 'center',
-      width: '60%',
-      height: '60%',
-      border: { type: 'line' },
-      tags: true,
-      keys: true,
-      vi: true,
-      mouse: true,
-      style: {
-        border: { fg: 'white' },
-        selected: { bg: 'blue', fg: 'white' },
-      },
-      items: commands.map(c => `{bold}${c.key}{/bold}  ${c.name}`),
-    });
-
-    list.on('select', (item, index) => {
-      list.destroy();
-      this.screen.render();
-      commands[index].action();
-    });
-
-    list.key(['escape', 'q'], () => {
-      list.destroy();
-      this.screen.render();
-    });
-
-    list.focus();
-    this.screen.render();
+  private showStackSelector(): void {
+    this.showMessage('Stacks: use wit stack commands');
   }
 
   /**
-   * Show help dialog
+   * Show help
    */
   private showHelp(): void {
     const helpContent = `
-{bold}wit Terminal UI - Keyboard Shortcuts{/bold}
+wit TUI - Keyboard Shortcuts
 
-{bold}Navigation:{/bold}
-  Tab        - Switch between panels
-  ↑/↓ or j/k - Navigate items
+Navigation:
+  Tab        - Switch panels
+  j/k        - Navigate items
   Enter      - Select item
-  : or Ctrl+K - Command palette
 
-{bold}Changes:{/bold}
-  a - Add selected file to staging
+Changes:
+  a - Add selected file
   A - Stage all changes
-  c - Create a commit
+  c - Create commit
   C - Amend last commit
-  w - WIP commit (quick save)
+  w - WIP commit
 
-{bold}Branches:{/bold}
+Branches:
   s - Switch branch
   b - Create new branch
   m - Merge branch
 
-{bold}Stash & Tags:{/bold}
+Other:
+  t - Create tag
+  T - Stacks menu
   z - Stash menu
-  t - Tags menu
-
-{bold}Remote:{/bold}
-  p - Push to remote
-  l - Pull from remote
-  f - Fetch from remote
-
-{bold}History:{/bold}
-  u - Undo last operation
-  R - Reset (soft/mixed/hard)
-
-{bold}Other:{/bold}
-  r - Refresh view
+  p - Push
+  l - Pull
+  f - Fetch
+  u - Undo
+  R - Reset menu
+  r - Refresh
   q - Quit
-  ? - Show this help
+  ? - This help
 
-{gray-fg}Press any key to close{/gray-fg}
-`;
+Press any key to close`;
 
-    const helpDialog = blessed.box({
-      parent: this.screen,
-      top: 'center',
-      left: 'center',
-      width: '60%',
-      height: '60%',
-      content: helpContent,
-      tags: true,
-      border: { type: 'line' },
-      style: {
-        border: { fg: 'white' },
-        bg: 'black',
-      },
-    });
+    this.diffText.content = helpContent;
+    this.diffText.fg = COLORS.white;
+  }
 
-    helpDialog.key(['escape', 'q', 'enter', 'space'], () => {
-      helpDialog.destroy();
-      this.screen.render();
-    });
-
-    helpDialog.focus();
-    this.screen.render();
+  /**
+   * Focus next panel
+   */
+  private focusNext(): void {
+    const panels = [this.filesSelect, this.logSelect];
+    const current = panels.findIndex((p) => p.focused);
+    const next = (current + 1) % panels.length;
+    panels[next].focus();
   }
 
   /**
    * Show a message
    */
   private showMessage(message: string): void {
-    this.messageBox.display(message, 2, () => {
-      this.screen.render();
-    });
+    this.messageText.content = message;
+    this.messageBox.visible = true;
+
+    if (this.messageTimeout) {
+      clearTimeout(this.messageTimeout);
+    }
+
+    this.messageTimeout = setTimeout(() => {
+      this.messageBox.visible = false;
+    }, 2000);
+  }
+
+  /**
+   * Show modal
+   */
+  private showModal(view: 'branches' | 'stacks'): void {
+    this.currentView = view;
+    this.modalContainer.visible = true;
+  }
+
+  /**
+   * Hide modal
+   */
+  private hideModal(): void {
+    this.currentView = 'main';
+    this.modalContainer.visible = false;
+    this.filesSelect.focus();
+  }
+
+  /**
+   * Show input dialog
+   */
+  private showInput(label: string, callback: (value: string | null) => void): void {
+    this.currentView = 'input';
+    this.inputLabel.content = label;
+    this.inputBox.visible = true;
+    this.inputCallback = callback;
+    this.inputField.focus();
+  }
+
+  /**
+   * Hide input dialog
+   */
+  private hideInput(): void {
+    this.currentView = 'main';
+    this.inputBox.visible = false;
+    this.filesSelect.focus();
   }
 
   /**
    * Quit the application
    */
   private quit(): void {
-    this.screen.destroy();
+    this.renderer.stop();
     process.exit(0);
-  }
-
-  /**
-   * Run the TUI
-   */
-  run(): void {
-    this.filesBox.focus();
-    this.screen.render();
-  }
-
-  // ============ Stack Methods ============
-
-  /**
-   * Show stack selector
-   */
-  private showStackSelector(): void {
-    this.currentView = 'stacks';
-    const stacks = this.stackManager.listStacks();
-    const currentStack = this.stackManager.getCurrentStack();
-    
-    const items: string[] = [];
-    
-    // Add action items
-    items.push('{bold}{green-fg}[CREATE]{/green-fg} Create new stack{/bold}');
-    
-    if (currentStack) {
-      items.push('{bold}{cyan-fg}[PUSH]{/cyan-fg} Push new branch to current stack{/bold}');
-      items.push('{bold}{yellow-fg}[SYNC]{/yellow-fg} Sync current stack{/bold}');
-      items.push('{bold}{blue-fg}[UP]{/blue-fg} Navigate up in stack{/bold}');
-      items.push('{bold}{blue-fg}[DOWN]{/blue-fg} Navigate down in stack{/bold}');
-      items.push('');
-    }
-    
-    // Add existing stacks
-    if (stacks.length > 0) {
-      items.push('{bold}─── Stacks ───{/bold}');
-      for (const name of stacks) {
-        const stack = this.stackManager.getStack(name);
-        if (stack) {
-          const isCurrent = currentStack?.name === name;
-          const prefix = isCurrent ? '{magenta-fg}* ' : '  ';
-          const suffix = isCurrent ? ' (current){/magenta-fg}' : '';
-          items.push(`${prefix}${name} (${stack.branches.length} branches)${suffix}`);
-        }
-      }
-    } else {
-      items.push('{gray-fg}No stacks yet. Create one to get started!{/gray-fg}');
-    }
-    
-    this.stackBox.setItems(items);
-    this.stackBox.show();
-    this.stackBox.focus();
-    this.screen.render();
-  }
-
-  /**
-   * Show create stack dialog
-   */
-  private showCreateStackDialog(): void {
-    this.stackBox.hide();
-    
-    const inputBox = blessed.textbox({
-      parent: this.screen,
-      label: ' Stack Name ',
-      top: 'center',
-      left: 'center',
-      width: '50%',
-      height: 3,
-      border: { type: 'line' },
-      style: {
-        border: { fg: 'green' },
-      },
-      inputOnFocus: true,
-    });
-
-    inputBox.focus();
-    this.screen.render();
-
-    inputBox.on('submit', (value) => {
-      inputBox.destroy();
-      if (value && value.trim()) {
-        try {
-          this.stackManager.create(value.trim());
-          this.showMessage(`Stack '${value.trim()}' created`);
-        } catch (error) {
-          this.showMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-      }
-      this.refresh();
-    });
-
-    inputBox.on('cancel', () => {
-      inputBox.destroy();
-      this.screen.render();
-    });
-  }
-
-  /**
-   * Push to current stack
-   */
-  private pushToStack(): void {
-    this.stackBox.hide();
-    
-    const inputBox = blessed.textbox({
-      parent: this.screen,
-      label: ' Branch Name (optional) ',
-      top: 'center',
-      left: 'center',
-      width: '50%',
-      height: 3,
-      border: { type: 'line' },
-      style: {
-        border: { fg: 'cyan' },
-      },
-      inputOnFocus: true,
-    });
-
-    inputBox.focus();
-    this.screen.render();
-
-    inputBox.on('submit', (value) => {
-      inputBox.destroy();
-      try {
-        const branchName = value && value.trim() ? value.trim() : undefined;
-        this.stackManager.push(branchName);
-        this.showMessage(`Pushed new branch to stack`);
-      } catch (error) {
-        this.showMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      }
-      this.refresh();
-    });
-
-    inputBox.on('cancel', () => {
-      inputBox.destroy();
-      this.screen.render();
-    });
-  }
-
-  /**
-   * Sync current stack
-   */
-  private syncCurrentStack(): void {
-    this.stackBox.hide();
-    try {
-      const result = this.stackManager.sync();
-      if (result.success) {
-        this.showMessage(`Synced ${result.synced.length} branches successfully`);
-      } else {
-        const conflictCount = result.conflicts.length;
-        this.showMessage(`Sync completed with ${conflictCount} conflict(s): ${result.message || ''}`);
-      }
-    } catch (error) {
-      this.showMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-    this.refresh();
-  }
-
-  /**
-   * Navigate up in stack
-   */
-  private stackNavigateUp(): void {
-    this.stackBox.hide();
-    try {
-      const result = this.stackManager.up();
-      if (result) {
-        this.showMessage(`Switched to ${result}`);
-      } else {
-        this.showMessage('Already at top of stack');
-      }
-    } catch (error) {
-      this.showMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-    this.refresh();
-  }
-
-  /**
-   * Navigate down in stack
-   */
-  private stackNavigateDown(): void {
-    this.stackBox.hide();
-    try {
-      const result = this.stackManager.down();
-      if (result) {
-        this.showMessage(`Switched to ${result}`);
-      } else {
-        this.showMessage('Already at bottom of stack');
-      }
-    } catch (error) {
-      this.showMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-    this.refresh();
-  }
-
-  /**
-   * Show stack details
-   */
-  private showStackDetails(stackName: string): void {
-    const nodes = this.stackManager.visualize(stackName);
-    
-    const items: string[] = [];
-    items.push(`{bold}Stack: ${stackName}{/bold}`);
-    items.push('');
-    
-    for (const node of nodes.slice().reverse()) {
-      const current = node.isCurrent ? '{magenta-fg}● ' : '  ';
-      const statusColor = node.status === 'synced' ? 'green' : 
-                         node.status === 'behind' ? 'yellow' :
-                         node.status === 'ahead' ? 'blue' : 'red';
-      items.push(`${current}{${statusColor}-fg}${node.branch}{/${statusColor}-fg}`);
-      items.push(`     ${node.commit.slice(0, 8)} ${node.message}`);
-    }
-    
-    this.stackBox.setItems(items);
-    this.screen.render();
   }
 }
 
 /**
  * Launch the TUI
  */
-export function launchTUI(): void {
+export async function launchTUI(): Promise<void> {
+  // Check dependencies first
+  const depCheck = checkOpenTUIDependencies();
+  if (!depCheck.ok) {
+    console.error('TUI dependency check failed:\n');
+    console.error(depCheck.message);
+    process.exit(1);
+  }
+
   try {
     const repo = Repository.find();
     const tui = new TsgitTUI(repo);
-    tui.run();
+    await tui.run();
   } catch (error) {
-    console.error('Error:', error instanceof Error ? error.message : 'Unknown error');
-    console.error('Make sure you are in a wit repository');
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    
+    // Check for OpenTUI-specific errors
+    if (message.includes('bindings') || message.includes('native') || message.includes('zig')) {
+      console.error('TUI initialization failed:\n');
+      console.error(message);
+      console.error('\nMake sure Zig is installed and try reinstalling dependencies.');
+    } else {
+      console.error('Error:', message);
+      console.error('Make sure you are in a wit repository');
+    }
     process.exit(1);
   }
 }
