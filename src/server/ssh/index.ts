@@ -415,6 +415,8 @@ export class SSHServer extends EventEmitter {
     // Git commands look like:
     // git-upload-pack '/path/to/repo.git'
     // git-receive-pack '/path/to/repo.git'
+    // Also support .wit extension:
+    // git-upload-pack '/path/to/repo.wit'
     
     const match = command.match(/^(git-(?:upload|receive)-pack)\s+['"]?([^'"]+)['"]?$/);
     
@@ -429,7 +431,10 @@ export class SSHServer extends EventEmitter {
     if (repoPath.startsWith('/')) {
       repoPath = repoPath.slice(1);
     }
-    if (!repoPath.endsWith('.git')) {
+    // Strip .wit extension and normalize to .git for internal storage
+    if (repoPath.endsWith('.wit')) {
+      repoPath = repoPath.slice(0, -4) + '.git';
+    } else if (!repoPath.endsWith('.git')) {
       repoPath += '.git';
     }
 

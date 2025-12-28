@@ -924,9 +924,9 @@ export const packageVersions = pgTable('package_versions', {
   optionalDependencies: text('optional_dependencies'), // JSON object
   engines: text('engines'),                        // JSON object (node version, etc.)
   bin: text('bin'),                                // JSON object (binary entry points)
-  publishedBy: uuid('published_by')
+  publishedBy: text('published_by')
     .notNull()
-    .references(() => users.id),
+    .references(() => authUser.id),
   deprecated: text('deprecated'),                  // Per-version deprecation message
   downloadCount: integer('download_count').notNull().default(0),
   publishedAt: timestamp('published_at', { withTimezone: true }).defaultNow().notNull(),
