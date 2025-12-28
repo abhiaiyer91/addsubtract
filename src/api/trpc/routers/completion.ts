@@ -9,7 +9,7 @@ import { z } from 'zod';
 import { router, protectedProcedure } from '../trpc';
 import { TRPCError } from '@trpc/server';
 import { Agent } from '@mastra/core/agent';
-import { getAnyApiKeyForRepo, isAIAvailable } from '../../../ai/mastra.js';
+import { getAnyApiKeyForRepo, isAIAvailable, isAIAvailableForRepo } from '../../../ai/mastra.js';
 
 // Cache for rate limiting and deduplication
 const completionCache = new Map<string, { result: string; timestamp: number }>();
@@ -63,7 +63,7 @@ async function generateCompletion(
   const apiKeyInfo = await getAnyApiKeyForRepo(repoId);
   
   if (!apiKeyInfo) {
-    throw new Error('No AI API key configured. Set ANTHROPIC_API_KEY or OPENAI_API_KEY.');
+    throw new Error('No AI API key configured. Set ANTHROPIC_API_KEY or OPENAI_API_KEY, or add an API key in repository settings.');
   }
 
   // Determine model based on provider
@@ -201,11 +201,15 @@ export const completionRouter = router({
         };
       }
 
-      // Check if AI is available
-      if (!isAIAvailable() && !repoId) {
+      // Check if AI is available (server-level or repo-level keys)
+      const aiAvailable = repoId 
+        ? await isAIAvailableForRepo(repoId)
+        : isAIAvailable();
+      
+      if (!aiAvailable) {
         throw new TRPCError({
           code: 'PRECONDITION_FAILED',
-          message: 'No AI API key configured. Set ANTHROPIC_API_KEY or OPENAI_API_KEY.',
+          message: 'No AI API key configured. Set ANTHROPIC_API_KEY or OPENAI_API_KEY, or add an API key in repository settings.',
         });
       }
 
@@ -271,11 +275,15 @@ export const completionRouter = router({
         }
       }
 
-      // Check if AI is available
-      if (!isAIAvailable() && !repoId) {
+      // Check if AI is available (server-level or repo-level keys)
+      const aiAvailable = repoId 
+        ? await isAIAvailableForRepo(repoId)
+        : isAIAvailable();
+      
+      if (!aiAvailable) {
         throw new TRPCError({
           code: 'PRECONDITION_FAILED',
-          message: 'No AI API key configured.',
+          message: 'No AI API key configured. Set ANTHROPIC_API_KEY or OPENAI_API_KEY, or add an API key in repository settings.',
         });
       }
 
