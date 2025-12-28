@@ -27,6 +27,7 @@ import { userModel } from '../../db/models/user';
 import { PackageStorage, createPackageStorage } from '../storage/packages';
 import { authMiddleware } from '../middleware/auth';
 import { eventBus } from '../../events';
+import { repoModel } from '../../db/models/repository';
 
 // Types for npm publish payload
 interface NpmPublishPayload {
@@ -96,7 +97,7 @@ export function createPackageRoutes(baseUrl: string): Hono {
       const tokenRecord = await tokenModel.verify(token);
       if (tokenRecord) {
         const user = await userModel.findById(tokenRecord.userId);
-        if (user) {
+        if (user && user.username) {
           return { id: user.id, username: user.username };
         }
       }
@@ -338,18 +339,10 @@ export function createPackageRoutes(baseUrl: string): Hono {
         return c.json({ error: 'Not authorized to publish to this package' }, 403);
       }
     } else {
-      // Create new package
-      pkg = await packageModel.create({
-        name,
-        scope,
-        ownerId: user.id,
-        description: payload.description,
-        readme: payload.readme,
-        visibility: 'public', // Default to public
-      });
-
-      // Add creator as maintainer
-      await maintainerModel.add(pkg.id, user.id);
+      // Package doesn't exist - users must enable package registry via the UI first
+      return c.json({ 
+        error: 'Package not found. Please enable package registry for your repository first via the web UI.' 
+      }, 404);
     }
 
     // Process each version in the payload
@@ -449,9 +442,10 @@ export function createPackageRoutes(baseUrl: string): Hono {
       return c.json({ error: 'Not found' }, 404);
     }
 
-    // Only owner can unpublish
-    if (pkg.ownerId !== user.id) {
-      return c.json({ error: 'Only the owner can unpublish' }, 403);
+    // Get repo to check ownership
+    const repo = await repoModel.findById(pkg.repoId);
+    if (!repo || repo.ownerId !== user.id) {
+      return c.json({ error: 'Only the repository owner can unpublish' }, 403);
     }
 
     const fullName = getFullPackageName(scope, name);
@@ -643,7 +637,8 @@ export function createPackageRoutes(baseUrl: string): Hono {
         links: {
           npm: `${baseUrl}/package/${getFullPackageName(pkg.scope, pkg.name)}`,
           homepage: pkg.homepage,
-          repository: pkg.repositoryUrl,
+          // Repository URL is derived from linked repo, not stored on package
+          repository: undefined,
         },
       },
       score: {

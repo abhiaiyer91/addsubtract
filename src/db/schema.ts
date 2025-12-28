@@ -879,29 +879,29 @@ export const packageVisibilityEnum = pgEnum('package_visibility', ['public', 'pr
 
 /**
  * Packages table - npm package metadata
- * One entry per unique package name (scoped or unscoped)
+ * Each package is scoped to a repository - the repo is the source of truth
  */
 export const packages = pgTable('packages', {
   id: uuid('id').primaryKey().defaultRandom(),
-  name: text('name').notNull(),                    // Package name without scope, e.g., "cli"
-  scope: text('scope'),                            // Scope without @, e.g., "wit" (null for unscoped)
-  repoId: uuid('repo_id').references(() => repositories.id, { onDelete: 'set null' }),
-  ownerId: uuid('owner_id')
+  name: text('name').notNull(),                    // Package name (can differ from repo name)
+  scope: text('scope'),                            // Scope without @, e.g., "wit" (defaults to owner username)
+  repoId: uuid('repo_id')
     .notNull()
-    .references(() => users.id, { onDelete: 'cascade' }),
+    .references(() => repositories.id, { onDelete: 'cascade' }),
   description: text('description'),
   visibility: packageVisibilityEnum('visibility').notNull().default('public'),
   keywords: text('keywords'),                      // JSON array
   license: text('license'),
   homepage: text('homepage'),
-  repositoryUrl: text('repository_url'),           // Git repository URL
   readme: text('readme'),                          // README content (updated on publish)
   downloadCount: integer('download_count').notNull().default(0),
   deprecated: text('deprecated'),                  // Deprecation message (null = not deprecated)
+  publishOnRelease: boolean('publish_on_release').notNull().default(false), // Auto-publish on git release
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => ({
   uniqueName: unique().on(table.scope, table.name),
+  uniqueRepo: unique().on(table.repoId), // One package per repo
 }));
 
 /**

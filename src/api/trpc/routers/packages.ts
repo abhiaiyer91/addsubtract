@@ -18,6 +18,7 @@ import {
   generatePackageMetadata,
 } from '../../../db/models/packages';
 import { userModel } from '../../../db/models/user';
+import { repoModel } from '../../../db/models/repository';
 
 /**
  * Input validation schemas
@@ -36,11 +37,10 @@ const createPackageSchema = z.object({
   scope: z.string().nullable().optional(),
   description: z.string().optional(),
   visibility: z.enum(['public', 'private']).default('public'),
-  repoId: z.string().uuid().optional(),
+  repoId: z.string().uuid(), // Required - packages must be linked to a repo
   keywords: z.array(z.string()).optional(),
   license: z.string().optional(),
   homepage: z.string().url().optional(),
-  repositoryUrl: z.string().optional(),
 });
 
 const updatePackageSchema = z.object({
@@ -121,6 +121,24 @@ export const packagesRouter = router({
       return {
         ...pkgWithVersions,
         fullName: getFullPackageName(input.scope, input.name),
+      };
+    }),
+
+  /**
+   * Get a package by repository ID
+   */
+  getByRepoId: publicProcedure
+    .input(z.object({ repoId: z.string().uuid() }))
+    .query(async ({ input }) => {
+      const pkg = await packageModel.getByRepoId(input.repoId);
+      if (!pkg) {
+        return null;
+      }
+
+      const pkgWithVersions = await packageModel.getWithVersions(pkg.id);
+      return {
+        ...pkgWithVersions,
+        fullName: getFullPackageName(pkg.scope, pkg.name),
       };
     }),
 
@@ -310,17 +328,22 @@ export const packagesRouter = router({
       });
     }
 
+    if (!input.repoId) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Repository ID is required',
+      });
+    }
+
     const pkg = await packageModel.create({
       name: input.name,
       scope: input.scope ?? null,
-      ownerId: ctx.user.id,
       description: input.description,
       visibility: input.visibility,
       repoId: input.repoId,
       keywords: input.keywords ? JSON.stringify(input.keywords) : null,
       license: input.license,
       homepage: input.homepage,
-      repositoryUrl: input.repositoryUrl,
     });
 
     // Add creator as maintainer
@@ -331,6 +354,122 @@ export const packagesRouter = router({
       fullName: getFullPackageName(pkg.scope, pkg.name),
     };
   }),
+
+  /**
+   * Enable package registry for a repository
+   * Creates a new package linked to the repo if it doesn't exist
+   */
+  enableForRepo: protectedProcedure
+    .input(
+      z.object({
+        repoId: z.string().uuid(),
+        name: z.string().min(1).max(214),
+        scope: z.string().nullable().optional(),
+        description: z.string().optional(),
+        publishOnRelease: z.boolean().default(false),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      // Get repo and verify ownership
+      const repo = await repoModel.findById(input.repoId);
+      if (!repo) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Repository not found',
+        });
+      }
+
+      if (repo.ownerId !== ctx.user.id) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only the repository owner can enable package registry',
+        });
+      }
+
+      // Check if package already exists for this repo
+      const existingForRepo = await packageModel.getByRepoId(input.repoId);
+      if (existingForRepo) {
+        // Update existing package
+        const updated = await packageModel.update(existingForRepo.id, {
+          name: input.name,
+          scope: input.scope ?? null,
+          description: input.description,
+          publishOnRelease: input.publishOnRelease,
+        });
+        return {
+          ...updated,
+          fullName: getFullPackageName(updated?.scope ?? null, updated?.name ?? input.name),
+        };
+      }
+
+      // Check if package name is already taken
+      const existingByName = await packageModel.getByName(input.scope ?? null, input.name);
+      if (existingByName) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'Package name is already taken',
+        });
+      }
+
+      // Create new package
+      const pkg = await packageModel.create({
+        name: input.name,
+        scope: input.scope ?? null,
+        repoId: input.repoId,
+        description: input.description,
+        visibility: repo.isPrivate ? 'private' : 'public',
+        publishOnRelease: input.publishOnRelease,
+      });
+
+      // Add creator as maintainer
+      await maintainerModel.add(pkg.id, ctx.user.id);
+
+      return {
+        ...pkg,
+        fullName: getFullPackageName(pkg.scope, pkg.name),
+      };
+    }),
+
+  /**
+   * Disable package registry for a repository
+   * Deletes the package if it has no versions, otherwise just unlinks it
+   */
+  disableForRepo: protectedProcedure
+    .input(z.object({ repoId: z.string().uuid() }))
+    .mutation(async ({ input, ctx }) => {
+      // Get repo and verify ownership
+      const repo = await repoModel.findById(input.repoId);
+      if (!repo) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Repository not found',
+        });
+      }
+
+      if (repo.ownerId !== ctx.user.id) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only the repository owner can disable package registry',
+        });
+      }
+
+      const pkg = await packageModel.getByRepoId(input.repoId);
+      if (!pkg) {
+        return { success: true };
+      }
+
+      // Check if package has versions
+      const versions = await packageVersionModel.listByPackage(pkg.id);
+      if (versions.length === 0) {
+        // No versions, safe to delete
+        await packageModel.delete(pkg.id);
+      } else {
+        // Has versions, just unlink from repo
+        await packageModel.update(pkg.id, { repoId: undefined });
+      }
+
+      return { success: true };
+    }),
 
   /**
    * Update package metadata
@@ -418,7 +557,7 @@ export const packagesRouter = router({
     }),
 
   /**
-   * Delete a package (owner only)
+   * Delete a package (repo owner only)
    */
   delete: protectedProcedure
     .input(z.object({ id: z.string().uuid() }))
@@ -431,11 +570,12 @@ export const packagesRouter = router({
         });
       }
 
-      // Only owner can delete
-      if (pkg.ownerId !== ctx.user.id) {
+      // Get repo to check ownership
+      const repo = await repoModel.findById(pkg.repoId);
+      if (!repo || repo.ownerId !== ctx.user.id) {
         throw new TRPCError({
           code: 'FORBIDDEN',
-          message: 'Only the owner can delete a package',
+          message: 'Only the repository owner can delete a package',
         });
       }
 
@@ -537,11 +677,12 @@ export const packagesRouter = router({
       });
     }
 
-    // Only owner can add maintainers
-    if (pkg.ownerId !== ctx.user.id) {
+    // Get repo to check ownership
+    const repo = await repoModel.findById(pkg.repoId);
+    if (!repo || repo.ownerId !== ctx.user.id) {
       throw new TRPCError({
         code: 'FORBIDDEN',
-        message: 'Only the owner can add maintainers',
+        message: 'Only the repository owner can add maintainers',
       });
     }
 
@@ -576,19 +717,20 @@ export const packagesRouter = router({
         });
       }
 
-      // Only owner can remove maintainers
-      if (pkg.ownerId !== ctx.user.id) {
+      // Get repo to check ownership
+      const repo = await repoModel.findById(pkg.repoId);
+      if (!repo || repo.ownerId !== ctx.user.id) {
         throw new TRPCError({
           code: 'FORBIDDEN',
-          message: 'Only the owner can remove maintainers',
+          message: 'Only the repository owner can remove maintainers',
         });
       }
 
-      // Cannot remove the owner
-      if (input.userId === pkg.ownerId) {
+      // Cannot remove the repo owner from maintainers
+      if (input.userId === repo.ownerId) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
-          message: 'Cannot remove the owner from maintainers',
+          message: 'Cannot remove the repository owner from maintainers',
         });
       }
 

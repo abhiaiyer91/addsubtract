@@ -12,6 +12,7 @@ import {
   packageVersions,
   packageDistTags,
   packageMaintainers,
+  repositories,
   type Package,
   type NewPackage,
   type PackageVersion,
@@ -97,6 +98,19 @@ export const packageModel = {
   },
 
   /**
+   * Get a package by repository ID
+   */
+  async getByRepoId(repoId: string): Promise<Package | null> {
+    const db = getDb();
+    const [pkg] = await db
+      .select()
+      .from(packages)
+      .where(eq(packages.repoId, repoId))
+      .limit(1);
+    return pkg ?? null;
+  },
+
+  /**
    * Get package with all versions and dist-tags
    */
   async getWithVersions(id: string): Promise<(Package & { 
@@ -130,7 +144,7 @@ export const packageModel = {
   },
 
   /**
-   * List packages by owner
+   * List packages by owner (via repository owner)
    */
   async listByOwner(ownerId: string, options: {
     limit?: number;
@@ -139,13 +153,16 @@ export const packageModel = {
     const db = getDb();
     const { limit = 50, offset = 0 } = options;
 
-    return db
-      .select()
+    const result = await db
+      .select({ pkg: packages })
       .from(packages)
-      .where(eq(packages.ownerId, ownerId))
+      .innerJoin(repositories, eq(packages.repoId, repositories.id))
+      .where(eq(repositories.ownerId, ownerId))
       .orderBy(desc(packages.updatedAt))
       .limit(limit)
       .offset(offset);
+    
+    return result.map(r => r.pkg);
   },
 
   /**
@@ -531,22 +548,20 @@ export const maintainerModel = {
   },
 
   /**
-   * Check if user can publish (is maintainer or owner)
+   * Check if user can publish (is maintainer or repo owner)
    */
   async canPublish(packageId: string, userId: string): Promise<boolean> {
     const db = getDb();
     
-    // Check if user is owner
-    const [pkg] = await db
-      .select()
+    // Check if user is repo owner
+    const [result] = await db
+      .select({ pkg: packages, repo: repositories })
       .from(packages)
-      .where(and(
-        eq(packages.id, packageId),
-        eq(packages.ownerId, userId)
-      ))
+      .innerJoin(repositories, eq(packages.repoId, repositories.id))
+      .where(eq(packages.id, packageId))
       .limit(1);
     
-    if (pkg) return true;
+    if (result && result.repo.ownerId === userId) return true;
 
     // Check if user is maintainer
     return this.isMaintainer(packageId, userId);
@@ -610,7 +625,8 @@ export async function generatePackageMetadata(
     readmeFilename: 'README.md',
     homepage: pkg.homepage,
     keywords: pkg.keywords ? JSON.parse(pkg.keywords) : [],
-    repository: pkg.repositoryUrl ? { type: 'git', url: pkg.repositoryUrl } : undefined,
+    // Repository URL is derived from the linked repository, not stored on package
+    repository: undefined,
     license: pkg.license,
   };
 }
