@@ -40,8 +40,7 @@ import { RepoSettingsPage } from './routes/repo/settings';
 import { CollaboratorsPage } from './routes/repo/settings/collaborators';
 import { BranchProtectionPage } from './routes/repo/settings/branches';
 import { WebhooksPage } from './routes/repo/settings/webhooks';
-import { RepoAISettingsPage } from './routes/repo/settings/ai';
-import { TriageAgentSettingsPage } from './routes/repo/settings/triage';
+import { AgentsSettingsPage } from './routes/repo/settings/agents';
 import { PackageSettingsPage } from './routes/repo/settings/package';
 import { PackagePage } from './routes/repo/package';
 import { ReleasesPage } from './routes/repo/releases';
@@ -181,8 +180,7 @@ export function App() {
             <Route path="/:owner/:repo/settings/collaborators" element={<CollaboratorsPage />} />
             <Route path="/:owner/:repo/settings/branches" element={<BranchProtectionPage />} />
             <Route path="/:owner/:repo/settings/webhooks" element={<WebhooksPage />} />
-            <Route path="/:owner/:repo/settings/ai" element={<RepoAISettingsPage />} />
-            <Route path="/:owner/:repo/settings/triage" element={<TriageAgentSettingsPage />} />
+            <Route path="/:owner/:repo/settings/agents" element={<AgentsSettingsPage />} />
             <Route path="/:owner/:repo/settings/package" element={<PackageSettingsPage />} />
           </Route>
         </Routes>
