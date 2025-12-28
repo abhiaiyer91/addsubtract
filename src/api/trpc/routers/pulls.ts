@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import * as path from 'path';
-import { execSync } from 'child_process';
 import { router, publicProcedure, protectedProcedure } from '../trpc';
 import {
   prModel,
@@ -18,10 +17,13 @@ import {
 } from '../../../db/models';
 import { mergePullRequest, checkMergeability, getDefaultMergeMessage } from '../../../server/storage/merge';
 import { getConflictDetails } from '../../../server/storage/conflicts';
-import { resolveDiskPath } from '../../../server/storage/repos';
+import { resolveDiskPath, BareRepository } from '../../../server/storage/repos';
 import { triggerAsyncReview } from '../../../ai/services/pr-review';
 import { exists } from '../../../utils/fs';
 import { eventBus, extractMentions } from '../../../events';
+import { diff, createHunks, FileDiff } from '../../../core/diff';
+import { Blob, Tree, Commit } from '../../../core/object';
+import { TreeEntry, Author } from '../../../core/types';
 
 /**
  * Parse a unified diff into structured file changes
@@ -135,7 +137,121 @@ function parseDiff(diffText: string): Array<{
 }
 
 /**
- * Get commits between two refs
+ * Flatten a tree into a map of path -> blob hash
+ */
+function flattenTree(repo: BareRepository, treeHash: string, prefix: string): Map<string, string> {
+  const result = new Map<string, string>();
+  const tree = repo.objects.readTree(treeHash);
+  
+  for (const entry of tree.entries) {
+    const fullPath = prefix ? `${prefix}/${entry.name}` : entry.name;
+    
+    if (entry.mode === '40000') {
+      const subTree = flattenTree(repo, entry.hash, fullPath);
+      for (const [path, hash] of subTree) {
+        result.set(path, hash);
+      }
+    } else {
+      result.set(fullPath, entry.hash);
+    }
+  }
+  
+  return result;
+}
+
+/**
+ * Flatten tree to include file modes
+ */
+function flattenTreeWithModes(repo: BareRepository, treeHash: string, prefix: string): Map<string, { hash: string; mode: string }> {
+  const result = new Map<string, { hash: string; mode: string }>();
+  const tree = repo.objects.readTree(treeHash);
+  
+  for (const entry of tree.entries) {
+    const fullPath = prefix ? `${prefix}/${entry.name}` : entry.name;
+    
+    if (entry.mode === '40000') {
+      const subTree = flattenTreeWithModes(repo, entry.hash, fullPath);
+      for (const [path, info] of subTree) {
+        result.set(path, info);
+      }
+    } else {
+      result.set(fullPath, { hash: entry.hash, mode: entry.mode });
+    }
+  }
+  
+  return result;
+}
+
+/**
+ * Build a tree from a flat file map
+ */
+function buildTreeFromFiles(repo: BareRepository, files: Map<string, { hash: string; mode: string }>): string {
+  // Group files by directory
+  const dirs = new Map<string, TreeEntry[]>();
+  dirs.set('', []);
+  
+  for (const [filePath, info] of files) {
+    const parts = filePath.split('/');
+    const fileName = parts.pop()!;
+    const dirPath = parts.join('/');
+    
+    // Ensure parent directories exist
+    let currentPath = '';
+    for (const part of parts) {
+      const parentPath = currentPath;
+      currentPath = currentPath ? `${currentPath}/${part}` : part;
+      
+      if (!dirs.has(currentPath)) {
+        dirs.set(currentPath, []);
+        // Add directory entry to parent
+        const parentEntries = dirs.get(parentPath)!;
+        if (!parentEntries.some(e => e.name === part && e.mode === '40000')) {
+          parentEntries.push({ name: part, mode: '40000', hash: '' }); // Hash filled later
+        }
+      }
+    }
+    
+    // Add file entry
+    const dirEntries = dirs.get(dirPath) || [];
+    if (!dirs.has(dirPath)) {
+      dirs.set(dirPath, dirEntries);
+    }
+    dirEntries.push({ name: fileName, mode: info.mode, hash: info.hash });
+  }
+  
+  // Build trees bottom-up
+  const sortedPaths = Array.from(dirs.keys()).sort((a, b) => b.split('/').length - a.split('/').length);
+  const treeHashes = new Map<string, string>();
+  
+  for (const dirPath of sortedPaths) {
+    const entries = dirs.get(dirPath)!;
+    
+    // Update directory hashes
+    for (const entry of entries) {
+      if (entry.mode === '40000') {
+        const childPath = dirPath ? `${dirPath}/${entry.name}` : entry.name;
+        entry.hash = treeHashes.get(childPath)!;
+      }
+    }
+    
+    // Sort entries (directories first, then by name)
+    entries.sort((a, b) => {
+      if (a.mode === '40000' && b.mode !== '40000') return -1;
+      if (a.mode !== '40000' && b.mode === '40000') return 1;
+      return a.name.localeCompare(b.name);
+    });
+    
+    // Write tree object
+    const tree = new Tree(entries.filter(e => e.hash));
+    const hash = repo.objects.writeObject(tree);
+    treeHashes.set(dirPath, hash);
+  }
+  
+  return treeHashes.get('')!;
+}
+
+/**
+ * Get commits between two refs using wit's TS API
  */
 function getCommitsBetween(repoPath: string, baseSha: string, headSha: string): Array<{
   sha: string;
@@ -145,19 +261,32 @@ function getCommitsBetween(repoPath: string, baseSha: string, headSha: string): 
   date: string;
 }> {
   try {
-    const output = execSync(
-      `git log --format="%H|%s|%an|%ae|%aI" ${baseSha}..${headSha}`,
-      { cwd: repoPath, encoding: 'utf-8' }
-    );
+    const repo = new BareRepository(repoPath);
+    const commits: Array<{ sha: string; message: string; author: string; authorEmail: string; date: string }> = [];
     
-    return output
-      .trim()
-      .split('\n')
-      .filter(Boolean)
-      .map(line => {
-        const [sha, message, author, authorEmail, date] = line.split('|');
-        return { sha, message, author, authorEmail, date };
-      });
+    // Walk commit history from head to base
+    let currentHash: string | null = headSha;
+    const baseSet = new Set<string>([baseSha]);
+    
+    while (currentHash && !baseSet.has(currentHash)) {
+      try {
+        const commit = repo.objects.readCommit(currentHash);
+        commits.push({
+          sha: currentHash,
+          message: commit.message.split('\n')[0], // First line only
+          author: commit.author.name,
+          authorEmail: commit.author.email,
+          date: new Date(commit.author.timestamp * 1000).toISOString(),
+        });
+        
+        // Move to parent (first parent for linear history)
+        currentHash = commit.parentHashes.length > 0 ? commit.parentHashes[0] : null;
+      } catch {
+        break;
+      }
+    }
+    
+    return commits;
   } catch (error) {
     console.error('[pulls.getCommits] Error:', error);
     return [];
@@ -1108,11 +1237,29 @@ export const pullsRouter = router({
       }
 
       try {
-        // Read the current file content from the source branch
-        const fileContent = execSync(
-          `git show ${pr.sourceBranch}:${comment.path}`,
-          { cwd: diskPath, encoding: 'utf-8' }
-        );
+        // Read the current file content from the source branch using wit's TS API
+        const bareRepo = new BareRepository(diskPath);
+        const branchHash = bareRepo.refs.resolve(`refs/heads/${pr.sourceBranch}`);
+        if (!branchHash) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: `Branch '${pr.sourceBranch}' not found`,
+          });
+        }
+        
+        const parentCommit = bareRepo.objects.readCommit(branchHash);
+        const files = flattenTreeWithModes(bareRepo, parentCommit.treeHash, '');
+        const fileInfo = files.get(comment.path);
+        
+        if (!fileInfo) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: `File '${comment.path}' not found in branch '${pr.sourceBranch}'`,
+          });
+        }
+        
+        const existingBlob = bareRepo.objects.readBlob(fileInfo.hash);
+        const fileContent = existingBlob.content.toString('utf-8');
 
         const lines = fileContent.split('\n');
         const startLine = comment.startLine || comment.line;
@@ -1127,81 +1274,56 @@ export const pullsRouter = router({
 
         const newContent = newLines.join('\n');
 
-        // Create a worktree to make the change
-        const worktreePath = path.join(diskPath, '..', `worktree-suggestion-${Date.now()}`);
+        // Create a new blob with the modified content
+        const newBlob = new Blob(Buffer.from(newContent, 'utf-8'));
+        const newBlobHash = bareRepo.objects.writeObject(newBlob);
         
-        try {
-          // Create worktree from source branch
-          execSync(`wit worktree add "${worktreePath}" ${pr.sourceBranch}`, {
-            cwd: diskPath,
-            encoding: 'utf-8',
-          });
+        // Update the file map with the new blob
+        files.set(comment.path, { hash: newBlobHash, mode: fileInfo.mode });
+        
+        // Build new tree with the modified file
+        const newTreeHash = buildTreeFromFiles(bareRepo, files);
+        
+        // Get the suggestion author's username
+        const { userModel } = await import('../../../db/models');
+        const suggestionAuthor = comment.userId ? await userModel.findById(comment.userId) : null;
+        const authorUsername = suggestionAuthor?.username || 'reviewer';
 
-          // Write the modified file
-          const fs = await import('fs');
-          fs.writeFileSync(path.join(worktreePath, comment.path), newContent);
+        // Create commit with author info
+        const commitMessage = `Apply suggestion from @${authorUsername}\n\nCo-authored-by: ${ctx.user.name || ctx.user.username} <${ctx.user.email}>`;
+        
+        const author: Author = {
+          name: ctx.user.name || ctx.user.username || 'Unknown',
+          email: ctx.user.email,
+          timestamp: Math.floor(Date.now() / 1000),
+          timezone: '+0000',
+        };
+        
+        const newCommit = new Commit(
+          newTreeHash,
+          [branchHash], // Parent is the current branch head
+          author,
+          author,
+          commitMessage
+        );
+        
+        const newSha = bareRepo.objects.writeObject(newCommit);
+        
+        // Update the branch ref to point to the new commit
+        // This is equivalent to "push" since we're directly updating the bare repo
+        bareRepo.refs.updateBranch(pr.sourceBranch, newSha);
 
-          // Get the suggestion author's username
-          const { userModel } = await import('../../../db/models');
-          const suggestionAuthor = comment.userId ? await userModel.findById(comment.userId) : null;
-          const authorUsername = suggestionAuthor?.username || 'reviewer';
+        // Mark the suggestion as applied
+        await prCommentModel.markSuggestionApplied(input.commentId, newSha);
 
-          // Stage and commit
-          execSync(`wit add "${comment.path}"`, {
-            cwd: worktreePath,
-            encoding: 'utf-8',
-          });
+        // Update PR head SHA
+        await prModel.updateHead(pr.id, newSha);
 
-          const commitMessage = `Apply suggestion from @${authorUsername}\n\nCo-authored-by: ${ctx.user.name || ctx.user.username} <${ctx.user.email}>`;
-          execSync(
-            `wit commit -m "${commitMessage.replace(/"/g, '\\"')}"`,
-            {
-              cwd: worktreePath,
-              encoding: 'utf-8',
-              env: {
-                ...process.env,
-                GIT_AUTHOR_NAME: ctx.user.name || ctx.user.username || 'Unknown',
-                GIT_AUTHOR_EMAIL: ctx.user.email,
-                GIT_COMMITTER_NAME: ctx.user.name || ctx.user.username || 'Unknown',
-                GIT_COMMITTER_EMAIL: ctx.user.email,
-              },
-            }
-          );
-
-          // Get the new commit SHA
-          const newSha = execSync('wit rev-parse HEAD', {
-            cwd: worktreePath,
-            encoding: 'utf-8',
-          }).trim();
-
-          // Push the change back to the source branch
-          execSync(`wit push origin HEAD:${pr.sourceBranch}`, {
-            cwd: worktreePath,
-            encoding: 'utf-8',
-          });
-
-          // Mark the suggestion as applied
-          await prCommentModel.markSuggestionApplied(input.commentId, newSha);
-
-          // Update PR head SHA
-          await prModel.updateHead(pr.id, newSha);
-
-          return {
-            success: true,
-            commitSha: newSha,
-            message: 'Suggestion applied successfully',
-          };
-        } finally {
-          // Clean up worktree
-          try {
-            execSync(`wit worktree remove "${worktreePath}" --force`, {
-              cwd: diskPath,
-              encoding: 'utf-8',
-            });
-          } catch {
-            // Ignore cleanup errors
-          }
-        }
+        return {
+          success: true,
+          commitSha: newSha,
+          message: 'Suggestion applied successfully',
+        };
       } catch (error) {
         console.error('[pulls.applySuggestion] Error:', error);
         throw new TRPCError({
@@ -1456,12 +1578,87 @@ export const pullsRouter = router({
       }
 
       try {
-        const diffOutput = execSync(
-          `git diff ${pr.baseSha}..${pr.headSha}`,
-          { cwd: diskPath, encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024 }
-        );
-
-        const files = parseDiff(diffOutput);
+        // Use wit's TS API to generate diff
+        const repo = new BareRepository(diskPath);
+        
+        const baseCommit = repo.objects.readCommit(pr.baseSha);
+        const headCommit = repo.objects.readCommit(pr.headSha);
+        
+        const baseFiles = flattenTree(repo, baseCommit.treeHash, '');
+        const headFiles = flattenTree(repo, headCommit.treeHash, '');
+        
+        const allPaths = new Set([...baseFiles.keys(), ...headFiles.keys()]);
+        
+        const files: Array<{
+          oldPath: string;
+          newPath: string;
+          status: 'added' | 'deleted' | 'modified' | 'renamed';
+          additions: number;
+          deletions: number;
+          hunks: Array<{
+            oldStart: number;
+            oldLines: number;
+            newStart: number;
+            newLines: number;
+            lines: Array<{ type: 'context' | 'add' | 'delete'; content: string }>;
+          }>;
+        }> = [];
+        
+        for (const filePath of allPaths) {
+          const baseHash = baseFiles.get(filePath);
+          const headHash = headFiles.get(filePath);
+          
+          if (baseHash === headHash) continue;
+          
+          let oldContent = '';
+          let newContent = '';
+          
+          if (baseHash) {
+            const blob = repo.objects.readBlob(baseHash);
+            oldContent = blob.content.toString('utf-8');
+          }
+          
+          if (headHash) {
+            const blob = repo.objects.readBlob(headHash);
+            newContent = blob.content.toString('utf-8');
+          }
+          
+          const diffLines = diff(oldContent, newContent);
+          const hunks = createHunks(diffLines);
+          
+          // Count additions and deletions
+          let additions = 0;
+          let deletions = 0;
+          for (const hunk of hunks) {
+            for (const line of hunk.lines) {
+              if (line.type === 'add') additions++;
+              if (line.type === 'remove') deletions++;
+            }
+          }
+          
+          // Determine status
+          let status: 'added' | 'deleted' | 'modified' | 'renamed' = 'modified';
+          if (!baseHash) status = 'added';
+          else if (!headHash) status = 'deleted';
+          
+          files.push({
+            oldPath: filePath,
+            newPath: filePath,
+            status,
+            additions,
+            deletions,
+            hunks: hunks.map(h => ({
+              oldStart: h.oldStart,
+              oldLines: h.oldCount,
+              newStart: h.newStart,
+              newLines: h.newCount,
+              lines: h.lines.map(l => ({
+                type: l.type === 'remove' ? 'delete' as const : l.type,
+                content: l.content,
+              })),
+            })),
+          });
+        }
 
         // Calculate totals
         const totalAdditions = files.reduce((sum, f) => sum + f.additions, 0);

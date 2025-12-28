@@ -1,6 +1,5 @@
 import * as path from 'path';
 import * as fs from 'fs';
-import { execSync } from 'child_process';
 import { Repository } from '../../core/repository';
 import { ObjectStore } from '../../core/object-store';
 import { Index } from '../../core/index';
@@ -24,27 +23,6 @@ export class StorageError extends Error {
   constructor(message: string, public readonly code: string) {
     super(message);
     this.name = 'StorageError';
-  }
-}
-
-/**
- * Execute a shell command and return output
- */
-function exec(command: string, cwd?: string): string {
-  try {
-    return execSync(command, {
-      cwd,
-      encoding: 'utf-8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
-  } catch (error) {
-    if (error instanceof Error && 'stderr' in error) {
-      throw new StorageError(
-        (error as any).stderr || error.message,
-        'EXEC_FAILED'
-      );
-    }
-    throw error;
   }
 }
 
@@ -283,10 +261,173 @@ export class BareRepository extends Repository {
   isValid(): boolean {
     return exists(path.join(this.gitDir, 'objects'));
   }
+
+  /**
+   * Get file content at a specific ref
+   */
+  getFileAtRef(ref: string, filePath: string): Buffer | null {
+    const hash = this.refs.resolve(ref);
+    if (!hash) return null;
+
+    const commit = this.objects.readCommit(hash);
+    const blobHash = this.findBlobInTree(commit.treeHash, filePath.split('/'));
+
+    if (!blobHash) return null;
+
+    const blob = this.objects.readBlob(blobHash);
+    return blob.content;
+  }
+
+  /**
+   * Find a blob in a tree by path
+   */
+  private findBlobInTree(treeHash: string, pathParts: string[]): string | null {
+    const tree = this.objects.readTree(treeHash);
+
+    for (const entry of tree.entries) {
+      if (entry.name === pathParts[0]) {
+        if (pathParts.length === 1) {
+          return entry.mode === '40000' ? null : entry.hash;
+        }
+        if (entry.mode === '40000') {
+          return this.findBlobInTree(entry.hash, pathParts.slice(1));
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Create a worktree for this bare repository
+   * Returns the path to the created worktree
+   */
+  createWorktree(worktreePath: string, branchOrCommit: string): string {
+    const fullPath = path.resolve(worktreePath);
+    
+    // Create worktree directory
+    mkdirp(fullPath);
+    
+    // Resolve the commit hash
+    let commitHash = this.refs.resolve(`refs/heads/${branchOrCommit}`);
+    if (!commitHash) {
+      commitHash = this.refs.resolve(branchOrCommit);
+    }
+    if (!commitHash) {
+      throw new StorageError(`Cannot resolve ref: ${branchOrCommit}`, 'REF_NOT_FOUND');
+    }
+    
+    // Create worktree entry in bare repo
+    const worktreeName = path.basename(fullPath).replace(/[^a-zA-Z0-9_-]/g, '_');
+    const worktreeEntryDir = path.join(this.gitDir, 'worktrees', worktreeName);
+    mkdirp(worktreeEntryDir);
+    
+    // Create .wit file in worktree pointing to entry
+    const worktreeGitFile = path.join(fullPath, '.wit');
+    fs.writeFileSync(worktreeGitFile, `gitdir: ${worktreeEntryDir}\n`);
+    
+    // Create gitdir file pointing back
+    fs.writeFileSync(path.join(worktreeEntryDir, 'gitdir'), worktreeGitFile + '\n');
+    
+    // Create HEAD - check if it's a branch
+    const branchHash = this.refs.resolve(`refs/heads/${branchOrCommit}`);
+    if (branchHash) {
+      fs.writeFileSync(path.join(worktreeEntryDir, 'HEAD'), `ref: refs/heads/${branchOrCommit}\n`);
+    } else {
+      fs.writeFileSync(path.join(worktreeEntryDir, 'HEAD'), commitHash + '\n');
+    }
+    
+    // Create commondir file
+    fs.writeFileSync(path.join(worktreeEntryDir, 'commondir'), '../../\n');
+    
+    // Checkout files from the commit
+    this.checkoutToWorktree(fullPath, commitHash);
+    
+    return fullPath;
+  }
+
+  /**
+   * Checkout files from a commit to a worktree directory
+   */
+  private checkoutToWorktree(worktreePath: string, commitHash: string): void {
+    const commit = this.objects.readCommit(commitHash);
+    this.checkoutTreeRecursive(worktreePath, commit.treeHash, '');
+  }
+
+  /**
+   * Recursively checkout tree entries to worktree
+   */
+  private checkoutTreeRecursive(basePath: string, treeHash: string, prefix: string): void {
+    const tree = this.objects.readTree(treeHash);
+
+    for (const entry of tree.entries) {
+      const relativePath = prefix ? `${prefix}/${entry.name}` : entry.name;
+      const fullPath = path.join(basePath, relativePath);
+
+      if (entry.mode === '40000') {
+        mkdirp(fullPath);
+        this.checkoutTreeRecursive(basePath, entry.hash, relativePath);
+      } else {
+        const blob = this.objects.readBlob(entry.hash);
+        mkdirp(path.dirname(fullPath));
+        fs.writeFileSync(fullPath, blob.content);
+        
+        // Set executable bit if needed
+        if (entry.mode === '100755') {
+          fs.chmodSync(fullPath, 0o755);
+        }
+      }
+    }
+  }
+
+  /**
+   * Remove a worktree
+   */
+  removeWorktree(worktreePath: string): void {
+    const fullPath = path.resolve(worktreePath);
+    const worktreeName = path.basename(fullPath).replace(/[^a-zA-Z0-9_-]/g, '_');
+    const worktreeEntryDir = path.join(this.gitDir, 'worktrees', worktreeName);
+    
+    // Remove the worktree entry
+    if (exists(worktreeEntryDir)) {
+      fs.rmSync(worktreeEntryDir, { recursive: true, force: true });
+    }
+    
+    // Remove the worktree directory
+    if (exists(fullPath)) {
+      fs.rmSync(fullPath, { recursive: true, force: true });
+    }
+  }
+
+  /**
+   * Prune stale worktree entries
+   */
+  pruneWorktrees(): void {
+    const worktreesDir = path.join(this.gitDir, 'worktrees');
+    if (!exists(worktreesDir)) return;
+    
+    const entries = fs.readdirSync(worktreesDir);
+    for (const name of entries) {
+      const entryDir = path.join(worktreesDir, name);
+      const stat = fs.statSync(entryDir);
+      if (!stat.isDirectory()) continue;
+      
+      const gitdirPath = path.join(entryDir, 'gitdir');
+      if (!exists(gitdirPath)) {
+        fs.rmSync(entryDir, { recursive: true, force: true });
+        continue;
+      }
+      
+      const gitdirContent = fs.readFileSync(gitdirPath, 'utf-8').trim();
+      if (!exists(gitdirContent)) {
+        fs.rmSync(entryDir, { recursive: true, force: true });
+      }
+    }
+  }
 }
 
 /**
- * Fork a repository on disk using git clone --bare
+ * Fork a repository on disk using wit's TS API
  * 
  * Creates a bare clone of the source repository at the target path,
  * preserving all branches, tags, and commit history. Sets up the
@@ -324,51 +465,87 @@ export function forkRepository(
   mkdirp(parentDir);
 
   try {
-    // Clone the repository as bare
-    // --bare: Create a bare repository
-    // --no-hardlinks: Don't use hardlinks (safer for separate storage)
-    exec(`git clone --bare --no-hardlinks "${sourceRepoPath}" "${targetPath}"`);
+    // Create the target bare repository structure
+    mkdirp(targetPath);
+    mkdirp(path.join(targetPath, 'objects'));
+    mkdirp(path.join(targetPath, 'refs', 'heads'));
+    mkdirp(path.join(targetPath, 'refs', 'tags'));
+    mkdirp(path.join(targetPath, 'refs', 'remotes', 'upstream'));
+    mkdirp(path.join(targetPath, 'info'));
 
-    // Remove the origin remote that points to the local source
-    exec('git remote remove origin', targetPath);
+    // Copy all objects from source to target
+    const srcObjectsDir = path.join(sourceRepoPath, 'objects');
+    const destObjectsDir = path.join(targetPath, 'objects');
+    copyObjectsRecursive(srcObjectsDir, destObjectsDir);
 
-    // Set up upstream remote pointing to parent repository
-    // This allows fetching upstream changes
-    const remoteUrl = parentUrl || sourceRepoPath;
-    exec(`git remote add upstream "${remoteUrl}"`, targetPath);
+    // Open source repo to read refs
+    const sourceRepo = new BareRepository(sourceRepoPath);
+    const targetRefs = new Refs(targetPath);
 
-    // Configure fetch specs for upstream
-    exec('git config remote.upstream.fetch "+refs/heads/*:refs/remotes/upstream/*"', targetPath);
-
-    // Get list of branches
-    const branchOutput = exec('git branch', targetPath);
-    const branches = branchOutput
-      .split('\n')
-      .map(b => b.replace(/^\*?\s+/, '').trim())
-      .filter(b => b.length > 0);
-
-    // Get default branch (HEAD reference)
-    let defaultBranch = 'main';
-    try {
-      const headRef = exec('git symbolic-ref HEAD', targetPath).trim();
-      defaultBranch = headRef.replace('refs/heads/', '');
-    } catch {
-      // If HEAD is detached or doesn't exist, default to main
-      if (branches.includes('main')) {
-        defaultBranch = 'main';
-      } else if (branches.includes('master')) {
-        defaultBranch = 'master';
-      } else if (branches.length > 0) {
-        defaultBranch = branches[0];
+    // Copy all branch refs
+    const branches = sourceRepo.refs.listBranches();
+    for (const branch of branches) {
+      const hash = sourceRepo.refs.resolve(`refs/heads/${branch}`);
+      if (hash) {
+        const branchPath = path.join(targetPath, 'refs', 'heads', branch);
+        mkdirp(path.dirname(branchPath));
+        fs.writeFileSync(branchPath, hash + '\n');
       }
     }
 
-    // Configure repository settings
-    exec('git config receive.denyNonFastForwards true', targetPath);
-    exec('git config core.sharedRepository group', targetPath);
+    // Copy all tag refs
+    const tags = sourceRepo.refs.listTags();
+    for (const tag of tags) {
+      const hash = sourceRepo.refs.resolve(`refs/tags/${tag}`);
+      if (hash) {
+        const tagPath = path.join(targetPath, 'refs', 'tags', tag);
+        mkdirp(path.dirname(tagPath));
+        fs.writeFileSync(tagPath, hash + '\n');
+      }
+    }
 
-    // Update server info for dumb HTTP protocol compatibility
-    exec('git update-server-info', targetPath);
+    // Copy HEAD
+    const headPath = path.join(sourceRepoPath, 'HEAD');
+    if (exists(headPath)) {
+      fs.copyFileSync(headPath, path.join(targetPath, 'HEAD'));
+    } else {
+      fs.writeFileSync(path.join(targetPath, 'HEAD'), 'ref: refs/heads/main\n');
+    }
+
+    // Get default branch from HEAD
+    let defaultBranch = 'main';
+    const head = sourceRepo.refs.getHead();
+    if (head.isSymbolic) {
+      defaultBranch = head.target.replace('refs/heads/', '');
+    } else if (branches.includes('main')) {
+      defaultBranch = 'main';
+    } else if (branches.includes('master')) {
+      defaultBranch = 'master';
+    } else if (branches.length > 0) {
+      defaultBranch = branches[0];
+    }
+
+    // Write config for bare repository with upstream remote
+    const remoteUrl = parentUrl || sourceRepoPath;
+    const config = `[core]
+    repositoryformatversion = 0
+    filemode = true
+    bare = true
+[remote "upstream"]
+    url = ${remoteUrl}
+    fetch = +refs/heads/*:refs/remotes/upstream/*
+[receive]
+    denyNonFastForwards = true
+[core]
+    sharedRepository = group
+`;
+    fs.writeFileSync(path.join(targetPath, 'config'), config);
+
+    // Write description
+    fs.writeFileSync(
+      path.join(targetPath, 'description'),
+      'Forked repository\n'
+    );
 
     return {
       diskPath: targetPath,
@@ -396,6 +573,30 @@ export function forkRepository(
 }
 
 /**
+ * Recursively copy objects from source to destination
+ */
+function copyObjectsRecursive(src: string, dest: string): void {
+  if (!exists(src)) return;
+
+  const entries = fs.readdirSync(src);
+
+  for (const entry of entries) {
+    const srcPath = path.join(src, entry);
+    const destPath = path.join(dest, entry);
+    const stat = fs.statSync(srcPath);
+
+    if (stat.isDirectory()) {
+      mkdirp(destPath);
+      copyObjectsRecursive(srcPath, destPath);
+    } else {
+      if (!exists(destPath)) {
+        fs.copyFileSync(srcPath, destPath);
+      }
+    }
+  }
+}
+
+/**
  * Delete a repository from disk
  */
 export function deleteRepository(diskPath: string): void {
@@ -414,7 +615,7 @@ export function deleteRepository(diskPath: string): void {
 }
 
 /**
- * Get repository information
+ * Get repository information using wit's TS API
  */
 export function getRepositoryInfo(diskPath: string): {
   branches: string[];
@@ -429,32 +630,21 @@ export function getRepositoryInfo(diskPath: string): {
     );
   }
 
+  const repo = new BareRepository(diskPath);
+
   // Get branches
-  let branches: string[] = [];
-  try {
-    const branchOutput = exec('git branch', diskPath);
-    branches = branchOutput
-      .split('\n')
-      .map(b => b.replace(/^\*?\s+/, '').trim())
-      .filter(b => b.length > 0);
-  } catch {
-    // Empty repo has no branches
-  }
+  const branches = repo.refs.listBranches();
 
   // Get tags
-  let tags: string[] = [];
-  try {
-    const tagOutput = exec('git tag', diskPath);
-    tags = tagOutput.split('\n').filter(t => t.length > 0);
-  } catch {
-    // No tags
-  }
+  const tags = repo.refs.listTags();
 
-  // Get default branch
+  // Get default branch from HEAD
   let defaultBranch = 'main';
   try {
-    const headRef = exec('git symbolic-ref HEAD', diskPath).trim();
-    defaultBranch = headRef.replace('refs/heads/', '');
+    const head = repo.refs.getHead();
+    if (head.isSymbolic) {
+      defaultBranch = head.target.replace('refs/heads/', '');
+    }
   } catch {
     // Use main as default
   }
@@ -468,12 +658,13 @@ export function getRepositoryInfo(diskPath: string): {
 }
 
 /**
- * Check if repository has any commits
+ * Check if repository has any commits using wit's TS API
  */
 export function hasCommits(diskPath: string): boolean {
   try {
-    exec('git rev-parse HEAD', diskPath);
-    return true;
+    const repo = new BareRepository(diskPath);
+    const headHash = repo.refs.resolve('HEAD');
+    return headHash !== null;
   } catch {
     return false;
   }

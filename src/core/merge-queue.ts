@@ -10,11 +10,18 @@
  * - Intelligent ordering based on file overlap
  * - Speculative merging with rollback
  * - Commit reassembly to create a clean history
+ * 
+ * Uses wit's TypeScript API for all git operations.
  */
 
 import * as path from 'path';
-import { execSync, spawn } from 'child_process';
+import * as fs from 'fs';
 import type { MergeQueueEntry, MergeQueueBatch, MergeQueueConfig, PullRequest } from '../db/schema';
+import { BareRepository } from '../server/storage/repos';
+import { exists, mkdirp } from '../utils/fs';
+import { Commit, Tree, Blob } from './object';
+import { Author, TreeEntry } from './types';
+import { diff } from './diff';
 
 // ============ TYPES ============
 
@@ -76,13 +83,160 @@ export interface BatchMergeResult {
   errorMessage?: string;
 }
 
+// ============ HELPER FUNCTIONS ============
+
+/**
+ * Flatten a tree into a map of path -> { hash, mode }
+ */
+function flattenTree(repo: BareRepository, treeHash: string, prefix: string): Map<string, { hash: string; mode: string }> {
+  const result = new Map<string, { hash: string; mode: string }>();
+  const tree = repo.objects.readTree(treeHash);
+  
+  for (const entry of tree.entries) {
+    const fullPath = prefix ? `${prefix}/${entry.name}` : entry.name;
+    
+    if (entry.mode === '40000') {
+      const subTree = flattenTree(repo, entry.hash, fullPath);
+      for (const [path, info] of subTree) {
+        result.set(path, info);
+      }
+    } else {
+      result.set(fullPath, { hash: entry.hash, mode: entry.mode });
+    }
+  }
+  
+  return result;
+}
+
+/**
+ * Find merge base between two commits
+ */
+function findMergeBase(repo: BareRepository, sha1: string, sha2: string): string | null {
+  const ancestors1 = new Set<string>();
+  const queue1 = [sha1];
+  
+  while (queue1.length > 0) {
+    const current = queue1.shift()!;
+    if (ancestors1.has(current)) continue;
+    ancestors1.add(current);
+    
+    try {
+      const commit = repo.objects.readCommit(current);
+      for (const parent of commit.parentHashes) {
+        queue1.push(parent);
+      }
+    } catch {
+      break;
+    }
+  }
+  
+  const queue2 = [sha2];
+  const visited2 = new Set<string>();
+  
+  while (queue2.length > 0) {
+    const current = queue2.shift()!;
+    if (visited2.has(current)) continue;
+    visited2.add(current);
+    
+    if (ancestors1.has(current)) {
+      return current;
+    }
+    
+    try {
+      const commit = repo.objects.readCommit(current);
+      for (const parent of commit.parentHashes) {
+        queue2.push(parent);
+      }
+    } catch {
+      break;
+    }
+  }
+  
+  return null;
+}
+
+/**
+ * Build a tree from a flat file map
+ */
+function buildTree(repo: BareRepository, files: Map<string, { hash: string; mode: string }>): string {
+  const dirs = new Map<string, TreeEntry[]>();
+  dirs.set('', []);
+  
+  for (const [filePath, info] of files) {
+    const parts = filePath.split('/');
+    const fileName = parts.pop()!;
+    const dirPath = parts.join('/');
+    
+    let currentPath = '';
+    for (const part of parts) {
+      const parentPath = currentPath;
+      currentPath = currentPath ? `${currentPath}/${part}` : part;
+      
+      if (!dirs.has(currentPath)) {
+        dirs.set(currentPath, []);
+        const parentEntries = dirs.get(parentPath)!;
+        if (!parentEntries.some(e => e.name === part && e.mode === '40000')) {
+          parentEntries.push({ name: part, mode: '40000', hash: '' });
+        }
+      }
+    }
+    
+    const dirEntries = dirs.get(dirPath) || [];
+    if (!dirs.has(dirPath)) {
+      dirs.set(dirPath, dirEntries);
+    }
+    dirEntries.push({ name: fileName, mode: info.mode, hash: info.hash });
+  }
+  
+  const sortedPaths = Array.from(dirs.keys()).sort((a, b) => b.split('/').length - a.split('/').length);
+  const treeHashes = new Map<string, string>();
+  
+  for (const dirPath of sortedPaths) {
+    const entries = dirs.get(dirPath)!;
+    
+    for (const entry of entries) {
+      if (entry.mode === '40000') {
+        const childPath = dirPath ? `${dirPath}/${entry.name}` : entry.name;
+        entry.hash = treeHashes.get(childPath)!;
+      }
+    }
+    
+    entries.sort((a, b) => {
+      if (a.mode === '40000' && b.mode !== '40000') return -1;
+      if (a.mode !== '40000' && b.mode === '40000') return 1;
+      return a.name.localeCompare(b.name);
+    });
+    
+    const tree = new Tree(entries.filter(e => e.hash));
+    const hash = repo.objects.writeObject(tree);
+    treeHashes.set(dirPath, hash);
+  }
+  
+  return treeHashes.get('')!;
+}
+
+/**
+ * Get timezone string
+ */
+function getTimezone(): string {
+  const offset = new Date().getTimezoneOffset();
+  const sign = offset <= 0 ? '+' : '-';
+  const hours = Math.floor(Math.abs(offset) / 60).toString().padStart(2, '0');
+  const minutes = (Math.abs(offset) % 60).toString().padStart(2, '0');
+  return `${sign}${hours}${minutes}`;
+}
+
 // ============ MERGE QUEUE MANAGER ============
 
 export class MergeQueueManager {
+  private repo: BareRepository;
+
   constructor(
     private diskPath: string,
     private targetBranch: string
-  ) {}
+  ) {
+    this.repo = new BareRepository(diskPath);
+  }
 
   /**
    * Analyze a PR's changes to understand what files it touches
@@ -117,40 +271,57 @@ export class MergeQueueManager {
   }
 
   /**
-   * Get files changed between two commits
+   * Get files changed between two commits using wit's TS API
    */
   private getChangedFiles(headSha: string, baseSha: string): FileChange[] {
     try {
-      const output = execSync(
-        `git diff --numstat --diff-filter=AMDRT ${baseSha}...${headSha}`,
-        { cwd: this.diskPath, encoding: 'utf8' }
-      );
-
+      const baseCommit = this.repo.objects.readCommit(baseSha);
+      const headCommit = this.repo.objects.readCommit(headSha);
+      
+      const baseFiles = flattenTree(this.repo, baseCommit.treeHash, '');
+      const headFiles = flattenTree(this.repo, headCommit.treeHash, '');
+      
       const files: FileChange[] = [];
-      for (const line of output.trim().split('\n')) {
-        if (!line) continue;
-        const [additions, deletions, filePath] = line.split('\t');
+      const allPaths = new Set([...baseFiles.keys(), ...headFiles.keys()]);
+      
+      for (const filePath of allPaths) {
+        const baseInfo = baseFiles.get(filePath);
+        const headInfo = headFiles.get(filePath);
         
-        // Handle renames (format: old => new)
-        const renameMatch = filePath.match(/^(.+) => (.+)$/);
-        if (renameMatch) {
-          files.push({
-            path: renameMatch[2],
-            oldPath: renameMatch[1],
-            changeType: 'renamed',
-            additions: parseInt(additions) || 0,
-            deletions: parseInt(deletions) || 0,
-          });
-        } else {
-          files.push({
-            path: filePath,
-            changeType: this.determineChangeType(baseSha, headSha, filePath),
-            additions: parseInt(additions) || 0,
-            deletions: parseInt(deletions) || 0,
-          });
+        if (baseInfo?.hash === headInfo?.hash) continue;
+        
+        let changeType: 'added' | 'modified' | 'deleted' | 'renamed' = 'modified';
+        let additions = 0;
+        let deletions = 0;
+        
+        if (!baseInfo && headInfo) {
+          changeType = 'added';
+        } else if (baseInfo && !headInfo) {
+          changeType = 'deleted';
         }
+        
+        // Count line changes
+        if (baseInfo && headInfo) {
+          try {
+            const baseBlob = this.repo.objects.readBlob(baseInfo.hash);
+            const headBlob = this.repo.objects.readBlob(headInfo.hash);
+            const baseLines = baseBlob.content.toString('utf-8').split('\n').length;
+            const headLines = headBlob.content.toString('utf-8').split('\n').length;
+            additions = Math.max(0, headLines - baseLines);
+            deletions = Math.max(0, baseLines - headLines);
+          } catch {
+            // Ignore errors counting lines
+          }
+        }
+        
+        files.push({
+          path: filePath,
+          changeType,
+          additions,
+          deletions,
+        });
       }
-
+      
       return files;
     } catch {
       return [];
@@ -158,73 +329,63 @@ export class MergeQueueManager {
   }
 
   /**
-   * Determine if a file was added, modified, or deleted
-   */
-  private determineChangeType(
-    baseSha: string,
-    headSha: string,
-    filePath: string
-  ): 'added' | 'modified' | 'deleted' {
-    try {
-      // Check if file exists in base
-      const inBase = this.fileExistsInCommit(baseSha, filePath);
-      const inHead = this.fileExistsInCommit(headSha, filePath);
-
-      if (!inBase && inHead) return 'added';
-      if (inBase && !inHead) return 'deleted';
-      return 'modified';
-    } catch {
-      return 'modified';
-    }
-  }
-
-  /**
-   * Check if a file exists in a specific commit
+   * Check if a file exists in a specific commit using wit's TS API
    */
   private fileExistsInCommit(sha: string, filePath: string): boolean {
     try {
-      execSync(`git cat-file -e ${sha}:${filePath}`, {
-        cwd: this.diskPath,
-        stdio: 'ignore',
-      });
-      return true;
+      const commit = this.repo.objects.readCommit(sha);
+      const files = flattenTree(this.repo, commit.treeHash, '');
+      return files.has(filePath);
     } catch {
       return false;
     }
   }
 
   /**
-   * Get commits between two refs
+   * Get commits between two refs using wit's TS API
    */
   private getCommits(baseSha: string, headSha: string): CommitInfo[] {
     try {
-      const format = '%H|%s|%an|%ae|%aI';
-      const output = execSync(
-        `git log --format="${format}" ${baseSha}..${headSha}`,
-        { cwd: this.diskPath, encoding: 'utf8' }
-      );
-
       const commits: CommitInfo[] = [];
-      for (const line of output.trim().split('\n')) {
-        if (!line) continue;
-        const [sha, message, author, authorEmail, dateStr] = line.split('|');
+      let currentHash: string | null = headSha;
+      const visited = new Set<string>();
+      
+      while (currentHash && currentHash !== baseSha && !visited.has(currentHash)) {
+        visited.add(currentHash);
         
-        // Get files for this commit
-        const filesOutput = execSync(
-          `git diff-tree --no-commit-id --name-only -r ${sha}`,
-          { cwd: this.diskPath, encoding: 'utf8' }
-        );
-
-        commits.push({
-          sha,
-          message,
-          author,
-          authorEmail,
-          date: new Date(dateStr),
-          files: filesOutput.trim().split('\n').filter(Boolean),
-        });
+        try {
+          const commit = this.repo.objects.readCommit(currentHash);
+          
+          // Get files changed in this commit
+          const files: string[] = [];
+          if (commit.parentHashes.length > 0) {
+            const parentCommit = this.repo.objects.readCommit(commit.parentHashes[0]);
+            const parentFiles = flattenTree(this.repo, parentCommit.treeHash, '');
+            const commitFiles = flattenTree(this.repo, commit.treeHash, '');
+            
+            const allPaths = new Set([...parentFiles.keys(), ...commitFiles.keys()]);
+            for (const filePath of allPaths) {
+              if (parentFiles.get(filePath)?.hash !== commitFiles.get(filePath)?.hash) {
+                files.push(filePath);
+              }
+            }
+          }
+          
+          commits.push({
+            sha: currentHash,
+            message: commit.message,
+            author: commit.author.name,
+            authorEmail: commit.author.email,
+            date: new Date(commit.author.timestamp * 1000),
+            files,
+          });
+          
+          currentHash = commit.parentHashes.length > 0 ? commit.parentHashes[0] : null;
+        } catch {
+          break;
+        }
       }
-
+      
       return commits;
     } catch {
       return [];
@@ -384,81 +545,106 @@ export class MergeQueueManager {
   }
 
   /**
-   * Create a temporary worktree for speculative merging
-   */
-  private createWorktree(): string {
-    const worktreePath = path.join(
-      this.diskPath,
-      '..',
-      `merge-queue-${Date.now()}`
-    );
-    
-    execSync(
-      `git worktree add -d "${worktreePath}" ${this.targetBranch}`,
-      { cwd: this.diskPath }
-    );
-
-    return worktreePath;
-  }
-
-  /**
-   * Remove a temporary worktree
-   */
-  private removeWorktree(worktreePath: string): void {
-    try {
-      execSync(`git worktree remove --force "${worktreePath}"`, {
-        cwd: this.diskPath,
-      });
-    } catch {
-      // Worktree might not exist
-    }
-  }
-
-  /**
-   * Attempt to merge a single PR into the worktree
+   * Attempt to merge a single PR into the current state
+   * Returns the new commit SHA if successful
    */
   private tryMergePR(
-    worktreePath: string,
+    currentSha: string,
     headSha: string,
-    message: string
-  ): { success: boolean; sha?: string; error?: string } {
+    message: string,
+    author: Author
+  ): { success: boolean; sha?: string; error?: string; conflicts?: string[] } {
     try {
-      // Attempt the merge
-      execSync(`git merge --no-ff -m "${message}" ${headSha}`, {
-        cwd: worktreePath,
-        stdio: 'pipe',
-      });
-
-      // Get the merge commit SHA
-      const sha = execSync('git rev-parse HEAD', {
-        cwd: worktreePath,
-        encoding: 'utf8',
-      }).trim();
-
-      return { success: true, sha };
-    } catch (error: any) {
-      // Merge failed, abort it
-      try {
-        execSync('git merge --abort', { cwd: worktreePath, stdio: 'ignore' });
-      } catch {
-        // Might not be in a merge state
+      // Find merge base
+      const mergeBase = findMergeBase(this.repo, currentSha, headSha);
+      if (!mergeBase) {
+        return { success: false, error: 'No common ancestor found' };
       }
-
-      return {
-        success: false,
-        error: error.message || 'Merge failed',
-      };
+      
+      // Get trees
+      const baseCommit = this.repo.objects.readCommit(mergeBase);
+      const currentCommit = this.repo.objects.readCommit(currentSha);
+      const headCommit = this.repo.objects.readCommit(headSha);
+      
+      const baseFiles = flattenTree(this.repo, baseCommit.treeHash, '');
+      const currentFiles = flattenTree(this.repo, currentCommit.treeHash, '');
+      const headFiles = flattenTree(this.repo, headCommit.treeHash, '');
+      
+      // Three-way merge
+      const mergedFiles = new Map<string, { hash: string; mode: string }>();
+      const conflicts: string[] = [];
+      
+      const allPaths = new Set([...baseFiles.keys(), ...currentFiles.keys(), ...headFiles.keys()]);
+      
+      for (const filePath of allPaths) {
+        const baseInfo = baseFiles.get(filePath);
+        const currentInfo = currentFiles.get(filePath);
+        const headInfo = headFiles.get(filePath);
+        
+        // Simple merge logic
+        if (currentInfo?.hash === headInfo?.hash) {
+          if (currentInfo) mergedFiles.set(filePath, currentInfo);
+          continue;
+        }
+        
+        if (!baseInfo) {
+          // File added
+          if (currentInfo && headInfo && currentInfo.hash !== headInfo.hash) {
+            conflicts.push(filePath);
+          }
+          if (headInfo) mergedFiles.set(filePath, headInfo);
+          else if (currentInfo) mergedFiles.set(filePath, currentInfo);
+          continue;
+        }
+        
+        if (currentInfo?.hash === baseInfo.hash) {
+          // Only changed in head
+          if (headInfo) mergedFiles.set(filePath, headInfo);
+          continue;
+        }
+        
+        if (headInfo?.hash === baseInfo.hash) {
+          // Only changed in current
+          if (currentInfo) mergedFiles.set(filePath, currentInfo);
+          continue;
+        }
+        
+        // Both changed - check for actual conflict
+        if (currentInfo && headInfo) {
+          conflicts.push(filePath);
+          mergedFiles.set(filePath, headInfo); // Prefer head on conflict
+        } else if (currentInfo) {
+          mergedFiles.set(filePath, currentInfo);
+        } else if (headInfo) {
+          mergedFiles.set(filePath, headInfo);
+        }
+      }
+      
+      if (conflicts.length > 0) {
+        return { success: false, error: 'Merge conflict', conflicts };
+      }
+      
+      // Build merged tree
+      const mergedTreeHash = buildTree(this.repo, mergedFiles);
+      
+      // Create merge commit
+      const mergeCommit = new Commit(
+        mergedTreeHash,
+        [currentSha, headSha],
+        author,
+        author,
+        message
+      );
+      
+      const sha = this.repo.objects.writeObject(mergeCommit);
+      return { success: true, sha };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Merge failed' };
     }
   }
 
   /**
    * Reassemble commits from multiple PRs into a logical sequence
-   * 
-   * This is the core algorithm that makes the merge queue intelligent:
-   * 1. Analyze all PRs for file changes and conflict potential
-   * 2. Determine optimal merge order
-   * 3. For each PR, cherry-pick commits in order, preserving authorship
-   * 4. If conflicts occur, try reordering or report failure
    */
   async reassembleCommits(
     prAnalyses: PRAnalysis[],
@@ -466,115 +652,63 @@ export class MergeQueueManager {
   ): Promise<MergeQueueResult> {
     // Determine optimal order
     const orderedPrs = await this.determineOptimalOrder(prAnalyses);
-    
-    // Create temporary worktree
-    const worktreePath = this.createWorktree();
     const reassembledCommits: ReassembledCommit[] = [];
 
-    try {
-      let order = 0;
-      
-      for (const pr of orderedPrs) {
-        const headSha = prHeadShas.get(pr.prId);
-        if (!headSha) continue;
-
-        // For each commit in the PR (in chronological order)
-        const commits = [...pr.commits].reverse(); // Oldest first
-        
-        for (const commit of commits) {
-          // Cherry-pick the commit
-          try {
-            execSync(`git cherry-pick ${commit.sha}`, {
-              cwd: worktreePath,
-              stdio: 'pipe',
-            });
-
-            const newSha = execSync('git rev-parse HEAD', {
-              cwd: worktreePath,
-              encoding: 'utf8',
-            }).trim();
-
-            reassembledCommits.push({
-              originalSha: commit.sha,
-              newSha,
-              prId: pr.prId,
-              message: commit.message,
-              order: order++,
-            });
-          } catch (cherryPickError) {
-            // Cherry-pick failed, try squash merge instead
-            try {
-              execSync('git cherry-pick --abort', {
-                cwd: worktreePath,
-                stdio: 'ignore',
-              });
-            } catch { /* ignore */ }
-
-            // Fall back to merge commit
-            const mergeResult = this.tryMergePR(
-              worktreePath,
-              headSha,
-              `Merge PR: ${pr.prId}`
-            );
-
-            if (!mergeResult.success) {
-              this.removeWorktree(worktreePath);
-              return {
-                success: false,
-                failedPrId: pr.prId,
-                errorMessage: `Failed to merge: ${mergeResult.error}`,
-                reassembledCommits,
-              };
-            }
-
-            // Add merge commit to reassembled list
-            reassembledCommits.push({
-              originalSha: headSha,
-              newSha: mergeResult.sha!,
-              prId: pr.prId,
-              message: `Merge PR: ${pr.prId}`,
-              order: order++,
-            });
-
-            break; // Move to next PR since we merged all commits
-          }
-        }
-      }
-
-      // Get final merge SHA
-      const mergeSha = execSync('git rev-parse HEAD', {
-        cwd: worktreePath,
-        encoding: 'utf8',
-      }).trim();
-
-      // Push the result to a temp branch for CI
-      const tempBranch = `merge-queue/batch-${Date.now()}`;
-      execSync(`git push origin HEAD:refs/heads/${tempBranch}`, {
-        cwd: worktreePath,
-      });
-
-      this.removeWorktree(worktreePath);
-
-      return {
-        success: true,
-        mergeSha,
-        reassembledCommits,
-      };
-    } catch (error: any) {
-      this.removeWorktree(worktreePath);
+    // Get current target branch SHA
+    let currentSha = this.repo.refs.resolve(`refs/heads/${this.targetBranch}`);
+    if (!currentSha) {
       return {
         success: false,
-        errorMessage: error.message,
+        errorMessage: `Target branch '${this.targetBranch}' not found`,
         reassembledCommits,
       };
     }
+
+    const author: Author = {
+      name: 'Merge Queue',
+      email: 'merge-queue@wit.dev',
+      timestamp: Math.floor(Date.now() / 1000),
+      timezone: getTimezone(),
+    };
+
+    let order = 0;
+
+    for (const pr of orderedPrs) {
+      const headSha = prHeadShas.get(pr.prId);
+      if (!headSha) continue;
+
+      const message = `Merge PR: ${pr.prId}`;
+      const result = this.tryMergePR(currentSha, headSha, message, author);
+
+      if (!result.success) {
+        return {
+          success: false,
+          failedPrId: pr.prId,
+          errorMessage: result.error || 'Merge failed',
+          reassembledCommits,
+        };
+      }
+
+      reassembledCommits.push({
+        originalSha: headSha,
+        newSha: result.sha!,
+        prId: pr.prId,
+        message,
+        order: order++,
+      });
+
+      currentSha = result.sha!;
+    }
+
+    return {
+      success: true,
+      mergeSha: currentSha,
+      reassembledCommits,
+    };
   }
 
   /**
    * Process a batch of PRs with optimistic merging
-   * 
-   * Optimistic merging attempts to merge multiple PRs at once,
-   * rolling back and bisecting on failure
    */
   async processBatch(
     entries: Array<{ prId: string; headSha: string; baseSha: string }>
@@ -624,7 +758,6 @@ export class MergeQueueManager {
     const firstResult = await this.processBatch(firstHalf);
     
     if (!firstResult.success) {
-      // First half failed, second half untested
       return {
         success: false,
         mergedPrs: [],
@@ -650,11 +783,7 @@ export class MergeQueueManager {
    */
   async finalizeMerge(mergeSha: string): Promise<boolean> {
     try {
-      // Update the target branch to point to the merge commit
-      execSync(
-        `git update-ref refs/heads/${this.targetBranch} ${mergeSha}`,
-        { cwd: this.diskPath }
-      );
+      this.repo.refs.updateBranch(this.targetBranch, mergeSha);
       return true;
     } catch {
       return false;
@@ -665,15 +794,8 @@ export class MergeQueueManager {
    * Check if a PR can be fast-forwarded
    */
   canFastForward(headSha: string, baseSha: string): boolean {
-    try {
-      const mergeBase = execSync(
-        `git merge-base ${headSha} ${baseSha}`,
-        { cwd: this.diskPath, encoding: 'utf8' }
-      ).trim();
-      return mergeBase === baseSha;
-    } catch {
-      return false;
-    }
+    const mergeBase = findMergeBase(this.repo, headSha, baseSha);
+    return mergeBase === baseSha;
   }
 
   /**
@@ -683,41 +805,73 @@ export class MergeQueueManager {
     headSha: string,
     originalBaseSha: string
   ): Promise<{ success: boolean; newHeadSha?: string; error?: string }> {
-    const worktreePath = this.createWorktree();
-
     try {
       // Get current target branch SHA
-      const targetSha = execSync(
-        `git rev-parse ${this.targetBranch}`,
-        { cwd: this.diskPath, encoding: 'utf8' }
-      ).trim();
-
-      // Checkout the PR head
-      execSync(`git checkout ${headSha}`, { cwd: worktreePath, stdio: 'pipe' });
-
-      // Rebase onto target
-      execSync(`git rebase --onto ${targetSha} ${originalBaseSha}`, {
-        cwd: worktreePath,
-        stdio: 'pipe',
-      });
-
-      const newHeadSha = execSync('git rev-parse HEAD', {
-        cwd: worktreePath,
-        encoding: 'utf8',
-      }).trim();
-
-      this.removeWorktree(worktreePath);
-
-      return { success: true, newHeadSha };
-    } catch (error: any) {
-      // Abort rebase
-      try {
-        execSync('git rebase --abort', { cwd: worktreePath, stdio: 'ignore' });
-      } catch { /* ignore */ }
-
-      this.removeWorktree(worktreePath);
-
-      return { success: false, error: error.message };
+      const targetSha = this.repo.refs.resolve(`refs/heads/${this.targetBranch}`);
+      if (!targetSha) {
+        return { success: false, error: `Target branch '${this.targetBranch}' not found` };
+      }
+      
+      // Get commits to rebase
+      const commits = this.getCommits(originalBaseSha, headSha);
+      if (commits.length === 0) {
+        return { success: true, newHeadSha: targetSha };
+      }
+      
+      // Rebase each commit
+      let currentBase = targetSha;
+      
+      for (const commitInfo of commits.reverse()) {
+        const originalCommit = this.repo.objects.readCommit(commitInfo.sha);
+        
+        // Get the changes in this commit
+        const parentSha = originalCommit.parentHashes[0];
+        if (!parentSha) continue;
+        
+        const parentCommit = this.repo.objects.readCommit(parentSha);
+        const parentFiles = flattenTree(this.repo, parentCommit.treeHash, '');
+        const commitFiles = flattenTree(this.repo, originalCommit.treeHash, '');
+        
+        // Apply changes to current base
+        const baseCommit = this.repo.objects.readCommit(currentBase);
+        const baseFiles = flattenTree(this.repo, baseCommit.treeHash, '');
+        
+        // Merge the changes
+        const newFiles = new Map(baseFiles);
+        
+        for (const [filePath, info] of commitFiles) {
+          const parentInfo = parentFiles.get(filePath);
+          if (!parentInfo || parentInfo.hash !== info.hash) {
+            // File was changed in this commit
+            newFiles.set(filePath, info);
+          }
+        }
+        
+        // Handle deletions
+        for (const filePath of parentFiles.keys()) {
+          if (!commitFiles.has(filePath)) {
+            newFiles.delete(filePath);
+          }
+        }
+        
+        // Build new tree
+        const newTreeHash = buildTree(this.repo, newFiles);
+        
+        // Create rebased commit
+        const rebasedCommit = new Commit(
+          newTreeHash,
+          [currentBase],
+          originalCommit.author,
+          originalCommit.committer,
+          originalCommit.message
+        );
+        
+        currentBase = this.repo.objects.writeObject(rebasedCommit);
+      }
+      
+      return { success: true, newHeadSha: currentBase };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Rebase failed' };
     }
   }
 }
