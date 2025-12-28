@@ -6,7 +6,6 @@ import {
   stars,
   watches,
   organizations,
-  users,
   type Repository,
   type NewRepository,
   type Collaborator,
@@ -16,7 +15,7 @@ import {
 } from '../schema';
 import { user } from '../auth-schema';
 
-// Owner type - compatible with both old users and better-auth user table
+// Owner type for better-auth user table
 type Owner = {
   id: string;
   name: string;
@@ -52,12 +51,11 @@ export const repoModel = {
     const repo = await this.findById(id);
     if (!repo) return undefined;
 
-    // Try better-auth user table first
-    try {
+    if (repo.ownerType === 'user') {
       const userResult = await db
         .select()
         .from(user)
-        .where(sql`${user.id} = ${repo.ownerId}::text`);
+        .where(eq(user.id, repo.ownerId));
 
       if (userResult.length > 0) {
         return {
@@ -72,45 +70,23 @@ export const repoModel = {
           },
         };
       }
-    } catch {
-      // Ignore type mismatch, try legacy table
-    }
+    } else {
+      // Organization
+      const orgResult = await db
+        .select()
+        .from(organizations)
+        .where(eq(organizations.id, repo.ownerId));
 
-    // Try legacy users table
-    const legacyUserResult = await db
-      .select()
-      .from(users)
-      .where(eq(users.id, repo.ownerId));
-
-    if (legacyUserResult.length > 0) {
-      return {
-        repo,
-        owner: {
-          id: legacyUserResult[0].id,
-          name: legacyUserResult[0].name ?? '',
-          email: legacyUserResult[0].email,
-          username: legacyUserResult[0].username,
-          image: null,
-          avatarUrl: legacyUserResult[0].avatarUrl,
-        },
-      };
-    }
-
-    // Try organization
-    const orgResult = await db
-      .select()
-      .from(organizations)
-      .where(eq(organizations.id, repo.ownerId));
-
-    if (orgResult.length > 0) {
-      return {
-        repo,
-        owner: {
-          id: orgResult[0].id,
-          name: orgResult[0].name,
-          type: 'organization' as const,
-        },
-      };
+      if (orgResult.length > 0) {
+        return {
+          repo,
+          owner: {
+            id: orgResult[0].id,
+            name: orgResult[0].name,
+            type: 'organization' as const,
+          },
+        };
+      }
     }
 
     return undefined;
@@ -143,60 +119,29 @@ export const repoModel = {
   > {
     const db = getDb();
 
-    // Try better-auth user table first (new users have text IDs)
-    try {
-      const userResult = await db
-        .select()
-        .from(repositories)
-        .innerJoin(user, sql`${repositories.ownerId}::text = ${user.id}`)
-        .where(
-          and(
-            eq(user.username, ownerName),
-            eq(repositories.name, repoName),
-            eq(repositories.ownerType, 'user')
-          )
-        );
-
-      if (userResult.length > 0) {
-        return {
-          repo: userResult[0].repositories,
-          owner: {
-            id: userResult[0].user.id,
-            name: userResult[0].user.name,
-            email: userResult[0].user.email,
-            username: userResult[0].user.username,
-            image: userResult[0].user.image,
-            avatarUrl: userResult[0].user.avatarUrl,
-          },
-        };
-      }
-    } catch {
-      // Ignore errors from type mismatch, try legacy table
-    }
-
-    // Try legacy users table (old users have UUID IDs)
-    const legacyUserResult = await db
+    // Try user table
+    const userResult = await db
       .select()
       .from(repositories)
-      .innerJoin(users, eq(repositories.ownerId, users.id))
+      .innerJoin(user, eq(repositories.ownerId, user.id))
       .where(
         and(
-          eq(users.username, ownerName),
+          eq(user.username, ownerName),
           eq(repositories.name, repoName),
           eq(repositories.ownerType, 'user')
         )
       );
 
-    if (legacyUserResult.length > 0) {
+    if (userResult.length > 0) {
       return {
-        repo: legacyUserResult[0].repositories,
+        repo: userResult[0].repositories,
         owner: {
-          id: legacyUserResult[0].users.id,
-          name: legacyUserResult[0].users.name ?? '',
-          email: legacyUserResult[0].users.email,
-          username: legacyUserResult[0].users.username,
-          image: null,
-          avatarUrl: legacyUserResult[0].users.avatarUrl,
+          id: userResult[0].user.id,
+          name: userResult[0].user.name,
+          email: userResult[0].user.email,
+          username: userResult[0].user.username,
+          image: userResult[0].user.image,
+          avatarUrl: userResult[0].user.avatarUrl,
         },
       };
     }
@@ -657,22 +602,12 @@ export const watchModel = {
         let ownerName = 'unknown';
 
         if (repo.ownerType === 'user') {
-          // Try better-auth user table
           const userResult = await db
             .select({ username: user.username })
             .from(user)
-            .where(sql`${user.id} = ${repo.ownerId}::text`);
+            .where(eq(user.id, repo.ownerId));
           if (userResult.length > 0 && userResult[0].username) {
             ownerName = userResult[0].username;
-          } else {
-            // Try legacy users table
-            const legacyResult = await db
-              .select({ username: users.username })
-              .from(users)
-              .where(eq(users.id, repo.ownerId));
-            if (legacyResult.length > 0 && legacyResult[0].username) {
-              ownerName = legacyResult[0].username;
-            }
           }
         } else {
           // Organization
