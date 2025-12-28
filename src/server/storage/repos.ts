@@ -681,3 +681,39 @@ export function getRepoUrl(diskPath: string, serverBaseUrl: string): string {
   
   return `${serverBaseUrl}/${owner}/${repoWithExt}`;
 }
+
+/**
+ * Initialize a bare repository at the given path
+ * Used when a repo exists in the database but not on disk
+ */
+export function initBareRepository(repoPath: string): BareRepository {
+  // Create repository directory structure (bare repo)
+  mkdirp(repoPath);
+  mkdirp(path.join(repoPath, 'objects'));
+  mkdirp(path.join(repoPath, 'refs', 'heads'));
+  mkdirp(path.join(repoPath, 'refs', 'tags'));
+  mkdirp(path.join(repoPath, 'info'));
+
+  // Write HEAD pointing to main branch
+  fs.writeFileSync(path.join(repoPath, 'HEAD'), 'ref: refs/heads/main\n');
+
+  // Write config for bare repository
+  const config = `[core]
+    repositoryformatversion = 0
+    filemode = true
+    bare = true
+[wit]
+    hashAlgorithm = sha1
+`;
+  fs.writeFileSync(path.join(repoPath, 'config'), config);
+
+  // Write description
+  fs.writeFileSync(
+    path.join(repoPath, 'description'),
+    'Wit repository\n'
+  );
+
+  console.log(`[server] Initialized bare repository at: ${repoPath}`);
+
+  return new BareRepository(repoPath);
+}

@@ -13,14 +13,14 @@ import {
   orgModel,
   orgMemberModel,
 } from '../../../db/models';
-import { BareRepository, forkRepository, getRepoDiskPath, RepoManager, resolveDiskPath } from '../../../server/storage/repos';
-import { exists } from '../../../utils/fs';
+import { BareRepository, forkRepository, getRepoDiskPath, RepoManager, resolveDiskPath, initBareRepository } from '../../../server/storage/repos';
+import { exists, mkdirp } from '../../../utils/fs';
 import { eventBus } from '../../../events';
 
 /**
- * Helper to get a BareRepository from disk path
+ * Helper to get a BareRepository from disk path, auto-creating if needed
  */
-function getRepoFromDisk(diskPath: string): BareRepository | null {
+function getRepoFromDisk(diskPath: string, autoCreate: boolean = false): BareRepository | null {
   // diskPath is stored as /repos/owner/name.git in the database
   // We need to resolve it relative to REPOS_DIR
   const reposDir = process.env.REPOS_DIR || './repos';
@@ -34,6 +34,12 @@ function getRepoFromDisk(diskPath: string): BareRepository | null {
   console.log('[getRepoFromDisk] diskPath:', diskPath, 'reposDir:', reposDir, 'cwd:', process.cwd(), 'absolutePath:', absolutePath, 'exists:', exists(absolutePath));
   
   if (!exists(absolutePath) || !exists(path.join(absolutePath, 'objects'))) {
+    if (autoCreate) {
+      // Auto-create the bare repository on disk
+      console.log('[getRepoFromDisk] Auto-creating repository at:', absolutePath);
+      mkdirp(absolutePath);
+      return initBareRepository(absolutePath);
+    }
     return null;
   }
   
@@ -1512,8 +1518,8 @@ export const reposRouter = router({
         });
       }
 
-      // Get the bare repository
-      const bareRepo = getRepoFromDisk(result.repo.diskPath);
+      // Get the bare repository (auto-create if missing on disk)
+      const bareRepo = getRepoFromDisk(result.repo.diskPath, true);
       if (!bareRepo) {
         throw new TRPCError({
           code: 'NOT_FOUND',
