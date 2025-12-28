@@ -1662,4 +1662,100 @@ export const reposRouter = router({
         });
       }
     }),
+
+  /**
+   * Get leaderboard of repos by commit count in last 7 days
+   */
+  leaderboard: publicProcedure
+    .input(
+      z.object({
+        limit: z.number().min(1).max(100).default(20),
+      }).optional()
+    )
+    .query(async ({ input }) => {
+      const limit = input?.limit ?? 20;
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      
+      // Get all public repositories
+      const publicRepos = await repoModel.listAllPublic();
+      
+      // For each repo, count commits in the last 7 days
+      const reposWithCommits: Array<{
+        id: string;
+        name: string;
+        ownerName: string;
+        ownerType: 'user' | 'organization';
+        description: string | null;
+        commitCount: number;
+        starsCount: number;
+      }> = [];
+      
+      for (const repo of publicRepos) {
+        try {
+          const bareRepo = getRepoFromDisk(repo.diskPath);
+          if (!bareRepo) continue;
+          
+          // Resolve HEAD to get the default branch commit
+          let commitHash = bareRepo.refs.resolve('HEAD');
+          if (!commitHash) continue;
+          
+          let commitCount = 0;
+          const maxWalk = 500; // Limit how many commits we walk
+          let walked = 0;
+          
+          // Walk commit history and count commits in last 7 days
+          while (commitHash && walked < maxWalk) {
+            try {
+              const commit = bareRepo.objects.readCommit(commitHash);
+              const commitDate = new Date(commit.author.timestamp * 1000);
+              
+              // If commit is older than 7 days, stop walking
+              if (commitDate < sevenDaysAgo) {
+                break;
+              }
+              
+              commitCount++;
+              walked++;
+              
+              // Move to parent
+              commitHash = commit.parentHashes[0] || null;
+            } catch {
+              break;
+            }
+          }
+          
+          if (commitCount > 0) {
+            // Get owner name
+            let ownerName = '';
+            if (repo.ownerType === 'user') {
+              const user = await userModel.findById(repo.ownerId);
+              ownerName = user?.username || user?.name || 'unknown';
+            } else {
+              const org = await orgModel.findById(repo.ownerId);
+              ownerName = org?.name || 'unknown';
+            }
+            
+            reposWithCommits.push({
+              id: repo.id,
+              name: repo.name,
+              ownerName,
+              ownerType: repo.ownerType,
+              description: repo.description,
+              commitCount,
+              starsCount: repo.starsCount,
+            });
+          }
+        } catch (error) {
+          // Skip repos that fail
+          console.error(`[repos.leaderboard] Error processing repo ${repo.id}:`, error);
+        }
+      }
+      
+      // Sort by commit count descending
+      reposWithCommits.sort((a, b) => b.commitCount - a.commitCount);
+      
+      // Return top N
+      return reposWithCommits.slice(0, limit);
+    }),
 });

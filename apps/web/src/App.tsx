@@ -69,6 +69,7 @@ import { TeamDetailPage } from './routes/org/team-detail';
 import { SearchPage } from './routes/search';
 import { InboxPage } from './routes/inbox';
 import { WrappedPage } from './routes/wrapped';
+import { LeaderboardPage } from './routes/leaderboard';
 
 // Scroll to top on route change
 function ScrollToTop() {
@@ -113,6 +114,7 @@ export function App() {
             <Route path="/orgs/new" element={<NewOrgPage />} />
             <Route path="/search" element={<SearchPage />} />
             <Route path="/inbox" element={<InboxPage />} />
+            <Route path="/leaderboard" element={<LeaderboardPage />} />
 
             {/* Organization routes */}
             <Route path="/org/:slug" element={<OrgPage />} />

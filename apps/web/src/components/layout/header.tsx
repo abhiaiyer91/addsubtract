@@ -14,6 +14,7 @@ import {
   X,
   Building2,
   Flame,
+  Trophy,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -64,6 +65,15 @@ export function Header() {
                 <GitBranch className="h-4 w-4 md:h-5 md:w-5 text-primary" />
               </div>
               <span className="font-bold text-lg md:text-xl tracking-tight">wit</span>
+            </Link>
+
+            {/* Leaderboard link */}
+            <Link
+              to="/leaderboard"
+              className="hidden md:flex items-center gap-1.5 px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-lg transition-all"
+            >
+              <Trophy className="h-4 w-4" />
+              <span>Leaderboard</span>
             </Link>
           </div>
 
@@ -219,6 +229,15 @@ export function Header() {
 
             {/* Mobile navigation links */}
             <nav className="space-y-1">
+              {/* Leaderboard - visible to all */}
+              <Link
+                to="/leaderboard"
+                className="flex items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-lg transition-all"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <Trophy className="h-4 w-4" />
+                Leaderboard
+              </Link>
               {authenticated && (
                 <>
                   <Link
