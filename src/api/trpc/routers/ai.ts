@@ -184,11 +184,56 @@ function getFileDiff(repoPath: string, baseSha: string, headSha: string, filePat
 
 export const aiRouter = router({
   /**
-   * Check if AI features are available
+   * Check if AI features are available and get configuration status
+   * Checks user keys if authenticated, otherwise just server keys
    */
-  status: publicProcedure.query(() => {
+  status: publicProcedure.query(async ({ ctx }) => {
+    const hasServerOpenAI = !!process.env.OPENAI_API_KEY;
+    const hasServerAnthropic = !!process.env.ANTHROPIC_API_KEY;
+    const serverAvailable = hasServerOpenAI || hasServerAnthropic;
+    
+    // If user is authenticated, check their personal keys too
+    let hasUserOpenAI = false;
+    let hasUserAnthropic = false;
+    let userKeySource: 'user' | 'server' | null = null;
+    
+    if (ctx.user) {
+      // Import here to avoid circular dependency
+      const { userAiKeyModel } = await import('../../../db/models');
+      const userOpenAIKey = await userAiKeyModel.getDecryptedKey(ctx.user.id, 'openai');
+      const userAnthropicKey = await userAiKeyModel.getDecryptedKey(ctx.user.id, 'anthropic');
+      hasUserOpenAI = !!userOpenAIKey;
+      hasUserAnthropic = !!userAnthropicKey;
+      
+      if (hasUserOpenAI || hasUserAnthropic) {
+        userKeySource = 'user';
+      } else if (serverAvailable) {
+        userKeySource = 'server';
+      }
+    }
+    
+    const hasOpenAI = hasUserOpenAI || hasServerOpenAI;
+    const hasAnthropic = hasUserAnthropic || hasServerAnthropic;
+    const available = hasOpenAI || hasAnthropic;
+    
     return {
-      available: isAIAvailable(),
+      available,
+      providers: {
+        openai: hasOpenAI,
+        anthropic: hasAnthropic,
+      },
+      features: {
+        semanticSearch: hasOpenAI, // Requires OpenAI for embeddings
+        codeGeneration: available,
+        prDescription: available,
+        codeReview: available,
+      },
+      source: userKeySource,
+      hasUserKeys: hasUserOpenAI || hasUserAnthropic,
+      hasServerKeys: serverAvailable,
+      message: !available 
+        ? 'AI features are not configured. Add an API key in Settings > AI to enable AI-powered features.'
+        : undefined,
     };
   }),
 

@@ -54,6 +54,7 @@ import { NewJournalPage } from './routes/repo/journal/page-new';
 import { SettingsPage } from './routes/settings';
 import { SSHKeysPage } from './routes/settings/keys';
 import { TokensPage } from './routes/settings/tokens';
+import { UserAIKeysPage } from './routes/settings/ai-keys';
 import { OAuthAppsPage } from './routes/settings/oauth-apps';
 import { OAuthAppDetailPage } from './routes/settings/oauth-app-detail';
 import { AuthorizedAppsPage } from './routes/settings/authorized-apps';
@@ -103,6 +104,7 @@ export function App() {
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/settings/keys" element={<SSHKeysPage />} />
             <Route path="/settings/tokens" element={<TokensPage />} />
+            <Route path="/settings/ai" element={<UserAIKeysPage />} />
             <Route path="/settings/oauth-apps" element={<OAuthAppsPage />} />
             <Route path="/settings/oauth-apps/:id" element={<OAuthAppDetailPage />} />
             <Route path="/settings/authorized-apps" element={<AuthorizedAppsPage />} />
