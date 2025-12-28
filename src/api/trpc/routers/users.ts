@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { router, publicProcedure, protectedProcedure } from '../trpc';
-import { userModel, repoModel, starModel, orgMemberModel } from '../../../db/models';
+import { userModel, repoModel, starModel, watchModel, orgMemberModel } from '../../../db/models';
 
 export const usersRouter = router({
   /**
@@ -137,6 +137,28 @@ export const usersRouter = router({
       }
 
       return starModel.listByUser(user.id);
+    }),
+
+  /**
+   * Get a user's watched repositories
+   */
+  watched: publicProcedure
+    .input(
+      z.object({
+        username: z.string().min(1),
+      })
+    )
+    .query(async ({ input }) => {
+      const user = await userModel.findByUsername(input.username);
+
+      if (!user) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'User not found',
+        });
+      }
+
+      return watchModel.listByUser(user.id);
     }),
 
   /**
