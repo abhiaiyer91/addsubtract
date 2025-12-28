@@ -214,7 +214,7 @@ export const webhooksRouter = router({
 
       const webhook = await webhookModel.update(input.id, {
         url: input.url,
-        secret: input.secret ?? undefined,
+        secret: input.secret,
         events: input.events as WebhookEvent[] | undefined,
         isActive: input.isActive,
       });

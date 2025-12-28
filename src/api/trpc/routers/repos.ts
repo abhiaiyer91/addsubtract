@@ -438,10 +438,7 @@ export const reposRouter = router({
       // Create fork on disk
       let storageResult;
       try {
-        const reposDir = process.env.REPOS_DIR || './repos';
-        const sourceAbsolutePath = path.isAbsolute(sourceRepo.diskPath) 
-          ? sourceRepo.diskPath 
-          : path.join(process.cwd(), reposDir, sourceRepo.diskPath.replace(/^\/repos\//, ''));
+        const sourceAbsolutePath = resolveDiskPath(sourceRepo.diskPath);
 
         storageResult = forkRepository(sourceAbsolutePath, targetDiskPath);
       } catch (error) {

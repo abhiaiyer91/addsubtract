@@ -97,7 +97,7 @@ export const webhookModel = {
     id: string,
     data: {
       url?: string;
-      secret?: string;
+      secret?: string | null;
       events?: WebhookEvent[];
       isActive?: boolean;
     }

@@ -91,7 +91,7 @@ describe('Comments Flow', () => {
 
       expect(comment).toBeDefined();
       expect(comment.body).toBe('This is a test comment on an issue');
-      expect(comment.authorId).toBe(ownerId);
+      expect(comment.userId).toBe(ownerId);
     });
 
     it('lists issue comments', async () => {
@@ -223,7 +223,7 @@ describe('Comments Flow', () => {
 
       expect(comment).toBeDefined();
       expect(comment.body).toBe('This is a test comment on a PR');
-      expect(comment.authorId).toBe(ownerId);
+      expect(comment.userId).toBe(ownerId);
     });
 
     it('lists PR comments', async () => {
