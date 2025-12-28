@@ -44,6 +44,7 @@ import {
 import {
   Tooltip,
   TooltipContent,
+  TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
@@ -750,37 +751,41 @@ function ChatInput({
       <div className="relative rounded-lg border border-zinc-800 bg-zinc-900/50 focus-within:border-zinc-700 transition-colors">
         {/* Toolbar */}
         <div className="flex items-center gap-1 px-2 py-1.5 border-b border-zinc-800/50">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 text-zinc-500 hover:text-zinc-300"
-                onClick={() => setValue('@')}
-              >
-                <AtSign className="h-3.5 w-3.5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="top">
-              <p className="text-xs">Mention file or codebase</p>
-            </TooltipContent>
-          </Tooltip>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-zinc-500 hover:text-zinc-300"
+                  onClick={() => setValue('@')}
+                >
+                  <AtSign className="h-3.5 w-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                <p className="text-xs">Mention file or codebase</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 text-zinc-500 hover:text-zinc-300"
-                onClick={() => setValue('/')}
-              >
-                <Slash className="h-3.5 w-3.5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="top">
-              <p className="text-xs">Commands</p>
-            </TooltipContent>
-          </Tooltip>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-zinc-500 hover:text-zinc-300"
+                  onClick={() => setValue('/')}
+                >
+                  <Slash className="h-3.5 w-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                <p className="text-xs">Commands</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           
           <div className="flex-1" />
           
