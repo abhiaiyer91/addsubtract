@@ -3,10 +3,17 @@
  * 
  * Listens to events and creates appropriate notifications.
  * Also handles inbox-related state updates (review requests).
+ * Sends email notifications based on user preferences.
  */
 
 import { eventBus } from '../bus';
 import { notificationModel, prReviewerModel } from '../../db/models';
+import { emailPreferencesModel } from '../../db/models/email-preferences';
+import { getGlobalEmailService } from '../../core/email';
+import { getDb } from '../../db';
+import { user } from '../../db/auth-schema';
+import { notifications, type Notification } from '../../db/schema';
+import { eq } from 'drizzle-orm';
 import type { 
   PrReviewRequestedEvent,
   PrReviewedEvent,
@@ -19,6 +26,80 @@ import type {
   RepoForkedEvent,
   CiRunCompletedEvent,
 } from '../types';
+
+/**
+ * Send email notification for a notification if user preferences allow
+ */
+async function sendNotificationEmail(notification: Notification, actorName?: string): Promise<void> {
+  const emailService = getGlobalEmailService();
+  
+  // Check if email service is configured
+  if (!emailService.isConfigured()) {
+    return;
+  }
+
+  try {
+    // Check user preferences
+    const shouldSend = await emailPreferencesModel.shouldSendEmail(notification.userId, notification.type);
+    if (!shouldSend) {
+      return;
+    }
+
+    // Get user email
+    const db = getDb();
+    const [recipient] = await db
+      .select({ email: user.email, name: user.name })
+      .from(user)
+      .where(eq(user.id, notification.userId))
+      .limit(1);
+
+    if (!recipient?.email) {
+      return;
+    }
+
+    // Send the email
+    const result = await emailService.sendNotificationEmail({
+      email: recipient.email,
+      name: recipient.name || undefined,
+      notifications: [{
+        type: notification.type,
+        title: notification.title,
+        body: notification.body || undefined,
+        url: notification.url || undefined,
+        actorName,
+      }],
+    });
+
+    if (result.success) {
+      // Mark notification as email sent
+      await db
+        .update(notifications)
+        .set({ emailSent: true, emailSentAt: new Date() })
+        .where(eq(notifications.id, notification.id));
+    } else {
+      console.error('[EventBus] Failed to send notification email:', result.error);
+    }
+  } catch (error) {
+    console.error('[EventBus] Error sending notification email:', error);
+  }
+}
+
+/**
+ * Get actor name for email notifications
+ */
+async function getActorName(actorId: string): Promise<string | undefined> {
+  try {
+    const db = getDb();
+    const [actor] = await db
+      .select({ name: user.name, username: user.username })
+      .from(user)
+      .where(eq(user.id, actorId))
+      .limit(1);
+    return actor?.name || actor?.username || undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 /**
  * Register all notification handlers
@@ -38,7 +119,7 @@ export function registerNotificationHandlers(): void {
     // Don't notify if reviewing own PR
     if (reviewerId === event.actorId) return;
     
-    await notificationModel.create({
+    const notification = await notificationModel.create({
       userId: reviewerId,
       type: 'pr_review_requested',
       title: `Review requested on #${prNumber}: ${prTitle}`,
@@ -48,6 +129,10 @@ export function registerNotificationHandlers(): void {
       repoId,
       url: `/${repoFullName}/pull/${prNumber}`,
     });
+    
+    // Send email notification
+    const actorName = await getActorName(event.actorId);
+    sendNotificationEmail(notification, actorName);
   });
 
   // PR Reviewed
@@ -68,7 +153,7 @@ export function registerNotificationHandlers(): void {
                       reviewState === 'changes_requested' ? 'requested changes on' : 
                       'commented on';
     
-    await notificationModel.create({
+    const notification = await notificationModel.create({
       userId: authorId,
       type: 'pr_reviewed',
       title: `Your PR #${prNumber} was ${stateText}`,
@@ -78,6 +163,10 @@ export function registerNotificationHandlers(): void {
       repoId,
       url: `/${repoFullName}/pull/${prNumber}`,
     });
+    
+    // Send email notification
+    const actorName = await getActorName(event.actorId);
+    sendNotificationEmail(notification, actorName);
   });
 
   // PR Merged
@@ -86,7 +175,7 @@ export function registerNotificationHandlers(): void {
     
     // Notify the author if someone else merged it
     if (authorId !== event.actorId) {
-      await notificationModel.create({
+      const notification = await notificationModel.create({
         userId: authorId,
         type: 'pr_merged',
         title: `Your PR #${prNumber} was merged`,
@@ -96,6 +185,10 @@ export function registerNotificationHandlers(): void {
         repoId,
         url: `/${repoFullName}/pull/${prNumber}`,
       });
+      
+      // Send email notification
+      const actorName = await getActorName(event.actorId);
+      sendNotificationEmail(notification, actorName);
     }
   });
 
@@ -105,7 +198,7 @@ export function registerNotificationHandlers(): void {
     
     // Notify the PR author (if not the commenter)
     if (authorId !== event.actorId) {
-      await notificationModel.create({
+      const notification = await notificationModel.create({
         userId: authorId,
         type: 'pr_comment',
         title: `New comment on your PR #${prNumber}`,
@@ -115,6 +208,10 @@ export function registerNotificationHandlers(): void {
         repoId,
         url: `/${repoFullName}/pull/${prNumber}`,
       });
+      
+      // Send email notification
+      const actorName = await getActorName(event.actorId);
+      sendNotificationEmail(notification, actorName);
     }
     
     // Handle mentions separately through the mention event
@@ -127,7 +224,7 @@ export function registerNotificationHandlers(): void {
     // Don't notify if self-assigning
     if (assigneeId === event.actorId) return;
     
-    await notificationModel.create({
+    const notification = await notificationModel.create({
       userId: assigneeId,
       type: 'issue_assigned',
       title: `You were assigned to #${issueNumber}: ${issueTitle}`,
@@ -136,6 +233,10 @@ export function registerNotificationHandlers(): void {
       repoId,
       url: `/${repoFullName}/issues/${issueNumber}`,
     });
+    
+    // Send email notification
+    const actorName = await getActorName(event.actorId);
+    sendNotificationEmail(notification, actorName);
   });
 
   // Issue Commented
@@ -144,7 +245,7 @@ export function registerNotificationHandlers(): void {
     
     // Notify the issue author (if not the commenter)
     if (authorId !== event.actorId) {
-      await notificationModel.create({
+      const notification = await notificationModel.create({
         userId: authorId,
         type: 'issue_comment',
         title: `New comment on your issue #${issueNumber}`,
@@ -154,6 +255,10 @@ export function registerNotificationHandlers(): void {
         repoId,
         url: `/${repoFullName}/issues/${issueNumber}`,
       });
+      
+      // Send email notification
+      const actorName = await getActorName(event.actorId);
+      sendNotificationEmail(notification, actorName);
     }
   });
 
@@ -167,7 +272,7 @@ export function registerNotificationHandlers(): void {
     const contextType = context.includes('pr') ? 'pull request' : 'issue';
     const urlPath = context.includes('pr') ? 'pull' : 'issues';
     
-    await notificationModel.create({
+    const notification = await notificationModel.create({
       userId: mentionedUserId,
       type: 'mention',
       title: `You were mentioned in a ${contextType}`,
@@ -178,6 +283,10 @@ export function registerNotificationHandlers(): void {
       repoId,
       url: `/${repoFullName}/${urlPath}/${contextNumber}`,
     });
+    
+    // Send email notification
+    const actorName = await getActorName(event.actorId);
+    sendNotificationEmail(notification, actorName);
   });
 
   // Repo Starred
@@ -187,7 +296,7 @@ export function registerNotificationHandlers(): void {
     // Don't notify if starring own repo
     if (ownerId === event.actorId) return;
     
-    await notificationModel.create({
+    const notification = await notificationModel.create({
       userId: ownerId,
       type: 'repo_starred',
       title: `Someone starred your repository`,
@@ -196,6 +305,10 @@ export function registerNotificationHandlers(): void {
       repoId,
       url: `/${repoFullName}`,
     });
+    
+    // Send email notification (usually off by default, but respect preferences)
+    const actorName = await getActorName(event.actorId);
+    sendNotificationEmail(notification, actorName);
   });
 
   // Repo Forked
@@ -203,7 +316,7 @@ export function registerNotificationHandlers(): void {
     const { repoId, forkedFromFullName, ownerId } = event.payload;
     
     // Notify the original repo owner
-    await notificationModel.create({
+    const notification = await notificationModel.create({
       userId: ownerId,
       type: 'repo_forked',
       title: `Someone forked your repository`,
@@ -212,6 +325,10 @@ export function registerNotificationHandlers(): void {
       repoId,
       url: `/${forkedFromFullName}`,
     });
+    
+    // Send email notification
+    const actorName = await getActorName(event.actorId);
+    sendNotificationEmail(notification, actorName);
   });
 
   // CI Run Completed
@@ -220,7 +337,7 @@ export function registerNotificationHandlers(): void {
     
     // Notify the author if CI failed on their PR
     if (authorId && conclusion === 'failure') {
-      await notificationModel.create({
+      const notification = await notificationModel.create({
         userId: authorId,
         type: 'ci_failed',
         title: `CI failed: ${workflowName}`,
@@ -229,6 +346,25 @@ export function registerNotificationHandlers(): void {
         repoId,
         url: prNumber ? `/${repoFullName}/pull/${prNumber}` : `/${repoFullName}`,
       });
+      
+      // Send email notification
+      sendNotificationEmail(notification);
+    }
+    
+    // Optionally notify on CI success (usually off by default)
+    if (authorId && conclusion === 'success') {
+      const notification = await notificationModel.create({
+        userId: authorId,
+        type: 'ci_passed',
+        title: `CI passed: ${workflowName}`,
+        body: prNumber ? `Pull request #${prNumber}` : undefined,
+        actorId: event.actorId,
+        repoId,
+        url: prNumber ? `/${repoFullName}/pull/${prNumber}` : `/${repoFullName}`,
+      });
+      
+      // Send email notification (usually off by default)
+      sendNotificationEmail(notification);
     }
   });
 

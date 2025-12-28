@@ -2,7 +2,7 @@
  * Better Auth Server Configuration
  * 
  * Centralized authentication using better-auth with Drizzle adapter.
- * Supports email/password and GitHub OAuth.
+ * Supports email/password, GitHub OAuth, password reset, and email verification.
  */
 
 import { betterAuth } from 'better-auth';
@@ -10,6 +10,7 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { username } from 'better-auth/plugins';
 import { getDb } from '../db';
 import * as authSchema from '../db/auth-schema';
+import { getGlobalEmailService } from '../core/email';
 
 // Singleton auth instance
 let authInstance: ReturnType<typeof betterAuth> | null = null;
@@ -42,6 +43,9 @@ export function createAuth() {
 
   const db = getDb();
   
+  const appUrl = process.env.APP_URL || 'http://localhost:5173';
+  const emailService = getGlobalEmailService();
+  
   authInstance = betterAuth({
     database: drizzleAdapter(db, {
       provider: 'pg',
@@ -54,11 +58,40 @@ export function createAuth() {
     // Secret for signing tokens - required in production
     secret: process.env.BETTER_AUTH_SECRET,
     
-    // Email and password authentication
+    // Email and password authentication with password reset
     emailAndPassword: {
       enabled: true,
       minPasswordLength: 8,
       maxPasswordLength: 128,
+      // Password reset configuration
+      sendResetPassword: async ({ user, url }) => {
+        const result = await emailService.sendPasswordReset({
+          email: user.email,
+          name: user.name,
+          resetUrl: url,
+          expiresInMinutes: 60,
+        });
+        if (!result.success) {
+          console.error('[Auth] Failed to send password reset email:', result.error);
+        }
+      },
+    },
+    
+    // Email verification configuration
+    emailVerification: {
+      sendOnSignUp: emailService.isConfigured(),
+      autoSignInAfterVerification: true,
+      sendVerificationEmail: async ({ user, url }) => {
+        const result = await emailService.sendEmailVerification({
+          email: user.email,
+          name: user.name,
+          verifyUrl: url,
+          expiresInMinutes: 1440, // 24 hours
+        });
+        if (!result.success) {
+          console.error('[Auth] Failed to send verification email:', result.error);
+        }
+      },
     },
     
     // Use username plugin for GitHub-style usernames
@@ -114,6 +147,29 @@ export function createAuth() {
     
     // Trusted origins for CORS - configurable via TRUSTED_ORIGINS env var
     trustedOrigins: getTrustedOrigins(),
+    
+    // Callbacks for welcome email and other events
+    databaseHooks: {
+      user: {
+        create: {
+          after: async (user) => {
+            // Send welcome email on new user creation
+            // Note: username comes from the username plugin and may be typed as object
+            const username = typeof user.username === 'string' ? user.username : (user.username as unknown as string);
+            if (emailService.isConfigured() && username) {
+              const result = await emailService.sendWelcomeEmail({
+                email: user.email,
+                name: user.name,
+                username,
+              });
+              if (!result.success) {
+                console.error('[Auth] Failed to send welcome email:', result.error);
+              }
+            }
+          },
+        },
+      },
+    },
   });
 
   return authInstance;

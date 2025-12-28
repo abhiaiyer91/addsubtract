@@ -12,6 +12,8 @@ import { HomePage } from './routes/index';
 import { LoginPage } from './routes/login';
 import { RegisterPage } from './routes/register';
 import { ForgotPasswordPage } from './routes/forgot-password';
+import { ResetPasswordPage } from './routes/reset-password';
+import { VerifyEmailPage } from './routes/verify-email';
 import { TermsPage } from './routes/terms';
 import { PrivacyPage } from './routes/privacy';
 import { UserHomePage } from './routes/user-home';
@@ -54,6 +56,7 @@ import { NewJournalPage } from './routes/repo/journal/page-new';
 import { SettingsPage } from './routes/settings';
 import { SSHKeysPage } from './routes/settings/keys';
 import { TokensPage } from './routes/settings/tokens';
+import { NotificationSettingsPage } from './routes/settings/notifications';
 import { UserAIKeysPage } from './routes/settings/ai-keys';
 import { OAuthAppsPage } from './routes/settings/oauth-apps';
 import { OAuthAppDetailPage } from './routes/settings/oauth-app-detail';
@@ -99,11 +102,14 @@ export function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/verify-email" element={<VerifyEmailPage />} />
             <Route path="/terms" element={<TermsPage />} />
             <Route path="/privacy" element={<PrivacyPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/settings/keys" element={<SSHKeysPage />} />
             <Route path="/settings/tokens" element={<TokensPage />} />
+            <Route path="/settings/notifications" element={<NotificationSettingsPage />} />
             <Route path="/settings/ai" element={<UserAIKeysPage />} />
             <Route path="/settings/oauth-apps" element={<OAuthAppsPage />} />
             <Route path="/settings/oauth-apps/:id" element={<OAuthAppDetailPage />} />

@@ -1366,8 +1366,57 @@ export const notifications = pgTable('notifications', {
   // Read status
   read: boolean('read').notNull().default(false),
   
+  // Email sent status
+  emailSent: boolean('email_sent').notNull().default(false),
+  emailSentAt: timestamp('email_sent_at', { withTimezone: true }),
+  
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
+
+// ============ EMAIL NOTIFICATION PREFERENCES ============
+
+/**
+ * Email notification preferences for users
+ * Controls which types of notifications trigger email delivery
+ */
+export const emailNotificationPreferences = pgTable('email_notification_preferences', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  
+  // User these preferences belong to
+  userId: text('user_id')
+    .notNull()
+    .references(() => authUser.id, { onDelete: 'cascade' })
+    .unique(), // One preference row per user
+  
+  // Master switch for all email notifications
+  emailEnabled: boolean('email_enabled').notNull().default(true),
+  
+  // Individual notification type preferences
+  prReviewRequested: boolean('pr_review_requested').notNull().default(true),
+  prReviewed: boolean('pr_reviewed').notNull().default(true),
+  prMerged: boolean('pr_merged').notNull().default(true),
+  prComment: boolean('pr_comment').notNull().default(true),
+  issueAssigned: boolean('issue_assigned').notNull().default(true),
+  issueComment: boolean('issue_comment').notNull().default(true),
+  mention: boolean('mention').notNull().default(true),
+  repoPush: boolean('repo_push').notNull().default(false), // Off by default - too noisy
+  repoStarred: boolean('repo_starred').notNull().default(false), // Off by default
+  repoForked: boolean('repo_forked').notNull().default(true),
+  ciFailed: boolean('ci_failed').notNull().default(true),
+  ciPassed: boolean('ci_passed').notNull().default(false), // Off by default
+  
+  // Digest preferences
+  digestEnabled: boolean('digest_enabled').notNull().default(false),
+  digestFrequency: text('digest_frequency').notNull().default('daily'), // 'daily', 'weekly'
+  digestDay: integer('digest_day').notNull().default(1), // Day of week for weekly (0=Sun, 1=Mon, etc)
+  digestHour: integer('digest_hour').notNull().default(9), // Hour of day (0-23) in UTC
+  
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type EmailNotificationPreferences = typeof emailNotificationPreferences.$inferSelect;
+export type NewEmailNotificationPreferences = typeof emailNotificationPreferences.$inferInsert;
 
 // ============ AGENT SESSIONS ============
 

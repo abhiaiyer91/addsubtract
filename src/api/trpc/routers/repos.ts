@@ -16,6 +16,10 @@ import {
 import { BareRepository, forkRepository, getRepoDiskPath, RepoManager, resolveDiskPath, initBareRepository } from '../../../server/storage/repos';
 import { exists, mkdirp } from '../../../utils/fs';
 import { eventBus } from '../../../events';
+import { getGlobalEmailService } from '../../../core/email';
+import { getDb } from '../../../db';
+import { user } from '../../../db/auth-schema';
+import { eq } from 'drizzle-orm';
 
 /**
  * Helper to get a BareRepository from disk path, auto-creating if needed
@@ -1436,11 +1440,42 @@ export const reposRouter = router({
         });
       }
 
-      return collaboratorModel.add({
+      const collab = await collaboratorModel.add({
         repoId: input.repoId,
         userId: input.userId,
         permission: input.permission,
       });
+
+      // Send email notification to the new collaborator
+      const emailService = getGlobalEmailService();
+      if (emailService.isConfigured()) {
+        try {
+          const db = getDb();
+          const [collaboratorUser] = await db.select().from(user).where(eq(user.id, input.userId)).limit(1);
+          const [inviterUser] = await db.select().from(user).where(eq(user.id, ctx.user.id)).limit(1);
+          
+          if (collaboratorUser && repo) {
+            const roleText = input.permission === 'admin' ? 'Administrator' : 
+                           input.permission === 'write' ? 'Contributor' : 'Viewer';
+            
+            await emailService.sendNotificationEmail({
+              email: collaboratorUser.email,
+              name: collaboratorUser.name || undefined,
+              notifications: [{
+                type: 'collaborator_added',
+                title: `You've been added as a collaborator`,
+                body: `You now have ${roleText} access to ${repo.name}`,
+                url: `/${repo.ownerId}/${repo.name}`,
+                actorName: inviterUser?.name || inviterUser?.username || undefined,
+              }],
+            });
+          }
+        } catch (error) {
+          console.error('[Repos] Failed to send collaborator invitation email:', error);
+        }
+      }
+
+      return collab;
     }),
 
   /**
@@ -1472,12 +1507,36 @@ export const reposRouter = router({
         });
       }
 
+      // Get user info before removal for notification
+      const db = getDb();
+      const [collaboratorUser] = await db.select().from(user).where(eq(user.id, input.userId)).limit(1);
+      const [removedByUser] = await db.select().from(user).where(eq(user.id, ctx.user.id)).limit(1);
+
       const removed = await collaboratorModel.remove(input.repoId, input.userId);
       if (!removed) {
         throw new TRPCError({
           code: 'NOT_FOUND',
           message: 'Collaborator not found',
         });
+      }
+
+      // Send removal email notification
+      const emailService = getGlobalEmailService();
+      if (emailService.isConfigured() && collaboratorUser) {
+        try {
+          await emailService.sendNotificationEmail({
+            email: collaboratorUser.email,
+            name: collaboratorUser.name || undefined,
+            notifications: [{
+              type: 'collaborator_removed',
+              title: `You've been removed from a repository`,
+              body: `Your access to ${repo.name} has been revoked`,
+              actorName: removedByUser?.name || removedByUser?.username || undefined,
+            }],
+          });
+        } catch (error) {
+          console.error('[Repos] Failed to send removal email:', error);
+        }
       }
 
       return { success: true };

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { router, protectedProcedure } from '../trpc';
-import { notificationModel } from '../../../db/models';
+import { notificationModel, emailPreferencesModel } from '../../../db/models';
 
 export const notificationsRouter = router({
   /**
@@ -61,4 +61,42 @@ export const notificationsRouter = router({
   deleteAll: protectedProcedure.mutation(async ({ ctx }) => {
     return notificationModel.deleteAll(ctx.user.id);
   }),
+
+  // ============ Email Preferences ============
+
+  /**
+   * Get email notification preferences
+   */
+  getEmailPreferences: protectedProcedure.query(async ({ ctx }) => {
+    return emailPreferencesModel.getOrCreate(ctx.user.id);
+  }),
+
+  /**
+   * Update email notification preferences
+   */
+  updateEmailPreferences: protectedProcedure
+    .input(
+      z.object({
+        emailEnabled: z.boolean().optional(),
+        prReviewRequested: z.boolean().optional(),
+        prReviewed: z.boolean().optional(),
+        prMerged: z.boolean().optional(),
+        prComment: z.boolean().optional(),
+        issueAssigned: z.boolean().optional(),
+        issueComment: z.boolean().optional(),
+        mention: z.boolean().optional(),
+        repoPush: z.boolean().optional(),
+        repoStarred: z.boolean().optional(),
+        repoForked: z.boolean().optional(),
+        ciFailed: z.boolean().optional(),
+        ciPassed: z.boolean().optional(),
+        digestEnabled: z.boolean().optional(),
+        digestFrequency: z.enum(['daily', 'weekly']).optional(),
+        digestDay: z.number().min(0).max(6).optional(),
+        digestHour: z.number().min(0).max(23).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      return emailPreferencesModel.update(ctx.user.id, input);
+    }),
 });

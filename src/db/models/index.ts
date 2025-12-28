@@ -81,6 +81,9 @@ export { releaseModel, releaseAssetModel } from './releases';
 // Notification models
 export { notificationModel, notificationHelpers, type NotificationWithActor } from './notification';
 
+// Email notification preferences model
+export { emailPreferencesModel } from './email-preferences';
+
 // Workflow/CI models
 export {
   workflowRunModel,
