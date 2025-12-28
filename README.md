@@ -33,7 +33,7 @@ That's it. You're using wit.
 - AI commit messages and code review
 - Semantic search over your codebase
 - Web UI (`wit web`) and Terminal UI (`wit ui`)
-- Self-hosted server with PRs and issues
+- Self-hosted server (`wit serve`) for Git hosting with PRs, issues, and API
 
 ## What's Not (Yet)
 
@@ -65,7 +65,34 @@ wit search "how does X work?"
 wit wip -a               # quick save with auto-message
 wit amend -m "fix typo"  # fix last commit
 wit cleanup              # delete merged branches
+
+# Visual interfaces
+wit web                  # browser UI for current repo
+wit ui                   # terminal UI
+wit graph                # commit graph in terminal
 ```
+
+## Self-Hosting
+
+wit can run as a self-hosted Git server with a full web interface:
+
+```bash
+# Start the server
+wit serve --port 3000 --repos ./repos
+
+# In another terminal, start the web app
+cd apps/web && npm run dev
+```
+
+This gives you:
+- Git HTTP/SSH hosting at `http://localhost:3000`
+- Web UI at `http://localhost:5173`
+- Pull requests, issues, and code review
+- tRPC API for building integrations
+
+**`wit web` vs `wit serve`:**
+- `wit web` - Quick browser UI for your current repository (like GitKraken). No server setup needed.
+- `wit serve` - Full Git hosting platform for multiple repositories with PRs, issues, auth, and API.
 
 ## Requirements
 
