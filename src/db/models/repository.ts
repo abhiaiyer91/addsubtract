@@ -252,6 +252,18 @@ export const repoModel = {
   },
 
   /**
+   * List all public repositories
+   */
+  async listAllPublic(): Promise<Repository[]> {
+    const db = getDb();
+    return db
+      .select()
+      .from(repositories)
+      .where(eq(repositories.isPrivate, false))
+      .orderBy(desc(repositories.pushedAt));
+  },
+
+  /**
    * List forked repositories
    */
   async listForks(repoId: string): Promise<Repository[]> {
