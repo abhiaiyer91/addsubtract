@@ -9,7 +9,7 @@ builder = "nixpacks"
 buildCommand = "npm ci && npm run build"
 
 [deploy]
-startCommand = "npm run db:migrate && node dist/cli.js serve --port $PORT --repos /data/repos"
+startCommand = "node dist/cli.js serve --port $PORT --repos /data/repos"
 healthcheckPath = "/health"
 healthcheckTimeout = 30
 restartPolicyType = "on_failure"
