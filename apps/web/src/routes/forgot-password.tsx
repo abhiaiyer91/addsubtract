@@ -1,25 +1,41 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { GitBranch, Loader2, ArrowLeft } from 'lucide-react';
+import { GitBranch, Loader2, ArrowLeft, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { authClient } from '@/lib/auth-client';
 
 export function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setError(null);
 
-    // TODO: Implement password reset logic
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    setSubmitted(true);
-    setIsLoading(false);
+    try {
+      const result = await authClient.forgetPassword({
+        email,
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      
+      if (result.error) {
+        setError(result.error.message || 'Failed to send reset email. Please try again.');
+        setIsLoading(false);
+        return;
+      }
+      
+      setSubmitted(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -44,6 +60,12 @@ export function ForgotPasswordPage() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
+                {error && (
+                  <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-md flex items-start gap-2">
+                    <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                    <span>{error}</span>
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label htmlFor="email">Email address</Label>
                   <Input

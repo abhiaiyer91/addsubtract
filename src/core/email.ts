@@ -5,6 +5,10 @@
  * - Collaborator invitations
  * - Role change notifications
  * - Activity alerts
+ * - Password reset
+ * - Email verification
+ * - Welcome emails
+ * - Notification emails
  * 
  * Uses Resend (https://resend.com) as the email provider.
  */
@@ -586,4 +590,658 @@ export function createEmailService(config: {
     repositoryName: config.repositoryName,
     repositoryUrl: config.repositoryUrl,
   });
+}
+
+// ============ Global Email Service ============
+
+/**
+ * Global email configuration (not repository-specific)
+ */
+export interface GlobalEmailConfig {
+  apiKey: string;
+  fromAddress: string;
+  fromName: string;
+  appUrl: string;
+  appName?: string;
+  logoUrl?: string;
+  primaryColor?: string;
+}
+
+/**
+ * Global Email Service for app-wide emails
+ * Used for: password reset, email verification, welcome emails, notifications
+ */
+export class GlobalEmailService {
+  private apiKey: string;
+  private fromAddress: string;
+  private fromName: string;
+  private appUrl: string;
+  private appName: string;
+  private logoUrl?: string;
+  private primaryColor: string;
+
+  constructor(config: GlobalEmailConfig) {
+    this.apiKey = config.apiKey;
+    this.fromAddress = config.fromAddress;
+    this.fromName = config.fromName;
+    this.appUrl = config.appUrl;
+    this.appName = config.appName || 'wit';
+    this.logoUrl = config.logoUrl;
+    this.primaryColor = config.primaryColor || '#6366f1';
+  }
+
+  /**
+   * Check if email service is configured
+   */
+  isConfigured(): boolean {
+    return Boolean(this.apiKey && this.fromAddress);
+  }
+
+  /**
+   * Send a password reset email
+   */
+  async sendPasswordReset(options: {
+    email: string;
+    name?: string;
+    resetUrl: string;
+    expiresInMinutes?: number;
+  }): Promise<EmailResult> {
+    const { email, name, resetUrl, expiresInMinutes = 60 } = options;
+    
+    const html = this.renderPasswordResetEmail({ email, name, resetUrl, expiresInMinutes });
+    const text = this.renderPasswordResetEmailText({ email, name, resetUrl, expiresInMinutes });
+
+    return this.send({
+      to: email,
+      subject: `Reset your ${this.appName} password`,
+      html,
+      text,
+    });
+  }
+
+  /**
+   * Send email verification
+   */
+  async sendEmailVerification(options: {
+    email: string;
+    name?: string;
+    verifyUrl: string;
+    expiresInMinutes?: number;
+  }): Promise<EmailResult> {
+    const { email, name, verifyUrl, expiresInMinutes = 1440 } = options; // 24 hours
+    
+    const html = this.renderEmailVerificationEmail({ email, name, verifyUrl, expiresInMinutes });
+    const text = this.renderEmailVerificationEmailText({ email, name, verifyUrl, expiresInMinutes });
+
+    return this.send({
+      to: email,
+      subject: `Verify your ${this.appName} email`,
+      html,
+      text,
+    });
+  }
+
+  /**
+   * Send welcome email
+   */
+  async sendWelcomeEmail(options: {
+    email: string;
+    name?: string;
+    username: string;
+  }): Promise<EmailResult> {
+    const { email, name, username } = options;
+    
+    const html = this.renderWelcomeEmail({ email, name, username });
+    const text = this.renderWelcomeEmailText({ email, name, username });
+
+    return this.send({
+      to: email,
+      subject: `Welcome to ${this.appName}!`,
+      html,
+      text,
+    });
+  }
+
+  /**
+   * Send notification email
+   */
+  async sendNotificationEmail(options: {
+    email: string;
+    name?: string;
+    notifications: Array<{
+      type: string;
+      title: string;
+      body?: string;
+      url?: string;
+      actorName?: string;
+    }>;
+  }): Promise<EmailResult> {
+    const { email, name, notifications } = options;
+    
+    const html = this.renderNotificationEmail({ email, name, notifications });
+    const text = this.renderNotificationEmailText({ email, name, notifications });
+
+    const subject = notifications.length === 1
+      ? notifications[0].title
+      : `You have ${notifications.length} new notifications`;
+
+    return this.send({
+      to: email,
+      subject,
+      html,
+      text,
+    });
+  }
+
+  /**
+   * Send an email using Resend API
+   */
+  private async send(options: {
+    to: string;
+    subject: string;
+    html: string;
+    text: string;
+  }): Promise<EmailResult> {
+    if (!this.isConfigured()) {
+      return {
+        success: false,
+        error: 'Email service is not configured. Set RESEND_API_KEY and EMAIL_FROM_ADDRESS.',
+      };
+    }
+
+    try {
+      const response = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: `${this.fromName} <${this.fromAddress}>`,
+          to: options.to,
+          subject: options.subject,
+          html: options.html,
+          text: options.text,
+        }),
+      });
+
+      const data = await response.json() as { id?: string; error?: { message: string } };
+
+      if (!response.ok) {
+        return {
+          success: false,
+          error: data.error?.message || 'Failed to send email',
+        };
+      }
+
+      return {
+        success: true,
+        messageId: data.id,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
+   * Render password reset email HTML
+   */
+  private renderPasswordResetEmail(data: {
+    email: string;
+    name?: string;
+    resetUrl: string;
+    expiresInMinutes: number;
+  }): string {
+    const greeting = data.name ? `Hi ${data.name},` : 'Hi,';
+    const expiresText = data.expiresInMinutes >= 60
+      ? `${Math.floor(data.expiresInMinutes / 60)} hour${Math.floor(data.expiresInMinutes / 60) > 1 ? 's' : ''}`
+      : `${data.expiresInMinutes} minute${data.expiresInMinutes > 1 ? 's' : ''}`;
+
+    return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reset your password</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f4f4f5;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);">
+          <tr>
+            <td style="padding: 40px 40px 20px; text-align: center; border-bottom: 1px solid #e4e4e7;">
+              ${this.logoUrl ? `<img src="${this.logoUrl}" alt="${this.appName}" style="height: 40px; margin-bottom: 20px;">` : ''}
+              <h1 style="margin: 0; font-size: 24px; font-weight: 600; color: #18181b;">
+                Reset your password
+              </h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 40px;">
+              <p style="margin: 0 0 20px; font-size: 16px; line-height: 1.6; color: #3f3f46;">
+                ${greeting}
+              </p>
+              <p style="margin: 0 0 20px; font-size: 16px; line-height: 1.6; color: #3f3f46;">
+                We received a request to reset your password for your ${this.appName} account. Click the button below to set a new password:
+              </p>
+              
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="${data.resetUrl}" 
+                   style="display: inline-block; padding: 14px 32px; background-color: ${this.primaryColor}; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: 600; border-radius: 8px; box-shadow: 0 2px 4px rgba(99, 102, 241, 0.3);">
+                  Reset Password
+                </a>
+              </div>
+              
+              <p style="margin: 20px 0; font-size: 14px; color: #71717a;">
+                This link will expire in <strong>${expiresText}</strong>.
+              </p>
+              
+              <p style="margin: 20px 0 0; font-size: 14px; color: #71717a;">
+                If you didn't request a password reset, you can safely ignore this email. Your password will remain unchanged.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 20px 40px 40px; border-top: 1px solid #e4e4e7;">
+              <p style="margin: 0; font-size: 12px; color: #a1a1aa; text-align: center;">
+                If the button doesn't work, copy and paste this link into your browser:
+              </p>
+              <p style="margin: 10px 0 0; font-size: 12px; color: ${this.primaryColor}; text-align: center; word-break: break-all;">
+                ${data.resetUrl}
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `.trim();
+  }
+
+  /**
+   * Render password reset email plain text
+   */
+  private renderPasswordResetEmailText(data: {
+    email: string;
+    name?: string;
+    resetUrl: string;
+    expiresInMinutes: number;
+  }): string {
+    const greeting = data.name ? `Hi ${data.name},` : 'Hi,';
+    const expiresText = data.expiresInMinutes >= 60
+      ? `${Math.floor(data.expiresInMinutes / 60)} hour${Math.floor(data.expiresInMinutes / 60) > 1 ? 's' : ''}`
+      : `${data.expiresInMinutes} minute${data.expiresInMinutes > 1 ? 's' : ''}`;
+
+    return `${greeting}
+
+We received a request to reset your password for your ${this.appName} account.
+
+Click the link below to set a new password:
+${data.resetUrl}
+
+This link will expire in ${expiresText}.
+
+If you didn't request a password reset, you can safely ignore this email. Your password will remain unchanged.
+`;
+  }
+
+  /**
+   * Render email verification email HTML
+   */
+  private renderEmailVerificationEmail(data: {
+    email: string;
+    name?: string;
+    verifyUrl: string;
+    expiresInMinutes: number;
+  }): string {
+    const greeting = data.name ? `Hi ${data.name},` : 'Hi,';
+    const expiresText = data.expiresInMinutes >= 60
+      ? `${Math.floor(data.expiresInMinutes / 60)} hour${Math.floor(data.expiresInMinutes / 60) > 1 ? 's' : ''}`
+      : `${data.expiresInMinutes} minute${data.expiresInMinutes > 1 ? 's' : ''}`;
+
+    return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verify your email</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f4f4f5;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);">
+          <tr>
+            <td style="padding: 40px 40px 20px; text-align: center; border-bottom: 1px solid #e4e4e7;">
+              ${this.logoUrl ? `<img src="${this.logoUrl}" alt="${this.appName}" style="height: 40px; margin-bottom: 20px;">` : ''}
+              <h1 style="margin: 0; font-size: 24px; font-weight: 600; color: #18181b;">
+                Verify your email
+              </h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 40px;">
+              <p style="margin: 0 0 20px; font-size: 16px; line-height: 1.6; color: #3f3f46;">
+                ${greeting}
+              </p>
+              <p style="margin: 0 0 20px; font-size: 16px; line-height: 1.6; color: #3f3f46;">
+                Thanks for signing up for ${this.appName}! Please verify your email address by clicking the button below:
+              </p>
+              
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="${data.verifyUrl}" 
+                   style="display: inline-block; padding: 14px 32px; background-color: ${this.primaryColor}; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: 600; border-radius: 8px; box-shadow: 0 2px 4px rgba(99, 102, 241, 0.3);">
+                  Verify Email
+                </a>
+              </div>
+              
+              <p style="margin: 20px 0; font-size: 14px; color: #71717a;">
+                This link will expire in <strong>${expiresText}</strong>.
+              </p>
+              
+              <p style="margin: 20px 0 0; font-size: 14px; color: #71717a;">
+                If you didn't create an account on ${this.appName}, you can safely ignore this email.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 20px 40px 40px; border-top: 1px solid #e4e4e7;">
+              <p style="margin: 0; font-size: 12px; color: #a1a1aa; text-align: center;">
+                If the button doesn't work, copy and paste this link into your browser:
+              </p>
+              <p style="margin: 10px 0 0; font-size: 12px; color: ${this.primaryColor}; text-align: center; word-break: break-all;">
+                ${data.verifyUrl}
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `.trim();
+  }
+
+  /**
+   * Render email verification email plain text
+   */
+  private renderEmailVerificationEmailText(data: {
+    email: string;
+    name?: string;
+    verifyUrl: string;
+    expiresInMinutes: number;
+  }): string {
+    const greeting = data.name ? `Hi ${data.name},` : 'Hi,';
+    const expiresText = data.expiresInMinutes >= 60
+      ? `${Math.floor(data.expiresInMinutes / 60)} hour${Math.floor(data.expiresInMinutes / 60) > 1 ? 's' : ''}`
+      : `${data.expiresInMinutes} minute${data.expiresInMinutes > 1 ? 's' : ''}`;
+
+    return `${greeting}
+
+Thanks for signing up for ${this.appName}! Please verify your email address by clicking the link below:
+
+${data.verifyUrl}
+
+This link will expire in ${expiresText}.
+
+If you didn't create an account on ${this.appName}, you can safely ignore this email.
+`;
+  }
+
+  /**
+   * Render welcome email HTML
+   */
+  private renderWelcomeEmail(data: {
+    email: string;
+    name?: string;
+    username: string;
+  }): string {
+    const greeting = data.name ? `Hi ${data.name},` : 'Hi,';
+
+    return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Welcome to ${this.appName}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f4f4f5;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);">
+          <tr>
+            <td style="padding: 40px 40px 20px; text-align: center; border-bottom: 1px solid #e4e4e7;">
+              ${this.logoUrl ? `<img src="${this.logoUrl}" alt="${this.appName}" style="height: 40px; margin-bottom: 20px;">` : ''}
+              <h1 style="margin: 0; font-size: 24px; font-weight: 600; color: #18181b;">
+                Welcome to ${this.appName}!
+              </h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 40px;">
+              <p style="margin: 0 0 20px; font-size: 16px; line-height: 1.6; color: #3f3f46;">
+                ${greeting}
+              </p>
+              <p style="margin: 0 0 20px; font-size: 16px; line-height: 1.6; color: #3f3f46;">
+                Your account <strong>@${data.username}</strong> has been created successfully. You're all set to start collaborating on code!
+              </p>
+              
+              <div style="margin: 30px 0; padding: 20px; background-color: #f4f4f5; border-radius: 8px;">
+                <h3 style="margin: 0 0 16px; font-size: 14px; font-weight: 600; color: #71717a; text-transform: uppercase; letter-spacing: 0.5px;">
+                  Getting Started
+                </h3>
+                <ul style="margin: 0; padding: 0 0 0 20px; font-size: 14px; line-height: 1.8; color: #52525b;">
+                  <li>Create your first repository</li>
+                  <li>Set up SSH keys for secure Git access</li>
+                  <li>Explore public repositories</li>
+                  <li>Invite collaborators to your projects</li>
+                </ul>
+              </div>
+              
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="${this.appUrl}/${data.username}" 
+                   style="display: inline-block; padding: 14px 32px; background-color: ${this.primaryColor}; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: 600; border-radius: 8px; box-shadow: 0 2px 4px rgba(99, 102, 241, 0.3);">
+                  Go to your profile
+                </a>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 20px 40px 40px; border-top: 1px solid #e4e4e7;">
+              <p style="margin: 0; font-size: 12px; color: #a1a1aa; text-align: center;">
+                You're receiving this email because you signed up for ${this.appName}.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `.trim();
+  }
+
+  /**
+   * Render welcome email plain text
+   */
+  private renderWelcomeEmailText(data: {
+    email: string;
+    name?: string;
+    username: string;
+  }): string {
+    const greeting = data.name ? `Hi ${data.name},` : 'Hi,';
+
+    return `${greeting}
+
+Welcome to ${this.appName}!
+
+Your account @${data.username} has been created successfully. You're all set to start collaborating on code!
+
+Getting Started:
+- Create your first repository
+- Set up SSH keys for secure Git access
+- Explore public repositories
+- Invite collaborators to your projects
+
+Visit your profile: ${this.appUrl}/${data.username}
+
+You're receiving this email because you signed up for ${this.appName}.
+`;
+  }
+
+  /**
+   * Render notification email HTML
+   */
+  private renderNotificationEmail(data: {
+    email: string;
+    name?: string;
+    notifications: Array<{
+      type: string;
+      title: string;
+      body?: string;
+      url?: string;
+      actorName?: string;
+    }>;
+  }): string {
+    const greeting = data.name ? `Hi ${data.name},` : 'Hi,';
+    
+    const notificationHtml = data.notifications.map(n => `
+      <div style="margin: 16px 0; padding: 16px; background-color: #f4f4f5; border-radius: 8px; border-left: 4px solid ${this.primaryColor};">
+        <p style="margin: 0 0 8px; font-size: 16px; font-weight: 600; color: #18181b;">
+          ${n.title}
+        </p>
+        ${n.body ? `<p style="margin: 0 0 8px; font-size: 14px; color: #52525b;">${n.body}</p>` : ''}
+        ${n.actorName ? `<p style="margin: 0; font-size: 12px; color: #71717a;">by ${n.actorName}</p>` : ''}
+        ${n.url ? `<a href="${this.appUrl}${n.url}" style="display: inline-block; margin-top: 8px; font-size: 14px; color: ${this.primaryColor}; text-decoration: none;">View details &rarr;</a>` : ''}
+      </div>
+    `).join('');
+
+    return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>New notifications</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f4f4f5;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td style="padding: 40px 20px;">
+        <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);">
+          <tr>
+            <td style="padding: 40px 40px 20px; text-align: center; border-bottom: 1px solid #e4e4e7;">
+              ${this.logoUrl ? `<img src="${this.logoUrl}" alt="${this.appName}" style="height: 40px; margin-bottom: 20px;">` : ''}
+              <h1 style="margin: 0; font-size: 24px; font-weight: 600; color: #18181b;">
+                ${data.notifications.length === 1 ? 'New notification' : `${data.notifications.length} new notifications`}
+              </h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 40px;">
+              <p style="margin: 0 0 20px; font-size: 16px; line-height: 1.6; color: #3f3f46;">
+                ${greeting}
+              </p>
+              
+              ${notificationHtml}
+              
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="${this.appUrl}/inbox" 
+                   style="display: inline-block; padding: 14px 32px; background-color: ${this.primaryColor}; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: 600; border-radius: 8px; box-shadow: 0 2px 4px rgba(99, 102, 241, 0.3);">
+                  View all notifications
+                </a>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 20px 40px 40px; border-top: 1px solid #e4e4e7;">
+              <p style="margin: 0; font-size: 12px; color: #a1a1aa; text-align: center;">
+                <a href="${this.appUrl}/settings/notifications" style="color: ${this.primaryColor}; text-decoration: none;">Manage notification preferences</a>
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `.trim();
+  }
+
+  /**
+   * Render notification email plain text
+   */
+  private renderNotificationEmailText(data: {
+    email: string;
+    name?: string;
+    notifications: Array<{
+      type: string;
+      title: string;
+      body?: string;
+      url?: string;
+      actorName?: string;
+    }>;
+  }): string {
+    const greeting = data.name ? `Hi ${data.name},` : 'Hi,';
+    
+    const notificationText = data.notifications.map(n => {
+      let text = `- ${n.title}`;
+      if (n.body) text += `\n  ${n.body}`;
+      if (n.actorName) text += `\n  by ${n.actorName}`;
+      if (n.url) text += `\n  ${this.appUrl}${n.url}`;
+      return text;
+    }).join('\n\n');
+
+    return `${greeting}
+
+You have ${data.notifications.length} new notification${data.notifications.length > 1 ? 's' : ''}:
+
+${notificationText}
+
+View all notifications: ${this.appUrl}/inbox
+
+To manage your notification preferences, visit: ${this.appUrl}/settings/notifications
+`;
+  }
+}
+
+/**
+ * Singleton global email service instance
+ */
+let globalEmailServiceInstance: GlobalEmailService | null = null;
+
+/**
+ * Get or create the global email service
+ */
+export function getGlobalEmailService(): GlobalEmailService {
+  if (!globalEmailServiceInstance) {
+    globalEmailServiceInstance = new GlobalEmailService({
+      apiKey: process.env.RESEND_API_KEY || '',
+      fromAddress: process.env.EMAIL_FROM_ADDRESS || 'noreply@wit.dev',
+      fromName: process.env.EMAIL_FROM_NAME || 'wit',
+      appUrl: process.env.APP_URL || process.env.AUTH_BASE_URL || 'http://localhost:5173',
+      appName: 'wit',
+    });
+  }
+  return globalEmailServiceInstance;
+}
+
+/**
+ * Reset the global email service (for testing)
+ */
+export function resetGlobalEmailService(): void {
+  globalEmailServiceInstance = null;
 }

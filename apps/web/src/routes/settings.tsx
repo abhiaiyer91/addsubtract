@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Loader2, Check, Key, Ticket, ChevronRight, AppWindow, Shield } from 'lucide-react';
+import { Loader2, Check, Key, Ticket, ChevronRight, AppWindow, Shield, Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -159,6 +159,34 @@ export function SettingsPage() {
               )}
             </div>
           </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Notifications</CardTitle>
+          <CardDescription>
+            Configure how and when you receive notifications.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <Link
+            to="/settings/notifications"
+            className="flex items-center justify-between p-3 rounded-lg hover:bg-muted transition-colors group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-muted rounded-md group-hover:bg-background">
+                <Bell className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <div>
+                <div className="font-medium">Email Notifications</div>
+                <div className="text-sm text-muted-foreground">
+                  Choose which notifications you receive by email
+                </div>
+              </div>
+            </div>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          </Link>
         </CardContent>
       </Card>
 
