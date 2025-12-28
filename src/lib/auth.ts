@@ -154,11 +154,13 @@ export function createAuth() {
         create: {
           after: async (user) => {
             // Send welcome email on new user creation
-            if (emailService.isConfigured() && user.username) {
+            // Note: username comes from the username plugin and may be typed as object
+            const username = typeof user.username === 'string' ? user.username : (user.username as unknown as string);
+            if (emailService.isConfigured() && username) {
               const result = await emailService.sendWelcomeEmail({
                 email: user.email,
                 name: user.name,
-                username: user.username,
+                username,
               });
               if (!result.success) {
                 console.error('[Auth] Failed to send welcome email:', result.error);
