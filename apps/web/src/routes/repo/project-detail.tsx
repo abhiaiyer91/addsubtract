@@ -1,14 +1,11 @@
 import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
-  FolderKanban,
   ArrowLeft,
   Plus,
   Calendar,
-  Users,
   CheckCircle2,
   Clock,
-  Target,
   TrendingUp,
   AlertCircle,
   CircleDot,
@@ -20,13 +17,30 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { RepoLayout } from './components/repo-layout';
 import { KanbanBoard } from '@/components/issue/kanban-board';
 import { useSession } from '@/lib/auth-client';
@@ -52,6 +66,12 @@ export function ProjectDetailPage() {
   const { owner, repo, projectId } = useParams<{ owner: string; repo: string; projectId: string }>();
   const { data: session } = useSession();
   const authenticated = !!session?.user;
+  
+  // State for update dialog
+  const [showUpdateDialog, setShowUpdateDialog] = useState(false);
+  const [updateBody, setUpdateBody] = useState('');
+  const [updateHealth, setUpdateHealth] = useState<string>('on_track');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Fetch repository data
   const { data: repoData, isLoading: repoLoading } = trpc.repos.get.useQuery(
@@ -84,10 +104,34 @@ export function ProjectDetailPage() {
   );
 
   // Fetch updates
-  const { data: updates } = trpc.projects.listUpdates.useQuery(
+  const { data: updates, refetch: refetchUpdates } = trpc.projects.listUpdates.useQuery(
     { projectId: projectId!, limit: 10 },
     { enabled: !!projectId }
   );
+
+  // Create update mutation
+  const createUpdateMutation = trpc.projects.createUpdate.useMutation({
+    onSuccess: () => {
+      refetchUpdates();
+      setShowUpdateDialog(false);
+      setUpdateBody('');
+      setUpdateHealth('on_track');
+      setIsSubmitting(false);
+    },
+    onError: () => {
+      setIsSubmitting(false);
+    },
+  });
+
+  const handlePostUpdate = () => {
+    if (!updateBody.trim() || !projectId) return;
+    setIsSubmitting(true);
+    createUpdateMutation.mutate({
+      projectId,
+      body: updateBody.trim(),
+      health: updateHealth as 'on_track' | 'at_risk' | 'off_track',
+    });
+  };
 
   const isLoading = repoLoading || projectLoading;
 
@@ -293,6 +337,14 @@ export function ProjectDetailPage() {
           <TabsContent value="updates" className="mt-4">
             {updates && updates.length > 0 ? (
               <div className="space-y-4">
+                {authenticated && (
+                  <div className="flex justify-end">
+                    <Button onClick={() => setShowUpdateDialog(true)}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Post Update
+                    </Button>
+                  </div>
+                )}
                 {updates.map((update: any) => (
                   <div key={update.id} className="p-4 border rounded-lg">
                     <div className="flex items-center gap-3 mb-2">
@@ -323,7 +375,7 @@ export function ProjectDetailPage() {
                   Share progress updates with your team
                 </p>
                 {authenticated && (
-                  <Button>
+                  <Button onClick={() => setShowUpdateDialog(true)}>
                     <Plus className="mr-2 h-4 w-4" />
                     Post Update
                   </Button>
@@ -333,6 +385,73 @@ export function ProjectDetailPage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Post Update Dialog */}
+      <Dialog open={showUpdateDialog} onOpenChange={setShowUpdateDialog}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Post Project Update</DialogTitle>
+            <DialogDescription>
+              Share a progress update with your team. Include the current health status of the project.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="health">Health Status</Label>
+              <Select value={updateHealth} onValueChange={setUpdateHealth}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select health status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="on_track">
+                    <span className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-green-500" />
+                      On Track
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="at_risk">
+                    <span className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-yellow-500" />
+                      At Risk
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="off_track">
+                    <span className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-red-500" />
+                      Off Track
+                    </span>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="body">Update</Label>
+              <Textarea
+                id="body"
+                placeholder="What's the latest on this project?"
+                value={updateBody}
+                onChange={(e) => setUpdateBody(e.target.value)}
+                rows={4}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowUpdateDialog(false)}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handlePostUpdate}
+              disabled={isSubmitting || !updateBody.trim()}
+            >
+              {isSubmitting ? 'Posting...' : 'Post Update'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </RepoLayout>
   );
 }
