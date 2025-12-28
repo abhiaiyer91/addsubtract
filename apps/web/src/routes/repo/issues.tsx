@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams, Link, useSearchParams, useNavigate } from 'react-router-dom';
 import {
   CircleDot,
@@ -63,6 +63,20 @@ const PRIORITY_CONFIG: Record<string, { label: string; icon: React.ReactNode; co
   none: { label: 'No priority', icon: <Signal className="h-3 w-3" />, color: 'text-muted-foreground' },
 };
 
+// Status config for list view grouping
+type IssueStatus = 'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done' | 'canceled';
+
+const STATUS_CONFIG: Record<IssueStatus, { label: string; color: string; bgColor: string }> = {
+  backlog: { label: 'Backlog', color: 'text-slate-500', bgColor: 'bg-slate-500/10' },
+  todo: { label: 'Todo', color: 'text-blue-500', bgColor: 'bg-blue-500/10' },
+  in_progress: { label: 'In Progress', color: 'text-yellow-500', bgColor: 'bg-yellow-500/10' },
+  in_review: { label: 'In Review', color: 'text-purple-500', bgColor: 'bg-purple-500/10' },
+  done: { label: 'Done', color: 'text-green-500', bgColor: 'bg-green-500/10' },
+  canceled: { label: 'Canceled', color: 'text-red-500', bgColor: 'bg-red-500/10' },
+};
+
+const STATUS_ORDER: IssueStatus[] = ['backlog', 'todo', 'in_progress', 'in_review', 'done', 'canceled'];
+
 export function IssuesPage() {
   const { owner, repo } = useParams<{ owner: string; repo: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -70,6 +84,7 @@ export function IssuesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [projectsOpen, setProjectsOpen] = useState(true);
   const [cyclesOpen, setCyclesOpen] = useState(true);
+  const [collapsedStatuses, setCollapsedStatuses] = useState<Set<IssueStatus>>(new Set());
   const { data: session } = useSession();
   const authenticated = !!session?.user;
 
@@ -177,6 +192,41 @@ export function IssuesPage() {
   // Counts
   const openCount = openIssuesData?.length || 0;
   const closedCount = closedIssuesData?.length || 0;
+
+  // Group issues by status for list view
+  const groupedByStatus = useMemo(() => {
+    const groups: Record<IssueStatus, typeof filteredIssues> = {
+      backlog: [],
+      todo: [],
+      in_progress: [],
+      in_review: [],
+      done: [],
+      canceled: [],
+    };
+    
+    for (const issue of filteredIssues) {
+      const status = (issue.status || 'backlog') as IssueStatus;
+      if (groups[status]) {
+        groups[status].push(issue);
+      } else {
+        groups.backlog.push(issue);
+      }
+    }
+    
+    return groups;
+  }, [filteredIssues]);
+
+  const toggleStatusCollapsed = (status: IssueStatus) => {
+    setCollapsedStatuses(prev => {
+      const next = new Set(prev);
+      if (next.has(status)) {
+        next.delete(status);
+      } else {
+        next.add(status);
+      }
+      return next;
+    });
+  };
 
   const handleStateChange = (state: string) => {
     const newParams = new URLSearchParams(searchParams);
@@ -400,7 +450,7 @@ export function IssuesPage() {
         </aside>
 
         {/* Main Content */}
-        <div className="flex-1 space-y-4">
+        <div className="flex-1 min-w-0 space-y-4">
           {/* Breadcrumb - shows when filtering by project or cycle */}
           {(selectedProjectId || selectedCycleId) && (
             <div className="flex items-center gap-2 text-sm">
@@ -708,15 +758,54 @@ export function IssuesPage() {
                   )}
                 </div>
               ) : (
-                <div className="border rounded-lg divide-y">
-                  {filteredIssues.map((issue) => (
-                    <IssueRow
-                      key={issue.id}
-                      issue={issue}
-                      owner={owner!}
-                      repo={repo!}
-                    />
-                  ))}
+                <div className="space-y-4">
+                  {STATUS_ORDER.map((status) => {
+                    const issues = groupedByStatus[status];
+                    if (issues.length === 0) return null;
+                    
+                    const config = STATUS_CONFIG[status];
+                    const isCollapsed = collapsedStatuses.has(status);
+                    
+                    return (
+                      <div key={status} className="border rounded-lg overflow-hidden">
+                        {/* Status group header */}
+                        <button
+                          onClick={() => toggleStatusCollapsed(status)}
+                          className={cn(
+                            'w-full flex items-center gap-2 px-4 py-2.5 text-left transition-colors',
+                            config.bgColor,
+                            'hover:opacity-80'
+                          )}
+                        >
+                          {isCollapsed ? (
+                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                          )}
+                          <span className={cn('font-medium text-sm', config.color)}>
+                            {config.label}
+                          </span>
+                          <Badge variant="secondary" className="ml-auto text-xs">
+                            {issues.length}
+                          </Badge>
+                        </button>
+                        
+                        {/* Issues list */}
+                        {!isCollapsed && (
+                          <div className="divide-y">
+                            {issues.map((issue) => (
+                              <IssueRow
+                                key={issue.id}
+                                issue={issue}
+                                owner={owner!}
+                                repo={repo!}
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </>

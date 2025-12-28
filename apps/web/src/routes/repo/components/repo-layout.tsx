@@ -525,7 +525,9 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
       )}
 
       {/* Page content */}
-      {children}
+      <div className="min-w-0">
+        {children}
+      </div>
 
       {/* Agent Panel */}
       {authenticated && (

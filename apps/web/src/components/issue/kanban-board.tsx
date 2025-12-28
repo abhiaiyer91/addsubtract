@@ -206,7 +206,7 @@ export function KanbanBoard({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 min-w-0">
       {/* Error message */}
       {error && (
         <div className="flex items-center gap-2 p-3 text-sm text-red-600 bg-red-50 dark:bg-red-900/20 dark:text-red-400 rounded-lg">
@@ -229,7 +229,7 @@ export function KanbanBoard({
         </div>
       )}
       
-      <div className="flex gap-4 overflow-x-auto pb-4">
+      <div className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4">
         {STATUSES.map((status) => {
           const config = STATUS_CONFIG[status];
           const issues = groupedIssues[status] || [];

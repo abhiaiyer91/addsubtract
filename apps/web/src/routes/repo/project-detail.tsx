@@ -181,7 +181,7 @@ export function ProjectDetailPage() {
 
   return (
     <RepoLayout owner={owner!} repo={repo!}>
-      <div className="space-y-6">
+      <div className="space-y-6 min-w-0">
         {/* Breadcrumb */}
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Link to={`/${owner}/${repo}/projects`} className="hover:text-foreground transition-colors">
