@@ -132,7 +132,7 @@ export function createApp(repoManager: RepoManager, options: { verbose?: boolean
       repositories: repos.map(r => ({
         owner: r.owner,
         name: r.name,
-        url: `/${r.owner}/${r.name}.git`,
+        url: `/${r.owner}/${r.name}.wit`,
       })),
     });
   });
@@ -269,7 +269,7 @@ export function startServer(options: ServerOptions): WitServer {
 ║   tRPC API: http://${host === '0.0.0.0' ? 'localhost' : host}:${port}/trpc                         ${port.toString().length === 4 ? ' ' : ''}║${sshInfo}
 ║   Repositories: ${absoluteReposDir.slice(0, 40).padEnd(41)}║
 ║                                                              ║
-║   Clone: wit clone http://localhost:${port}/owner/repo.git     ${port.toString().length === 4 ? ' ' : ''}║
+║   Clone: wit clone http://localhost:${port}/owner/repo.wit     ${port.toString().length === 4 ? ' ' : ''}║
 ║   Push:  wit push origin main                                ║
 ║                                                              ║
 ║   Press Ctrl+C to stop                                       ║
@@ -428,7 +428,14 @@ async function loadHostKeys(options: ServerOptions): Promise<Buffer[]> {
  * Create a new repository
  */
 export function createRepository(reposDir: string, owner: string, name: string): Repository {
-  const repoPath = path.join(reposDir, owner, name.endsWith('.git') ? name : `${name}.git`);
+  // Normalize name - strip .wit/.git suffix and add .git for internal storage
+  let repoName = name;
+  if (repoName.endsWith('.wit')) {
+    repoName = repoName.slice(0, -4) + '.git';
+  } else if (!repoName.endsWith('.git')) {
+    repoName = `${repoName}.git`;
+  }
+  const repoPath = path.join(reposDir, owner, repoName);
   fs.mkdirSync(path.dirname(repoPath), { recursive: true });
   fs.mkdirSync(repoPath, { recursive: true });
   return Repository.init(repoPath);

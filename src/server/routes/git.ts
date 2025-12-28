@@ -575,7 +575,7 @@ async function logCloneActivity(
   }
 
   try {
-    const repoName = repo.replace(/\.git$/, '');
+    const repoName = repo.replace(/\.(git|wit)$/, '');
     const dbRepoResult = await repoModel.findByPath(owner, repoName);
 
     if (!dbRepoResult) {
@@ -612,7 +612,7 @@ async function handleDatabaseIntegration(
   }
 
   try {
-    const repoName = repo.replace(/\.git$/, '');
+    const repoName = repo.replace(/\.(git|wit)$/, '');
 
     // Get or create repository in database
     const dbRepoResult = await repoModel.findByPath(owner, repoName);
