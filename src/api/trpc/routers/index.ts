@@ -32,6 +32,7 @@ import { ideRouter } from './ide';
 import { completionRouter } from './completion';
 import { packagesRouter } from './packages';
 import { oauthAppsRouter } from './oauth-apps';
+import { adminRouter } from './admin';
 
 /**
  * Main application router
@@ -71,6 +72,7 @@ export const appRouter = router({
   completion: completionRouter,
   packages: packagesRouter,
   oauthApps: oauthAppsRouter,
+  admin: adminRouter,
 });
 
 /**
@@ -112,4 +114,5 @@ export {
   completionRouter,
   packagesRouter,
   oauthAppsRouter,
+  adminRouter,
 };
