@@ -1,0 +1,371 @@
+/**
+ * Sandbox Settings Router
+ *
+ * Handles sandbox configuration for repositories.
+ * Only repository owners can manage sandbox settings.
+ */
+
+import { z } from 'zod';
+import { TRPCError } from '@trpc/server';
+import { router, protectedProcedure } from '../trpc';
+import {
+  repoModel,
+  sandboxConfigModel,
+  sandboxKeyModel,
+  sandboxSessionModel,
+  isSandboxRepoOwner,
+  type SandboxProvider,
+} from '../../../db/models';
+
+// Schema definitions
+const sandboxProviderSchema = z.enum(['e2b', 'daytona', 'docker']);
+const networkModeSchema = z.enum(['none', 'restricted', 'full']);
+const languageSchema = z.enum(['typescript', 'javascript', 'python']);
+
+// Sandbox settings input schema
+const sandboxSettingsSchema = z.object({
+  enabled: z.boolean().optional(),
+  provider: sandboxProviderSchema.optional(),
+  networkMode: networkModeSchema.optional(),
+  defaultLanguage: languageSchema.optional(),
+
+  // Resource limits
+  memoryMB: z.number().min(512).max(8192).optional(),
+  cpuCores: z.number().min(1).max(4).optional(),
+  timeoutMinutes: z.number().min(5).max(120).optional(),
+
+  // E2B settings
+  e2bTemplateId: z.string().optional(),
+
+  // Daytona settings
+  daytonaSnapshot: z.string().optional(),
+  daytonaAutoStop: z.number().min(0).max(60).optional(),
+
+  // Docker settings
+  dockerImage: z.string().optional(),
+});
+
+/**
+ * Helper to get repo and verify ownership
+ */
+async function getRepoAndVerifyOwner(
+  owner: string,
+  repoName: string,
+  userId: string
+) {
+  const result = await repoModel.findByPath(owner, repoName);
+
+  if (!result) {
+    throw new TRPCError({
+      code: 'NOT_FOUND',
+      message: 'Repository not found',
+    });
+  }
+
+  const isOwner = result.repo.ownerId === userId;
+
+  return { repo: result.repo, isOwner };
+}
+
+/**
+ * Helper to verify repo owner by ID
+ */
+async function verifyRepoOwner(repoId: string, userId: string) {
+  const repo = await repoModel.findById(repoId);
+
+  if (!repo) {
+    throw new TRPCError({
+      code: 'NOT_FOUND',
+      message: 'Repository not found',
+    });
+  }
+
+  if (repo.ownerId !== userId) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Only the repository owner can manage sandbox settings',
+    });
+  }
+
+  return repo;
+}
+
+export const sandboxRouter = router({
+  /**
+   * Get sandbox settings for a repository
+   */
+  getSettings: protectedProcedure
+    .input(
+      z.object({
+        owner: z.string(),
+        repo: z.string(),
+      })
+    )
+    .query(async ({ input, ctx }) => {
+      const { repo, isOwner } = await getRepoAndVerifyOwner(
+        input.owner,
+        input.repo,
+        ctx.user.id
+      );
+
+      // Get config from database
+      const config = await sandboxConfigModel.getConfig(repo.id);
+
+      // Non-owners get limited info
+      if (!isOwner) {
+        return {
+          isOwner: false,
+          repoId: repo.id,
+          enabled: config?.enabled ?? false,
+          provider: config?.provider ?? 'e2b',
+        };
+      }
+
+      // Get API keys metadata
+      const keys = await sandboxKeyModel.listKeys(repo.id);
+      const currentProviderKey = keys.find((k) => k.provider === (config?.provider ?? 'e2b'));
+
+      // Return full settings for owners
+      if (!config) {
+        // Return defaults if no config exists
+        return {
+          isOwner: true,
+          repoId: repo.id,
+          enabled: false,
+          provider: 'e2b' as const,
+          hasApiKey: false,
+          apiKeyHint: undefined,
+          networkMode: 'none' as const,
+          defaultLanguage: 'typescript' as const,
+          memoryMB: 2048,
+          cpuCores: 1,
+          timeoutMinutes: 60,
+          e2bTemplateId: undefined,
+          daytonaSnapshot: undefined,
+          daytonaAutoStop: 15,
+          dockerImage: 'wit-sandbox:latest',
+        };
+      }
+
+      return {
+        isOwner: true,
+        repoId: repo.id,
+        enabled: config.enabled,
+        provider: config.provider,
+        hasApiKey: !!currentProviderKey,
+        apiKeyHint: currentProviderKey?.keyHint,
+        networkMode: config.networkMode,
+        defaultLanguage: config.defaultLanguage,
+        memoryMB: config.memoryMB,
+        cpuCores: config.cpuCores,
+        timeoutMinutes: config.timeoutMinutes,
+        e2bTemplateId: config.e2bTemplateId ?? undefined,
+        daytonaSnapshot: config.daytonaSnapshot ?? undefined,
+        daytonaAutoStop: config.daytonaAutoStop,
+        dockerImage: config.dockerImage,
+      };
+    }),
+
+  /**
+   * Update sandbox settings
+   */
+  updateSettings: protectedProcedure
+    .input(
+      z.object({
+        repoId: z.string().uuid(),
+        settings: sandboxSettingsSchema,
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      await verifyRepoOwner(input.repoId, ctx.user.id);
+
+      const updatedConfig = await sandboxConfigModel.upsertConfig(
+        input.repoId,
+        ctx.user.id,
+        input.settings
+      );
+
+      // Check if provider has API key
+      const hasApiKey =
+        updatedConfig.provider === 'docker' ||
+        (await sandboxKeyModel.hasKey(input.repoId, updatedConfig.provider));
+
+      return {
+        success: true,
+        settings: {
+          enabled: updatedConfig.enabled,
+          provider: updatedConfig.provider,
+          hasApiKey,
+          networkMode: updatedConfig.networkMode,
+          defaultLanguage: updatedConfig.defaultLanguage,
+          memoryMB: updatedConfig.memoryMB,
+          cpuCores: updatedConfig.cpuCores,
+          timeoutMinutes: updatedConfig.timeoutMinutes,
+          e2bTemplateId: updatedConfig.e2bTemplateId ?? undefined,
+          daytonaSnapshot: updatedConfig.daytonaSnapshot ?? undefined,
+          daytonaAutoStop: updatedConfig.daytonaAutoStop,
+          dockerImage: updatedConfig.dockerImage,
+        },
+      };
+    }),
+
+  /**
+   * Enable or disable sandbox
+   */
+  setEnabled: protectedProcedure
+    .input(
+      z.object({
+        repoId: z.string().uuid(),
+        enabled: z.boolean(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      await verifyRepoOwner(input.repoId, ctx.user.id);
+
+      // Get current config to check provider
+      const currentConfig = await sandboxConfigModel.getConfig(input.repoId);
+      const provider = currentConfig?.provider ?? 'e2b';
+
+      // Check if API key is required
+      if (input.enabled && provider !== 'docker') {
+        const hasApiKey = await sandboxKeyModel.hasKey(input.repoId, provider);
+        if (!hasApiKey) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: `${provider.toUpperCase()} API key is required to enable sandbox`,
+          });
+        }
+      }
+
+      const updatedConfig = await sandboxConfigModel.setEnabled(
+        input.repoId,
+        ctx.user.id,
+        input.enabled
+      );
+
+      return { success: true, enabled: updatedConfig.enabled };
+    }),
+
+  /**
+   * Set sandbox provider API key
+   */
+  setApiKey: protectedProcedure
+    .input(
+      z.object({
+        repoId: z.string().uuid(),
+        provider: z.enum(['e2b', 'daytona']),
+        apiKey: z.string().min(1),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      await verifyRepoOwner(input.repoId, ctx.user.id);
+
+      // Validate API key format
+      if (input.provider === 'e2b' && !input.apiKey.startsWith('e2b_')) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'E2B API keys should start with "e2b_"',
+        });
+      }
+
+      // Store encrypted API key
+      const keyInfo = await sandboxKeyModel.setKey(
+        input.repoId,
+        input.provider,
+        input.apiKey,
+        ctx.user.id
+      );
+
+      // Update config to use this provider
+      await sandboxConfigModel.upsertConfig(input.repoId, ctx.user.id, {
+        provider: input.provider,
+      });
+
+      return { success: true, keyHint: keyInfo.keyHint };
+    }),
+
+  /**
+   * Delete sandbox provider API key
+   */
+  deleteApiKey: protectedProcedure
+    .input(
+      z.object({
+        repoId: z.string().uuid(),
+        provider: z.enum(['e2b', 'daytona']),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      await verifyRepoOwner(input.repoId, ctx.user.id);
+
+      const deleted = await sandboxKeyModel.deleteKey(input.repoId, input.provider);
+
+      if (!deleted) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'API key not found',
+        });
+      }
+
+      // Get current config
+      const currentConfig = await sandboxConfigModel.getConfig(input.repoId);
+
+      // Disable sandbox if this was the active provider
+      if (currentConfig?.provider === input.provider) {
+        await sandboxConfigModel.setEnabled(input.repoId, ctx.user.id, false);
+      }
+
+      return { success: true };
+    }),
+
+  /**
+   * Get sandbox status for a repository
+   */
+  getStatus: protectedProcedure
+    .input(
+      z.object({
+        repoId: z.string().uuid(),
+      })
+    )
+    .query(async ({ input }) => {
+      return sandboxConfigModel.getStatus(input.repoId);
+    }),
+
+  /**
+   * List active sandbox sessions for a repository
+   */
+  listSessions: protectedProcedure
+    .input(
+      z.object({
+        repoId: z.string().uuid(),
+        activeOnly: z.boolean().optional().default(true),
+        limit: z.number().min(1).max(100).optional().default(50),
+        offset: z.number().min(0).optional().default(0),
+      })
+    )
+    .query(async ({ input, ctx }) => {
+      // Verify user has access to repo (owner or collaborator)
+      const repo = await repoModel.findById(input.repoId);
+      if (!repo) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Repository not found',
+        });
+      }
+
+      if (input.activeOnly) {
+        return sandboxSessionModel.getActiveSessions(input.repoId);
+      }
+
+      return sandboxSessionModel.getSessionHistory(input.repoId, {
+        limit: input.limit,
+        offset: input.offset,
+      });
+    }),
+
+  /**
+   * Get user's active sandbox sessions across all repos
+   */
+  myActiveSessions: protectedProcedure.query(async ({ ctx }) => {
+    return sandboxSessionModel.getUserActiveSessions(ctx.user.id);
+  }),
+});

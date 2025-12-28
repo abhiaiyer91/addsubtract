@@ -2027,6 +2027,149 @@ export const oauthAppWebhooks = pgTable('oauth_app_webhooks', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+// ============ SANDBOX SETTINGS ============
+
+/**
+ * Sandbox provider enum
+ * Supported sandbox providers for code execution
+ */
+export const sandboxProviderEnum = pgEnum('sandbox_provider', [
+  'e2b',      // E2B Firecracker microVMs
+  'daytona',  // Daytona cloud dev environments
+  'docker',   // Self-hosted Docker containers
+]);
+
+/**
+ * Sandbox network mode enum
+ * Controls network access from sandbox
+ */
+export const sandboxNetworkModeEnum = pgEnum('sandbox_network_mode', [
+  'none',       // No network access (most secure)
+  'restricted', // Only allowed hosts
+  'full',       // Full internet access
+]);
+
+/**
+ * Repository sandbox configuration
+ * Stores sandbox settings per repository
+ */
+export const repoSandboxConfig = pgTable('repo_sandbox_config', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  repoId: uuid('repo_id')
+    .notNull()
+    .references(() => repositories.id, { onDelete: 'cascade' })
+    .unique(), // One config per repo
+
+  /** Whether sandbox is enabled for this repo */
+  enabled: boolean('enabled').notNull().default(false),
+
+  /** Sandbox provider to use */
+  provider: sandboxProviderEnum('provider').notNull().default('e2b'),
+
+  /** Network access mode */
+  networkMode: sandboxNetworkModeEnum('network_mode').notNull().default('none'),
+
+  /** Default language runtime (for Daytona) */
+  defaultLanguage: text('default_language').notNull().default('typescript'),
+
+  // Resource limits
+  /** Memory limit in MB */
+  memoryMB: integer('memory_mb').notNull().default(2048),
+  /** CPU cores */
+  cpuCores: integer('cpu_cores').notNull().default(1),
+  /** Session timeout in minutes */
+  timeoutMinutes: integer('timeout_minutes').notNull().default(60),
+
+  // E2B-specific settings
+  /** E2B template ID */
+  e2bTemplateId: text('e2b_template_id'),
+
+  // Daytona-specific settings
+  /** Daytona snapshot name/ID */
+  daytonaSnapshot: text('daytona_snapshot'),
+  /** Auto-stop interval in minutes (0 = never) */
+  daytonaAutoStop: integer('daytona_auto_stop').notNull().default(15),
+
+  // Docker-specific settings
+  /** Docker image to use */
+  dockerImage: text('docker_image').notNull().default('wit-sandbox:latest'),
+
+  /** User who last updated this config */
+  updatedById: text('updated_by_id').notNull(),
+
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+/**
+ * Sandbox provider API keys
+ * Stores encrypted API keys for sandbox providers per repository
+ */
+export const repoSandboxKeys = pgTable('repo_sandbox_keys', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  repoId: uuid('repo_id')
+    .notNull()
+    .references(() => repositories.id, { onDelete: 'cascade' }),
+
+  /** Sandbox provider (e2b, daytona) */
+  provider: sandboxProviderEnum('provider').notNull(),
+
+  /** Encrypted API key */
+  encryptedKey: text('encrypted_key').notNull(),
+
+  /** Last characters of the key for display */
+  keyHint: text('key_hint').notNull(),
+
+  /** User who added this key */
+  createdById: text('created_by_id').notNull(),
+
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  // Only one key per provider per repo
+  uniqueProviderPerRepo: unique().on(table.repoId, table.provider),
+}));
+
+/**
+ * Sandbox sessions
+ * Tracks active and historical sandbox sessions
+ */
+export const sandboxSessions = pgTable('sandbox_sessions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+
+  /** Repository this session is for */
+  repoId: uuid('repo_id')
+    .notNull()
+    .references(() => repositories.id, { onDelete: 'cascade' }),
+
+  /** User who created this session */
+  userId: text('user_id').notNull(),
+
+  /** Provider used for this session */
+  provider: sandboxProviderEnum('provider').notNull(),
+
+  /** Provider-specific session/sandbox ID */
+  providerId: text('provider_id').notNull(),
+
+  /** Branch being worked on (optional) */
+  branch: text('branch'),
+
+  /** Current state of the session */
+  state: text('state').notNull().default('running'),
+
+  /** Session metadata (JSON) */
+  metadata: text('metadata'),
+
+  /** When the session started */
+  startedAt: timestamp('started_at', { withTimezone: true }).defaultNow().notNull(),
+
+  /** When the session ended (null if still active) */
+  endedAt: timestamp('ended_at', { withTimezone: true }),
+
+  /** Exit code if session ended */
+  exitCode: integer('exit_code'),
+});
+
 // ============ TYPE EXPORTS ============
 
 export type RepoAiKey = typeof repoAiKeys.$inferSelect;
