@@ -119,6 +119,8 @@ export function AgentsSettingsPage() {
     onSuccess: () => {
       closeDialog();
       utils.repoAiKeys.getSettings.invalidate({ owner: owner!, repo: repo! });
+      // Also refresh triage config since aiAvailable depends on API keys
+      utils.triageAgent.getConfig.invalidate({ owner: owner!, repo: repo! });
     },
     onError: (err: { message: string }) => {
       setKeyError(err.message);
@@ -128,6 +130,8 @@ export function AgentsSettingsPage() {
   const deleteKeyMutation = trpc.repoAiKeys.delete.useMutation({
     onSuccess: () => {
       utils.repoAiKeys.getSettings.invalidate({ owner: owner!, repo: repo! });
+      // Also refresh triage config since aiAvailable depends on API keys
+      utils.triageAgent.getConfig.invalidate({ owner: owner!, repo: repo! });
     },
   });
 
