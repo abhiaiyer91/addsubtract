@@ -22,6 +22,7 @@ import { createGitRoutes } from './routes/git';
 import { createIssueRoutes } from './routes/issues';
 import { createProjectRoutes } from './routes/projects';
 import { createCycleRoutes } from './routes/cycles';
+import { createAgentStreamRoutes } from './routes/agent-stream';
 import { RepoManager } from './storage/repos';
 import { syncReposToDatabase } from './storage/sync';
 import { appRouter, createContext } from '../api/trpc';
@@ -159,10 +160,12 @@ export function createApp(repoManager: RepoManager, options: { verbose?: boolean
   const issueRoutes = createIssueRoutes();
   const projectRoutes = createProjectRoutes();
   const cycleRoutes = createCycleRoutes();
+  const agentStreamRoutes = createAgentStreamRoutes();
   
   app.route('/api/repos', issueRoutes);
   app.route('/api/repos', projectRoutes);
   app.route('/api/repos', cycleRoutes);
+  app.route('/api/agent', agentStreamRoutes);
 
   // Git Smart HTTP routes
   const gitRoutes = createGitRoutes(repoManager);

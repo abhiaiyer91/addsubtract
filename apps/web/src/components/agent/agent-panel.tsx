@@ -33,6 +33,7 @@ import { trpc } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 import { Link } from 'react-router-dom';
 import { useAgentTools } from '@/lib/use-agent-tools';
+import { useChatStream } from '@/lib/use-chat-stream';
 
 type AgentMode = 'pm' | 'code';
 
@@ -622,27 +623,133 @@ export function AgentPanel({ isOpen, onClose, repoId, repoName, owner, embedded 
 
   // Mutations
   const createSession = trpc.agent.createSession.useMutation({
-    onSuccess: (newSession) => {
+    onSuccess: async (newSession) => {
       setActiveSessionId(newSession.id);
-      setMessages([]);
       utils.agent.listSessions.invalidate();
       
-      // If there's a pending prompt, send it
+      // If there's a pending prompt, send it using streaming
       if (pendingPrompt) {
-        setTimeout(() => {
-          chat.mutate({ 
-            sessionId: newSession.id, 
-            message: pendingPrompt,
-            provider: selectedProvider as 'anthropic' | 'openai' | undefined
-          });
-          setPendingPrompt(null);
-        }, 100);
+        const message = pendingPrompt;
+        setPendingPrompt(null);
+        
+        const streamingId = `streaming-${Date.now()}`;
+        setStreamingMessageId(streamingId);
+        
+        // Keep the temp user message and add streaming assistant message
+        setMessages((prev) => [
+          ...prev.filter(m => m.id.startsWith('temp-')), // Keep user's temp message
+          {
+            id: streamingId,
+            role: 'assistant',
+            content: '',
+            createdAt: new Date(),
+            isStreaming: true,
+          },
+        ]);
+
+        try {
+          const result = await streamChat(
+            newSession.id,
+            message,
+            selectedProvider as 'anthropic' | 'openai' | undefined,
+            (chunk, fullContent) => {
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === streamingId ? { ...m, content: fullContent } : m
+                )
+              );
+            }
+          );
+
+          if (result) {
+            setMessages((prev) =>
+              prev.map((m) => {
+                if (m.id.startsWith('temp-')) {
+                  return { ...m, id: result.userMessageId };
+                }
+                if (m.id === streamingId) {
+                  return {
+                    ...m,
+                    id: result.assistantMessageId,
+                    content: result.content,
+                    toolCalls: result.toolCalls as ToolCall[] | undefined,
+                    isStreaming: false,
+                  };
+                }
+                return m;
+              })
+            );
+
+            if (embedded && result.toolCalls) {
+              processToolCalls(result.toolCalls);
+              const hasFileChanges = result.toolCalls.some((tc: any) => {
+                const toolName = tc.payload?.toolName || tc.toolName;
+                return ['writeFile', 'editFile', 'deleteFile'].includes(toolName);
+              });
+              if (hasFileChanges) {
+                utils.repos.getTree.invalidate();
+                utils.repos.getFile.invalidate();
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Pending prompt stream error:', error);
+        }
+      } else {
+        setMessages([]);
       }
     },
   });
 
   const { processToolCalls } = useAgentTools();
+  const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
 
+  // Streaming chat hook
+  const { streamChat, isStreaming, cancelStream } = useChatStream({
+    onToolCalls: (toolCalls) => {
+      if (embedded) {
+        processToolCalls(toolCalls);
+        
+        // Invalidate file tree cache if agent modified files
+        const hasFileChanges = toolCalls.some((tc: any) => {
+          const toolName = tc.payload?.toolName || tc.toolName;
+          return ['writeFile', 'editFile', 'deleteFile'].includes(toolName);
+        });
+        if (hasFileChanges) {
+          utils.repos.getTree.invalidate();
+          utils.repos.getFile.invalidate();
+        }
+      }
+    },
+    onError: (errorMessage) => {
+      setMessages((prev) => {
+        const filtered = prev.filter(m => !m.id.startsWith('temp-') && !m.id.startsWith('streaming-'));
+        return [
+          ...filtered,
+          {
+            id: `error-${Date.now()}`,
+            role: 'system',
+            content: `Error: ${errorMessage}`,
+            createdAt: new Date(),
+          },
+        ];
+      });
+      setStreamingMessageId(null);
+    },
+    onComplete: (assistantMessageId) => {
+      // Update the streaming message to have the real ID
+      setMessages((prev) => 
+        prev.map(m => 
+          m.id === streamingMessageId 
+            ? { ...m, id: assistantMessageId, isStreaming: false }
+            : m
+        )
+      );
+      setStreamingMessageId(null);
+    },
+  });
+
+  // Legacy non-streaming chat (kept as fallback)
   const chat = trpc.agent.chat.useMutation({
     onSuccess: (result) => {
       setMessages((prev) => {
@@ -714,7 +821,7 @@ export function AgentPanel({ isOpen, onClose, repoId, repoName, owner, embedded 
   // Scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, chat.isPending]);
+  }, [messages, isStreaming]);
 
   // Auto-select first session when sessions change (filtered by mode)
   useEffect(() => {
@@ -741,23 +848,98 @@ export function AgentPanel({ isOpen, onClose, repoId, repoName, owner, embedded 
   const handleSend = async (message: string) => {
     const provider = selectedProvider as 'anthropic' | 'openai' | undefined;
     
-    // Add temp user message
+    if (!activeSessionId) {
+      // Create session first, then send message
+      // Add temp user message
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `temp-${Date.now()}`,
+          role: 'user',
+          content: message,
+          createdAt: new Date(),
+        },
+      ]);
+      setPendingPrompt(message);
+      createSession.mutate({ repoId, mode: selectedMode });
+      return;
+    }
+    
+    // Use streaming for chat
+    const userTempId = `temp-user-${Date.now()}`;
+    const streamingId = `streaming-${Date.now()}`;
+    setStreamingMessageId(streamingId);
+    
+    // Add user message and empty streaming assistant message
     setMessages((prev) => [
       ...prev,
       {
-        id: `temp-${Date.now()}`,
+        id: userTempId,
         role: 'user',
         content: message,
         createdAt: new Date(),
       },
+      {
+        id: streamingId,
+        role: 'assistant',
+        content: '',
+        createdAt: new Date(),
+        isStreaming: true,
+      },
     ]);
-    
-    if (!activeSessionId) {
-      // Create session first, then send message
-      setPendingPrompt(message);
-      createSession.mutate({ repoId, mode: selectedMode });
-    } else {
-      chat.mutate({ sessionId: activeSessionId, message, provider });
+
+    try {
+      const result = await streamChat(
+        activeSessionId,
+        message,
+        provider,
+        (chunk, fullContent) => {
+          // Update the streaming message content as chunks arrive
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === streamingId ? { ...m, content: fullContent } : m
+            )
+          );
+        }
+      );
+
+      if (result) {
+        // Update with final message IDs and tool calls
+        setMessages((prev) =>
+          prev.map((m) => {
+            if (m.id === userTempId) {
+              return { ...m, id: result.userMessageId };
+            }
+            if (m.id === streamingId) {
+              return {
+                ...m,
+                id: result.assistantMessageId,
+                content: result.content,
+                toolCalls: result.toolCalls as ToolCall[] | undefined,
+                isStreaming: false,
+              };
+            }
+            return m;
+          })
+        );
+
+        // Process tool calls for IDE integration
+        if (embedded && result.toolCalls) {
+          processToolCalls(result.toolCalls);
+          
+          const hasFileChanges = result.toolCalls.some((tc: any) => {
+            const toolName = tc.payload?.toolName || tc.toolName;
+            return ['writeFile', 'editFile', 'deleteFile'].includes(toolName);
+          });
+          if (hasFileChanges) {
+            utils.repos.getTree.invalidate();
+            utils.repos.getFile.invalidate();
+          }
+        }
+      }
+    } catch (error) {
+      // Error is handled in the hook's onError callback
+      console.error('Chat stream error:', error);
     }
   };
 
@@ -772,7 +954,7 @@ export function AgentPanel({ isOpen, onClose, repoId, repoName, owner, embedded 
     setMessages([]);
   };
 
-  const isLoading = chat.isPending || createSession.isPending;
+  const isLoading = isStreaming || createSession.isPending;
 
   if (!isOpen && !embedded) return null;
 
