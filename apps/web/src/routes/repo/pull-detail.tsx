@@ -358,9 +358,9 @@ export function PullDetailPage() {
       addInlineCommentMutation.mutate({
         prId: prData.id,
         body,
-        path: parentComment?.path,
-        line: parentComment?.line,
-        side: parentComment?.side,
+        path: parentComment?.path ?? undefined,
+        line: parentComment?.line ?? undefined,
+        side: parentComment?.side === 'LEFT' || parentComment?.side === 'RIGHT' ? parentComment.side : undefined,
         commitSha: prData.headSha,
         replyToId: commentId,
       });

@@ -683,16 +683,15 @@ function MergeActions({
   const [copied, setCopied] = useState(false);
 
   // AI summarize mutation
-  // @ts-expect-error - summarizeForSquash exists on backend but types not regenerated
   const summarizeMutation = trpc.ai.summarizeForSquash.useMutation({
-    onSuccess: (data: { fullMessage: string; commitCount: number }) => {
+    onSuccess: (data) => {
       setSquashMessage(data.fullMessage);
       toastSuccess({
         title: 'Commit message generated',
         description: `Summarized ${data.commitCount} commits`,
       });
     },
-    onError: (error: { message: string }) => {
+    onError: (error) => {
       toastError({
         title: 'Failed to generate summary',
         description: error.message,

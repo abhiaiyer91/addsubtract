@@ -6,13 +6,11 @@ import {
   Search,
   MoreHorizontal,
   Calendar,
-  Users,
   CheckCircle2,
   Clock,
   Target,
   TrendingUp,
   AlertCircle,
-  ArrowRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -57,11 +55,12 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.
   canceled: { label: 'Canceled', color: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300', icon: <AlertCircle className="h-3 w-3" /> },
 };
 
-const HEALTH_CONFIG: Record<string, { label: string; color: string }> = {
-  on_track: { label: 'On Track', color: 'text-green-500' },
-  at_risk: { label: 'At Risk', color: 'text-yellow-500' },
-  off_track: { label: 'Off Track', color: 'text-red-500' },
-};
+// Health config may be used in the future for project health indicators
+// const HEALTH_CONFIG: Record<string, { label: string; color: string }> = {
+//   on_track: { label: 'On Track', color: 'text-green-500' },
+//   at_risk: { label: 'At Risk', color: 'text-yellow-500' },
+//   off_track: { label: 'Off Track', color: 'text-red-500' },
+// };
 
 export function ProjectsPage() {
   const { owner, repo } = useParams<{ owner: string; repo: string }>();

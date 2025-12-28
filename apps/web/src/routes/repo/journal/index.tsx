@@ -55,7 +55,8 @@ export function JournalPage() {
   const isLoading = repoLoading || treeLoading;
 
   // Filter pages by search query
-  const filterTree = (items: typeof tree): typeof tree => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const filterTree = (items: any[] | undefined): any[] | undefined => {
     if (!searchQuery || !items) return items;
     return items
       .map((item) => ({
@@ -69,7 +70,7 @@ export function JournalPage() {
       );
   };
 
-  const filteredTree = filterTree(tree || []);
+  const filteredTree = filterTree(tree as any[] | undefined) || [];
 
   const handleNewPage = () => {
     navigate(`/${owner}/${repo}/journal/new`);
@@ -318,8 +319,8 @@ interface EmptyStateContentProps {
 }
 
 function EmptyStateContent({
-  owner,
-  repo,
+  owner: _owner,
+  repo: _repo,
   authenticated,
   hasPages,
   onNewPage,

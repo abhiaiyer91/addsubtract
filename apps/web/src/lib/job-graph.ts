@@ -24,7 +24,6 @@ export function buildJobGraph(jobs: any[]): JobGraph {
   const levelMap = new Map<string, number>();
   
   // Build dependency map from job names
-  const jobMap = new Map(jobs.map(j => [j.jobName, j]));
   const dependencyMap = new Map<string, string[]>();
   
   // Parse dependencies (assuming jobs have a needs field or we infer from execution order)
@@ -94,7 +93,7 @@ export function buildJobGraph(jobs: any[]): JobGraph {
   };
 }
 
-function findCriticalPath(nodes: JobGraphNode[], edges: Array<{ from: string; to: string }>): string[] {
+function findCriticalPath(nodes: JobGraphNode[], _edges: Array<{ from: string; to: string }>): string[] {
   if (nodes.length === 0) return [];
   
   const nodeMap = new Map(nodes.map(n => [n.id, n]));

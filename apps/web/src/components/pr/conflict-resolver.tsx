@@ -3,7 +3,6 @@ import {
   GitMerge,
   AlertTriangle,
   Check,
-  X,
   Sparkles,
   Loader2,
   ChevronDown,

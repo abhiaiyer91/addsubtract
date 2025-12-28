@@ -82,7 +82,7 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
     onMutate: async () => {
       await utils.repos.isStarred.cancel({ repoId: repoData?.repo.id || '' });
       const previousStarred = utils.repos.isStarred.getData({ repoId: repoData?.repo.id || '' });
-      utils.repos.isStarred.setData({ repoId: repoData?.repo.id || '' }, { starred: true });
+      utils.repos.isStarred.setData({ repoId: repoData?.repo.id || '' }, true);
       return { previousStarred };
     },
     onSuccess: () => {
@@ -90,7 +90,7 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
       toastSuccess({ title: 'Repository starred' });
     },
     onError: (error, _variables, context) => {
-      if (context?.previousStarred) {
+      if (context?.previousStarred !== undefined) {
         utils.repos.isStarred.setData({ repoId: repoData?.repo.id || '' }, context.previousStarred);
       }
       toastError({ title: 'Failed to star repository', description: error.message });
@@ -104,7 +104,7 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
     onMutate: async () => {
       await utils.repos.isStarred.cancel({ repoId: repoData?.repo.id || '' });
       const previousStarred = utils.repos.isStarred.getData({ repoId: repoData?.repo.id || '' });
-      utils.repos.isStarred.setData({ repoId: repoData?.repo.id || '' }, { starred: false });
+      utils.repos.isStarred.setData({ repoId: repoData?.repo.id || '' }, false);
       return { previousStarred };
     },
     onSuccess: () => {
@@ -112,7 +112,7 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
       toastSuccess({ title: 'Repository unstarred' });
     },
     onError: (error, _variables, context) => {
-      if (context?.previousStarred) {
+      if (context?.previousStarred !== undefined) {
         utils.repos.isStarred.setData({ repoId: repoData?.repo.id || '' }, context.previousStarred);
       }
       toastError({ title: 'Failed to unstar repository', description: error.message });
@@ -127,7 +127,7 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
     onMutate: async () => {
       await utils.repos.isWatching.cancel({ repoId: repoData?.repo.id || '' });
       const previousWatching = utils.repos.isWatching.getData({ repoId: repoData?.repo.id || '' });
-      utils.repos.isWatching.setData({ repoId: repoData?.repo.id || '' }, { watching: true });
+      utils.repos.isWatching.setData({ repoId: repoData?.repo.id || '' }, true);
       return { previousWatching };
     },
     onSuccess: () => {
@@ -135,7 +135,7 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
       toastSuccess({ title: 'Now watching repository' });
     },
     onError: (error, _variables, context) => {
-      if (context?.previousWatching) {
+      if (context?.previousWatching !== undefined) {
         utils.repos.isWatching.setData({ repoId: repoData?.repo.id || '' }, context.previousWatching);
       }
       toastError({ title: 'Failed to watch repository', description: error.message });
@@ -149,7 +149,7 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
     onMutate: async () => {
       await utils.repos.isWatching.cancel({ repoId: repoData?.repo.id || '' });
       const previousWatching = utils.repos.isWatching.getData({ repoId: repoData?.repo.id || '' });
-      utils.repos.isWatching.setData({ repoId: repoData?.repo.id || '' }, { watching: false });
+      utils.repos.isWatching.setData({ repoId: repoData?.repo.id || '' }, false);
       return { previousWatching };
     },
     onSuccess: () => {
@@ -157,7 +157,7 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
       toastSuccess({ title: 'Stopped watching repository' });
     },
     onError: (error, _variables, context) => {
-      if (context?.previousWatching) {
+      if (context?.previousWatching !== undefined) {
         utils.repos.isWatching.setData({ repoId: repoData?.repo.id || '' }, context.previousWatching);
       }
       toastError({ title: 'Failed to unwatch repository', description: error.message });
@@ -179,8 +179,8 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
     },
   });
 
-  const isStarred = starredData?.starred || false;
-  const isWatching = watchingData?.watching || false;
+  const isStarred = starredData || false;
+  const isWatching = watchingData || false;
 
   const handleStar = () => {
     if (!repoData?.repo.id) return;
@@ -225,7 +225,7 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
   }
 
   const { repo: repoInfo, owner: ownerInfo } = repoData;
-  const ownerUsername = 'username' in ownerInfo ? ownerInfo.username : owner;
+  const ownerUsername = 'username' in ownerInfo ? (ownerInfo.username || owner) : owner;
 
   // Render IDE mode if enabled
   if (isIDEMode && authenticated) {

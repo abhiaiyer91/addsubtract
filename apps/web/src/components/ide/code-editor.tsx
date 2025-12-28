@@ -326,10 +326,9 @@ function registerInlineCompletionProvider(
         }, 400);
       });
     },
-
-    freeInlineCompletions: (_completions: languages.InlineCompletions) => {
-      // Clean up if needed
-    },
+    
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
+    disposeInlineCompletions: () => {},
   };
 
   // Register for all languages

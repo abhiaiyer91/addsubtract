@@ -67,7 +67,7 @@ export function CollaboratorsPage() {
     },
   });
 
-  const handleInvite = (e: React.FormEvent) => {
+  const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
@@ -78,11 +78,21 @@ export function CollaboratorsPage() {
 
     if (!repoData?.repo.id) return;
 
-    addCollaborator.mutate({
-      repoId: repoData.repo.id,
-      username: username.trim(),
-      permission: permission as 'read' | 'write' | 'admin',
-    });
+    // First lookup the user by username
+    try {
+      const user = await utils.users.get.fetch({ username: username.trim() });
+      if (!user) {
+        setError('User not found');
+        return;
+      }
+      addCollaborator.mutate({
+        repoId: repoData.repo.id,
+        userId: user.id,
+        permission: permission as 'read' | 'write' | 'admin',
+      });
+    } catch {
+      setError('User not found');
+    }
   };
 
   const handleRemove = (userId: string, displayName: string) => {

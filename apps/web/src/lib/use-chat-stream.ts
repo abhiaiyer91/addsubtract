@@ -1,11 +1,12 @@
 import { useState, useCallback, useRef } from 'react';
 
-interface StreamMessage {
+// Stream message type used for chat responses
+export interface StreamMessage {
   id: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
   createdAt: Date;
-  toolCalls?: any[];
+  toolCalls?: unknown[];
   isStreaming?: boolean;
 }
 
@@ -77,7 +78,7 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
 
         for (const line of lines) {
           if (line.startsWith('event: ')) {
-            const eventType = line.slice(7).trim();
+            // Event type is noted but not currently used
             continue;
           }
           

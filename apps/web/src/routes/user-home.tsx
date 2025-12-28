@@ -196,7 +196,7 @@ export function UserHomePage() {
   );
 
   // Fetch user's organizations (own profile only)
-  const { data: orgsData } = trpc.organizations.listByUser.useQuery(
+  const { data: orgsData } = trpc.organizations.listForUser.useQuery(
     undefined,
     { enabled: isOwnProfile }
   );
@@ -501,8 +501,8 @@ export function UserHomePage() {
                       </TabsTrigger>
                       <TabsTrigger value="mine" className="flex-1 text-xs">
                         Yours
-                        {prSummary?.myOpenPrs ? (
-                          <Badge variant="secondary" className="ml-1 text-xs">{prSummary.myOpenPrs}</Badge>
+                        {prSummary?.myPrsOpen ? (
+                          <Badge variant="secondary" className="ml-1 text-xs">{prSummary.myPrsOpen}</Badge>
                         ) : null}
                       </TabsTrigger>
                     </TabsList>

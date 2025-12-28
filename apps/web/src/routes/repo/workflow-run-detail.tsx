@@ -1,9 +1,9 @@
 import { useState, useMemo } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { 
-  CheckCircle2, XCircle, Clock, Play, RotateCcw, Ban,
+  CheckCircle2, XCircle, Clock, Ban,
   ChevronDown, ChevronRight, GitCommit, GitBranch,
-  User, Calendar, Timer, Loader2, ChevronLeft
+  Calendar, Timer, Loader2, ChevronLeft
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -28,13 +28,12 @@ const stateConfig = {
 
 export function WorkflowRunDetail() {
   const { owner, repo, runId } = useParams();
-  const navigate = useNavigate();
   const utils = trpc.useUtils();
-  const [selectedJob, setSelectedJob] = useState<string | null>(null);
+  const [_selectedJob, setSelectedJob] = useState<string | null>(null);
 
   const { data: run, isLoading } = trpc.workflows.getRun.useQuery(
     { runId: runId! },
-    { enabled: !!runId, refetchInterval: (data) => data?.state === 'in_progress' ? 3000 : false }
+    { enabled: !!runId, refetchInterval: (query) => query.state.data?.state === 'in_progress' ? 3000 : false }
   );
 
   const jobGraph = useMemo(() => {
@@ -45,10 +44,10 @@ export function WorkflowRunDetail() {
   const cancelMutation = trpc.workflows.cancel.useMutation({
     onSuccess: () => {
       utils.workflows.getRun.invalidate({ runId: runId! });
-      toastSuccess('Workflow cancelled');
+      toastSuccess({ title: 'Workflow cancelled' });
     },
     onError: (err) => {
-      toastError(err.message);
+      toastError({ title: err.message });
     },
   });
 
@@ -90,7 +89,7 @@ export function WorkflowRunDetail() {
             Actions
           </Link>
           <span className="text-muted-foreground">/</span>
-          <span>Run #{run.runNumber}</span>
+          <span>Run {run.id.slice(0, 8)}</span>
         </div>
 
         {/* Header */}
@@ -179,7 +178,7 @@ export function WorkflowRunDetail() {
               <CardTitle className="text-sm font-medium text-muted-foreground">Run Number</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">#{run.runNumber}</div>
+              <div className="text-2xl font-bold">{run.id.slice(0, 8)}</div>
             </CardContent>
           </Card>
         </div>
@@ -262,7 +261,7 @@ function JobCard({ job }: { job: any }) {
   );
 }
 
-function StepRow({ step, number }: { step: any; number: number }) {
+function StepRow({ step, number: _number }: { step: any; number: number }) {
   const [showLogs, setShowLogs] = useState(false);
   const config = stateConfig[step.state as keyof typeof stateConfig] || stateConfig.queued;
   const Icon = config.icon;

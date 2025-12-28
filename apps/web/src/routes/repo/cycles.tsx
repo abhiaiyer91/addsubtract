@@ -3,18 +3,12 @@ import { useParams, Link } from 'react-router-dom';
 import {
   RefreshCw,
   Plus,
-  Search,
   Calendar,
   CheckCircle2,
-  Clock,
   Target,
-  TrendingUp,
-  AlertTriangle,
   CircleDot,
   ArrowRight,
-  BarChart3,
   Play,
-  Pause,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,7 +28,7 @@ import { DatePicker } from '@/components/ui/date-picker';
 import { RepoLayout } from './components/repo-layout';
 import { useSession } from '@/lib/auth-client';
 import { trpc } from '@/lib/trpc';
-import { formatRelativeTime, cn } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { toastSuccess, toastError } from '@/components/ui/use-toast';
 
 export function CyclesPage() {
@@ -72,7 +66,7 @@ export function CyclesPage() {
   );
 
   // Fetch upcoming cycles
-  const { data: upcomingCycle } = trpc.cycles.getUpcoming.useQuery(
+  const { data: _upcomingCycle } = trpc.cycles.getUpcoming.useQuery(
     { repoId: repoData?.repo.id! },
     { enabled: !!repoData?.repo.id }
   );
@@ -351,7 +345,7 @@ function CurrentCycleCard({ cycle, owner, repo }: CurrentCycleCardProps) {
   const timeProgressPercent = Math.min(100, Math.round((daysElapsed / totalDays) * 100));
 
   const issueProgressPercent = progress
-    ? Math.round((progress.completed / Math.max(progress.total, 1)) * 100)
+    ? Math.round((progress.completedIssues / Math.max(progress.totalIssues, 1)) * 100)
     : 0;
 
   return (
@@ -396,8 +390,8 @@ function CurrentCycleCard({ cycle, owner, repo }: CurrentCycleCardProps) {
           </div>
           <Progress value={issueProgressPercent} className="h-2" />
           <div className="flex justify-between text-xs text-muted-foreground">
-            <span>{progress?.completed || 0} completed</span>
-            <span>{progress?.total || 0} total</span>
+            <span>{progress?.completedIssues || 0} completed</span>
+            <span>{progress?.totalIssues || 0} total</span>
           </div>
         </div>
       </div>
@@ -406,11 +400,11 @@ function CurrentCycleCard({ cycle, owner, repo }: CurrentCycleCardProps) {
       <div className="flex items-center gap-6 mt-4 pt-4 border-t text-sm">
         <div className="flex items-center gap-2">
           <CircleDot className="h-4 w-4 text-yellow-500" />
-          <span>{progress?.inProgress || 0} in progress</span>
+          <span>{progress?.totalIssues ? progress.totalIssues - progress.completedIssues : 0} remaining</span>
         </div>
         <div className="flex items-center gap-2">
           <Target className="h-4 w-4 text-blue-500" />
-          <span>{progress?.todo || 0} todo</span>
+          <span>{progress?.totalIssues || 0} total</span>
         </div>
         <Link 
           to={`/${owner}/${repo}/cycles/${cycle.id}`}
@@ -449,7 +443,7 @@ function CycleCard({ cycle, owner, repo, isCompleted }: CycleCardProps) {
   const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
 
   const progressPercent = progress
-    ? Math.round((progress.completed / Math.max(progress.total, 1)) * 100)
+    ? Math.round((progress.completedIssues / Math.max(progress.totalIssues, 1)) * 100)
     : 0;
 
   return (
@@ -488,7 +482,7 @@ function CycleCard({ cycle, owner, repo, isCompleted }: CycleCardProps) {
       <div className="space-y-1.5">
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span>Progress</span>
-          <span>{progress?.completed || 0}/{progress?.total || 0} issues</span>
+          <span>{progress?.completedIssues || 0}/{progress?.totalIssues || 0} issues</span>
         </div>
         <Progress value={progressPercent} className="h-1.5" />
       </div>

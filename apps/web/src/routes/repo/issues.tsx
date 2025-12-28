@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useParams, Link, useSearchParams, useNavigate } from 'react-router-dom';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import {
   CircleDot,
   CheckCircle2,
@@ -23,14 +23,12 @@ import {
   Target,
   AlertCircle,
   Signal,
-  Timer,
   TrendingUp,
   X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   DropdownMenu,
@@ -80,7 +78,6 @@ const STATUS_ORDER: IssueStatus[] = ['backlog', 'todo', 'in_progress', 'in_revie
 export function IssuesPage() {
   const { owner, repo } = useParams<{ owner: string; repo: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
-  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [projectsOpen, setProjectsOpen] = useState(true);
   const [cyclesOpen, setCyclesOpen] = useState(true);

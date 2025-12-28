@@ -10,7 +10,6 @@ import {
   GitCommit,
   CheckCircle2,
   AlertCircle,
-  ArrowUpRight,
   GitPullRequest,
   GitMerge,
   Circle,
@@ -34,7 +33,7 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { RepoLayout } from './components/repo-layout';
-import { Loading, Skeleton } from '@/components/ui/loading';
+import { Skeleton } from '@/components/ui/loading';
 import { useSession } from '@/lib/auth-client';
 import { trpc } from '@/lib/trpc';
 

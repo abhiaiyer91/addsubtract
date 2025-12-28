@@ -31,12 +31,12 @@ interface JobGraphProps {
 }
 
 const statusConfig = {
-  pending: { icon: Clock, color: 'bg-gray-100 border-gray-300', text: 'text-gray-500' },
-  queued: { icon: Clock, color: 'bg-yellow-50 border-yellow-300', text: 'text-yellow-600' },
+  pending: { icon: Clock, color: 'bg-gray-100 border-gray-300', text: 'text-gray-500', animate: false },
+  queued: { icon: Clock, color: 'bg-yellow-50 border-yellow-300', text: 'text-yellow-600', animate: false },
   in_progress: { icon: Loader2, color: 'bg-blue-50 border-blue-300', text: 'text-blue-600', animate: true },
-  completed: { icon: CheckCircle2, color: 'bg-green-50 border-green-300', text: 'text-green-600' },
-  failed: { icon: XCircle, color: 'bg-red-50 border-red-300', text: 'text-red-600' },
-  cancelled: { icon: Ban, color: 'bg-gray-100 border-gray-300', text: 'text-gray-500' },
+  completed: { icon: CheckCircle2, color: 'bg-green-50 border-green-300', text: 'text-green-600', animate: false },
+  failed: { icon: XCircle, color: 'bg-red-50 border-red-300', text: 'text-red-600', animate: false },
+  cancelled: { icon: Ban, color: 'bg-gray-100 border-gray-300', text: 'text-gray-500', animate: false },
 };
 
 function JobNode({ data }: { data: any }) {
@@ -71,7 +71,6 @@ export function JobGraph({ graph, onNodeClick }: JobGraphProps) {
   const criticalPathSet = useMemo(() => new Set(graph.criticalPath), [graph.criticalPath]);
   
   const initialNodes: Node[] = useMemo(() => {
-    const NODE_WIDTH = 160;
     const NODE_HEIGHT = 60;
     const LEVEL_GAP = 200;
     const NODE_GAP = 80;
@@ -133,7 +132,7 @@ export function JobGraph({ graph, onNodeClick }: JobGraphProps) {
   const [nodes, , onNodesChange] = useNodesState(initialNodes);
   const [edges, , onEdgesChange] = useEdgesState(initialEdges);
 
-  const handleNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
+  const handleNodeClick = useCallback((_event: React.MouseEvent, node: Node) => {
     onNodeClick?.(node.id);
   }, [onNodeClick]);
 

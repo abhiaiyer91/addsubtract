@@ -9,7 +9,7 @@
 
 import { Link } from 'react-router-dom';
 import { trpc } from '../lib/trpc';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Card, CardContent } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { 
@@ -27,12 +27,14 @@ import {
 import { useSession } from '../lib/auth-client';
 import { formatRelativeTime } from '../lib/utils';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function PRCard({ pr }: { pr: any }) {
-  const stateIcon = {
+  const stateIcons: Record<string, React.ReactNode> = {
     open: <GitPullRequest className="h-4 w-4 text-green-500" />,
     closed: <XCircle className="h-4 w-4 text-red-500" />,
     merged: <GitMerge className="h-4 w-4 text-purple-500" />,
-  }[pr.state] || <GitPullRequest className="h-4 w-4" />;
+  };
+  const stateIcon = stateIcons[pr.state as string] || <GitPullRequest className="h-4 w-4" />;
 
   return (
     <Link 
@@ -202,7 +204,7 @@ export function PullsInboxPage() {
               </div>
               <div>
                 <p className="text-2xl font-bold">
-                  {summaryLoading ? '...' : summary?.myOpenPrs || 0}
+                  {summaryLoading ? '...' : summary?.myPrsOpen || 0}
                 </p>
                 <p className="text-xs text-muted-foreground">Your PRs</p>
               </div>
@@ -241,9 +243,9 @@ export function PullsInboxPage() {
           <TabsTrigger value="mine" className="gap-2">
             <GitPullRequest className="h-4 w-4" />
             Your PRs
-            {summary?.myOpenPrs ? (
+            {summary?.myPrsOpen ? (
               <Badge variant="secondary" className="ml-1">
-                {summary.myOpenPrs}
+                {summary.myPrsOpen}
               </Badge>
             ) : null}
           </TabsTrigger>

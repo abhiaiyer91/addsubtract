@@ -15,8 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { cn } from '@/lib/utils';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { trpc } from '@/lib/trpc';
 
 type SearchType = 'all' | 'code' | 'repositories' | 'issues' | 'prs';
@@ -30,7 +29,7 @@ export function SearchPage() {
   const [activeType, setActiveType] = useState<SearchType>(typeParam);
 
   // Search query
-  const { data: searchResults, isLoading, refetch } = trpc.search.search.useQuery(
+  const { data: searchResults, isLoading } = trpc.search.search.useQuery(
     { query: queryParam, type: activeType, limit: 50 },
     { enabled: !!queryParam }
   );
@@ -56,21 +55,6 @@ export function SearchPage() {
     setActiveType(type as SearchType);
     if (queryParam) {
       setSearchParams({ q: queryParam, type });
-    }
-  };
-
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case 'code':
-        return <Code className="h-4 w-4" />;
-      case 'repositories':
-        return <BookOpen className="h-4 w-4" />;
-      case 'issues':
-        return <CircleDot className="h-4 w-4" />;
-      case 'prs':
-        return <GitPullRequest className="h-4 w-4" />;
-      default:
-        return <Search className="h-4 w-4" />;
     }
   };
 

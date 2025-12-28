@@ -467,7 +467,7 @@ interface InboxViewProps {
   awaitingLoading: boolean;
   myPrsLoading: boolean;
   participatedLoading: boolean;
-  inboxSummary: { awaitingReview: number; myOpenPrs: number; participated: number } | undefined;
+  inboxSummary: { awaitingReview: number; myPrsOpen: number; participated: number } | undefined;
   owner: string;
   repo: string;
 }
@@ -498,9 +498,9 @@ function InboxView({
         <TabsTrigger value="mine" className="gap-2">
           <GitPullRequest className="h-4 w-4" />
           Your PRs
-          {inboxSummary?.myOpenPrs ? (
+          {inboxSummary?.myPrsOpen ? (
             <Badge variant="secondary" className="ml-1 h-5 px-1.5">
-              {inboxSummary.myOpenPrs}
+              {inboxSummary.myPrsOpen}
             </Badge>
           ) : null}
         </TabsTrigger>
@@ -585,11 +585,12 @@ function InboxPRList({
 }
 
 function InboxPRCard({ pr, owner, repo }: { pr: any; owner: string; repo: string }) {
-  const stateIcon = {
+  const stateIcons = {
     open: <GitPullRequest className="h-4 w-4 text-green-500" />,
     closed: <XCircle className="h-4 w-4 text-red-500" />,
     merged: <GitMerge className="h-4 w-4 text-purple-500" />,
-  }[pr.state] || <GitPullRequest className="h-4 w-4" />;
+  };
+  const stateIcon = stateIcons[pr.state as keyof typeof stateIcons] || <GitPullRequest className="h-4 w-4" />;
 
   return (
     <Link

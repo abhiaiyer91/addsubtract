@@ -52,7 +52,7 @@ export function CommentThread({
   isDeleting = false,
   isResolving = false,
   className,
-  filePath,
+  filePath: _filePath,
   lineRange,
 }: CommentThreadProps) {
   const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);

@@ -8,7 +8,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { RepoLayout } from '../components/repo-layout';
 import { useSession } from '@/lib/auth-client';
 import { trpc } from '@/lib/trpc';
-import { formatRelativeTime, formatDate } from '@/lib/utils';
+import { formatRelativeTime } from '@/lib/utils';
 import { MarkdownRenderer } from '@/components/markdown/renderer';
 
 export function ReleasesPage() {
