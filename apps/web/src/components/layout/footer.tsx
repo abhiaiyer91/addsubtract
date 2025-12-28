@@ -10,7 +10,7 @@ export function Footer() {
               <GitBranch className="h-4 w-4 text-primary" />
             </div>
             <span className="text-sm text-muted-foreground">
-              © {new Date().getFullYear()} Wit. All rights reserved.
+              © {new Date().getFullYear()} wit. All rights reserved.
             </span>
           </div>
 

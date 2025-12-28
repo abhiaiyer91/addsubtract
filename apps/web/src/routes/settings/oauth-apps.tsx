@@ -167,16 +167,16 @@ export function OAuthAppsPage() {
       <div>
         <h1 className="text-3xl font-bold">OAuth Apps</h1>
         <p className="text-muted-foreground mt-1">
-          Create and manage OAuth applications that integrate with Wit.
+          Create and manage OAuth applications that integrate with wit.
         </p>
       </div>
 
       <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 flex gap-3">
         <Shield className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
         <div className="text-sm">
-          <p className="font-medium text-blue-500">Build integrations with Wit</p>
+          <p className="font-medium text-blue-500">Build integrations with wit</p>
           <p className="text-muted-foreground mt-1">
-            OAuth apps allow third-party applications to access the Wit API on behalf of users.
+            OAuth apps allow third-party applications to access the wit API on behalf of users.
             Users will be asked to authorize your app before granting access.
           </p>
         </div>
@@ -288,7 +288,7 @@ export function OAuthAppsPage() {
                   <DialogHeader>
                     <DialogTitle>Register a New OAuth App</DialogTitle>
                     <DialogDescription>
-                      Create an OAuth application to integrate with the Wit API.
+                      Create an OAuth application to integrate with the wit API.
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4 py-4">
@@ -374,7 +374,7 @@ export function OAuthAppsPage() {
             <EmptyState
               icon={AppWindow}
               title="No OAuth Apps"
-              description="Register an OAuth app to start building integrations with Wit."
+              description="Register an OAuth app to start building integrations with wit."
             />
           ) : (
             <div className="divide-y">

@@ -90,7 +90,7 @@ export function RegisterPage() {
           </div>
           <CardTitle className="text-2xl">Create your account</CardTitle>
           <CardDescription>
-            Join Wit to host and collaborate on code
+            Join wit to host and collaborate on code
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>

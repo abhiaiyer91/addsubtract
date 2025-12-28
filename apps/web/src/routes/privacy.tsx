@@ -93,7 +93,7 @@ export function PrivacyPage() {
 
         <h2>8. Third-Party Services</h2>
         <p>
-          Our Service may contain links to third-party websites or services that are not owned or controlled by Wit.
+          Our Service may contain links to third-party websites or services that are not owned or controlled by wit.
           We have no control over and assume no responsibility for the content, privacy policies, or practices of any
           third-party sites or services.
         </p>

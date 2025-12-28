@@ -62,7 +62,7 @@ export function Header() {
               <div className="p-1.5 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
                 <GitBranch className="h-4 w-4 md:h-5 md:w-5 text-primary" />
               </div>
-              <span className="font-bold text-lg md:text-xl tracking-tight">Wit</span>
+              <span className="font-bold text-lg md:text-xl tracking-tight">wit</span>
             </Link>
           </div>
 

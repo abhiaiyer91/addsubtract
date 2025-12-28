@@ -228,7 +228,7 @@ export function SettingsPage() {
         <CardHeader>
           <CardTitle>Developer Settings</CardTitle>
           <CardDescription>
-            Build integrations and applications with Wit.
+            Build integrations and applications with wit.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">

@@ -92,7 +92,7 @@ export function AuthorizedAppsPage() {
       <div>
         <h1 className="text-3xl font-bold">Authorized Applications</h1>
         <p className="text-muted-foreground mt-1">
-          Applications you've granted access to your Wit account.
+          Applications you've granted access to your wit account.
         </p>
       </div>
 
@@ -101,7 +101,7 @@ export function AuthorizedAppsPage() {
         <div className="text-sm">
           <p className="font-medium text-blue-500">Manage your connected apps</p>
           <p className="text-muted-foreground mt-1">
-            These applications have access to your Wit account based on the permissions you granted.
+            These applications have access to your wit account based on the permissions you granted.
             You can revoke access at any time.
           </p>
         </div>

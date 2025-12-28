@@ -18,18 +18,18 @@ export function TermsPage() {
 
         <h2>1. Acceptance of Terms</h2>
         <p>
-          By accessing and using Wit, you accept and agree to be bound by the terms and provision of this agreement.
+          By accessing and using wit, you accept and agree to be bound by the terms and provision of this agreement.
         </p>
 
         <h2>2. Use License</h2>
         <p>
-          Permission is granted to temporarily download one copy of Wit for personal, non-commercial transitory viewing only.
+          Permission is granted to temporarily download one copy of wit for personal, non-commercial transitory viewing only.
           This is the grant of a license, not a transfer of title, and under this license you may not:
         </p>
         <ul>
           <li>Modify or copy the materials</li>
           <li>Use the materials for any commercial purpose or for any public display</li>
-          <li>Attempt to reverse engineer any software contained in Wit</li>
+          <li>Attempt to reverse engineer any software contained in wit</li>
           <li>Remove any copyright or other proprietary notations from the materials</li>
         </ul>
 
@@ -46,7 +46,7 @@ export function TermsPage() {
         </p>
 
         <h2>5. Prohibited Uses</h2>
-        <p>You may not use Wit:</p>
+        <p>You may not use wit:</p>
         <ul>
           <li>In any way that violates any applicable national or international law or regulation</li>
           <li>To transmit, or procure the sending of, any advertising or promotional material without our prior written consent</li>
@@ -56,7 +56,7 @@ export function TermsPage() {
 
         <h2>6. Intellectual Property</h2>
         <p>
-          The Service and its original content, features, and functionality are and will remain the exclusive property of Wit
+          The Service and its original content, features, and functionality are and will remain the exclusive property of wit
           and its licensors. The Service is protected by copyright, trademark, and other laws.
         </p>
 
@@ -68,7 +68,7 @@ export function TermsPage() {
 
         <h2>8. Limitation of Liability</h2>
         <p>
-          In no event shall Wit, nor its directors, employees, partners, agents, suppliers, or affiliates, be liable for any
+          In no event shall wit, nor its directors, employees, partners, agents, suppliers, or affiliates, be liable for any
           indirect, incidental, special, consequential or punitive damages, including without limitation, loss of profits, data,
           use, goodwill, or other intangible losses.
         </p>

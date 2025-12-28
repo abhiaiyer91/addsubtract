@@ -300,7 +300,7 @@ export function OAuthAuthorizePage() {
         <CardContent className="space-y-6">
           <div className="text-center">
             <p className="text-sm text-muted-foreground">
-              <strong className="text-foreground">{app.name}</strong> wants to access your Wit account
+              <strong className="text-foreground">{app.name}</strong> wants to access your wit account
             </p>
             <p className="text-xs text-muted-foreground mt-1">
               Signed in as <strong>{user.email}</strong>
@@ -352,7 +352,7 @@ export function OAuthAuthorizePage() {
                 <div>
                   <p className="font-medium text-amber-500">Unverified Application</p>
                   <p className="text-muted-foreground text-xs mt-1">
-                    This app hasn't been verified by Wit. Make sure you trust the developer before authorizing.
+                    This app hasn't been verified by wit. Make sure you trust the developer before authorizing.
                   </p>
                 </div>
               </div>
