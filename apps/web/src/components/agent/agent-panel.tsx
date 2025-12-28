@@ -49,7 +49,8 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { trpc } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { useIDEStore } from '@/lib/ide-store';
 import { useAgentTools } from '@/lib/use-agent-tools';
 import { useChatStream } from '@/lib/use-chat-stream';
 
@@ -962,6 +963,8 @@ export function AgentPanel({ isOpen, onClose, repoId, repoName, owner, embedded 
   const [streamStartTime, setStreamStartTime] = useState<Date | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const utils = trpc.useUtils();
+  const navigate = useNavigate();
+  const { setIDEMode } = useIDEStore();
 
   // Queries
   const { data: aiStatus } = trpc.agent.status.useQuery({ repoId });
@@ -1332,11 +1335,16 @@ export function AgentPanel({ isOpen, onClose, repoId, repoName, owner, embedded 
               Add your API key in repository settings to use the AI agent.
             </p>
             {repoId && owner && repoName && (
-              <Button asChild size="sm" className="bg-zinc-800 hover:bg-zinc-700">
-                <Link to={`/${owner}/${repoName}/settings/ai`}>
-                  <Settings className="h-4 w-4 mr-2" />
-                  Configure AI
-                </Link>
+              <Button 
+                size="sm" 
+                className="bg-zinc-800 hover:bg-zinc-700"
+                onClick={() => {
+                  setIDEMode(false);
+                  navigate(`/${owner}/${repoName}/settings/ai`);
+                }}
+              >
+                <Settings className="h-4 w-4 mr-2" />
+                Configure AI
               </Button>
             )}
           </div>
