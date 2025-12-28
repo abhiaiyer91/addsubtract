@@ -31,6 +31,7 @@ import { triageAgentRouter } from './triage-agent';
 import { ideRouter } from './ide';
 import { completionRouter } from './completion';
 import { packagesRouter } from './packages';
+import { oauthAppsRouter } from './oauth-apps';
 
 /**
  * Main application router
@@ -69,6 +70,7 @@ export const appRouter = router({
   ide: ideRouter,
   completion: completionRouter,
   packages: packagesRouter,
+  oauthApps: oauthAppsRouter,
 });
 
 /**
@@ -109,4 +111,5 @@ export {
   ideRouter,
   completionRouter,
   packagesRouter,
+  oauthAppsRouter,
 };

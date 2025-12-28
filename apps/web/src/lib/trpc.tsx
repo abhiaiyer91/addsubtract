@@ -24,7 +24,7 @@ export function TRPCProvider({ children }: { children: React.ReactNode }) {
     trpc.createClient({
       links: [
         httpBatchLink({
-          url: import.meta.env.VITE_API_URL || '/trpc',
+          url: `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/trpc`,
           // Use cookies for authentication (better-auth)
           fetch: (url, options) => {
             return fetch(url, {
