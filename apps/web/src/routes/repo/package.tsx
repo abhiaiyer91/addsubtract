@@ -19,7 +19,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { RepoLayout } from './components/repo-layout';
 import { useSession } from '@/lib/auth-client';
 import { trpc } from '@/lib/trpc';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/components/ui/use-toast';
 import { formatDistanceToNow } from 'date-fns';
 import { MarkdownRenderer } from '@/components/markdown/renderer';
 
