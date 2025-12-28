@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import { Markdown } from '@/components/markdown/renderer';
 import { trpc } from '@/lib/trpc';
 import { CommentThread } from './comment-thread';
@@ -228,6 +228,7 @@ export function DiffViewer({
   }
 
   return (
+    <TooltipProvider>
     <div className="space-y-4">
       {/* Header with summary and view toggle */}
       <div className="flex items-center justify-between">
@@ -299,6 +300,7 @@ export function DiffViewer({
         />
       ))}
     </div>
+    </TooltipProvider>
   );
 }
 
