@@ -423,7 +423,7 @@ const aiAnalysisStep = createStep({
   }),
   execute: async ({ inputData, mastra }) => {
     // Start with rule-based analysis
-    let issueType = inputData.detectedType;
+    const issueType = inputData.detectedType;
     let priority: 'none' | 'low' | 'medium' | 'high' | 'urgent' = 'medium';
     const suggestedLabels: string[] = [];
     let reasoning = '';

@@ -512,7 +512,7 @@ function parseTextReviewOutput(output: string): CodeRabbitReviewResult {
 
   const lines = output.split('\n');
   let currentSection = '';
-  let summaryLines: string[] = [];
+  const summaryLines: string[] = [];
 
   for (const line of lines) {
     const trimmedLine = line.trim();

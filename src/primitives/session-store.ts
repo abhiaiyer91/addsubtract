@@ -326,7 +326,7 @@ export async function createSessionStore(redisUrl?: string): Promise<SessionStor
   if (redisUrl) {
     try {
       // Dynamic import for optional ioredis dependency
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
+       
       let ioredis: any;
       try {
         // Use indirect require to avoid TypeScript module resolution

@@ -128,7 +128,7 @@ export async function commitWithOptions(
   }
 
   // Run commit-msg hook (unless --no-verify)
-  let finalMessage = options.message;
+  const finalMessage = options.message;
   if (!options.noVerify) {
     const commitMsgResult = await hookManager.runHook('commit-msg', {
       commitMessage: options.message,

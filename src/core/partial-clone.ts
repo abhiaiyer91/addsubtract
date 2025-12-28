@@ -293,7 +293,7 @@ export class PartialCloneManager {
   } {
     let localCount = 0;
     let remoteCount = 0;
-    let localSize = 0;
+    const localSize = 0;
     let remoteSize = 0;
 
     // Count local objects

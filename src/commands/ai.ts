@@ -391,7 +391,7 @@ async function handleExplain(args: string[]): Promise<void> {
     const commit = repo.objects.readCommit(hash);
     
     // Get the diff for this commit
-    let diffContent = '';
+    const diffContent = '';
     if (commit.parentHashes.length > 0) {
       // Get diff between parent and this commit
       const parentHash = commit.parentHashes[0];

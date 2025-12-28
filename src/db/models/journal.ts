@@ -141,7 +141,7 @@ export const journalPageModel = {
     const db = getDb();
     
     // If title changes, we might want to update slug too
-    let updateData: any = { ...data, updatedAt: new Date() };
+    const updateData: any = { ...data, updatedAt: new Date() };
     
     if (data.title && !data.slug) {
       const page = await this.findById(id);

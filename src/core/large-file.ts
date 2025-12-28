@@ -229,8 +229,8 @@ export class LargeFileHandler {
    * Get statistics about chunk storage
    */
   getStats(): { totalChunks: number; uniqueChunks: number; totalSize: number } {
-    let totalChunks = 0;
-    let totalSize = 0;
+    const totalChunks = 0;
+    const totalSize = 0;
 
     // This is a simplified implementation
     // In a real implementation, we would scan the chunks directory

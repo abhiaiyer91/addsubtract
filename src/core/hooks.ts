@@ -855,7 +855,7 @@ export function handleHooks(args: string[]): void {
       }
 
       // Load or create config
-      let config = loadHookConfig(repo.workDir) || { hooks: {}, staged: {}, enabled: true };
+      const config = loadHookConfig(repo.workDir) || { hooks: {}, staged: {}, enabled: true };
       
       // Add or append command
       const existing = config.hooks?.[hookType];

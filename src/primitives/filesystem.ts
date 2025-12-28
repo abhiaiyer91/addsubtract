@@ -572,7 +572,7 @@ export class Filesystem {
    */
   private globToRegex(pattern: string): RegExp {
     // Escape special regex characters except * and ?
-    let regex = pattern
+    const regex = pattern
       .replace(/[.+^${}()|[\]\\]/g, '\\$&')
       // Convert ** to match any path
       .replace(/\*\*/g, '{{GLOBSTAR}}')
