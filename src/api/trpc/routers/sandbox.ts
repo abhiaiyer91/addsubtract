@@ -368,4 +368,188 @@ export const sandboxRouter = router({
   myActiveSessions: protectedProcedure.query(async ({ ctx }) => {
     return sandboxSessionModel.getUserActiveSessions(ctx.user.id);
   }),
+
+  /**
+   * Execute a command in the sandbox
+   */
+  exec: protectedProcedure
+    .input(
+      z.object({
+        repoId: z.string().uuid(),
+        command: z.string().min(1),
+        args: z.array(z.string()).optional(),
+        timeout: z.number().min(1000).max(120000).optional().default(60000),
+        cwd: z.string().optional().default('/workspace'),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      // Check sandbox is ready
+      const status = await sandboxConfigModel.getStatus(input.repoId);
+      if (!status.ready) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: status.configured
+            ? 'Sandbox is not enabled or API key is missing'
+            : 'Sandbox is not configured for this repository',
+        });
+      }
+
+      // Get config and API key
+      const config = await sandboxConfigModel.getConfig(input.repoId);
+      if (!config) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Sandbox not configured',
+        });
+      }
+
+      let apiKey: string | undefined;
+      if (config.provider !== 'docker') {
+        apiKey = (await sandboxKeyModel.getDecryptedKey(input.repoId, config.provider)) ?? undefined;
+        if (!apiKey) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Sandbox API key not found',
+          });
+        }
+      }
+
+      // Execute based on provider
+      const fullCommand = input.args?.length
+        ? `${input.command} ${input.args.join(' ')}`
+        : input.command;
+
+      try {
+        switch (config.provider) {
+          case 'e2b': {
+            const { Sandbox } = await import('@e2b/code-interpreter');
+            const sandbox = await Sandbox.create({
+              apiKey,
+              timeoutMs: config.timeoutMinutes * 60 * 1000,
+            });
+
+            try {
+              const result = await sandbox.commands.run(fullCommand, {
+                cwd: input.cwd,
+                timeoutMs: input.timeout,
+              });
+
+              return {
+                success: result.exitCode === 0,
+                exitCode: result.exitCode,
+                stdout: result.stdout,
+                stderr: result.stderr,
+              };
+            } finally {
+              await sandbox.kill();
+            }
+          }
+
+          case 'daytona': {
+            const { Daytona } = await import('@daytonaio/sdk');
+            const daytona = new Daytona({ apiKey });
+            const sandbox = await daytona.create({
+              language: config.defaultLanguage as 'typescript' | 'javascript' | 'python',
+              autoStopInterval: config.daytonaAutoStop,
+            });
+
+            try {
+              const result = await sandbox.process.commandRun(fullCommand, {
+                cwd: input.cwd,
+                timeout: input.timeout,
+              });
+
+              return {
+                success: result.exitCode === 0,
+                exitCode: result.exitCode,
+                stdout: result.stdout,
+                stderr: result.stderr,
+              };
+            } finally {
+              await sandbox.delete();
+            }
+          }
+
+          case 'docker': {
+            const { spawn } = await import('child_process');
+
+            return new Promise((resolve) => {
+              const dockerArgs = [
+                'run',
+                '--rm',
+                '-w',
+                input.cwd,
+                '--network',
+                config.networkMode === 'none' ? 'none' : 'bridge',
+                '--memory',
+                `${config.memoryMB}m`,
+                '--cpus',
+                `${config.cpuCores}`,
+                '--security-opt',
+                'no-new-privileges',
+                config.dockerImage,
+                'sh',
+                '-c',
+                fullCommand,
+              ];
+
+              let stdout = '';
+              let stderr = '';
+
+              const child = spawn('docker', dockerArgs, { shell: false });
+
+              const timer = setTimeout(() => {
+                child.kill('SIGTERM');
+                resolve({
+                  success: false,
+                  error: 'Command timed out',
+                  exitCode: -1,
+                });
+              }, input.timeout);
+
+              child.stdout?.on('data', (data: Buffer) => {
+                stdout += data.toString();
+              });
+
+              child.stderr?.on('data', (data: Buffer) => {
+                stderr += data.toString();
+              });
+
+              child.on('error', (err) => {
+                clearTimeout(timer);
+                resolve({
+                  success: false,
+                  error: err.message,
+                  exitCode: -1,
+                });
+              });
+
+              child.on('close', (code) => {
+                clearTimeout(timer);
+                resolve({
+                  success: code === 0,
+                  exitCode: code ?? -1,
+                  stdout: stdout || undefined,
+                  stderr: stderr || undefined,
+                });
+              });
+            });
+          }
+
+          default:
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: `Unknown provider: ${config.provider}`,
+            });
+        }
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'MODULE_NOT_FOUND') {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: `${config.provider.toUpperCase()} SDK not installed`,
+          });
+        }
+        throw error;
+      }
+    }),
 });
