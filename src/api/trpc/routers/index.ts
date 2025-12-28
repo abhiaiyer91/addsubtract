@@ -30,6 +30,7 @@ import { wrappedRouter } from './wrapped';
 import { triageAgentRouter } from './triage-agent';
 import { ideRouter } from './ide';
 import { completionRouter } from './completion';
+import { oauthAppsRouter } from './oauth-apps';
 
 /**
  * Main application router
@@ -67,6 +68,7 @@ export const appRouter = router({
   triageAgent: triageAgentRouter,
   ide: ideRouter,
   completion: completionRouter,
+  oauthApps: oauthAppsRouter,
 });
 
 /**
@@ -106,4 +108,5 @@ export {
   triageAgentRouter,
   ideRouter,
   completionRouter,
+  oauthAppsRouter,
 };
