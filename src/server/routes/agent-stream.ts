@@ -14,9 +14,7 @@ import {
   repoAiKeyModel,
 } from '../../db/models';
 import { type AgentMode, type AgentContext } from '../../ai/types';
-import { betterAuth } from 'better-auth';
-import { drizzleAdapter } from 'better-auth/adapters/drizzle';
-import { getDb } from '../../db';
+import { createAuth } from '../../lib/auth';
 
 // Lazy import to avoid circular dependencies
 async function getAgentForMode(mode: AgentMode, context: AgentContext, model: string) {
@@ -38,12 +36,7 @@ export function createAgentStreamRoutes() {
   // SSE endpoint for streaming chat
   app.post('/chat/stream', async (c) => {
     // Get session from cookie using better-auth
-    const auth = betterAuth({
-      database: drizzleAdapter(getDb(), { provider: 'pg' }),
-      session: {
-        cookieCache: { enabled: true, maxAge: 60 * 5 },
-      },
-    });
+    const auth = createAuth();
 
     const session = await auth.api.getSession({
       headers: c.req.raw.headers,
