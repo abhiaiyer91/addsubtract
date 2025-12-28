@@ -88,13 +88,13 @@ function parseDiff(diffText: string): DiffFile[] {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
-    // New file diff header: diff --git a/path b/path
-    if (line.startsWith('diff --git')) {
+    // New file diff header: diff --git a/path b/path or diff --wit a/path b/path
+    if (line.startsWith('diff --git') || line.startsWith('diff --wit')) {
       if (currentFile) {
         if (currentHunk) currentFile.hunks.push(currentHunk);
         files.push(currentFile);
       }
-      const match = line.match(/diff --git a\/(.*) b\/(.*)/);
+      const match = line.match(/diff --(?:git|wit) a\/(.*) b\/(.*)/);
       currentFile = {
         path: match ? match[2] : 'unknown',
         oldPath: match ? match[1] : undefined,

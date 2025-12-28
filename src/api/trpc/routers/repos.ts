@@ -1230,7 +1230,7 @@ export const reposRouter = router({
 
       try {
         const commit = bareRepo.objects.readCommit(input.sha);
-        const { formatUnifiedDiff, diff: computeDiff } = await import('../../../core/diff');
+        const { formatUnifiedDiff, diff: computeDiff, createHunks } = await import('../../../core/diff');
         
         // Get the diff between this commit and its parent
         let diffText = '';
@@ -1268,17 +1268,27 @@ export const reposRouter = router({
             const allPaths = new Set([...parentFiles.keys(), ...currentFiles.keys()]);
             
             for (const filePath of allPaths) {
-              const parentHash = parentFiles.get(filePath);
-              const currentHash = currentFiles.get(filePath);
+              const oldHash = parentFiles.get(filePath);
+              const newHash = currentFiles.get(filePath);
               
-              if (parentHash === currentHash) continue;
+              if (oldHash === newHash) continue;
               
-              const oldContent = parentHash ? bareRepo.objects.readBlob(parentHash).toString() : '';
-              const newContent = currentHash ? bareRepo.objects.readBlob(currentHash).toString() : '';
+              const oldContent = oldHash ? bareRepo.objects.readBlob(oldHash).toString() : '';
+              const newContent = newHash ? bareRepo.objects.readBlob(newHash).toString() : '';
               
-              const fileDiff = computeDiff(oldContent, newContent);
-              if (fileDiff.length > 0) {
-                diffParts.push(formatUnifiedDiff(filePath, filePath, fileDiff));
+              const diffLines = computeDiff(oldContent, newContent);
+              const hunks = createHunks(diffLines);
+              if (hunks.length > 0) {
+                const fileDiff = {
+                  oldPath: filePath,
+                  newPath: filePath,
+                  hunks,
+                  isBinary: false,
+                  isNew: !oldHash,
+                  isDeleted: !newHash,
+                  isRename: false,
+                };
+                diffParts.push(formatUnifiedDiff(fileDiff));
               }
             }
             
@@ -1296,9 +1306,19 @@ export const reposRouter = router({
                   showTreeFiles(subTree, fullPath);
                 } else {
                   const content = bareRepo.objects.readBlob(entry.hash).toString();
-                  const fileDiff = computeDiff('', content);
-                  if (fileDiff.length > 0) {
-                    diffParts.push(formatUnifiedDiff('/dev/null', fullPath, fileDiff));
+                  const diffLines = computeDiff('', content);
+                  const hunks = createHunks(diffLines);
+                  if (hunks.length > 0) {
+                    const fileDiff = {
+                      oldPath: fullPath,
+                      newPath: fullPath,
+                      hunks,
+                      isBinary: false,
+                      isNew: true,
+                      isDeleted: false,
+                      isRename: false,
+                    };
+                    diffParts.push(formatUnifiedDiff(fileDiff));
                   }
                 }
               }
@@ -1307,8 +1327,11 @@ export const reposRouter = router({
             showTreeFiles(currentTree);
             diffText = diffParts.join('\n');
           }
-        } catch {
-          // If diff computation fails, return empty diff
+          
+          console.log('[repos.getCommit] Generated diff for', input.sha, 'text length:', diffText.length, 'has parent:', !!parentHash);
+        } catch (diffError) {
+          // If diff computation fails, log the error and return empty diff
+          console.error('[repos.getCommit] Diff computation error:', diffError);
           diffText = '';
         }
 
