@@ -18,7 +18,8 @@ export const PM_AGENT_INSTRUCTIONS = `You are wit AI in PM mode - a project mana
 You help users create and manage issues, pull requests, projects, and cycles. You work through the wit platform APIs, not the filesystem.
 
 ## Your Capabilities
-- Create issues with proper titles, descriptions, and labels
+- Create and update issues with proper titles, descriptions, labels, and priorities
+- Get details of specific issues
 - Create pull requests with good descriptions
 - Manage projects and milestones
 - Track cycles and sprints
@@ -76,6 +77,107 @@ function createIssueTool(context: AgentContext) {
         };
       } catch (error) {
         return { errorMessage: error instanceof Error ? error.message : 'Failed to create issue' };
+      }
+    },
+  });
+}
+
+/**
+ * Update issue tool
+ */
+function createUpdateIssueTool(context: AgentContext) {
+  return createTool({
+    id: 'update-issue',
+    description: 'Update an existing issue in the repository',
+    inputSchema: z.object({
+      issueNumber: z.number().describe('Issue number to update'),
+      title: z.string().optional().describe('New title'),
+      body: z.string().optional().describe('New description/body'),
+      state: z.enum(['open', 'closed']).optional().describe('Issue state'),
+      priority: z.enum(['none', 'low', 'medium', 'high', 'urgent']).optional().describe('Priority level'),
+      labels: z.array(z.string()).optional().describe('Labels to set'),
+      assignees: z.array(z.string()).optional().describe('Usernames to assign'),
+    }),
+    outputSchema: z.object({
+      issueNumber: z.number().optional(),
+      url: z.string().optional(),
+      errorMessage: z.string().optional(),
+    }),
+    execute: async ({ issueNumber, title, body, state, priority }) => {
+      try {
+        const { issueModel } = await import('../../db/models/index.js');
+        
+        // Find the issue first
+        const issue = await issueModel.findByRepoAndNumber(context.repoId, issueNumber);
+        if (!issue) {
+          return { errorMessage: `Issue #${issueNumber} not found` };
+        }
+        
+        // Build update object
+        const updates: Record<string, unknown> = {};
+        if (title !== undefined) updates.title = title;
+        if (body !== undefined) updates.body = body;
+        if (state !== undefined) updates.state = state;
+        if (priority !== undefined) updates.priority = priority;
+        
+        const updated = await issueModel.update(issue.id, updates);
+        
+        return {
+          issueNumber: updated?.number || issueNumber,
+          url: `/${context.owner}/${context.repoName}/issues/${issueNumber}`,
+        };
+      } catch (error) {
+        return { errorMessage: error instanceof Error ? error.message : 'Failed to update issue' };
+      }
+    },
+  });
+}
+
+/**
+ * Get issue tool
+ */
+function createGetIssueTool(context: AgentContext) {
+  return createTool({
+    id: 'get-issue',
+    description: 'Get details of a specific issue by number',
+    inputSchema: z.object({
+      issueNumber: z.number().describe('Issue number'),
+    }),
+    outputSchema: z.object({
+      issue: z.object({
+        number: z.number(),
+        title: z.string(),
+        body: z.string(),
+        state: z.string(),
+        priority: z.string(),
+        author: z.string().optional(),
+        labels: z.array(z.string()),
+        createdAt: z.string(),
+      }).optional(),
+      errorMessage: z.string().optional(),
+    }),
+    execute: async ({ issueNumber }) => {
+      try {
+        const { issueModel } = await import('../../db/models/index.js');
+        
+        const issue = await issueModel.findByRepoAndNumber(context.repoId, issueNumber);
+        if (!issue) {
+          return { errorMessage: `Issue #${issueNumber} not found` };
+        }
+        
+        return {
+          issue: {
+            number: issue.number,
+            title: issue.title,
+            body: issue.body || '',
+            state: issue.state,
+            priority: issue.priority || 'none',
+            labels: [],
+            createdAt: issue.createdAt.toISOString(),
+          },
+        };
+      } catch (error) {
+        return { errorMessage: error instanceof Error ? error.message : 'Failed to get issue' };
       }
     },
   });
@@ -231,6 +333,8 @@ export function createPMAgent(context: AgentContext, model: string = 'anthropic/
     model,
     tools: {
       createIssue: createIssueTool(context),
+      updateIssue: createUpdateIssueTool(context),
+      getIssue: createGetIssueTool(context),
       listIssues: createListIssuesTool(context),
       createPR: createPRTool(context),
       listPRs: createListPRsTool(context),

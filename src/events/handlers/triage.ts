@@ -31,10 +31,15 @@ export function registerTriageHandlers(): void {
 async function handleIssueCreated(event: IssueCreatedEvent): Promise<void> {
   const { issueId, issueNumber, issueTitle, repoId, repoFullName } = event.payload;
   
+  console.log(`[TriageHandler] Received issue.created event for ${repoFullName}#${issueNumber}`);
+  
   try {
     // Check if triage agent is enabled for this repo
     const config = await triageAgentConfigModel.findByRepoId(repoId);
+    console.log(`[TriageHandler] Config for repo ${repoId}:`, config ? { enabled: config.enabled, autoAssignLabels: config.autoAssignLabels, autoSetPriority: config.autoSetPriority } : 'NOT FOUND');
+    
     if (!config?.enabled) {
+      console.log(`[TriageHandler] Triage not enabled for ${repoFullName}, skipping`);
       return; // Triage agent not enabled
     }
 
@@ -54,17 +59,21 @@ async function handleIssueCreated(event: IssueCreatedEvent): Promise<void> {
 
     // Check if AI keys are available
     const aiAvailability = await repoAiKeyModel.checkAvailability(repoId);
+    console.log(`[TriageHandler] AI availability for ${repoFullName}:`, aiAvailability);
+    
     if (!aiAvailability.available) {
-      console.log(`[TriageWorkflow] Skipping triage for ${repoFullName}#${issueNumber} - no AI keys available`);
+      console.log(`[TriageHandler] Skipping triage for ${repoFullName}#${issueNumber} - no AI keys available`);
       return;
     }
 
     // Get author info
+    console.log(`[TriageHandler] Looking up author ${issue.authorId}`);
     const author = await userModel.findById(issue.authorId);
     if (!author) {
-      console.error(`[TriageWorkflow] Author ${issue.authorId} not found`);
+      console.error(`[TriageHandler] Author ${issue.authorId} not found`);
       return;
     }
+    console.log(`[TriageHandler] Found author: ${author.username || author.name}`);
 
     // Get the owner info for the repo path
     const [ownerName] = repoFullName.split('/');
@@ -86,10 +95,12 @@ async function handleIssueCreated(event: IssueCreatedEvent): Promise<void> {
       customPrompt: config.prompt || undefined,
     };
 
-    console.log(`[TriageWorkflow] Running triage workflow for ${repoFullName}#${issueNumber}`);
+    console.log(`[TriageHandler] Running triage workflow for ${repoFullName}#${issueNumber}`);
+    console.log(`[TriageHandler] Workflow input:`, JSON.stringify(workflowInput, null, 2));
 
     // Run the triage workflow
     const result = await runIssueTriageWorkflow(workflowInput);
+    console.log(`[TriageHandler] Workflow result:`, JSON.stringify(result, null, 2));
 
     // Log the run
     await triageAgentRunModel.create({
@@ -115,7 +126,8 @@ async function handleIssueCreated(event: IssueCreatedEvent): Promise<void> {
       console.error(`[TriageWorkflow] Failed to triage ${repoFullName}#${issueNumber}: ${result.error}`);
     }
   } catch (error) {
-    console.error(`[TriageWorkflow] Error processing issue ${issueId}:`, error);
+    console.error(`[TriageHandler] Error processing issue ${issueId}:`, error);
+    console.error(`[TriageHandler] Error stack:`, error instanceof Error ? error.stack : 'No stack trace');
     
     // Log the failed run
     try {
