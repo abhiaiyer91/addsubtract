@@ -62,7 +62,7 @@ export const dashboardRouter = router({
           // Merge PR and Issue inbox counts
           inbox: {
             prsAwaitingReview: prInbox.awaitingReview,
-            myOpenPrs: prInbox.myOpenPrs,
+            myOpenPrs: prInbox.myPrsOpen,
             prsParticipated: prInbox.participated,
             issuesAssigned: issueInbox.assignedToMe,
             issuesCreated: issueInbox.createdByMe,
@@ -89,7 +89,7 @@ export const dashboardRouter = router({
       ...dashboardSummary,
       inbox: {
         prsAwaitingReview: prInbox.awaitingReview,
-        myOpenPrs: prInbox.myOpenPrs,
+        myOpenPrs: prInbox.myPrsOpen,
         prsParticipated: prInbox.participated,
         issuesAssigned: issueInbox.assignedToMe,
         issuesCreated: issueInbox.createdByMe,

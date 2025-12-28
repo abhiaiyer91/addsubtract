@@ -15,6 +15,8 @@ import {
 } from '../schema';
 import { user } from '../auth-schema';
 
+type User = typeof user.$inferSelect;
+
 export const orgModel = {
   /**
    * Find an organization by ID

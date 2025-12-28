@@ -194,7 +194,7 @@ export const userStatsModel = {
         .from(prReviews)
         .where(
           and(
-            eq(prReviews.authorId, userId),
+            eq(prReviews.userId, userId),
             gte(prReviews.createdAt, startDate),
             lte(prReviews.createdAt, endDate)
           )
@@ -208,7 +208,7 @@ export const userStatsModel = {
           .from(prComments)
           .where(
             and(
-              eq(prComments.authorId, userId),
+              eq(prComments.userId, userId),
               gte(prComments.createdAt, startDate),
               lte(prComments.createdAt, endDate)
             )
@@ -218,7 +218,7 @@ export const userStatsModel = {
           .from(issueComments)
           .where(
             and(
-              eq(issueComments.authorId, userId),
+              eq(issueComments.userId, userId),
               gte(issueComments.createdAt, startDate),
               lte(issueComments.createdAt, endDate)
             )
@@ -308,7 +308,7 @@ export const userStatsModel = {
         .where(
           and(
             eq(pullRequests.state, 'open'),
-            sql`(${prReviews.authorId} = ${userId} OR ${prComments.authorId} = ${userId})`,
+            sql`(${prReviews.userId} = ${userId} OR ${prComments.userId} = ${userId})`,
             sql`${pullRequests.authorId} != ${userId}`
           )
         )

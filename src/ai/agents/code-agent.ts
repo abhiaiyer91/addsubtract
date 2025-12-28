@@ -117,7 +117,7 @@ function createReadFileTool(context: AgentContext) {
       content: z.string().optional(),
       error: z.string().optional(),
     }),
-    execute: async ({ path: filePath }): Promise<{ content?: string; error?: string }> => {
+    execute: async ({ path: filePath }: { path: string }) => {
       try {
         const vrepo = getVirtualRepo(context);
         const content = vrepo.read(filePath);
@@ -135,7 +135,7 @@ function createReadFileTool(context: AgentContext) {
         return { error: error instanceof Error ? error.message : 'Failed to read file' };
       }
     },
-  });
+  } as any);
 }
 
 /**
@@ -154,7 +154,7 @@ function createWriteFileTool(context: AgentContext) {
       commitHash: z.string().optional(),
       error: z.string().optional(),
     }),
-    execute: async ({ path: filePath, content }): Promise<{ success: boolean; commitHash?: string; error?: string }> => {
+    execute: async ({ path: filePath, content }: { path: string; content: string }) => {
       try {
         // Validate path
         if (filePath.startsWith('.git/') || filePath === '.git') {
@@ -186,7 +186,7 @@ function createWriteFileTool(context: AgentContext) {
         return { success: false, error: error instanceof Error ? error.message : 'Failed to write file' };
       }
     },
-  });
+  } as any);
 }
 
 /**
@@ -206,7 +206,7 @@ function createEditFileTool(context: AgentContext) {
       commitHash: z.string().optional(),
       error: z.string().optional(),
     }),
-    execute: async ({ path: filePath, oldText, newText }): Promise<{ success: boolean; commitHash?: string; error?: string }> => {
+    execute: async ({ path: filePath, oldText, newText }: { path: string; oldText: string; newText: string }) => {
       try {
         const vrepo = getVirtualRepo(context);
         const content = vrepo.read(filePath);
@@ -232,7 +232,7 @@ function createEditFileTool(context: AgentContext) {
         return { success: false, error: error instanceof Error ? error.message : 'Failed to edit file' };
       }
     },
-  });
+  } as any);
 }
 
 /**
@@ -253,7 +253,7 @@ function createListDirectoryTool(context: AgentContext) {
       })).optional(),
       error: z.string().optional(),
     }),
-    execute: async ({ path: dirPath }): Promise<{ entries?: Array<{ name: string; path: string; type: 'file' | 'dir' }>; error?: string }> => {
+    execute: async ({ path: dirPath }: { path: string }): Promise<{ entries?: Array<{ name: string; path: string; type: 'file' | 'dir' }>; error?: string }> => {
       try {
         const vrepo = getVirtualRepo(context);
         const entries = vrepo.list(dirPath);
@@ -267,7 +267,7 @@ function createListDirectoryTool(context: AgentContext) {
         return { error: error instanceof Error ? error.message : 'Failed to list directory' };
       }
     },
-  });
+  } as any);
 }
 
 /**
@@ -292,15 +292,20 @@ function createStatusTool(context: AgentContext) {
         const status = vrepo.status();
         const branch = vrepo.getCurrentBranch();
         
+        // Map 'untracked' to 'added' for the output schema
+        const mappedChanges = status.map(s => ({
+          path: s.path,
+          status: (s.status === 'untracked' ? 'added' : s.status) as 'added' | 'modified' | 'deleted',
+        }));
         return {
           branch,
-          changes: status.map(s => ({ path: s.path, status: s.status })),
+          changes: mappedChanges,
         };
       } catch (error) {
         return { branch: 'unknown', changes: [], error: error instanceof Error ? error.message : 'Failed to get status' };
       }
     },
-  });
+  } as any);
 }
 
 /**
@@ -318,7 +323,7 @@ function createCommitTool(context: AgentContext) {
       commitHash: z.string().optional(),
       error: z.string().optional(),
     }),
-    execute: async ({ message }): Promise<{ success: boolean; commitHash?: string; error?: string }> => {
+    execute: async ({ message }: { message: string }) => {
       try {
         const vrepo = getVirtualRepo(context);
         
@@ -336,7 +341,7 @@ function createCommitTool(context: AgentContext) {
         return { success: false, error: error instanceof Error ? error.message : 'Failed to commit' };
       }
     },
-  });
+  } as any);
 }
 
 /**
@@ -354,7 +359,7 @@ function createBranchTool(context: AgentContext) {
       branchName: z.string().optional(),
       error: z.string().optional(),
     }),
-    execute: async ({ name }): Promise<{ success: boolean; branchName?: string; error?: string }> => {
+    execute: async ({ name }: { name: string }) => {
       try {
         const vrepo = getVirtualRepo(context);
         
@@ -367,7 +372,7 @@ function createBranchTool(context: AgentContext) {
         return { success: false, error: error instanceof Error ? error.message : 'Failed to create branch' };
       }
     },
-  });
+  } as any);
 }
 
 /**
@@ -389,7 +394,7 @@ function createHistoryTool(context: AgentContext) {
       })),
       error: z.string().optional(),
     }),
-    execute: async ({ limit }): Promise<{ commits: Array<{ hash: string; message: string; author: string; date: string }>; error?: string }> => {
+    execute: async ({ limit }: { limit: number }): Promise<{ commits: Array<{ hash: string; message: string; author: string; date: string }>; error?: string }> => {
       try {
         const vrepo = getVirtualRepo(context);
         const commits = vrepo.log(limit);
@@ -406,7 +411,7 @@ function createHistoryTool(context: AgentContext) {
         return { commits: [], error: error instanceof Error ? error.message : 'Failed to get history' };
       }
     },
-  });
+  } as any);
 }
 
 /**
@@ -428,7 +433,7 @@ function createRunCommandTool(context: AgentContext) {
       exitCode: z.number().optional(),
       error: z.string().optional(),
     }),
-    execute: async ({ command, timeout }): Promise<{ success: boolean; stdout?: string; stderr?: string; exitCode?: number; error?: string }> => {
+    execute: async ({ command, timeout }: { command: string; timeout: number }) => {
       return new Promise((resolve) => {
         const parts = command.split(' ');
         const cmd = parts[0];
@@ -470,7 +475,7 @@ function createRunCommandTool(context: AgentContext) {
         });
       });
     },
-  });
+  } as any);
 }
 
 /**
@@ -488,7 +493,7 @@ function createDeleteFileTool(context: AgentContext) {
       commitHash: z.string().optional(),
       error: z.string().optional(),
     }),
-    execute: async ({ path: filePath }): Promise<{ success: boolean; commitHash?: string; error?: string }> => {
+    execute: async ({ path: filePath }: { path: string }) => {
       try {
         const vrepo = getVirtualRepo(context);
         const deleted = vrepo.delete(filePath);
@@ -507,7 +512,7 @@ function createDeleteFileTool(context: AgentContext) {
         return { success: false, error: error instanceof Error ? error.message : 'Failed to delete file' };
       }
     },
-  });
+  } as any);
 }
 
 /**

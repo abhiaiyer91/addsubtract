@@ -283,7 +283,7 @@ export async function runPRReviewWorkflow(input: PRReviewInput): Promise<PRRevie
   const mastra = getTsgitMastra();
   const workflow = mastra.getWorkflow('prReview');
   
-  const run = await workflow.createRunAsync();
+  const run = await workflow.createRun();
   const result = await run.start({ inputData: input });
   
   if (result.status === 'failed') {
@@ -299,7 +299,7 @@ export async function runPRReviewWorkflow(input: PRReviewInput): Promise<PRRevie
     };
   }
   
-  return result.result as PRReviewOutput;
+  return (result as any).result as PRReviewOutput;
 }
 
 /**
@@ -312,7 +312,7 @@ export async function runIssueTriageWorkflow(input: IssueTriageInput): Promise<I
   const mastra = getTsgitMastra();
   const workflow = mastra.getWorkflow('issueTriage');
   
-  const run = await workflow.createRunAsync();
+  const run = await workflow.createRun();
   const result = await run.start({ inputData: input });
   
   if (result.status === 'failed') {
@@ -328,7 +328,7 @@ export async function runIssueTriageWorkflow(input: IssueTriageInput): Promise<I
     };
   }
   
-  return result.result as IssueTriageOutput;
+  return (result as any).result as IssueTriageOutput;
 }
 
 /**
@@ -341,7 +341,7 @@ export async function runCodeGenerationWorkflow(input: CodeGenerationInput): Pro
   const mastra = getTsgitMastra();
   const workflow = mastra.getWorkflow('codeGeneration');
   
-  const run = await workflow.createRunAsync();
+  const run = await workflow.createRun();
   const result = await run.start({ inputData: input });
   
   if (result.status === 'failed') {
@@ -354,7 +354,7 @@ export async function runCodeGenerationWorkflow(input: CodeGenerationInput): Pro
     };
   }
   
-  return result.result as CodeGenerationOutput;
+  return (result as any).result as CodeGenerationOutput;
 }
 
 /**
@@ -367,7 +367,7 @@ export async function* streamPRReviewWorkflow(input: PRReviewInput) {
   const mastra = getTsgitMastra();
   const workflow = mastra.getWorkflow('prReview');
   
-  const run = await workflow.createRunAsync();
+  const run = await workflow.createRun();
   const result = await run.stream({ inputData: input });
   
   for await (const chunk of result.fullStream) {
@@ -385,7 +385,7 @@ export async function* streamIssueTriageWorkflow(input: IssueTriageInput) {
   const mastra = getTsgitMastra();
   const workflow = mastra.getWorkflow('issueTriage');
   
-  const run = await workflow.createRunAsync();
+  const run = await workflow.createRun();
   const result = await run.stream({ inputData: input });
   
   for await (const chunk of result.fullStream) {
@@ -403,7 +403,7 @@ export async function* streamCodeGenerationWorkflow(input: CodeGenerationInput) 
   const mastra = getTsgitMastra();
   const workflow = mastra.getWorkflow('codeGeneration');
   
-  const run = await workflow.createRunAsync();
+  const run = await workflow.createRun();
   const result = await run.stream({ inputData: input });
   
   for await (const chunk of result.fullStream) {

@@ -12,7 +12,7 @@ import * as path from 'path';
 import { VirtualRepository, VirtualRepositoryManager } from '../../../primitives/virtual-repository';
 import { setVirtualRepo, getVirtualRepo, clearVirtualRepo } from '../../../ai/tools/virtual-write-file';
 import { getRepoDiskPath, resolveDiskPath } from '../../../server/storage/repos';
-import { db } from '../../../db';
+import { getDb } from '../../../db';
 import { repositories } from '../../../db/schema';
 import { eq, and } from 'drizzle-orm';
 import { exists } from '../../../utils/fs';
@@ -25,6 +25,7 @@ const sessionManager = new VirtualRepositoryManager();
  */
 async function getRepoPath(owner: string, name: string): Promise<string | null> {
   // Try to get from database first
+  const db = getDb();
   const repo = await db.query.repositories.findFirst({
     where: eq(repositories.name, name),
     with: {
@@ -290,7 +291,7 @@ export const ideRouter = router({
 
       // Create author from user context
       const author = {
-        name: ctx.user.name || ctx.user.username,
+        name: ctx.user.name || ctx.user.username || 'Unknown',
         email: ctx.user.email,
         timestamp: Math.floor(Date.now() / 1000),
         timezone: getTimezone(),

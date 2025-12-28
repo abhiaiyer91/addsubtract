@@ -125,7 +125,7 @@ export const authRouter = router({
 
       return {
         user,
-        sessionId: result.session?.token || '',
+        sessionId: result.token || '',
       };
     }),
 

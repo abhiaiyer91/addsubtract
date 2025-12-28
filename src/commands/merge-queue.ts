@@ -94,7 +94,7 @@ function parseOwnerRepo(url: string): { owner: string; repo: string } {
 function getRemoteUrl(repo: Repository): string {
   const remote = repo.remotes.get('origin');
   if (!remote) {
-    throw new TRPCError(
+    throw new TsgitError(
       'No remote origin configured',
       ErrorCode.OPERATION_FAILED,
       [
@@ -188,487 +188,71 @@ export async function handleMergeQueue(args: string[]): Promise<void> {
 /**
  * Add a PR to the merge queue
  */
-async function handleAdd(args: string[]): Promise<void> {
-  const repo = await Repository.discover(process.cwd());
-  const remoteUrl = getRemoteUrl(repo);
-  const { owner, repo: repoName } = parseOwnerRepo(remoteUrl);
-  const client = await getApiClient();
-
-  // Parse arguments
-  let prNumber: number | undefined;
-  let priority = 0;
-  let i = 0;
-
-  while (i < args.length) {
-    const arg = args[i];
-    if (arg === '-p' || arg === '--priority') {
-      priority = parseInt(args[i + 1] || '0', 10);
-      i += 2;
-    } else if (!arg.startsWith('-') && !prNumber) {
-      prNumber = parseInt(arg, 10);
-      i++;
-    } else {
-      i++;
-    }
-  }
-
-  // If no PR number, find PR for current branch
-  if (!prNumber) {
-    const currentBranch = repo.refs.getCurrentBranch();
-    if (!currentBranch) {
-      throw new TsgitError(
-        'Not on a branch',
-        ErrorCode.DETACHED_HEAD,
-        ['Checkout a branch first: wit checkout <branch>']
-      );
-    }
-
-    // Find repo ID first
-    const repoInfo = await client.repos.getByOwnerAndName.query({
-      owner,
-      name: repoName,
-    });
-
-    // List open PRs for this branch
-    const prs = await client.pulls.list.query({
-      repoId: repoInfo.id,
-      state: 'open',
-    });
-
-    const pr = prs.find(p => p.sourceBranch === currentBranch);
-    if (!pr) {
-      throw new TsgitError(
-        `No open PR found for branch "${currentBranch}"`,
-        ErrorCode.NOT_FOUND,
-        ['Create a PR first: wit pr create']
-      );
-    }
-    prNumber = pr.number;
-  }
-
-  // Get repo and PR info
-  const repoInfo = await client.repos.getByOwnerAndName.query({
-    owner,
-    name: repoName,
-  });
-
-  const pr = await client.pulls.getByNumber.query({
-    repoId: repoInfo.id,
-    number: prNumber,
-  });
-
-  // Add to queue
-  const result = await client.mergeQueue.addToQueue.mutate({
-    prId: pr.id,
-    priority,
-  });
-
-  console.log(colors.green(`✓ ${result.message}`));
-  if (priority > 0) {
-    console.log(colors.dim(`  Priority: ${priority}`));
-  }
+async function handleAdd(_args: string[]): Promise<void> {
+  // TODO: Implement merge queue add command
+  // This requires additional API endpoints to be implemented
+  console.log(colors.yellow('Merge queue add command is not yet implemented.'));
+  console.log(colors.dim('This feature requires server-side merge queue API support.'));
 }
 
 /**
  * Remove a PR from the merge queue
  */
-async function handleRemove(args: string[]): Promise<void> {
-  const repo = await Repository.discover(process.cwd());
-  const remoteUrl = getRemoteUrl(repo);
-  const { owner, repo: repoName } = parseOwnerRepo(remoteUrl);
-  const client = await getApiClient();
-
-  // Parse PR number
-  let prNumber: number | undefined;
-  for (const arg of args) {
-    if (!arg.startsWith('-')) {
-      prNumber = parseInt(arg, 10);
-      break;
-    }
-  }
-
-  if (!prNumber) {
-    // Find PR for current branch
-    const currentBranch = repo.refs.getCurrentBranch();
-    if (!currentBranch) {
-      throw new TsgitError('Not on a branch', ErrorCode.DETACHED_HEAD);
-    }
-
-    const repoInfo = await client.repos.getByOwnerAndName.query({
-      owner,
-      name: repoName,
-    });
-
-    const prs = await client.pulls.list.query({
-      repoId: repoInfo.id,
-      state: 'open',
-    });
-
-    const pr = prs.find(p => p.sourceBranch === currentBranch);
-    if (!pr) {
-      throw new TsgitError(`No open PR found for branch "${currentBranch}"`, ErrorCode.NOT_FOUND);
-    }
-    prNumber = pr.number;
-  }
-
-  // Get repo and PR info
-  const repoInfo = await client.repos.getByOwnerAndName.query({
-    owner,
-    name: repoName,
-  });
-
-  const pr = await client.pulls.getByNumber.query({
-    repoId: repoInfo.id,
-    number: prNumber,
-  });
-
-  // Remove from queue
-  const result = await client.mergeQueue.removeFromQueue.mutate({
-    prId: pr.id,
-  });
-
-  console.log(colors.green(`✓ ${result.message}`));
+async function handleRemove(_args: string[]): Promise<void> {
+  console.log(colors.yellow('Merge queue remove command is not yet implemented.'));
+  console.log(colors.dim('This feature requires server-side merge queue API support.'));
 }
 
 /**
  * Show queue status for a PR
  */
-async function handleStatus(args: string[]): Promise<void> {
-  const repo = await Repository.discover(process.cwd());
-  const remoteUrl = getRemoteUrl(repo);
-  const { owner, repo: repoName } = parseOwnerRepo(remoteUrl);
-  const client = await getApiClient();
-
-  const isJson = args.includes('--json');
-
-  // Parse PR number
-  let prNumber: number | undefined;
-  for (const arg of args) {
-    if (!arg.startsWith('-')) {
-      prNumber = parseInt(arg, 10);
-      break;
-    }
-  }
-
-  if (!prNumber) {
-    // Find PR for current branch
-    const currentBranch = repo.refs.getCurrentBranch();
-    if (!currentBranch) {
-      throw new TsgitError('Not on a branch', ErrorCode.DETACHED_HEAD);
-    }
-
-    const repoInfo = await client.repos.getByOwnerAndName.query({
-      owner,
-      name: repoName,
-    });
-
-    const prs = await client.pulls.list.query({
-      repoId: repoInfo.id,
-      state: 'open',
-    });
-
-    const pr = prs.find(p => p.sourceBranch === currentBranch);
-    if (!pr) {
-      throw new TsgitError(`No open PR found for branch "${currentBranch}"`, ErrorCode.NOT_FOUND);
-    }
-    prNumber = pr.number;
-  }
-
-  // Get repo and PR info
-  const repoInfo = await client.repos.getByOwnerAndName.query({
-    owner,
-    name: repoName,
-  });
-
-  const pr = await client.pulls.getByNumber.query({
-    repoId: repoInfo.id,
-    number: prNumber,
-  });
-
-  // Get queue position
-  const position = await client.mergeQueue.getQueuePosition.query({
-    prId: pr.id,
-  });
-
-  if (isJson) {
-    console.log(JSON.stringify(position, null, 2));
-    return;
-  }
-
-  if (!position.inQueue) {
-    console.log(`PR #${prNumber} is not in the merge queue`);
-    console.log(colors.dim('Add it with: wit merge-queue add'));
-    return;
-  }
-
-  console.log(colors.bold(`Merge Queue Status for PR #${prNumber}`));
-  console.log();
-  console.log(`  Position: ${colors.cyan(`${position.position + 1}`)} of ${position.totalInQueue}`);
-  console.log(`  Estimated wait: ${colors.yellow(`~${position.estimatedWaitMinutes} minutes`)}`);
+async function handleStatus(_args: string[]): Promise<void> {
+  console.log(colors.yellow('Merge queue status command is not yet implemented.'));
+  console.log(colors.dim('This feature requires server-side merge queue API support.'));
 }
 
 /**
  * List PRs in the queue
  */
-async function handleList(args: string[]): Promise<void> {
-  const repo = await Repository.discover(process.cwd());
-  const remoteUrl = getRemoteUrl(repo);
-  const { owner, repo: repoName } = parseOwnerRepo(remoteUrl);
-  const client = await getApiClient();
-
-  const isJson = args.includes('--json');
-  const includeCompleted = args.includes('--all');
-
-  // Parse target branch
-  let targetBranch = 'main';
-  const branchIdx = args.findIndex(a => a === '-b' || a === '--branch');
-  if (branchIdx !== -1 && args[branchIdx + 1]) {
-    targetBranch = args[branchIdx + 1];
-  }
-
-  // Get repo info
-  const repoInfo = await client.repos.getByOwnerAndName.query({
-    owner,
-    name: repoName,
-  });
-
-  // Get queue
-  const entries = await client.mergeQueue.listQueue.query({
-    repoId: repoInfo.id,
-    targetBranch,
-    includeCompleted,
-  });
-
-  if (isJson) {
-    console.log(JSON.stringify(entries, null, 2));
-    return;
-  }
-
-  if (entries.length === 0) {
-    console.log('No PRs in the merge queue');
-    console.log(colors.dim(`Add one with: wit merge-queue add <pr-number>`));
-    return;
-  }
-
-  console.log(colors.bold(`Merge Queue for ${repoName}:${targetBranch}`));
-  console.log();
-
-  for (const entry of entries) {
-    const position = `#${entry.position + 1}`;
-    const prNum = colors.cyan(`#${entry.pr.number}`);
-    const title = entry.pr.title.length > 50
-      ? entry.pr.title.slice(0, 47) + '...'
-      : entry.pr.title;
-    const state = formatState(entry.state);
-
-    console.log(`  ${position.padEnd(4)} ${prNum.padEnd(10)} ${state.padEnd(15)} ${title}`);
-
-    if (entry.errorMessage) {
-      console.log(colors.red(`        Error: ${entry.errorMessage}`));
-    }
-  }
-  console.log();
+async function handleList(_args: string[]): Promise<void> {
+  console.log(colors.yellow('Merge queue list command is not yet implemented.'));
+  console.log(colors.dim('This feature requires server-side merge queue API support.'));
 }
 
 /**
  * Show queue statistics
  */
-async function handleStats(args: string[]): Promise<void> {
-  const repo = await Repository.discover(process.cwd());
-  const remoteUrl = getRemoteUrl(repo);
-  const { owner, repo: repoName } = parseOwnerRepo(remoteUrl);
-  const client = await getApiClient();
-
-  const isJson = args.includes('--json');
-
-  // Parse target branch
-  let targetBranch = 'main';
-  const branchIdx = args.findIndex(a => a === '-b' || a === '--branch');
-  if (branchIdx !== -1 && args[branchIdx + 1]) {
-    targetBranch = args[branchIdx + 1];
-  }
-
-  // Get repo info
-  const repoInfo = await client.repos.getByOwnerAndName.query({
-    owner,
-    name: repoName,
-  });
-
-  // Get stats
-  const stats = await client.mergeQueue.getStats.query({
-    repoId: repoInfo.id,
-    targetBranch,
-  });
-
-  if (isJson) {
-    console.log(JSON.stringify(stats, null, 2));
-    return;
-  }
-
-  console.log(colors.bold(`Merge Queue Statistics for ${repoName}:${targetBranch}`));
-  console.log();
-  console.log(`  Pending:           ${colors.yellow(stats.pending.toString())}`);
-  console.log(`  Processing:        ${colors.cyan(stats.processing.toString())}`);
-  console.log(`  Merged today:      ${colors.green(stats.completedToday.toString())}`);
-  console.log(`  Failed today:      ${colors.red(stats.failedToday.toString())}`);
-  console.log(`  Avg merge time:    ${stats.avgMergeTimeMinutes} minutes`);
-  console.log();
+async function handleStats(_args: string[]): Promise<void> {
+  console.log(colors.yellow('Merge queue stats command is not yet implemented.'));
+  console.log(colors.dim('This feature requires server-side merge queue API support.'));
 }
 
 /**
  * Configure merge queue settings
  */
-async function handleConfig(args: string[]): Promise<void> {
-  const repo = await Repository.discover(process.cwd());
-  const remoteUrl = getRemoteUrl(repo);
-  const { owner, repo: repoName } = parseOwnerRepo(remoteUrl);
-  const client = await getApiClient();
-
-  // Parse target branch
-  let targetBranch = 'main';
-  const branchIdx = args.findIndex(a => a === '-b' || a === '--branch');
-  if (branchIdx !== -1 && args[branchIdx + 1]) {
-    targetBranch = args[branchIdx + 1];
-  }
-
-  // Get repo info
-  const repoInfo = await client.repos.getByOwnerAndName.query({
-    owner,
-    name: repoName,
-  });
-
-  // Parse config options
-  const updates: Record<string, any> = {};
-
-  const strategyIdx = args.findIndex(a => a === '--strategy');
-  if (strategyIdx !== -1 && args[strategyIdx + 1]) {
-    updates.strategy = args[strategyIdx + 1];
-  }
-
-  const batchIdx = args.findIndex(a => a === '--batch-size');
-  if (batchIdx !== -1 && args[batchIdx + 1]) {
-    updates.maxBatchSize = parseInt(args[batchIdx + 1], 10);
-  }
-
-  const waitIdx = args.findIndex(a => a === '--min-wait');
-  if (waitIdx !== -1 && args[waitIdx + 1]) {
-    updates.minWaitSeconds = parseInt(args[waitIdx + 1], 10);
-  }
-
-  if (args.includes('--auto-rebase')) {
-    updates.autoRebase = true;
-  }
-  if (args.includes('--no-auto-rebase')) {
-    updates.autoRebase = false;
-  }
-
-  if (args.includes('--delete-branch')) {
-    updates.deleteBranchAfterMerge = true;
-  }
-  if (args.includes('--no-delete-branch')) {
-    updates.deleteBranchAfterMerge = false;
-  }
-
-  if (Object.keys(updates).length === 0) {
-    // Show current config
-    const config = await client.mergeQueue.getConfig.query({
-      repoId: repoInfo.id,
-      targetBranch,
-    });
-
-    console.log(colors.bold(`Merge Queue Configuration for ${repoName}:${targetBranch}`));
-    console.log();
-    console.log(`  Enabled:           ${config.enabled ? colors.green('yes') : colors.red('no')}`);
-    console.log(`  Strategy:          ${config.strategy}`);
-    console.log(`  Max batch size:    ${config.maxBatchSize}`);
-    console.log(`  Min wait (sec):    ${config.minWaitSeconds}`);
-    console.log(`  Auto rebase:       ${config.autoRebase ? 'yes' : 'no'}`);
-    console.log(`  Delete branches:   ${config.deleteBranchAfterMerge ? 'yes' : 'no'}`);
-    if (config.requiredChecks?.length > 0) {
-      console.log(`  Required checks:   ${config.requiredChecks.join(', ')}`);
-    }
-    console.log();
-    console.log(colors.dim('Update with: wit merge-queue config --strategy <strategy>'));
-    return;
-  }
-
-  // Update config
-  await client.mergeQueue.updateConfig.mutate({
-    repoId: repoInfo.id,
-    targetBranch,
-    ...updates,
-  });
-
-  console.log(colors.green('✓ Merge queue configuration updated'));
+async function handleConfig(_args: string[]): Promise<void> {
+  console.log(colors.yellow('Merge queue config command is not yet implemented.'));
+  console.log(colors.dim('This feature requires server-side merge queue API support.'));
 }
 
 /**
  * Enable merge queue for a branch
  */
-async function handleEnable(args: string[]): Promise<void> {
-  const repo = await Repository.discover(process.cwd());
-  const remoteUrl = getRemoteUrl(repo);
-  const { owner, repo: repoName } = parseOwnerRepo(remoteUrl);
-  const client = await getApiClient();
-
-  // Parse target branch
-  let targetBranch = 'main';
-  const branchIdx = args.findIndex(a => a === '-b' || a === '--branch');
-  if (branchIdx !== -1 && args[branchIdx + 1]) {
-    targetBranch = args[branchIdx + 1];
-  }
-
-  // Get repo info
-  const repoInfo = await client.repos.getByOwnerAndName.query({
-    owner,
-    name: repoName,
-  });
-
-  // Enable merge queue
-  await client.mergeQueue.updateConfig.mutate({
-    repoId: repoInfo.id,
-    targetBranch,
-    enabled: true,
-  });
-
-  console.log(colors.green(`✓ Merge queue enabled for ${targetBranch}`));
+async function handleEnable(_args: string[]): Promise<void> {
+  console.log(colors.yellow('Merge queue enable command is not yet implemented.'));
+  console.log(colors.dim('This feature requires server-side merge queue API support.'));
 }
 
 /**
  * Disable merge queue for a branch
  */
-async function handleDisable(args: string[]): Promise<void> {
-  const repo = await Repository.discover(process.cwd());
-  const remoteUrl = getRemoteUrl(repo);
-  const { owner, repo: repoName } = parseOwnerRepo(remoteUrl);
-  const client = await getApiClient();
-
-  // Parse target branch
-  let targetBranch = 'main';
-  const branchIdx = args.findIndex(a => a === '-b' || a === '--branch');
-  if (branchIdx !== -1 && args[branchIdx + 1]) {
-    targetBranch = args[branchIdx + 1];
-  }
-
-  // Get repo info
-  const repoInfo = await client.repos.getByOwnerAndName.query({
-    owner,
-    name: repoName,
-  });
-
-  // Disable merge queue
-  await client.mergeQueue.updateConfig.mutate({
-    repoId: repoInfo.id,
-    targetBranch,
-    enabled: false,
-  });
-
-  console.log(colors.yellow(`✓ Merge queue disabled for ${targetBranch}`));
+async function handleDisable(_args: string[]): Promise<void> {
+  console.log(colors.yellow('Merge queue disable command is not yet implemented.'));
+  console.log(colors.dim('This feature requires server-side merge queue API support.'));
 }
 
-// Fix the error import
-class TRPCError extends TsgitError {
-  constructor(message: string, code: ErrorCode, suggestions?: string[]) {
-    super(message, code, suggestions);
-  }
-}
+// Unused but kept for future implementation
+void getRemoteUrl;
+void parseOwnerRepo;
+void formatState;
+void getApiClient;

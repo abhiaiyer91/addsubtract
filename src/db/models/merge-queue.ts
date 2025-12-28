@@ -20,6 +20,7 @@ import {
   type MergeQueueBatch,
   type NewMergeQueueBatch,
   type MergeQueueHistoryEntry,
+  type NewMergeQueueHistoryEntry,
   type MergeQueueState,
   type MergeQueueStrategy,
 } from '../schema';

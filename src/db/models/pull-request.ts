@@ -528,8 +528,7 @@ export const prCommentModel = {
   async create(data: NewPrComment): Promise<PrComment> {
     const db = getDb();
     const [comment] = await db.insert(prComments).values(data).returning();
-    // Return comment with authorId alias
-    return { ...comment, authorId: comment.userId };
+    return comment;
   },
 
   /**
