@@ -26,7 +26,6 @@ export function IssueDetailPage() {
     number: string;
   }>();
   const [comment, setComment] = useState('');
-  const [selectedLabels, setSelectedLabels] = useState<Label[]>([]);
   const { data: session } = useSession();
   const authenticated = !!session?.user;
   const currentUser = session?.user || null;
@@ -243,6 +242,67 @@ export function IssueDetailPage() {
     },
   });
 
+  const addLabelMutation = trpc.issues.addLabel.useMutation({
+    onMutate: async ({ labelId }) => {
+      await utils.issues.get.cancel({ repoId: repoData?.repo.id!, number: issueNumber });
+      const previousIssue = utils.issues.get.getData({ repoId: repoData?.repo.id!, number: issueNumber });
+      const labelToAdd = availableLabels?.find((l) => l.id === labelId);
+      if (labelToAdd) {
+        utils.issues.get.setData(
+          { repoId: repoData?.repo.id!, number: issueNumber },
+          (old) => old ? { ...old, labels: [...(old.labels || []), labelToAdd] } : old
+        );
+      }
+      return { previousIssue };
+    },
+    onError: (error, _variables, context) => {
+      if (context?.previousIssue) {
+        utils.issues.get.setData(
+          { repoId: repoData?.repo.id!, number: issueNumber },
+          context.previousIssue
+        );
+      }
+      toastError({
+        title: 'Failed to add label',
+        description: error.message,
+      });
+    },
+    onSettled: () => {
+      utils.issues.get.invalidate({ repoId: repoData?.repo.id!, number: issueNumber });
+      utils.issues.list.invalidate({ repoId: repoData?.repo.id! });
+      utils.issues.listGroupedByStatus.invalidate({ repoId: repoData?.repo.id! });
+    },
+  });
+
+  const removeLabelMutation = trpc.issues.removeLabel.useMutation({
+    onMutate: async ({ labelId }) => {
+      await utils.issues.get.cancel({ repoId: repoData?.repo.id!, number: issueNumber });
+      const previousIssue = utils.issues.get.getData({ repoId: repoData?.repo.id!, number: issueNumber });
+      utils.issues.get.setData(
+        { repoId: repoData?.repo.id!, number: issueNumber },
+        (old) => old ? { ...old, labels: (old.labels || []).filter((l) => l.id !== labelId) } : old
+      );
+      return { previousIssue };
+    },
+    onError: (error, _variables, context) => {
+      if (context?.previousIssue) {
+        utils.issues.get.setData(
+          { repoId: repoData?.repo.id!, number: issueNumber },
+          context.previousIssue
+        );
+      }
+      toastError({
+        title: 'Failed to remove label',
+        description: error.message,
+      });
+    },
+    onSettled: () => {
+      utils.issues.get.invalidate({ repoId: repoData?.repo.id!, number: issueNumber });
+      utils.issues.list.invalidate({ repoId: repoData?.repo.id! });
+      utils.issues.listGroupedByStatus.invalidate({ repoId: repoData?.repo.id! });
+    },
+  });
+
   const handleProjectChange = (newProject: { id: string; name: string; icon: string | null } | null) => {
     if (!issueData?.id) return;
     assignToProjectMutation.mutate({
@@ -257,6 +317,33 @@ export function IssueDetailPage() {
       issueId: issueData.id,
       priority,
     });
+  };
+
+  const handleLabelsChange = (newLabels: Label[]) => {
+    if (!issueData?.id) return;
+    const currentLabels = issueData.labels || [];
+    const currentLabelIds = new Set(currentLabels.map((l) => l.id));
+    const newLabelIds = new Set(newLabels.map((l) => l.id));
+
+    // Find labels to add (in newLabels but not in current)
+    for (const label of newLabels) {
+      if (!currentLabelIds.has(label.id)) {
+        addLabelMutation.mutate({
+          issueId: issueData.id,
+          labelId: label.id,
+        });
+      }
+    }
+
+    // Find labels to remove (in current but not in newLabels)
+    for (const label of currentLabels) {
+      if (!newLabelIds.has(label.id)) {
+        removeLabelMutation.mutate({
+          issueId: issueData.id,
+          labelId: label.id,
+        });
+      }
+    }
   };
 
   const isLoading = repoLoading || issueLoading;
@@ -498,8 +585,8 @@ export function IssueDetailPage() {
           <div>
             <LabelPicker
               availableLabels={availableLabels || []}
-              selectedLabels={selectedLabels}
-              onLabelsChange={setSelectedLabels}
+              selectedLabels={issue.labels || []}
+              onLabelsChange={handleLabelsChange}
             />
           </div>
 
