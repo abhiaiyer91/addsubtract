@@ -10,12 +10,14 @@ import {
   FileCode,
   Star,
   Lock,
+  Sparkles,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { trpc } from '@/lib/trpc';
 
 type SearchType = 'all' | 'code' | 'repositories' | 'issues' | 'prs';
@@ -105,6 +107,21 @@ export function SearchPage() {
         </TabsList>
       </Tabs>
 
+      {/* AI Status Banner for Code Search */}
+      {activeType === 'code' && queryParam && !aiStatus?.features?.semanticSearch && (
+        <Alert className="mb-4 border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950">
+          <Sparkles className="h-4 w-4 text-amber-600" />
+          <AlertDescription className="text-amber-800 dark:text-amber-200">
+            <strong>Using text search.</strong> AI-powered semantic search finds code by meaning, not just keywords.
+            {' '}
+            <Link to="/settings/ai" className="underline hover:no-underline font-medium">
+              Add an OpenAI API key
+            </Link>
+            {' '}to enable semantic search.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Results */}
       {!queryParam ? (
         <EmptyState />
@@ -114,10 +131,8 @@ export function SearchPage() {
         </div>
       ) : searchResults?.results?.length === 0 ? (
         <NoResults query={queryParam} type={activeType} />
-      ) : activeType === 'code' ? (
-        <CodeSearchPlaceholder aiAvailable={aiStatus?.available || false} />
       ) : (
-        <SearchResults results={searchResults?.results || []} />
+        <SearchResults results={searchResults?.results || []} activeType={activeType} aiStatus={aiStatus} />
       )}
     </div>
   );
@@ -157,49 +172,16 @@ function NoResults({ query, type }: { query: string; type: string }) {
   );
 }
 
-function CodeSearchPlaceholder({ aiAvailable }: { aiAvailable: boolean }) {
-  return (
-    <Card className="bg-primary/5 border-primary/20">
-      <CardContent className="p-8">
-        <div className="flex items-start gap-4">
-          <div className="p-3 bg-primary/10 rounded-lg">
-            <Code className="h-6 w-6 text-primary" />
-          </div>
-          <div className="flex-1">
-            <h3 className="text-lg font-semibold mb-2">Semantic Code Search</h3>
-            <p className="text-muted-foreground mb-4">
-              {aiAvailable ? (
-                <>
-                  Code search uses AI to understand your query and find semantically relevant code.
-                  Search by meaning, not just keywords.
-                </>
-              ) : (
-                <>
-                  Semantic code search requires AI configuration.
-                  Configure an AI provider to enable natural language code search.
-                </>
-              )}
-            </p>
-            
-            <div className="space-y-3">
-              <p className="text-sm font-medium">Example queries:</p>
-              <div className="flex flex-wrap gap-2">
-                <Badge variant="secondary">"where is authentication handled"</Badge>
-                <Badge variant="secondary">"function that validates email"</Badge>
-                <Badge variant="secondary">"error handling in API calls"</Badge>
-              </div>
-            </div>
-
-            {!aiAvailable && (
-              <p className="text-sm text-muted-foreground mt-4">
-                To enable: Set <code className="bg-muted px-1.5 py-0.5 rounded text-xs">OPENAI_API_KEY</code> environment variable.
-              </p>
-            )}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
+function SemanticSearchBadge({ enabled }: { enabled: boolean }) {
+  if (enabled) {
+    return (
+      <div className="mb-4 flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
+        <Sparkles className="h-4 w-4" />
+        <span>AI-powered semantic search is active</span>
+      </div>
+    );
+  }
+  return null;
 }
 
 interface SearchResult {
@@ -212,14 +194,32 @@ interface SearchResult {
   metadata?: Record<string, any>;
 }
 
-function SearchResults({ results }: { results: SearchResult[] }) {
+function SearchResults({ results, activeType, aiStatus }: { results: SearchResult[]; activeType: SearchType; aiStatus: any }) {
+  const codeResults = results.filter(r => r.type === 'code');
+  const otherResults = results.filter(r => r.type !== 'code');
+  
   return (
     <div className="space-y-3">
+      {/* Show semantic search badge when viewing code results */}
+      {activeType === 'code' && <SemanticSearchBadge enabled={aiStatus?.features?.semanticSearch} />}
+      
       <p className="text-sm text-muted-foreground mb-4">
         {results.length} result{results.length !== 1 ? 's' : ''}
+        {activeType === 'code' && !aiStatus?.features?.semanticSearch && (
+          <span className="ml-2 text-amber-600">(text search)</span>
+        )}
+        {activeType === 'code' && aiStatus?.features?.semanticSearch && (
+          <span className="ml-2 text-green-600">(semantic search)</span>
+        )}
       </p>
       
-      {results.map((result) => (
+      {/* Show code results first when on code tab */}
+      {activeType === 'code' && codeResults.map((result) => (
+        <SearchResultCard key={result.id} result={result} />
+      ))}
+      
+      {/* Show other results */}
+      {(activeType !== 'code' ? results : otherResults).map((result) => (
         <SearchResultCard key={result.id} result={result} />
       ))}
     </div>

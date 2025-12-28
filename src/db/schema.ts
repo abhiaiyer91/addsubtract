@@ -1526,6 +1526,38 @@ export const repoAiKeys = pgTable('repo_ai_keys', {
   uniqueProviderPerRepo: unique().on(table.repoId, table.provider),
 }));
 
+// ============ USER AI KEYS ============
+
+/**
+ * User AI Keys table
+ * Stores encrypted API keys for AI providers per user
+ * Users can set their own keys to use across all repositories
+ */
+export const userAiKeys = pgTable('user_ai_keys', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  
+  // User this key belongs to
+  userId: text('user_id')
+    .notNull()
+    .references(() => authUser.id, { onDelete: 'cascade' }),
+  
+  // AI provider (openai, anthropic)
+  provider: aiProviderEnum('provider').notNull(),
+  
+  // Encrypted API key (we store encrypted, never plain text)
+  encryptedKey: text('encrypted_key').notNull(),
+  
+  // Last 4 characters of the key for display (e.g., "...xyz1")
+  keyHint: text('key_hint').notNull(),
+  
+  // Timestamps
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  // Only one key per provider per user
+  uniqueProviderPerUser: unique().on(table.userId, table.provider),
+}));
+
 // ============ TRIAGE AGENT CONFIGURATION ============
 
 /**
