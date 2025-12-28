@@ -49,9 +49,9 @@ function parseOptions(args: string[]): {
   help: boolean;
 } {
   const options = {
-    port: 3000,
-    reposDir: './repos',
-    host: '0.0.0.0',
+    port: parseInt(process.env.PORT || '3000', 10),
+    reposDir: process.env.REPOS_DIR || './repos',
+    host: process.env.HOST || '0.0.0.0',
     verbose: false,
     help: false,
   };
