@@ -7,6 +7,7 @@ import { RepoLayout } from './components/repo-layout';
 import { useSession } from '@/lib/auth-client';
 import { trpc } from '@/lib/trpc';
 import { Loading } from '@/components/ui/loading';
+import { useIDEStore } from '@/lib/ide-store';
 
 export function BlobPage() {
   const { owner, repo, ref, '*': path } = useParams<{
@@ -21,6 +22,7 @@ export function BlobPage() {
   const filename = filePath.split('/').pop() || '';
   const { data: session } = useSession();
   const authenticated = !!session?.user;
+  const { setIDEMode, openFile } = useIDEStore();
 
   // Fetch real file data from tRPC
   const { data: fileData, isLoading: fileLoading, error: fileError } = trpc.repos.getFile.useQuery(
@@ -115,7 +117,26 @@ export function BlobPage() {
             </Button>
           </Link>
           {authenticated && (
-            <Button variant="outline" size="sm" className="gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="gap-2"
+              onClick={() => {
+                // Detect language from filename
+                const ext = filename.split('.').pop()?.toLowerCase() || '';
+                const langMap: Record<string, string> = {
+                  ts: 'typescript', tsx: 'typescript', js: 'javascript', jsx: 'javascript',
+                  py: 'python', rb: 'ruby', go: 'go', rs: 'rust', java: 'java',
+                  md: 'markdown', json: 'json', yaml: 'yaml', yml: 'yaml',
+                  html: 'html', css: 'css', scss: 'scss', sql: 'sql',
+                };
+                const language = langMap[ext] || 'plaintext';
+                
+                // Open file in IDE and switch to IDE mode
+                openFile(filePath, fileContent, language);
+                setIDEMode(true);
+              }}
+            >
               <Pencil className="h-4 w-4" />
               Edit
             </Button>
