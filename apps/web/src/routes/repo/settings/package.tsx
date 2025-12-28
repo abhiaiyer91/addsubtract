@@ -48,8 +48,8 @@ export function PackageSettingsPage() {
 
   // Get package info for this repo
   const { data: packageData, isLoading: packageLoading } = trpc.packages.getByRepoId.useQuery(
-    { repoId: repoData?.id ?? '' },
-    { enabled: !!repoData?.id }
+    { repoId: repoData?.repo.id ?? '' },
+    { enabled: !!repoData?.repo.id }
   );
 
   // Initialize form state from package data
@@ -62,7 +62,7 @@ export function PackageSettingsPage() {
     } else if (repoData) {
       // Default values for new package
       setIsEnabled(false);
-      setPackageName(repoData.name);
+      setPackageName(repoData.repo.name);
       setPackageScope(owner ?? '');
       setPublishOnRelease(false);
     }
@@ -75,9 +75,9 @@ export function PackageSettingsPage() {
         title: 'Package registry enabled',
         description: `Package ${data.fullName} is now available.`,
       });
-      utils.packages.getByRepoId.invalidate({ repoId: repoData?.id ?? '' });
+      utils.packages.getByRepoId.invalidate({ repoId: repoData?.repo.id ?? '' });
     },
-    onError: (err) => {
+    onError: (err: Error) => {
       toast({
         title: 'Failed to enable package registry',
         description: err.message,
@@ -94,9 +94,9 @@ export function PackageSettingsPage() {
         description: 'Package registry has been disabled for this repository.',
       });
       setIsEnabled(false);
-      utils.packages.getByRepoId.invalidate({ repoId: repoData?.id ?? '' });
+      utils.packages.getByRepoId.invalidate({ repoId: repoData?.repo.id ?? '' });
     },
-    onError: (err) => {
+    onError: (err: Error) => {
       toast({
         title: 'Failed to disable package registry',
         description: err.message,
@@ -112,9 +112,9 @@ export function PackageSettingsPage() {
         title: 'Package settings updated',
         description: 'Your package settings have been saved.',
       });
-      utils.packages.getByRepoId.invalidate({ repoId: repoData?.id ?? '' });
+      utils.packages.getByRepoId.invalidate({ repoId: repoData?.repo.id ?? '' });
     },
-    onError: (err) => {
+    onError: (err: Error) => {
       toast({
         title: 'Failed to update package',
         description: err.message,
@@ -128,7 +128,7 @@ export function PackageSettingsPage() {
 
     if (enabled) {
       enableMutation.mutate({
-        repoId: repoData.id,
+        repoId: repoData.repo.id,
         name: packageName,
         scope: packageScope || null,
         publishOnRelease,
@@ -143,7 +143,7 @@ export function PackageSettingsPage() {
       ) {
         return;
       }
-      disableMutation.mutate({ repoId: repoData.id });
+      disableMutation.mutate({ repoId: repoData.repo.id });
     }
     setIsEnabled(enabled);
   };
@@ -199,7 +199,7 @@ export function PackageSettingsPage() {
   }
 
   // Only owners can manage package settings
-  const isOwner = session?.user?.id === repoData.ownerId;
+  const isOwner = session?.user?.id === repoData.repo.ownerId;
   if (!isOwner) {
     return (
       <RepoLayout owner={owner!} repo={repo!}>
