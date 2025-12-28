@@ -1527,9 +1527,7 @@ function PanelWrapper({
             </div>
             <span className="font-semibold text-sm text-zinc-100">wit AI</span>
             {repoName && (
-              <span className="text-xs text-zinc-500">
-                {owner}/{repoName}
-              </span>
+              <span className="text-xs text-zinc-500">{owner}/{repoName}</span>
             )}
           </div>
           <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 text-zinc-400 hover:text-zinc-200">
