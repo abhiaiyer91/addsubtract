@@ -240,7 +240,7 @@ export function KanbanBoard({
             <div
               key={status}
               className={cn(
-                'flex-shrink-0 w-72 flex flex-col rounded-lg border bg-card',
+                'flex-shrink-0 w-72 flex flex-col rounded-lg border bg-card h-fit',
                 isDropTarget && 'ring-2 ring-primary ring-offset-2'
               )}
               onDragOver={(e) => handleDragOver(e, status)}
