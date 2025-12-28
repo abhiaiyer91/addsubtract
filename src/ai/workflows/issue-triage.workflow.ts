@@ -643,12 +643,12 @@ const applyTriageStep = createStep({
       
       // Add triage comment
       if (inputData.addTriageComment) {
-        const botUser = await userModel.findByUsername('wit-bot');
+        const botUser = await userModel.getOrCreateBotUser();
         const commentBody = formatTriageComment(inputData);
         
         const comment = await issueCommentModel.create({
           issueId: inputData.issueId,
-          userId: botUser?.id || inputData.authorId,
+          userId: botUser.id,
           body: commentBody,
         });
         triageCommentId = comment.id;

@@ -826,27 +826,18 @@ const createReviewStep = createStep({
       const reviewBody = formatReviewAsMarkdown(inputData);
       
       // Get or create bot user
-      const botUser = await userModel.findByUsername('wit-bot');
+      const botUser = await userModel.getOrCreateBotUser();
       
-      if (botUser) {
-        // Create as a proper PR review
-        const reviewState = inputData.approved ? 'approved' : 'changes_requested';
-        const review = await prReviewModel.create({
-          prId: inputData.prId,
-          userId: botUser.id,
-          state: reviewState as 'approved' | 'changes_requested' | 'commented',
-          body: reviewBody,
-          commitSha: inputData.headSha,
-        });
-        reviewId = review.id;
-      } else {
-        // Fall back to comment
-        await prCommentModel.create({
-          prId: inputData.prId,
-          userId: inputData.authorId,
-          body: reviewBody,
-        });
-      }
+      // Create as a proper PR review
+      const reviewState = inputData.approved ? 'approved' : 'changes_requested';
+      const review = await prReviewModel.create({
+        prId: inputData.prId,
+        userId: botUser.id,
+        state: reviewState as 'approved' | 'changes_requested' | 'commented',
+        body: reviewBody,
+        commitSha: inputData.headSha,
+      });
+      reviewId = review.id;
       
       // Apply labels based on review findings
       if (inputData.securityConcerns.length > 0) {

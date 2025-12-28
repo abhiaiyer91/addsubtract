@@ -6,6 +6,11 @@ import { user } from '../auth-schema';
 export type User = typeof user.$inferSelect;
 export type NewUser = typeof user.$inferInsert;
 
+// Bot user constants
+const BOT_USERNAME = 'wit-bot';
+const BOT_EMAIL = 'bot@wit.dev';
+const BOT_NAME = 'Wit Bot';
+
 export const userModel = {
   /**
    * Find a user by their ID
@@ -124,5 +129,25 @@ export const userModel = {
     const db = getDb();
     const result = await db.delete(user).where(eq(user.id, id)).returning();
     return result.length > 0;
+  },
+
+  /**
+   * Get or create the AI bot user
+   * This user is used as the author for AI-generated comments, reviews, etc.
+   */
+  async getOrCreateBotUser(): Promise<User> {
+    // Try to find existing bot user
+    const existing = await this.findByUsername(BOT_USERNAME);
+    if (existing) {
+      return existing;
+    }
+
+    // Create the bot user
+    console.log('[UserModel] Creating wit-bot user');
+    return this.create({
+      name: BOT_NAME,
+      email: BOT_EMAIL,
+      username: BOT_USERNAME,
+    });
   },
 };

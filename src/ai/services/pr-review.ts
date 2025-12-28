@@ -427,19 +427,9 @@ function formatReviewAsMarkdown(result: AIReviewResult): string {
 
 /**
  * Get or create the AI bot user
- * Returns null if no bot user exists and we can't create reviews
  */
-async function getAIBotUser(): Promise<{ id: string } | null> {
-  // Try to find existing bot user
-  const botUser = await userModel.findByUsername('wit-bot');
-  if (botUser) {
-    return { id: botUser.id };
-  }
-
-  // For now, return null - the bot user should be created during setup/seeding
-  // In production, you'd want to auto-create this user
-  console.warn('[AI Review] No wit-bot user found. AI reviews will be stored as comments instead.');
-  return null;
+async function getAIBotUser(): Promise<{ id: string }> {
+  return userModel.getOrCreateBotUser();
 }
 
 /**
