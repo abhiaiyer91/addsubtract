@@ -596,7 +596,21 @@ const applyTriageStep = createStep({
       const { issueModel, issueLabelModel, labelModel, issueCommentModel, userModel } = 
         await import('../../db/models/index.js');
       
-      // Apply labels
+      // Always add the ai-triage label to mark this issue as triaged
+      const AI_TRIAGE_LABEL = 'ai-triage';
+      let triageLabel = await labelModel.findByName(inputData.repoId, AI_TRIAGE_LABEL);
+      if (!triageLabel) {
+        triageLabel = await labelModel.create({
+          repoId: inputData.repoId,
+          name: AI_TRIAGE_LABEL,
+          color: '#7c3aed', // Purple color for AI triage
+          description: 'Issue has been analyzed by AI triage',
+        });
+      }
+      await issueLabelModel.add(inputData.issueId, triageLabel.id);
+      appliedLabels.push(AI_TRIAGE_LABEL);
+      
+      // Apply suggested labels
       if (inputData.autoAssignLabels) {
         for (const labelName of inputData.suggestedLabels) {
           let label = await labelModel.findByName(inputData.repoId, labelName);
