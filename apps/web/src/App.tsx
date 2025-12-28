@@ -53,6 +53,10 @@ import { NewJournalPage } from './routes/repo/journal/page-new';
 import { SettingsPage } from './routes/settings';
 import { SSHKeysPage } from './routes/settings/keys';
 import { TokensPage } from './routes/settings/tokens';
+import { OAuthAppsPage } from './routes/settings/oauth-apps';
+import { OAuthAppDetailPage } from './routes/settings/oauth-app-detail';
+import { AuthorizedAppsPage } from './routes/settings/authorized-apps';
+import { OAuthAuthorizePage } from './routes/oauth/authorize';
 import { NewRepoPage } from './routes/new';
 import { NewOrgPage } from './routes/org/new';
 import { OrgPage } from './routes/org';
@@ -97,6 +101,10 @@ export function App() {
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/settings/keys" element={<SSHKeysPage />} />
             <Route path="/settings/tokens" element={<TokensPage />} />
+            <Route path="/settings/oauth-apps" element={<OAuthAppsPage />} />
+            <Route path="/settings/oauth-apps/:id" element={<OAuthAppDetailPage />} />
+            <Route path="/settings/authorized-apps" element={<AuthorizedAppsPage />} />
+            <Route path="/oauth/authorize" element={<OAuthAuthorizePage />} />
             <Route path="/new" element={<NewRepoPage />} />
             <Route path="/orgs/new" element={<NewOrgPage />} />
             <Route path="/search" element={<SearchPage />} />

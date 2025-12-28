@@ -1607,6 +1607,248 @@ export const journalPageHistory = pgTable('journal_page_history', {
 });
 
 
+// ============ OAUTH APPS (Wit Apps) ============
+
+/**
+ * OAuth Apps table - registered third-party applications
+ * Similar to GitHub OAuth Apps for building integrations
+ */
+export const oauthApps = pgTable('oauth_apps', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  
+  /** Owner of the app (user or organization) */
+  ownerId: text('owner_id').notNull(),
+  ownerType: ownerTypeEnum('owner_type').notNull().default('user'),
+  
+  /** App display name */
+  name: text('name').notNull(),
+  
+  /** Short description of the app */
+  description: text('description'),
+  
+  /** App website URL */
+  websiteUrl: text('website_url'),
+  
+  /** OAuth callback/redirect URI (required) */
+  callbackUrl: text('callback_url').notNull(),
+  
+  /** Additional allowed callback URLs (JSON array) */
+  additionalCallbackUrls: text('additional_callback_urls'),
+  
+  /** Client ID - public identifier */
+  clientId: text('client_id').notNull().unique(),
+  
+  /** Client secret hash (never store raw!) */
+  clientSecretHash: text('client_secret_hash').notNull(),
+  
+  /** First 8 chars of secret for identification */
+  clientSecretPrefix: text('client_secret_prefix').notNull(),
+  
+  /** App logo URL */
+  logoUrl: text('logo_url'),
+  
+  /** Privacy policy URL */
+  privacyPolicyUrl: text('privacy_policy_url'),
+  
+  /** Terms of service URL */
+  termsOfServiceUrl: text('terms_of_service_url'),
+  
+  /** Whether this app is published/public or still in development */
+  isPublished: boolean('is_published').notNull().default(false),
+  
+  /** Whether this app is verified by Wit */
+  isVerified: boolean('is_verified').notNull().default(false),
+  
+  /** Number of installations/authorizations */
+  installationsCount: integer('installations_count').notNull().default(0),
+  
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+/**
+ * OAuth App scopes - available scopes for OAuth apps
+ */
+export const oauthAppScopeEnum = pgEnum('oauth_app_scope', [
+  'user:read',           // Read user profile
+  'user:email',          // Read user email
+  'repo:read',           // Read repositories (public and private with access)
+  'repo:write',          // Write to repositories
+  'repo:admin',          // Admin access to repositories
+  'org:read',            // Read organization membership
+  'org:write',           // Manage organization membership
+  'workflow:read',       // Read workflow runs
+  'workflow:write',      // Trigger workflows
+  'issue:read',          // Read issues
+  'issue:write',         // Create/edit issues
+  'pull:read',           // Read pull requests
+  'pull:write',          // Create/edit pull requests
+  'webhook:read',        // Read webhooks
+  'webhook:write',       // Manage webhooks
+]);
+
+/**
+ * OAuth Authorizations - tracks which users have authorized which apps
+ * This is the "grant" - user approving an app's access
+ */
+export const oauthAuthorizations = pgTable('oauth_authorizations', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  
+  /** The app being authorized */
+  appId: uuid('app_id')
+    .notNull()
+    .references(() => oauthApps.id, { onDelete: 'cascade' }),
+  
+  /** The user who authorized the app */
+  userId: text('user_id')
+    .notNull()
+    .references(() => authUser.id, { onDelete: 'cascade' }),
+  
+  /** Scopes the user approved */
+  scopes: text('scopes').notNull(), // JSON array
+  
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  // Each user can only have one authorization per app
+  uniqueUserApp: unique().on(table.appId, table.userId),
+}));
+
+/**
+ * OAuth Authorization Codes - temporary codes for OAuth flow
+ * These are exchanged for access tokens
+ */
+export const oauthAuthorizationCodes = pgTable('oauth_authorization_codes', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  
+  /** The authorization code (hashed) */
+  codeHash: text('code_hash').notNull().unique(),
+  
+  /** The app this code was issued for */
+  appId: uuid('app_id')
+    .notNull()
+    .references(() => oauthApps.id, { onDelete: 'cascade' }),
+  
+  /** The user who authorized */
+  userId: text('user_id')
+    .notNull()
+    .references(() => authUser.id, { onDelete: 'cascade' }),
+  
+  /** Scopes requested */
+  scopes: text('scopes').notNull(), // JSON array
+  
+  /** Redirect URI used (must match on token exchange) */
+  redirectUri: text('redirect_uri').notNull(),
+  
+  /** PKCE code challenge (for public clients) */
+  codeChallenge: text('code_challenge'),
+  codeChallengeMethod: text('code_challenge_method'), // 'plain' or 'S256'
+  
+  /** State parameter (for CSRF protection) */
+  state: text('state'),
+  
+  /** When this code expires (short-lived, ~10 minutes) */
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  
+  /** Whether this code has been used */
+  used: boolean('used').notNull().default(false),
+  
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+/**
+ * OAuth Access Tokens - tokens issued to apps for API access
+ */
+export const oauthAccessTokens = pgTable('oauth_access_tokens', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  
+  /** Token hash (never store raw!) */
+  tokenHash: text('token_hash').notNull().unique(),
+  
+  /** Token prefix for identification */
+  tokenPrefix: text('token_prefix').notNull(),
+  
+  /** The app this token was issued to */
+  appId: uuid('app_id')
+    .notNull()
+    .references(() => oauthApps.id, { onDelete: 'cascade' }),
+  
+  /** The user who authorized */
+  userId: text('user_id')
+    .notNull()
+    .references(() => authUser.id, { onDelete: 'cascade' }),
+  
+  /** The authorization this token was created from */
+  authorizationId: uuid('authorization_id')
+    .references(() => oauthAuthorizations.id, { onDelete: 'cascade' }),
+  
+  /** Scopes this token has access to */
+  scopes: text('scopes').notNull(), // JSON array
+  
+  /** When this token expires (null = never) */
+  expiresAt: timestamp('expires_at', { withTimezone: true }),
+  
+  /** Last time this token was used */
+  lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+  
+  /** Whether this token has been revoked */
+  revoked: boolean('revoked').notNull().default(false),
+  revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+/**
+ * OAuth Refresh Tokens - for getting new access tokens
+ */
+export const oauthRefreshTokens = pgTable('oauth_refresh_tokens', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  
+  /** Token hash (never store raw!) */
+  tokenHash: text('token_hash').notNull().unique(),
+  
+  /** The access token this refresh token is for */
+  accessTokenId: uuid('access_token_id')
+    .notNull()
+    .references(() => oauthAccessTokens.id, { onDelete: 'cascade' }),
+  
+  /** When this token expires */
+  expiresAt: timestamp('expires_at', { withTimezone: true }),
+  
+  /** Whether this token has been used (refresh tokens are single-use) */
+  used: boolean('used').notNull().default(false),
+  usedAt: timestamp('used_at', { withTimezone: true }),
+  
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+/**
+ * OAuth App Webhooks - webhooks specific to OAuth app events
+ * Apps can receive events about their installations
+ */
+export const oauthAppWebhooks = pgTable('oauth_app_webhooks', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  
+  appId: uuid('app_id')
+    .notNull()
+    .references(() => oauthApps.id, { onDelete: 'cascade' }),
+  
+  /** Webhook URL */
+  url: text('url').notNull(),
+  
+  /** Webhook secret for signature verification */
+  secret: text('secret'),
+  
+  /** Events to subscribe to (JSON array) */
+  events: text('events').notNull(), // ['installation', 'installation.deleted', etc.]
+  
+  /** Whether this webhook is active */
+  isActive: boolean('is_active').notNull().default(true),
+  
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
 // ============ TYPE EXPORTS ============
 
 export type RepoAiKey = typeof repoAiKeys.$inferSelect;
@@ -1802,3 +2044,24 @@ export type NewTriageAgentConfig = typeof triageAgentConfig.$inferInsert;
 
 export type TriageAgentRun = typeof triageAgentRuns.$inferSelect;
 export type NewTriageAgentRun = typeof triageAgentRuns.$inferInsert;
+
+// OAuth App types
+export type OAuthAppScope = (typeof oauthAppScopeEnum.enumValues)[number];
+
+export type OAuthApp = typeof oauthApps.$inferSelect;
+export type NewOAuthApp = typeof oauthApps.$inferInsert;
+
+export type OAuthAuthorization = typeof oauthAuthorizations.$inferSelect;
+export type NewOAuthAuthorization = typeof oauthAuthorizations.$inferInsert;
+
+export type OAuthAuthorizationCode = typeof oauthAuthorizationCodes.$inferSelect;
+export type NewOAuthAuthorizationCode = typeof oauthAuthorizationCodes.$inferInsert;
+
+export type OAuthAccessToken = typeof oauthAccessTokens.$inferSelect;
+export type NewOAuthAccessToken = typeof oauthAccessTokens.$inferInsert;
+
+export type OAuthRefreshToken = typeof oauthRefreshTokens.$inferSelect;
+export type NewOAuthRefreshToken = typeof oauthRefreshTokens.$inferInsert;
+
+export type OAuthAppWebhook = typeof oauthAppWebhooks.$inferSelect;
+export type NewOAuthAppWebhook = typeof oauthAppWebhooks.$inferInsert;
