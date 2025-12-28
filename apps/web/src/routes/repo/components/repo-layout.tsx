@@ -89,7 +89,7 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
     onMutate: async () => {
       await utils.repos.isStarred.cancel({ repoId: repoData?.repo.id || '' });
       const previousStarred = utils.repos.isStarred.getData({ repoId: repoData?.repo.id || '' });
-      utils.repos.isStarred.setData({ repoId: repoData?.repo.id || '' }, true);
+      utils.repos.isStarred.setData({ repoId: repoData?.repo.id || '' }, { starred: true });
       return { previousStarred };
     },
     onSuccess: () => {
@@ -111,7 +111,7 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
     onMutate: async () => {
       await utils.repos.isStarred.cancel({ repoId: repoData?.repo.id || '' });
       const previousStarred = utils.repos.isStarred.getData({ repoId: repoData?.repo.id || '' });
-      utils.repos.isStarred.setData({ repoId: repoData?.repo.id || '' }, false);
+      utils.repos.isStarred.setData({ repoId: repoData?.repo.id || '' }, { starred: false });
       return { previousStarred };
     },
     onSuccess: () => {
@@ -134,7 +134,7 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
     onMutate: async () => {
       await utils.repos.isWatching.cancel({ repoId: repoData?.repo.id || '' });
       const previousWatching = utils.repos.isWatching.getData({ repoId: repoData?.repo.id || '' });
-      utils.repos.isWatching.setData({ repoId: repoData?.repo.id || '' }, true);
+      utils.repos.isWatching.setData({ repoId: repoData?.repo.id || '' }, { watching: true });
       return { previousWatching };
     },
     onSuccess: () => {
@@ -156,7 +156,7 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
     onMutate: async () => {
       await utils.repos.isWatching.cancel({ repoId: repoData?.repo.id || '' });
       const previousWatching = utils.repos.isWatching.getData({ repoId: repoData?.repo.id || '' });
-      utils.repos.isWatching.setData({ repoId: repoData?.repo.id || '' }, false);
+      utils.repos.isWatching.setData({ repoId: repoData?.repo.id || '' }, { watching: false });
       return { previousWatching };
     },
     onSuccess: () => {
@@ -186,8 +186,8 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
     },
   });
 
-  const isStarred = starredData || false;
-  const isWatching = watchingData || false;
+  const isStarred = starredData?.starred || false;
+  const isWatching = watchingData?.watching || false;
 
   const handleStar = () => {
     if (!repoData?.repo.id) return;
