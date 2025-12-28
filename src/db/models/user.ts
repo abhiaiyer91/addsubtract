@@ -116,4 +116,13 @@ export const userModel = {
     const found = await this.findByEmail(email);
     return !found;
   },
+
+  /**
+   * Delete a user by ID
+   */
+  async delete(id: string): Promise<boolean> {
+    const db = getDb();
+    const result = await db.delete(user).where(eq(user.id, id)).returning();
+    return result.length > 0;
+  },
 };

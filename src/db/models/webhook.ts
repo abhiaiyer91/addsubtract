@@ -149,9 +149,14 @@ export const webhookModel = {
   },
 
   /**
-   * Parse webhook events from JSON string
+   * Parse webhook events from JSON string or array
    */
   parseEvents(webhook: Webhook): WebhookEvent[] {
+    // Handle case where events is already an array (from create/update return)
+    if (Array.isArray(webhook.events)) {
+      return webhook.events as WebhookEvent[];
+    }
+    // Handle case where events is a JSON string (from database)
     try {
       return JSON.parse(webhook.events) as WebhookEvent[];
     } catch {
