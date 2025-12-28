@@ -313,16 +313,22 @@ async function doSemanticSearch(repo: Repository, query: string, limit: number):
 /**
  * Perform text search (fallback)
  */
-function doTextSearch(repo: Repository, query: string, limit: number): void {
+function doTextSearch(
+  repo: Repository, 
+  query: string, 
+  limit: number,
+  options?: { searchFiles?: boolean; searchContent?: boolean; filePattern?: string }
+): void {
   const engine = new SearchEngine(repo);
   const startTime = Date.now();
   
   const results = engine.search(query, {
     searchCommits: false,
-    searchFiles: true,
-    searchContent: true,
+    searchFiles: options?.searchFiles ?? true,
+    searchContent: options?.searchContent ?? true,
     maxResults: limit,
     contextLines: 2,
+    filePattern: options?.filePattern,
   });
   
   const duration = ((Date.now() - startTime) / 1000).toFixed(2);
@@ -355,6 +361,39 @@ function doTextSearch(repo: Repository, query: string, limit: number): void {
   
   console.log(`  ${c('dim', '─'.repeat(50))}`);
   console.log(`  ${c('dim', `Found ${results.totalCount} results in ${duration}s`)}`);
+  console.log();
+}
+
+/**
+ * Perform glob-based file search
+ */
+function doGlobSearch(repo: Repository, pattern: string, limit: number): void {
+  const engine = new SearchEngine(repo);
+  const startTime = Date.now();
+  
+  const results = engine.searchFilesByGlob(pattern, { maxResults: limit * 5 });
+  const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+  
+  if (results.length === 0) {
+    console.log(`  ${c('dim', 'No files found matching:')} ${c('white', pattern)}`);
+    console.log();
+    return;
+  }
+  
+  console.log(`  ${c('bold', 'Files matching')} ${c('cyan', pattern)}`);
+  console.log();
+  
+  for (const file of results.slice(0, limit * 3)) {
+    console.log(`    ${c('cyan', '●')} ${file.path}`);
+  }
+  
+  if (results.length > limit * 3) {
+    console.log(`    ${c('dim', `... and ${results.length - limit * 3} more`)}`);
+  }
+  
+  console.log();
+  console.log(`  ${c('dim', '─'.repeat(50))}`);
+  console.log(`  ${c('dim', `Found ${results.length} files in ${duration}s`)}`);
   console.log();
 }
 
@@ -407,6 +446,24 @@ async function interactiveMode(repo: Repository): Promise<void> {
 }
 
 /**
+ * Parse --in or --file flag value from args
+ */
+function parseFilePattern(args: string[]): string | undefined {
+  for (let i = 0; i < args.length; i++) {
+    if ((args[i] === '--in' || args[i] === '--file' || args[i] === '-f') && args[i + 1]) {
+      return args[i + 1];
+    }
+    if (args[i].startsWith('--in=')) {
+      return args[i].slice(5);
+    }
+    if (args[i].startsWith('--file=')) {
+      return args[i].slice(7);
+    }
+  }
+  return undefined;
+}
+
+/**
  * Main search command handler
  */
 export async function handleSearch(args: string[]): Promise<void> {
@@ -425,10 +482,25 @@ export async function handleSearch(args: string[]): Promise<void> {
   // Parse arguments
   const textOnly = args.includes('--text') || args.includes('-t');
   const interactive = args.includes('--interactive') || args.includes('-i');
+  const filesOnly = args.includes('--files');
+  const contentOnly = args.includes('--content') || args.includes('-c');
+  const filePattern = parseFilePattern(args);
   const limit = 10;
   
-  // Filter out flags to get the query
-  const queryParts = args.filter(arg => !arg.startsWith('-') && arg !== 'index' && arg !== 'status');
+  // Filter out flags and their values to get the query
+  const skipNextArg = new Set<number>();
+  for (let i = 0; i < args.length; i++) {
+    if ((args[i] === '--in' || args[i] === '--file' || args[i] === '-f') && args[i + 1]) {
+      skipNextArg.add(i + 1);
+    }
+  }
+  
+  const queryParts = args.filter((arg, idx) => 
+    !arg.startsWith('-') && 
+    arg !== 'index' && 
+    arg !== 'status' &&
+    !skipNextArg.has(idx)
+  );
   const query = queryParts.join(' ').trim();
   
   // Handle subcommands
@@ -439,6 +511,13 @@ export async function handleSearch(args: string[]): Promise<void> {
   
   if (args[0] === 'status') {
     await handleStatus(repo);
+    return;
+  }
+  
+  // Handle files subcommand for glob-only search
+  if (args[0] === 'files' && args[1]) {
+    const pattern = args.slice(1).filter(a => !a.startsWith('-')).join(' ');
+    doGlobSearch(repo, pattern, limit);
     return;
   }
   
@@ -461,11 +540,45 @@ export async function handleSearch(args: string[]): Promise<void> {
     console.log(`    ${c('cyan', 'wit search -i')}        ${c('dim', '· Interactive mode')}`);
     console.log(`    ${c('cyan', 'wit search -t')} ${c('white', '"foo"')} ${c('dim', '· Force text search')}`);
     console.log();
+    console.log(`  ${c('dim', 'File/Content Search:')}`);
+    console.log(`    ${c('cyan', 'wit search files')} ${c('white', '"*.ts"')}       ${c('dim', '· Find files by glob pattern')}`);
+    console.log(`    ${c('cyan', 'wit search')} ${c('white', '"foo"')} ${c('cyan', '--in')} ${c('white', '"*.ts"')} ${c('dim', '· Search in specific files')}`);
+    console.log(`    ${c('cyan', 'wit search --files')} ${c('white', '"pattern"')} ${c('dim', '· Search file names only')}`);
+    console.log(`    ${c('cyan', 'wit search --content')} ${c('white', '"pattern"')} ${c('dim', '· Search file contents only')}`);
+    console.log();
     return;
   }
   
   // Determine search mode
-  const useSemanticSearch = hasApiKey() && !textOnly;
+  const useSemanticSearch = hasApiKey() && !textOnly && !filesOnly && !contentOnly && !filePattern;
+  
+  // File pattern only search (glob search)
+  if (filesOnly) {
+    console.log();
+    console.log(`  ${c('bold', c('cyan', 'wit search --files'))} ${c('dim', '·')} ${c('white', `"${query}"`)}`);
+    console.log(`  ${c('dim', 'Searching file names...')}`);
+    console.log();
+    doGlobSearch(repo, query, limit);
+    return;
+  }
+  
+  // Content only search (optionally in specific files)
+  if (contentOnly || filePattern) {
+    console.log();
+    console.log(`  ${c('bold', c('cyan', 'wit search'))} ${c('dim', '·')} ${c('white', `"${query}"`)}`);
+    if (filePattern) {
+      console.log(`  ${c('dim', `Searching in files matching: ${filePattern}`)}`);
+    } else {
+      console.log(`  ${c('dim', 'Searching file contents...')}`);
+    }
+    console.log();
+    doTextSearch(repo, query, limit, { 
+      searchFiles: !contentOnly, 
+      searchContent: true, 
+      filePattern 
+    });
+    return;
+  }
   
   printHeader(query, useSemanticSearch ? 'semantic' : 'text');
   

@@ -79,6 +79,10 @@ export interface SearchOptions {
   regex?: boolean;
   maxResults?: number;
   contextLines?: number;
+  /** Glob pattern to filter files (e.g., *.ts, src/ ** /*.js) */
+  filePattern?: string;
+  /** Include untracked/working directory files (not just git-tracked) */
+  includeUntracked?: boolean;
 }
 
 const DEFAULT_OPTIONS: SearchOptions = {
@@ -89,6 +93,8 @@ const DEFAULT_OPTIONS: SearchOptions = {
   regex: false,
   maxResults: 100,
   contextLines: 2,
+  filePattern: undefined,
+  includeUntracked: false,
 };
 
 /**
@@ -228,17 +234,18 @@ export class SearchEngine {
 
   /**
    * Search files by name
+   * Supports both text pattern matching and glob pattern filtering
    */
   private searchFiles(pattern: RegExp, opts: SearchOptions): FileSearchResult[] {
     const results: FileSearchResult[] = [];
-    const status = this.repo.status();
-    const trackedFiles = new Set([
-      ...status.staged,
-      ...status.modified,
-      ...this.getTrackedFiles(),
-    ]);
+    const files = this.getAllFiles(opts.includeUntracked);
 
-    for (const filePath of trackedFiles) {
+    for (const filePath of files) {
+      // Apply glob filter first if provided
+      if (opts.filePattern && !matchesGlob(filePath, opts.filePattern)) {
+        continue;
+      }
+
       const filename = filePath.split('/').pop() || filePath;
       const match = filename.match(pattern) || filePath.match(pattern);
 
@@ -261,17 +268,51 @@ export class SearchEngine {
   }
 
   /**
+   * Search files by glob pattern only (no text query required)
+   * Returns all files matching the glob pattern
+   */
+  searchFilesByGlob(globPattern: string, opts: Partial<SearchOptions> = {}): FileSearchResult[] {
+    const files = this.getAllFiles(opts.includeUntracked);
+    const results: FileSearchResult[] = [];
+    const maxResults = opts.maxResults || 100;
+
+    for (const filePath of files) {
+      if (results.length >= maxResults) break;
+
+      if (matchesGlob(filePath, globPattern)) {
+        const filename = filePath.split('/').pop() || filePath;
+        results.push({
+          type: 'file',
+          path: filePath,
+          filename,
+          score: 1,
+          matchedText: filename,
+          highlightedText: filePath,
+        });
+      }
+    }
+
+    return results;
+  }
+
+  /**
    * Search file contents
+   * Supports filtering by file glob pattern (e.g., only search in *.ts files)
    */
   private searchContent(pattern: RegExp, opts: SearchOptions): ContentSearchResult[] {
     const results: ContentSearchResult[] = [];
     const contextLines = opts.contextLines || 2;
 
-    // Get tracked files
-    const files = this.getTrackedFiles();
+    // Get files to search
+    const files = this.getAllFiles(opts.includeUntracked);
 
     for (const filePath of files) {
       if (results.length >= (opts.maxResults || 100)) break;
+
+      // Apply file pattern filter if provided
+      if (opts.filePattern && !matchesGlob(filePath, opts.filePattern)) {
+        continue;
+      }
 
       try {
         const fullPath = require('path').join(this.repo.workDir, filePath);
@@ -309,6 +350,20 @@ export class SearchEngine {
   }
 
   /**
+   * Search for specific content in files matching a glob pattern
+   * Combined file + content search for targeted queries
+   */
+  searchContentInFiles(
+    query: string,
+    filePattern: string,
+    opts: Partial<SearchOptions> = {}
+  ): ContentSearchResult[] {
+    const mergedOpts = { ...DEFAULT_OPTIONS, ...opts, filePattern };
+    const pattern = this.createPattern(query, mergedOpts);
+    return this.searchContent(pattern, mergedOpts);
+  }
+
+  /**
    * Get list of tracked files
    */
   private getTrackedFiles(): string[] {
@@ -322,6 +377,58 @@ export class SearchEngine {
       return files;
     } catch {
       return [];
+    }
+  }
+
+  /**
+   * Get all files (tracked + optionally untracked from working directory)
+   */
+  private getAllFiles(includeUntracked?: boolean): string[] {
+    const status = this.repo.status();
+    const trackedFiles = new Set([
+      ...status.staged,
+      ...status.modified,
+      ...this.getTrackedFiles(),
+    ]);
+
+    if (includeUntracked) {
+      // Add untracked files from working directory
+      for (const file of status.untracked || []) {
+        trackedFiles.add(file);
+      }
+      // Also walk the working directory to find all files
+      this.walkWorkingDir('', trackedFiles);
+    }
+
+    return Array.from(trackedFiles);
+  }
+
+  /**
+   * Walk working directory to find files
+   */
+  private walkWorkingDir(prefix: string, files: Set<string>): void {
+    const fs = require('fs');
+    const path = require('path');
+    
+    try {
+      const dirPath = path.join(this.repo.workDir, prefix);
+      const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+      
+      for (const entry of entries) {
+        // Skip hidden files and directories, and .wit/.git
+        if (entry.name.startsWith('.')) continue;
+        if (entry.name === 'node_modules') continue;
+        
+        const relativePath = prefix ? `${prefix}/${entry.name}` : entry.name;
+        
+        if (entry.isDirectory()) {
+          this.walkWorkingDir(relativePath, files);
+        } else if (entry.isFile()) {
+          files.add(relativePath);
+        }
+      }
+    } catch {
+      // Skip directories we can't read
     }
   }
 
@@ -374,6 +481,63 @@ export class SearchEngine {
   private highlightMatch(text: string, pattern: RegExp): string {
     return text.replace(pattern, match => `<mark>${escapeHtml(match)}</mark>`);
   }
+}
+
+/**
+ * Convert glob pattern to regex
+ * Supports: * (any chars except /), ** (any chars including /), ? (single char)
+ */
+function globToRegex(glob: string): RegExp {
+  let regex = '';
+  let i = 0;
+  
+  while (i < glob.length) {
+    const char = glob[i];
+    
+    if (char === '*') {
+      if (glob[i + 1] === '*') {
+        // ** matches anything including path separators
+        if (glob[i + 2] === '/') {
+          regex += '(?:.*/)?';
+          i += 3;
+        } else {
+          regex += '.*';
+          i += 2;
+        }
+      } else {
+        // * matches anything except path separator
+        regex += '[^/]*';
+        i++;
+      }
+    } else if (char === '?') {
+      regex += '[^/]';
+      i++;
+    } else if (char === '.') {
+      regex += '\\.';
+      i++;
+    } else if (char === '/') {
+      regex += '/';
+      i++;
+    } else if ('[{('.includes(char)) {
+      regex += '\\' + char;
+      i++;
+    } else {
+      regex += char;
+      i++;
+    }
+  }
+  
+  return new RegExp(`^${regex}$`, 'i');
+}
+
+/**
+ * Check if a file path matches a glob pattern
+ */
+function matchesGlob(filePath: string, pattern: string): boolean {
+  const regex = globToRegex(pattern);
+  // Test against both full path and just the filename
+  const filename = filePath.split('/').pop() || filePath;
+  return regex.test(filePath) || regex.test(filename);
 }
 
 /**
