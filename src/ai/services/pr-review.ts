@@ -5,11 +5,11 @@
  * Reviews are triggered asynchronously when PRs are created or updated.
  */
 
-import { execSync } from 'child_process';
 import * as path from 'path';
 import { prModel, prReviewModel, prCommentModel, repoModel, userModel } from '../../db/models';
-import { resolveDiskPath } from '../../server/storage/repos';
+import { resolveDiskPath, BareRepository } from '../../server/storage/repos';
 import { exists } from '../../utils/fs';
+import { diff, createHunks, formatUnifiedDiff, FileDiff } from '../../core/diff';
 
 /**
  * AI Review result
@@ -33,15 +33,59 @@ export interface AIReviewIssue {
 }
 
 /**
- * Get diff between two commits in a bare repository
+ * Get diff between two commits in a bare repository using wit's TS API
  */
 function getDiff(repoPath: string, baseSha: string, headSha: string): string {
   try {
-    return execSync(`git diff ${baseSha}..${headSha}`, {
-      cwd: repoPath,
-      encoding: 'utf-8',
-      maxBuffer: 10 * 1024 * 1024, // 10MB buffer for large diffs
-    });
+    const repo = new BareRepository(repoPath);
+    const fileDiffs: FileDiff[] = [];
+    
+    // Get trees for both commits
+    const baseCommit = repo.objects.readCommit(baseSha);
+    const headCommit = repo.objects.readCommit(headSha);
+    
+    // Flatten trees to get file->hash mappings
+    const baseFiles = flattenTree(repo, baseCommit.treeHash, '');
+    const headFiles = flattenTree(repo, headCommit.treeHash, '');
+    
+    // Find all file paths
+    const allPaths = new Set([...baseFiles.keys(), ...headFiles.keys()]);
+    
+    for (const filePath of allPaths) {
+      const baseHash = baseFiles.get(filePath);
+      const headHash = headFiles.get(filePath);
+      
+      if (baseHash === headHash) continue; // No change
+      
+      let oldContent = '';
+      let newContent = '';
+      
+      if (baseHash) {
+        const blob = repo.objects.readBlob(baseHash);
+        oldContent = blob.content.toString('utf-8');
+      }
+      
+      if (headHash) {
+        const blob = repo.objects.readBlob(headHash);
+        newContent = blob.content.toString('utf-8');
+      }
+      
+      const diffLines = diff(oldContent, newContent);
+      const hunks = createHunks(diffLines);
+      
+      fileDiffs.push({
+        oldPath: filePath,
+        newPath: filePath,
+        hunks,
+        isBinary: false,
+        isNew: !baseHash,
+        isDeleted: !headHash,
+        isRename: false,
+      });
+    }
+    
+    // Format as unified diff
+    return fileDiffs.map(formatUnifiedDiff).join('\n');
   } catch (error) {
     console.error('[AI Review] Failed to get diff:', error);
     return '';
@@ -49,15 +93,54 @@ function getDiff(repoPath: string, baseSha: string, headSha: string): string {
 }
 
 /**
- * Get changed files between two commits
+ * Flatten a tree into a map of path -> blob hash
+ */
+function flattenTree(repo: BareRepository, treeHash: string, prefix: string): Map<string, string> {
+  const result = new Map<string, string>();
+  const tree = repo.objects.readTree(treeHash);
+  
+  for (const entry of tree.entries) {
+    const fullPath = prefix ? `${prefix}/${entry.name}` : entry.name;
+    
+    if (entry.mode === '40000') {
+      const subTree = flattenTree(repo, entry.hash, fullPath);
+      for (const [path, hash] of subTree) {
+        result.set(path, hash);
+      }
+    } else {
+      result.set(fullPath, entry.hash);
+    }
+  }
+  
+  return result;
+}
+
+/**
+ * Get changed files between two commits using wit's TS API
  */
 function getChangedFiles(repoPath: string, baseSha: string, headSha: string): string[] {
   try {
-    const output = execSync(`git diff --name-only ${baseSha}..${headSha}`, {
-      cwd: repoPath,
-      encoding: 'utf-8',
-    });
-    return output.split('\n').filter(f => f.trim());
+    const repo = new BareRepository(repoPath);
+    
+    const baseCommit = repo.objects.readCommit(baseSha);
+    const headCommit = repo.objects.readCommit(headSha);
+    
+    const baseFiles = flattenTree(repo, baseCommit.treeHash, '');
+    const headFiles = flattenTree(repo, headCommit.treeHash, '');
+    
+    const changedFiles: string[] = [];
+    const allPaths = new Set([...baseFiles.keys(), ...headFiles.keys()]);
+    
+    for (const filePath of allPaths) {
+      const baseHash = baseFiles.get(filePath);
+      const headHash = headFiles.get(filePath);
+      
+      if (baseHash !== headHash) {
+        changedFiles.push(filePath);
+      }
+    }
+    
+    return changedFiles;
   } catch {
     return [];
   }

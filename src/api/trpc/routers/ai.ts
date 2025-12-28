@@ -7,23 +7,87 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import * as path from 'path';
-import { execSync } from 'child_process';
 import { router, protectedProcedure, publicProcedure } from '../trpc';
 import { repoModel, prModel, collaboratorModel } from '../../../db/models';
-import { resolveDiskPath } from '../../../server/storage/repos';
+import { resolveDiskPath, BareRepository } from '../../../server/storage/repos';
 import { exists } from '../../../utils/fs';
 import { generatePRDescriptionTool } from '../../../ai/tools/generate-pr-description';
 import { getTsgitAgent, isAIAvailable } from '../../../ai/mastra';
+import { diff, createHunks, formatUnifiedDiff, FileDiff } from '../../../core/diff';
 
 /**
- * Get diff between two refs
+ * Flatten a tree into a map of path -> blob hash
+ */
+function flattenTree(repo: BareRepository, treeHash: string, prefix: string): Map<string, string> {
+  const result = new Map<string, string>();
+  const tree = repo.objects.readTree(treeHash);
+  
+  for (const entry of tree.entries) {
+    const fullPath = prefix ? `${prefix}/${entry.name}` : entry.name;
+    
+    if (entry.mode === '40000') {
+      const subTree = flattenTree(repo, entry.hash, fullPath);
+      for (const [path, hash] of subTree) {
+        result.set(path, hash);
+      }
+    } else {
+      result.set(fullPath, entry.hash);
+    }
+  }
+  
+  return result;
+}
+
+/**
+ * Get diff between two refs using wit's TS API
  */
 function getDiffBetweenRefs(repoPath: string, baseSha: string, headSha: string): string {
   try {
-    return execSync(
-      `git diff ${baseSha}..${headSha}`,
-      { cwd: repoPath, encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024 }
-    );
+    const repo = new BareRepository(repoPath);
+    const fileDiffs: FileDiff[] = [];
+    
+    const baseCommit = repo.objects.readCommit(baseSha);
+    const headCommit = repo.objects.readCommit(headSha);
+    
+    const baseFiles = flattenTree(repo, baseCommit.treeHash, '');
+    const headFiles = flattenTree(repo, headCommit.treeHash, '');
+    
+    const allPaths = new Set([...baseFiles.keys(), ...headFiles.keys()]);
+    
+    for (const filePath of allPaths) {
+      const baseHash = baseFiles.get(filePath);
+      const headHash = headFiles.get(filePath);
+      
+      if (baseHash === headHash) continue;
+      
+      let oldContent = '';
+      let newContent = '';
+      
+      if (baseHash) {
+        const blob = repo.objects.readBlob(baseHash);
+        oldContent = blob.content.toString('utf-8');
+      }
+      
+      if (headHash) {
+        const blob = repo.objects.readBlob(headHash);
+        newContent = blob.content.toString('utf-8');
+      }
+      
+      const diffLines = diff(oldContent, newContent);
+      const hunks = createHunks(diffLines);
+      
+      fileDiffs.push({
+        oldPath: filePath,
+        newPath: filePath,
+        hunks,
+        isBinary: false,
+        isNew: !baseHash,
+        isDeleted: !headHash,
+        isRename: false,
+      });
+    }
+    
+    return fileDiffs.map(formatUnifiedDiff).join('\n');
   } catch (error) {
     console.error('[ai.getDiff] Error:', error);
     return '';
@@ -31,25 +95,36 @@ function getDiffBetweenRefs(repoPath: string, baseSha: string, headSha: string):
 }
 
 /**
- * Get commits between two refs
+ * Get commits between two refs using wit's TS API
  */
 function getCommitsBetween(repoPath: string, baseSha: string, headSha: string): Array<{
   sha: string;
   message: string;
 }> {
   try {
-    const output = execSync(
-      `git log --format="%H|%B%x00" ${baseSha}..${headSha}`,
-      { cwd: repoPath, encoding: 'utf-8' }
-    );
+    const repo = new BareRepository(repoPath);
+    const commits: Array<{ sha: string; message: string }> = [];
     
-    return output
-      .split('\x00')
-      .filter(Boolean)
-      .map(entry => {
-        const [sha, ...messageParts] = entry.trim().split('|');
-        return { sha: sha.trim(), message: messageParts.join('|').trim() };
-      });
+    // Walk commit history from head to base
+    let currentHash: string | null = headSha;
+    const baseSet = new Set<string>([baseSha]);
+    
+    while (currentHash && !baseSet.has(currentHash)) {
+      try {
+        const commit = repo.objects.readCommit(currentHash);
+        commits.push({
+          sha: currentHash,
+          message: commit.message,
+        });
+        
+        // Move to parent (first parent for linear history)
+        currentHash = commit.parentHashes.length > 0 ? commit.parentHashes[0] : null;
+      } catch {
+        break;
+      }
+    }
+    
+    return commits;
   } catch (error) {
     console.error('[ai.getCommits] Error:', error);
     return [];
@@ -57,14 +132,50 @@ function getCommitsBetween(repoPath: string, baseSha: string, headSha: string): 
 }
 
 /**
- * Get file diff for a specific file
+ * Get file diff for a specific file using wit's TS API
  */
 function getFileDiff(repoPath: string, baseSha: string, headSha: string, filePath: string): string {
   try {
-    return execSync(
-      `git diff ${baseSha}..${headSha} -- "${filePath}"`,
-      { cwd: repoPath, encoding: 'utf-8', maxBuffer: 5 * 1024 * 1024 }
-    );
+    const repo = new BareRepository(repoPath);
+    
+    const baseCommit = repo.objects.readCommit(baseSha);
+    const headCommit = repo.objects.readCommit(headSha);
+    
+    const baseFiles = flattenTree(repo, baseCommit.treeHash, '');
+    const headFiles = flattenTree(repo, headCommit.treeHash, '');
+    
+    const baseHash = baseFiles.get(filePath);
+    const headHash = headFiles.get(filePath);
+    
+    if (baseHash === headHash) return '';
+    
+    let oldContent = '';
+    let newContent = '';
+    
+    if (baseHash) {
+      const blob = repo.objects.readBlob(baseHash);
+      oldContent = blob.content.toString('utf-8');
+    }
+    
+    if (headHash) {
+      const blob = repo.objects.readBlob(headHash);
+      newContent = blob.content.toString('utf-8');
+    }
+    
+    const diffLines = diff(oldContent, newContent);
+    const hunks = createHunks(diffLines);
+    
+    const fileDiff: FileDiff = {
+      oldPath: filePath,
+      newPath: filePath,
+      hunks,
+      isBinary: false,
+      isNew: !baseHash,
+      isDeleted: !headHash,
+      isRename: false,
+    };
+    
+    return formatUnifiedDiff(fileDiff);
   } catch (error) {
     console.error('[ai.getFileDiff] Error:', error);
     return '';
