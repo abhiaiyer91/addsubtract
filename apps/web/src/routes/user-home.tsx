@@ -18,6 +18,7 @@ import {
   XCircle,
   GitMerge,
   Clock,
+  Eye,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -53,6 +54,47 @@ function RepoCard({ repo, owner }: { repo: any; owner: string }) {
               <span className="flex items-center gap-1">
                 <Star className="h-3 w-3" />
                 {repo.starsCount || 0}
+              </span>
+              <span className="flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                {formatRelativeTime(repo.updatedAt)}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+// Watched repository card (includes owner name since watched repos can belong to different owners)
+function WatchedRepoCard({ repo }: { repo: any }) {
+  return (
+    <Link to={`/${repo.ownerName}/${repo.name}`} className="block group">
+      <div className="p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold text-primary truncate group-hover:underline">
+                {repo.ownerName}/{repo.name}
+              </h3>
+              {repo.isPrivate && (
+                <Badge variant="secondary" className="text-xs">Private</Badge>
+              )}
+            </div>
+            {repo.description && (
+              <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
+                {repo.description}
+              </p>
+            )}
+            <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <Star className="h-3 w-3" />
+                {repo.starsCount || 0}
+              </span>
+              <span className="flex items-center gap-1">
+                <Eye className="h-3 w-3" />
+                {repo.watchersCount || 0}
               </span>
               <span className="flex items-center gap-1">
                 <Clock className="h-3 w-3" />
@@ -143,6 +185,12 @@ export function UserHomePage() {
 
   // Fetch user's repositories
   const { data: reposData, isLoading: reposLoading } = trpc.users.repos.useQuery(
+    { username: owner! },
+    { enabled: !!owner }
+  );
+
+  // Fetch user's watched repositories
+  const { data: watchedData, isLoading: watchedLoading } = trpc.users.watched.useQuery(
     { username: owner! },
     { enabled: !!owner }
   );
@@ -329,14 +377,13 @@ export function UserHomePage() {
             </Card>
           )}
 
-          {/* Repositories */}
+          {/* Repositories & Watching */}
           <Card>
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base flex items-center gap-2">
                   <Code2 className="h-4 w-4" />
                   Repositories
-                  <Badge variant="secondary">{repos.length}</Badge>
                 </CardTitle>
                 {isOwnProfile && (
                   <Button variant="outline" size="sm" asChild>
@@ -348,30 +395,68 @@ export function UserHomePage() {
                 )}
               </div>
             </CardHeader>
-            <CardContent>
-              {reposLoading ? (
-                <div className="space-y-3">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="h-20 rounded-lg bg-muted animate-pulse" />
-                  ))}
+            <CardContent className="p-0">
+              <Tabs defaultValue="repos" className="w-full">
+                <div className="px-6 pb-3">
+                  <TabsList>
+                    <TabsTrigger value="repos" className="text-xs">
+                      Repositories
+                      <Badge variant="secondary" className="ml-1.5 text-xs">{repos.length}</Badge>
+                    </TabsTrigger>
+                    <TabsTrigger value="watching" className="text-xs">
+                      <Eye className="h-3 w-3 mr-1" />
+                      Watching
+                      <Badge variant="secondary" className="ml-1.5 text-xs">{watchedData?.length || 0}</Badge>
+                    </TabsTrigger>
+                  </TabsList>
                 </div>
-              ) : repos.length > 0 ? (
-                <div className="space-y-3">
-                  {repos.map((repo: any) => (
-                    <RepoCard key={repo.id} repo={repo} owner={user.username!} />
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Code2 className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                  <p>No repositories yet</p>
-                  {isOwnProfile && (
-                    <Button variant="outline" size="sm" className="mt-3" asChild>
-                      <Link to="/new">Create your first repository</Link>
-                    </Button>
+                <TabsContent value="repos" className="mt-0 px-6 pb-6">
+                  {reposLoading ? (
+                    <div className="space-y-3">
+                      {[1, 2, 3].map((i) => (
+                        <div key={i} className="h-20 rounded-lg bg-muted animate-pulse" />
+                      ))}
+                    </div>
+                  ) : repos.length > 0 ? (
+                    <div className="space-y-3">
+                      {repos.map((repo: any) => (
+                        <RepoCard key={repo.id} repo={repo} owner={user.username!} />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Code2 className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                      <p>No repositories yet</p>
+                      {isOwnProfile && (
+                        <Button variant="outline" size="sm" className="mt-3" asChild>
+                          <Link to="/new">Create your first repository</Link>
+                        </Button>
+                      )}
+                    </div>
                   )}
-                </div>
-              )}
+                </TabsContent>
+                <TabsContent value="watching" className="mt-0 px-6 pb-6">
+                  {watchedLoading ? (
+                    <div className="space-y-3">
+                      {[1, 2, 3].map((i) => (
+                        <div key={i} className="h-20 rounded-lg bg-muted animate-pulse" />
+                      ))}
+                    </div>
+                  ) : watchedData && watchedData.length > 0 ? (
+                    <div className="space-y-3">
+                      {watchedData.map((repo: any) => (
+                        <WatchedRepoCard key={repo.id} repo={repo} />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Eye className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                      <p>Not watching any repositories</p>
+                      <p className="text-xs mt-1">Watch repositories to get notified about activity</p>
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
             </CardContent>
           </Card>
         </div>

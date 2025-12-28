@@ -637,4 +637,58 @@ export const watchModel = {
       avatarUrl: r.user.avatarUrl,
     }));
   },
+
+  /**
+   * List watched repos for a user (with owner name)
+   */
+  async listByUser(userId: string): Promise<(Repository & { ownerName: string })[]> {
+    const db = getDb();
+    const result = await db
+      .select()
+      .from(watches)
+      .innerJoin(repositories, eq(watches.repoId, repositories.id))
+      .where(eq(watches.userId, userId))
+      .orderBy(desc(watches.createdAt));
+
+    // Get owner names for each repo
+    const reposWithOwners = await Promise.all(
+      result.map(async (r) => {
+        const repo = r.repositories;
+        let ownerName = 'unknown';
+
+        if (repo.ownerType === 'user') {
+          // Try better-auth user table
+          const userResult = await db
+            .select({ username: user.username })
+            .from(user)
+            .where(sql`${user.id} = ${repo.ownerId}::text`);
+          if (userResult.length > 0 && userResult[0].username) {
+            ownerName = userResult[0].username;
+          } else {
+            // Try legacy users table
+            const legacyResult = await db
+              .select({ username: users.username })
+              .from(users)
+              .where(eq(users.id, repo.ownerId));
+            if (legacyResult.length > 0 && legacyResult[0].username) {
+              ownerName = legacyResult[0].username;
+            }
+          }
+        } else {
+          // Organization
+          const orgResult = await db
+            .select({ name: organizations.name })
+            .from(organizations)
+            .where(eq(organizations.id, repo.ownerId));
+          if (orgResult.length > 0) {
+            ownerName = orgResult[0].name;
+          }
+        }
+
+        return { ...repo, ownerName };
+      })
+    );
+
+    return reposWithOwners;
+  },
 };
