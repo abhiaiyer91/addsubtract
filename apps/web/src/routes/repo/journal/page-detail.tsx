@@ -69,6 +69,8 @@ export function JournalPageDetail() {
 
   const titleRef = useRef<HTMLTextAreaElement>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastLoadedPageId = useRef<string | null>(null);
+  const lastSavedContent = useRef<string>('');
 
   // Fetch repository data
   const { data: repoData, isLoading: repoLoading } = trpc.repos.get.useQuery(
@@ -95,8 +97,13 @@ export function JournalPageDetail() {
       utils.journal.getBySlug.invalidate();
       utils.journal.tree.invalidate();
     },
-    onError: () => {
+    onError: (error) => {
       setPendingContent(null);
+      toast({
+        title: 'Failed to save',
+        description: error.message,
+        variant: 'destructive',
+      });
     },
   });
 
@@ -121,9 +128,12 @@ export function JournalPageDetail() {
     },
   });
 
-  // Set initial content when page loads
+  // Set initial content when page loads or when navigating to a different page
+  // Only sync on initial load or page change to avoid overwriting user's in-progress edits
   useEffect(() => {
-    if (page) {
+    if (page && page.id !== lastLoadedPageId.current) {
+      lastLoadedPageId.current = page.id;
+      lastSavedContent.current = page.content || '';
       setEditedContent(page.content || '');
       setEditedTitle(page.title || '');
       setPendingContent(null);
@@ -143,11 +153,16 @@ export function JournalPageDetail() {
 
       // Set new timeout for auto-save
       saveTimeoutRef.current = setTimeout(() => {
-        if (page && newContent !== (page.content || '')) {
+        // Compare with last saved content to avoid unnecessary saves
+        if (page && newContent !== lastSavedContent.current) {
+          lastSavedContent.current = newContent;
           updateMutation.mutate({
             pageId: page.id,
             content: newContent,
           });
+          // Note: setPendingContent(null) is called in onSuccess/onError handlers
+        } else {
+          // Content unchanged, clear pending state
           setPendingContent(null);
         }
       }, 1000); // Save after 1 second of inactivity
