@@ -2,7 +2,7 @@
  * Mastra Configuration for wit
  * 
  * Sets up the Mastra instance with the wit agent, tools, memory, and workflows.
- * Uses LibSQL for persistent storage of conversation history.
+ * Uses PostgreSQL for server-side storage, LibSQL for CLI storage.
  */
 
 import * as path from 'path';
@@ -11,6 +11,7 @@ import { Mastra } from '@mastra/core';
 import { Agent } from '@mastra/core/agent';
 import { Memory } from '@mastra/memory';
 import { LibSQLStore } from '@mastra/libsql';
+import { PostgresStore } from '@mastra/pg';
 import { witAgent, createTsgitAgent } from './agent.js';
 import { witTools } from './tools/index.js';
 import { prReviewWorkflow, issueTriageWorkflow, codeGenerationWorkflow } from './workflows/index.js';
@@ -18,10 +19,17 @@ import type { AIConfig } from './types.js';
 
 let mastraInstance: Mastra | null = null;
 let memoryInstance: Memory | null = null;
-let storageInstance: LibSQLStore | null = null;
+let storageInstance: LibSQLStore | PostgresStore | null = null;
 
 /**
- * Get the path to the wit data directory
+ * Check if we're running in server mode (have DATABASE_URL)
+ */
+function isServerMode(): boolean {
+  return !!process.env.DATABASE_URL;
+}
+
+/**
+ * Get the path to the wit data directory (for CLI mode)
  */
 function getWitDataDir(): string {
   const witDir = process.env.WIT_DATA_DIR || path.join(os.homedir(), '.wit');
@@ -29,15 +37,27 @@ function getWitDataDir(): string {
 }
 
 /**
- * Get or create the LibSQL storage instance
+ * Get or create the storage instance.
+ * Uses PostgresStore in server mode, LibSQLStore in CLI mode.
  */
-export function getStorage(): LibSQLStore {
+export function getStorage(): LibSQLStore | PostgresStore {
   if (!storageInstance) {
-    const dbPath = path.join(getWitDataDir(), 'agent.db');
-    storageInstance = new LibSQLStore({
-      id: 'wit-agent-storage',
-      url: `file:${dbPath}`,
-    });
+    if (isServerMode()) {
+      // Server mode: use PostgreSQL
+      storageInstance = new PostgresStore({
+        id: 'wit-mastra-storage',
+        connectionString: process.env.DATABASE_URL!,
+      });
+      console.log('[Mastra] Using PostgresStore for storage');
+    } else {
+      // CLI mode: use local LibSQL
+      const dbPath = path.join(getWitDataDir(), 'agent.db');
+      storageInstance = new LibSQLStore({
+        id: 'wit-agent-storage',
+        url: `file:${dbPath}`,
+      });
+      console.log('[Mastra] Using LibSQLStore for storage');
+    }
   }
   return storageInstance;
 }
