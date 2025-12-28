@@ -114,6 +114,9 @@ export function handleServe(args: string[]): void {
 
   // Resolve the repos directory
   const reposDir = path.resolve(options.reposDir);
+  
+  // Set REPOS_DIR env var so tRPC routers can access it
+  process.env.REPOS_DIR = reposDir;
 
   // Start the server
   const server = startServer({
