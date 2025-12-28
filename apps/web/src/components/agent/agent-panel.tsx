@@ -1520,17 +1520,17 @@ function PanelWrapper({
         )}
       >
         {/* Panel header */}
-        <div className="flex items-center justify-between h-12 px-4 border-b border-zinc-800 flex-shrink-0 bg-zinc-900/50">
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
+        <div className="flex items-center justify-between h-12 px-4 border-b border-zinc-800 flex-shrink-0 bg-zinc-900/50 m-0">
+          <div className="flex items-center gap-2.5 m-0">
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center m-0">
               <Sparkles className="h-4 w-4 text-white" />
             </div>
-            <span className="font-semibold text-sm text-zinc-100">wit AI</span>
+            <span className="font-semibold text-sm text-zinc-100 m-0">wit AI</span>
             {repoName && (
-              <span className="text-xs text-zinc-500">{owner}/{repoName}</span>
+              <span className="text-xs text-zinc-500 m-0">{owner}/{repoName}</span>
             )}
           </div>
-          <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 text-zinc-400 hover:text-zinc-200">
+          <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 text-zinc-400 hover:text-zinc-200 m-0">
             <PanelRightClose className="h-4 w-4" />
           </Button>
         </div>
