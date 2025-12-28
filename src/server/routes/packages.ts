@@ -70,6 +70,9 @@ interface NpmPublishPayload {
 export function createPackageRoutes(baseUrl: string): Hono {
   const app = new Hono();
   
+  // Apply auth middleware to set c.get('user') for session tokens
+  app.use('*', authMiddleware);
+  
   // Initialize package storage
   const storage = createPackageStorage(`${baseUrl}/api/packages`);
 
@@ -119,6 +122,192 @@ export function createPackageRoutes(baseUrl: string): Hono {
 
     return hasScope(JSON.parse(tokenRecord.scopes), requiredScope);
   }
+
+  // ============ SPECIAL ROUTES (must come before wildcard routes) ============
+
+  /**
+   * GET /-/ping - Health check
+   */
+  app.get('/-/ping', (c) => {
+    return c.json({ ok: true });
+  });
+
+  /**
+   * GET /-/whoami - Get current user
+   */
+  app.get('/-/whoami', async (c) => {
+    const user = await getAuthUser(c);
+    
+    if (!user) {
+      return c.json({ error: 'Not authenticated' }, 401);
+    }
+
+    return c.json({ username: user.username });
+  });
+
+  /**
+   * PUT /-/user/org.couchdb.user::username - npm login
+   * Creates or validates a user session
+   */
+  app.put('/-/user/org.couchdb.user::username', async (c) => {
+    // For now, just validate existing tokens
+    // Full npm login would create new tokens here
+    const user = await getAuthUser(c);
+    
+    if (user) {
+      return c.json({
+        ok: true,
+        id: `org.couchdb.user:${user.username}`,
+        token: c.req.header('Authorization')?.slice(7), // Return same token
+      });
+    }
+
+    return c.json({ error: 'Invalid credentials' }, 401);
+  });
+
+  /**
+   * GET /-/v1/search - Search packages
+   */
+  app.get('/-/v1/search', async (c) => {
+    const text = c.req.query('text') || '';
+    const size = parseInt(c.req.query('size') || '20', 10);
+    const from = parseInt(c.req.query('from') || '0', 10);
+
+    const packages = await packageModel.search(text, {
+      limit: Math.min(size, 100),
+      offset: from,
+    });
+
+    const objects = packages.map(pkg => ({
+      package: {
+        name: getFullPackageName(pkg.scope, pkg.name),
+        scope: pkg.scope ? `@${pkg.scope}` : 'unscoped',
+        version: '0.0.0', // Would need to fetch latest version
+        description: pkg.description,
+        keywords: pkg.keywords ? JSON.parse(pkg.keywords) : [],
+        date: pkg.updatedAt.toISOString(),
+        links: {
+          npm: `${baseUrl}/package/${getFullPackageName(pkg.scope, pkg.name)}`,
+          homepage: pkg.homepage,
+          // Repository URL is derived from linked repo, not stored on package
+          repository: undefined,
+        },
+      },
+      score: {
+        final: 1,
+        detail: {
+          quality: 1,
+          popularity: Math.min(pkg.downloadCount / 1000, 1),
+          maintenance: 1,
+        },
+      },
+      searchScore: 1,
+    }));
+
+    return c.json({
+      objects,
+      total: packages.length,
+      time: new Date().toISOString(),
+    });
+  });
+
+  /**
+   * GET /-/package/:package/dist-tags - Get all dist-tags
+   */
+  app.get('/-/package/:package{.+}/dist-tags', async (c) => {
+    const packageParam = c.req.param('package');
+    const { scope, name } = parsePackageFromUrl(packageParam);
+    const pkg = await packageModel.getByName(scope, name);
+
+    if (!pkg) {
+      return c.json({ error: 'Not found' }, 404);
+    }
+
+    const tags = await distTagModel.list(pkg.id);
+    const result: Record<string, string> = {};
+    for (const tag of tags) {
+      result[tag.tag] = tag.version;
+    }
+
+    return c.json(result);
+  });
+
+  /**
+   * PUT /-/package/:package/dist-tags/:tag - Add/update dist-tag
+   */
+  app.put('/-/package/:package{.+}/dist-tags/:tag', async (c) => {
+    const packageParam = c.req.param('package');
+    const tag = c.req.param('tag');
+    const { scope, name } = parsePackageFromUrl(packageParam);
+    
+    const user = await getAuthUser(c);
+    if (!user) {
+      return c.json({ error: 'Authentication required' }, 401);
+    }
+
+    const pkg = await packageModel.getByName(scope, name);
+    if (!pkg) {
+      return c.json({ error: 'Package not found' }, 404);
+    }
+
+    // Check write access
+    const canPublish = await maintainerModel.canPublish(pkg.id, user.id);
+    if (!canPublish) {
+      return c.json({ error: 'Not authorized' }, 403);
+    }
+
+    // Get version string from body
+    const version = await c.req.text();
+    const cleanVersion = version.replace(/^"|"$/g, ''); // Remove quotes if present
+    
+    // Find the version
+    const versionRecord = await packageVersionModel.getByVersion(pkg.id, cleanVersion);
+    if (!versionRecord) {
+      return c.json({ error: `Version ${cleanVersion} not found` }, 404);
+    }
+
+    // Set the tag
+    await distTagModel.set(pkg.id, tag, versionRecord.id);
+
+    return c.json({ ok: true });
+  });
+
+  /**
+   * DELETE /-/package/:package/dist-tags/:tag - Remove dist-tag
+   */
+  app.delete('/-/package/:package{.+}/dist-tags/:tag', async (c) => {
+    const packageParam = c.req.param('package');
+    const tag = c.req.param('tag');
+    const { scope, name } = parsePackageFromUrl(packageParam);
+    
+    const user = await getAuthUser(c);
+    if (!user) {
+      return c.json({ error: 'Authentication required' }, 401);
+    }
+
+    const pkg = await packageModel.getByName(scope, name);
+    if (!pkg) {
+      return c.json({ error: 'Package not found' }, 404);
+    }
+
+    // Check write access
+    const canPublish = await maintainerModel.canPublish(pkg.id, user.id);
+    if (!canPublish) {
+      return c.json({ error: 'Not authorized' }, 403);
+    }
+
+    // Can't delete 'latest' tag
+    if (tag === 'latest') {
+      return c.json({ error: 'Cannot delete latest tag' }, 400);
+    }
+
+    const deleted = await distTagModel.delete(pkg.id, tag);
+    if (!deleted) {
+      return c.json({ error: 'Tag not found' }, 404);
+    }
+
+    return c.json({ ok: true });
+  });
 
   // ============ PACKAGE METADATA ============
 
@@ -515,189 +704,6 @@ export function createPackageRoutes(baseUrl: string): Hono {
     // Delete version record
     await packageVersionModel.delete(pkgVersion.id);
 
-    return c.json({ ok: true });
-  });
-
-  // ============ DIST-TAGS ============
-
-  /**
-   * GET /-/package/:package/dist-tags - List dist-tags
-   */
-  app.get('/-/package/:package{.+}/dist-tags', async (c) => {
-    const packageParam = c.req.param('package');
-    const { scope, name } = parsePackageFromUrl(packageParam);
-
-    const pkg = await packageModel.getByName(scope, name);
-    if (!pkg) {
-      return c.json({ error: 'Not found' }, 404);
-    }
-
-    const tags = await distTagModel.list(pkg.id);
-    const tagsObj: Record<string, string> = {};
-    for (const tag of tags) {
-      tagsObj[tag.tag] = tag.version;
-    }
-
-    return c.json(tagsObj);
-  });
-
-  /**
-   * PUT /-/package/:package/dist-tags/:tag - Set dist-tag
-   */
-  app.put('/-/package/:package{.+}/dist-tags/:tag', async (c) => {
-    const packageParam = c.req.param('package');
-    const tag = c.req.param('tag');
-    const { scope, name } = parsePackageFromUrl(packageParam);
-
-    const user = await getAuthUser(c);
-    if (!user) {
-      return c.json({ error: 'Authentication required' }, 401);
-    }
-
-    const pkg = await packageModel.getByName(scope, name);
-    if (!pkg) {
-      return c.json({ error: 'Not found' }, 404);
-    }
-
-    const canPublish = await maintainerModel.canPublish(pkg.id, user.id);
-    if (!canPublish) {
-      return c.json({ error: 'Not authorized' }, 403);
-    }
-
-    // Body is just the version string (with quotes)
-    const body = await c.req.text();
-    const version = body.replace(/^"|"$/g, '');
-
-    const pkgVersion = await packageVersionModel.getByVersion(pkg.id, version);
-    if (!pkgVersion) {
-      return c.json({ error: 'Version not found' }, 404);
-    }
-
-    await distTagModel.set(pkg.id, tag, pkgVersion.id);
-
-    return c.json({ ok: true });
-  });
-
-  /**
-   * DELETE /-/package/:package/dist-tags/:tag - Delete dist-tag
-   */
-  app.delete('/-/package/:package{.+}/dist-tags/:tag', async (c) => {
-    const packageParam = c.req.param('package');
-    const tag = c.req.param('tag');
-    const { scope, name } = parsePackageFromUrl(packageParam);
-
-    if (tag === 'latest') {
-      return c.json({ error: 'Cannot delete latest tag' }, 400);
-    }
-
-    const user = await getAuthUser(c);
-    if (!user) {
-      return c.json({ error: 'Authentication required' }, 401);
-    }
-
-    const pkg = await packageModel.getByName(scope, name);
-    if (!pkg) {
-      return c.json({ error: 'Not found' }, 404);
-    }
-
-    const canPublish = await maintainerModel.canPublish(pkg.id, user.id);
-    if (!canPublish) {
-      return c.json({ error: 'Not authorized' }, 403);
-    }
-
-    await distTagModel.delete(pkg.id, tag);
-
-    return c.json({ ok: true });
-  });
-
-  // ============ SEARCH ============
-
-  /**
-   * GET /-/v1/search - Search packages
-   * npm search uses this endpoint
-   */
-  app.get('/-/v1/search', async (c) => {
-    const text = c.req.query('text') || '';
-    const size = parseInt(c.req.query('size') || '20', 10);
-    const from = parseInt(c.req.query('from') || '0', 10);
-
-    const packages = await packageModel.search(text, {
-      limit: Math.min(size, 100),
-      offset: from,
-    });
-
-    const objects = packages.map(pkg => ({
-      package: {
-        name: getFullPackageName(pkg.scope, pkg.name),
-        scope: pkg.scope ? `@${pkg.scope}` : 'unscoped',
-        version: '0.0.0', // Would need to fetch latest version
-        description: pkg.description,
-        keywords: pkg.keywords ? JSON.parse(pkg.keywords) : [],
-        date: pkg.updatedAt.toISOString(),
-        links: {
-          npm: `${baseUrl}/package/${getFullPackageName(pkg.scope, pkg.name)}`,
-          homepage: pkg.homepage,
-          // Repository URL is derived from linked repo, not stored on package
-          repository: undefined,
-        },
-      },
-      score: {
-        final: 1,
-        detail: {
-          quality: 1,
-          popularity: Math.min(pkg.downloadCount / 1000, 1),
-          maintenance: 1,
-        },
-      },
-      searchScore: 1,
-    }));
-
-    return c.json({
-      objects,
-      total: packages.length,
-      time: new Date().toISOString(),
-    });
-  });
-
-  // ============ AUTHENTICATION ============
-
-  /**
-   * PUT /-/user/org.couchdb.user::username - npm login
-   * Creates or validates a user session
-   */
-  app.put('/-/user/org.couchdb.user::username', async (c) => {
-    // For now, just validate existing tokens
-    // Full npm login would create new tokens here
-    const user = await getAuthUser(c);
-    
-    if (user) {
-      return c.json({
-        ok: true,
-        id: `org.couchdb.user:${user.username}`,
-        token: c.req.header('Authorization')?.slice(7), // Return same token
-      });
-    }
-
-    return c.json({ error: 'Invalid credentials' }, 401);
-  });
-
-  /**
-   * GET /-/whoami - Get current user
-   */
-  app.get('/-/whoami', async (c) => {
-    const user = await getAuthUser(c);
-    
-    if (!user) {
-      return c.json({ error: 'Not authenticated' }, 401);
-    }
-
-    return c.json({ username: user.username });
-  });
-
-  /**
-   * GET /-/ping - Health check
-   */
-  app.get('/-/ping', (c) => {
     return c.json({ ok: true });
   });
 
