@@ -28,7 +28,8 @@ describe.skipIf(shouldSkip)('Database Models', () => {
     const db = getDb();
     
     // Clean up tables in order (respecting foreign keys)
-    await db.execute(sql`TRUNCATE TABLE 
+    // Use IF EXISTS to handle cases where tables haven't been created yet
+    await db.execute(sql`TRUNCATE TABLE IF EXISTS
       activities, webhooks, pr_labels, issue_labels, labels,
       pr_comments, pr_reviews, pull_requests, issue_comments, issues,
       collaborators, stars, watches, repositories,
