@@ -48,6 +48,9 @@ export function createAuth() {
       schema: authSchema,
     }),
     
+    // Base URL for auth - required for cross-domain cookies
+    baseURL: process.env.AUTH_BASE_URL || 'http://localhost:3000',
+    
     // Secret for signing tokens - required in production
     secret: process.env.BETTER_AUTH_SECRET,
     
