@@ -75,6 +75,7 @@ export function IDELayout({ owner, repo, repoId, defaultRef }: IDELayoutProps) {
     showFileTree,
     setShowFileTree,
     pendingChanges,
+    setIDEMode,
   } = useIDEStore();
 
   const [quickOpenVisible, setQuickOpenVisible] = useState(false);
@@ -193,6 +194,13 @@ export function IDELayout({ owner, repo, repoId, defaultRef }: IDELayoutProps) {
           ? (currentIndex - 1 + openFiles.length) % openFiles.length
           : (currentIndex + 1) % openFiles.length;
         setActiveFile(openFiles[nextIndex].path);
+        return;
+      }
+
+      // Escape - Exit IDE mode
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setIDEMode(false);
         return;
       }
     };
