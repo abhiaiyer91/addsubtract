@@ -165,3 +165,12 @@ export {
   getFullPackageName,
   generatePackageMetadata,
 } from './packages';
+
+// Admin portal models
+export {
+  adminModel,
+  type SystemStats,
+  type UserWithStats,
+  type AuditLogEntry,
+  type AdminContext,
+} from './admin';
