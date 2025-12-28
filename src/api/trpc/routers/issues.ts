@@ -36,8 +36,8 @@ export const issuesRouter = router({
         state: z.enum(['open', 'closed']).optional(),
         status: issueStatusSchema.optional(),
         priority: issuePrioritySchema.optional(),
-        authorId: z.string().uuid().optional(),
-        assigneeId: z.string().uuid().optional(),
+        authorId: z.string().optional(), // User IDs are text, not UUIDs
+        assigneeId: z.string().optional(), // User IDs are text, not UUIDs
         projectId: z.string().uuid().optional(),
         cycleId: z.string().uuid().optional(),
         limit: z.number().min(1).max(100).default(20),
@@ -169,7 +169,7 @@ export const issuesRouter = router({
         title: z.string().min(1, 'Title is required').max(256),
         body: z.string().optional(),
         labelIds: z.array(z.string().uuid()).optional(),
-        assigneeId: z.string().uuid().optional(),
+        assigneeId: z.string().optional(), // User IDs are text, not UUIDs
         priority: issuePrioritySchema.optional(),
         status: issueStatusSchema.optional(),
         dueDate: z.string().datetime().optional(),
@@ -392,7 +392,7 @@ export const issuesRouter = router({
     .input(
       z.object({
         issueId: z.string().uuid(),
-        assigneeId: z.string().uuid(),
+        assigneeId: z.string(), // User IDs are text, not UUIDs
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -693,7 +693,7 @@ export const issuesRouter = router({
   listByAssignee: publicProcedure
     .input(
       z.object({
-        assigneeId: z.string().uuid(),
+        assigneeId: z.string(), // User IDs are text, not UUIDs
         state: z.enum(['open', 'closed']).optional(),
       })
     )
@@ -847,8 +847,8 @@ export const issuesRouter = router({
       z.object({
         repoId: z.string().uuid(),
         state: z.enum(['open', 'closed']).optional(),
-        authorId: z.string().uuid().optional(),
-        assigneeId: z.string().uuid().optional(),
+        authorId: z.string().optional(), // User IDs are text, not UUIDs
+        assigneeId: z.string().optional(), // User IDs are text, not UUIDs
         projectId: z.string().uuid().optional(),
         cycleId: z.string().uuid().optional(),
       })
@@ -1275,7 +1275,7 @@ export const issuesRouter = router({
         repoId: z.string().uuid(),
         state: z.enum(['open', 'closed']).optional(),
         status: issueStatusSchema.optional(),
-        assigneeId: z.string().uuid().optional(),
+        assigneeId: z.string().optional(), // User IDs are text, not UUIDs
         projectId: z.string().uuid().optional(),
         cycleId: z.string().uuid().optional(),
       })
@@ -1451,7 +1451,7 @@ export const issuesRouter = router({
         title: z.string().min(1, 'Title is required').max(256),
         body: z.string().optional(),
         priority: issuePrioritySchema.optional(),
-        assigneeId: z.string().uuid().optional(),
+        assigneeId: z.string().optional(), // User IDs are text, not UUIDs
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -2029,7 +2029,7 @@ export const issuesRouter = router({
     .input(
       z.object({
         repoId: z.string().uuid(),
-        userId: z.string().uuid(),
+        userId: z.string(), // User IDs are text, not UUIDs
       })
     )
     .query(async ({ input }) => {
