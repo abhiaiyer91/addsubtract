@@ -7,7 +7,6 @@ import {
   Sparkles,
   GitPullRequest,
   CircleDot,
-  Play,
   Terminal,
   Code2,
   Layers,
@@ -123,17 +122,6 @@ function LandingView() {
               <Link to="/register" className="group">
                 Start building
                 <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
-              </Link>
-            </Button>
-            <Button 
-              size="lg" 
-              variant="outline" 
-              asChild 
-              className="h-11 px-6 text-sm border-zinc-800 hover:border-zinc-700 bg-zinc-900/50 hover:bg-zinc-900 text-zinc-300 hover:text-white transition-all duration-300"
-            >
-              <Link to="/demo" className="group">
-                <Play className="mr-2 h-4 w-4" />
-                Watch demo
               </Link>
             </Button>
           </div>

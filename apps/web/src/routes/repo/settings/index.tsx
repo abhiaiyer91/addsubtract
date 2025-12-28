@@ -6,8 +6,19 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
+
 import { Loading } from '@/components/ui/loading';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { RepoLayout } from '../components/repo-layout';
 import { SettingsLayout } from './layout';
 import { useSession } from '@/lib/auth-client';
@@ -21,6 +32,8 @@ export function RepoSettingsPage() {
 
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
   const utils = trpc.useUtils();
 
@@ -89,13 +102,11 @@ export function RepoSettingsPage() {
 
   const handleDelete = () => {
     if (!repoData?.repo.id) return;
-
-    const confirmText = prompt(
-      `This action cannot be undone. Type "${repo}" to confirm deletion:`
-    );
-    if (confirmText === repo) {
-      deleteRepo.mutate({ repoId: repoData.repo.id });
-    }
+    if (deleteConfirmText !== repo) return;
+    
+    deleteRepo.mutate({ repoId: repoData.repo.id });
+    setDeleteDialogOpen(false);
+    setDeleteConfirmText('');
   };
 
   if (!authenticated) {
@@ -262,14 +273,51 @@ export function RepoSettingsPage() {
                     Once you delete a repository, there is no going back.
                   </p>
                 </div>
-                <Button
-                  variant="destructive"
-                  onClick={handleDelete}
-                  disabled={deleteRepo.isPending}
-                >
-                  {deleteRepo.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Delete repository
-                </Button>
+                <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="destructive"
+                      disabled={deleteRepo.isPending}
+                    >
+                      {deleteRepo.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Delete repository
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete repository</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This action cannot be undone. This will permanently delete the{' '}
+                        <strong>{owner}/{repo}</strong> repository and all of its contents.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <div className="py-4">
+                      <Label htmlFor="confirm-delete" className="text-sm text-muted-foreground">
+                        Type <strong>{repo}</strong> to confirm
+                      </Label>
+                      <Input
+                        id="confirm-delete"
+                        value={deleteConfirmText}
+                        onChange={(e) => setDeleteConfirmText(e.target.value)}
+                        placeholder={repo}
+                        className="mt-2"
+                      />
+                    </div>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel onClick={() => setDeleteConfirmText('')}>
+                        Cancel
+                      </AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={handleDelete}
+                        disabled={deleteConfirmText !== repo || deleteRepo.isPending}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        {deleteRepo.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Delete repository
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </div>
             </CardContent>
           </Card>
