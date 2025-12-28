@@ -2,6 +2,8 @@
 
 **Git that understands your code.** A Git implementation with AI woven into the workflow.
 
+[Website](https://wit.sh) | [Documentation](https://docs.wit.sh) | [Quickstart](https://docs.wit.sh/quickstart)
+
 ## Why wit?
 
 - **Undo anything** - `wit undo` instead of deciphering the reflog
@@ -39,11 +41,11 @@ This is early software. We're shipping fast, not perfect. Check the [ROADMAP](./
 
 ## Documentation
 
-- **[Getting Started](./docs/getting-started.mdx)** - From zero to productive in 5 minutes
-- **[Why wit?](./docs/why-wit.mdx)** - The problems we're solving
-- **[Commands Reference](./docs/commands/reference.mdx)** - Every command documented
-- **[AI Features](./docs/features/ai-powered.mdx)** - Commit messages, review, semantic search
-- **[Full Docs](./docs/)** - Everything else
+- **[Quickstart](https://docs.wit.sh/quickstart)** - From zero to productive in 5 minutes
+- **[Why wit?](https://docs.wit.sh/why-wit)** - The problems we're solving
+- **[Commands](https://docs.wit.sh/commands/overview)** - Every command documented
+- **[AI Features](https://docs.wit.sh/features/ai-powered)** - Commit messages, review, semantic search
+- **[Full Docs](https://docs.wit.sh)** - Everything else
 
 ## Quick Reference
 
@@ -68,6 +70,10 @@ wit cleanup              # delete merged branches
 ## Requirements
 
 Node.js >= 22.13.0
+
+## Contributing
+
+We welcome contributions! See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
 
 ## License
 
