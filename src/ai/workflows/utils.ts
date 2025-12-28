@@ -11,6 +11,52 @@ import { exists, readFileText, writeFile, mkdirp, walkDir, readDir, isDirectory 
 import * as path from 'path';
 
 /**
+ * Check if a path is a bare repository (has objects/ directly, not .wit/objects)
+ */
+function isBareRepo(repoPath: string): boolean {
+  return exists(path.join(repoPath, 'objects')) && exists(path.join(repoPath, 'refs'));
+}
+
+/**
+ * List all files in a bare repository by walking the tree at HEAD
+ */
+async function listFilesInBareRepo(repoPath: string): Promise<string[]> {
+  const { BareRepository } = await import('../../server/storage/repos.js');
+  
+  const repo = new BareRepository(repoPath);
+  if (!repo.isValid()) {
+    throw new Error(`Not a valid bare repository: ${repoPath}`);
+  }
+  
+  // Get HEAD commit
+  const headRef = repo.refs.resolve('HEAD');
+  if (!headRef) {
+    return []; // Empty repo
+  }
+  
+  const commit = repo.objects.readCommit(headRef);
+  const files: string[] = [];
+  
+  // Recursively walk the tree
+  function walkTree(treeHash: string, prefix: string = '') {
+    const tree = repo.objects.readTree(treeHash);
+    for (const entry of tree.entries) {
+      const entryPath = prefix ? `${prefix}/${entry.name}` : entry.name;
+      if (entry.mode === '40000') {
+        // Directory - recurse
+        walkTree(entry.hash, entryPath);
+      } else {
+        // File
+        files.push(entryPath);
+      }
+    }
+  }
+  
+  walkTree(commit.treeHash);
+  return files;
+}
+
+/**
  * Changed file information
  */
 export interface ChangedFile {
@@ -192,11 +238,19 @@ function generateFileDiff(oldContent: string, newContent: string, oldPath: strin
 }
 
 /**
- * Get files in a repository matching a pattern
+ * Find files in a repository (supports both working directories and bare repos)
  */
-export function findFilesInRepo(repoPath: string, pattern?: RegExp): string[] {
-  const repo = Repository.find(repoPath);
-  const files = walkDir(repo.workDir, ['.wit', '.git', 'node_modules']);
+export async function findFilesInRepo(repoPath: string, pattern?: RegExp): Promise<string[]> {
+  let files: string[];
+  
+  if (isBareRepo(repoPath)) {
+    // Bare repository - list files from git tree
+    files = await listFilesInBareRepo(repoPath);
+  } else {
+    // Working directory - walk filesystem
+    const repo = Repository.find(repoPath);
+    files = walkDir(repo.workDir, ['.wit', '.git', 'node_modules']);
+  }
   
   if (pattern) {
     return files.filter(f => pattern.test(f));
@@ -206,16 +260,32 @@ export function findFilesInRepo(repoPath: string, pattern?: RegExp): string[] {
 }
 
 /**
- * Search for a pattern in repository files
+ * Search for a pattern in repository files (for bare repos, this only searches file names)
  */
-export function searchInRepo(
+export async function searchInRepo(
   repoPath: string,
   pattern: RegExp,
   filePattern?: RegExp
-): Array<{ path: string; line: number; content: string }> {
+): Promise<Array<{ path: string; line: number; content: string }>> {
   const results: Array<{ path: string; line: number; content: string }> = [];
-  const files = findFilesInRepo(repoPath, filePattern);
+  const files = await findFilesInRepo(repoPath, filePattern);
   
+  // For bare repos, we can't easily read file contents without extracting
+  // So we just return files that match the pattern in their path
+  if (isBareRepo(repoPath)) {
+    for (const file of files) {
+      if (pattern.test(file)) {
+        results.push({
+          path: file,
+          line: 0,
+          content: `(file path matches: ${file})`,
+        });
+      }
+    }
+    return results;
+  }
+  
+  // For working directories, search file contents
   for (const file of files) {
     const fullPath = path.join(repoPath, file);
     

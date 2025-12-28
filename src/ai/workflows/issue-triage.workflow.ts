@@ -211,7 +211,7 @@ const searchCodebaseStep = createStep({
     // Get all files in the repo
     let allFiles: string[] = [];
     try {
-      allFiles = findFilesInRepo(inputData.repoPath);
+      allFiles = await findFilesInRepo(inputData.repoPath);
     } catch (error) {
       console.log(`[Issue Triage] Could not list repo files: ${error}, skipping codebase search`);
       return { relatedFiles };
@@ -264,11 +264,11 @@ const searchCodebaseStep = createStep({
     // Search for keyword matches in file content (limited)
     for (const keyword of inputData.keywords.slice(0, 3)) {
       try {
-        const searchResults = searchInRepo(
+        const searchResults = (await searchInRepo(
           inputData.repoPath,
           new RegExp(keyword, 'i'),
           /\.(ts|tsx|js|jsx)$/
-        ).slice(0, 3);
+        )).slice(0, 3);
         
         for (const result of searchResults) {
           if (!relatedFiles.some(f => f.path === result.path)) {
