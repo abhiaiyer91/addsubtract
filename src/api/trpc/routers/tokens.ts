@@ -213,6 +213,8 @@ function getScopeDescription(scope: TokenScope): string {
     'repo:admin': 'Manage repository settings, collaborators, and deletion',
     'user:read': 'Read your profile information',
     'user:write': 'Update your profile',
+    'packages:read': 'Download packages (including private packages)',
+    'packages:write': 'Publish and manage packages',
   };
   return descriptions[scope];
 }

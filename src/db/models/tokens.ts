@@ -19,6 +19,8 @@ export const TOKEN_SCOPES = [
   'repo:admin', // Manage settings, collaborators, delete repos
   'user:read', // Read profile information
   'user:write', // Update profile
+  'packages:read', // Download packages (including private)
+  'packages:write', // Publish and manage packages
 ] as const;
 
 export type TokenScope = (typeof TOKEN_SCOPES)[number];

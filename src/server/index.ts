@@ -23,6 +23,7 @@ import { createIssueRoutes } from './routes/issues';
 import { createProjectRoutes } from './routes/projects';
 import { createCycleRoutes } from './routes/cycles';
 import { createAgentStreamRoutes } from './routes/agent-stream';
+import { createPackageRoutes } from './routes/packages';
 import { RepoManager } from './storage/repos';
 import { syncReposToDatabase } from './storage/sync';
 import { appRouter, createContext } from '../api/trpc';
@@ -171,6 +172,12 @@ export function createApp(repoManager: RepoManager, options: { verbose?: boolean
   app.route('/api/repos', projectRoutes);
   app.route('/api/repos', cycleRoutes);
   app.route('/api/agent', agentStreamRoutes);
+
+  // Package registry routes (npm-compatible)
+  // Base URL is used for generating tarball download URLs
+  const baseUrl = process.env.BASE_URL || `http://localhost:${process.env.PORT || 3000}`;
+  const packageRoutes = createPackageRoutes(baseUrl);
+  app.route('/api/packages', packageRoutes);
 
   // Git Smart HTTP routes
   const gitRoutes = createGitRoutes(repoManager);

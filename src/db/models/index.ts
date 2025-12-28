@@ -151,3 +151,14 @@ export {
   triageAgentConfigModel,
   triageAgentRunModel,
 } from './triage-agent';
+
+// Package registry models
+export {
+  packageModel,
+  packageVersionModel,
+  distTagModel,
+  maintainerModel,
+  parsePackageName,
+  getFullPackageName,
+  generatePackageMetadata,
+} from './packages';
