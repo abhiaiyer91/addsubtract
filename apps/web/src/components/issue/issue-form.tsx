@@ -1,13 +1,30 @@
 import { useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Minus, Signal, SignalLow, SignalMedium, SignalHigh } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+
+export type IssuePriority = 'none' | 'low' | 'medium' | 'high' | 'urgent';
+
+const PRIORITY_OPTIONS: { value: IssuePriority; label: string; icon: React.ReactNode; color: string }[] = [
+  { value: 'none', label: 'No priority', icon: <Minus className="h-4 w-4" />, color: 'text-muted-foreground' },
+  { value: 'low', label: 'Low', icon: <SignalLow className="h-4 w-4" />, color: 'text-blue-500' },
+  { value: 'medium', label: 'Medium', icon: <SignalMedium className="h-4 w-4" />, color: 'text-yellow-500' },
+  { value: 'high', label: 'High', icon: <SignalHigh className="h-4 w-4" />, color: 'text-orange-500' },
+  { value: 'urgent', label: 'Urgent', icon: <Signal className="h-4 w-4" />, color: 'text-red-500' },
+];
 
 interface IssueFormProps {
-  onSubmit: (data: { title: string; body: string }) => Promise<void> | void;
+  onSubmit: (data: { title: string; body: string; priority?: IssuePriority }) => Promise<void> | void;
   isLoading?: boolean;
   error?: string | null;
 }
@@ -15,11 +32,14 @@ interface IssueFormProps {
 export function IssueForm({ onSubmit, isLoading, error }: IssueFormProps) {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
+  const [priority, setPriority] = useState<IssuePriority>('none');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await onSubmit({ title, body });
+    await onSubmit({ title, body, priority: priority !== 'none' ? priority : undefined });
   };
+
+  const selectedPriority = PRIORITY_OPTIONS.find(p => p.value === priority);
 
   return (
     <Card>
@@ -57,6 +77,31 @@ export function IssueForm({ onSubmit, isLoading, error }: IssueFormProps) {
             <p className="text-xs text-muted-foreground">
               Supports Markdown formatting
             </p>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="priority">Priority</Label>
+            <Select value={priority} onValueChange={(value) => setPriority(value as IssuePriority)} disabled={isLoading}>
+              <SelectTrigger id="priority" className="w-[200px]">
+                <SelectValue>
+                  {selectedPriority && (
+                    <span className={`flex items-center gap-2 ${selectedPriority.color}`}>
+                      {selectedPriority.icon}
+                      {selectedPriority.label}
+                    </span>
+                  )}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {PRIORITY_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    <span className={`flex items-center gap-2 ${option.color}`}>
+                      {option.icon}
+                      {option.label}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
         <CardFooter className="flex justify-end gap-2">

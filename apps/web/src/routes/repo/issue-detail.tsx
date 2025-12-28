@@ -10,6 +10,7 @@ import { Separator } from '@/components/ui/separator';
 import { Markdown } from '@/components/markdown/renderer';
 import { LabelPicker } from '@/components/issue/label-picker';
 import { ProjectPicker } from '@/components/issue/project-picker';
+import { PriorityPicker, type IssuePriority } from '@/components/issue/priority-picker';
 import { RepoLayout } from './components/repo-layout';
 import { Loading } from '@/components/ui/loading';
 import { formatRelativeTime, formatDate } from '@/lib/utils';
@@ -207,11 +208,54 @@ export function IssueDetailPage() {
     },
   });
 
+  const updatePriorityMutation = trpc.issues.updatePriority.useMutation({
+    onMutate: async ({ priority }) => {
+      await utils.issues.get.cancel({ repoId: repoData?.repo.id!, number: issueNumber });
+      const previousIssue = utils.issues.get.getData({ repoId: repoData?.repo.id!, number: issueNumber });
+      utils.issues.get.setData(
+        { repoId: repoData?.repo.id!, number: issueNumber },
+        (old) => old ? { ...old, priority } : old
+      );
+      return { previousIssue };
+    },
+    onSuccess: () => {
+      toastSuccess({
+        title: 'Priority updated',
+        description: 'Issue priority has been updated.',
+      });
+    },
+    onError: (error, _variables, context) => {
+      if (context?.previousIssue) {
+        utils.issues.get.setData(
+          { repoId: repoData?.repo.id!, number: issueNumber },
+          context.previousIssue
+        );
+      }
+      toastError({
+        title: 'Failed to update priority',
+        description: error.message,
+      });
+    },
+    onSettled: () => {
+      utils.issues.get.invalidate({ repoId: repoData?.repo.id!, number: issueNumber });
+      utils.issues.list.invalidate({ repoId: repoData?.repo.id! });
+      utils.issues.listGroupedByStatus.invalidate({ repoId: repoData?.repo.id! });
+    },
+  });
+
   const handleProjectChange = (newProject: { id: string; name: string; icon: string | null } | null) => {
     if (!issueData?.id) return;
     assignToProjectMutation.mutate({
       issueId: issueData.id,
       projectId: newProject?.id ?? null,
+    });
+  };
+
+  const handlePriorityChange = (priority: IssuePriority) => {
+    if (!issueData?.id) return;
+    updatePriorityMutation.mutate({
+      issueId: issueData.id,
+      priority,
     });
   };
 
@@ -458,6 +502,15 @@ export function IssueDetailPage() {
               onLabelsChange={setSelectedLabels}
             />
           </div>
+
+          <Separator />
+
+          {/* Priority */}
+          <PriorityPicker
+            priority={issue.priority as IssuePriority}
+            onPriorityChange={handlePriorityChange}
+            isLoading={updatePriorityMutation.isPending}
+          />
 
           <Separator />
 
