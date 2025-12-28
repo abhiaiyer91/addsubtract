@@ -1,6 +1,6 @@
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { ChevronRight, FolderKanban, RefreshCw } from 'lucide-react';
-import { IssueForm } from '@/components/issue/issue-form';
+import { IssueForm, type IssuePriority } from '@/components/issue/issue-form';
 import { RepoLayout } from './components/repo-layout';
 import { Loading } from '@/components/ui/loading';
 import { Badge } from '@/components/ui/badge';
@@ -63,13 +63,14 @@ export function NewIssuePage() {
     },
   });
 
-  const handleSubmit = async (data: { title: string; body: string }) => {
+  const handleSubmit = async (data: { title: string; body: string; priority?: IssuePriority }) => {
     if (!repoData?.repo.id) return;
 
     createIssueMutation.mutate({
       repoId: repoData.repo.id,
       title: data.title,
       body: data.body,
+      priority: data.priority,
       projectId: projectId || undefined,
       cycleId: cycleId || undefined,
     });
