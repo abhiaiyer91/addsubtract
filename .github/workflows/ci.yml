@@ -58,7 +58,7 @@ jobs:
         run: npm run build
 
       - name: Run database migrations
-        run: npm run db:push
+        run: npx drizzle-kit push --force
 
       - name: Run tests with coverage
         run: npm run test:coverage
