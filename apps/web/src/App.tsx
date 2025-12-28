@@ -112,7 +112,6 @@ export function App() {
             <Route path="/orgs/new" element={<NewOrgPage />} />
             <Route path="/search" element={<SearchPage />} />
             <Route path="/inbox" element={<InboxPage />} />
-            <Route path="/wrapped" element={<WrappedPage />} />
 
             {/* Organization routes */}
             <Route path="/org/:slug" element={<OrgPage />} />
@@ -122,6 +121,7 @@ export function App() {
             <Route path="/org/:slug/teams/:teamId" element={<TeamDetailPage />} />
 
             {/* User/Org profile - Unified dashboard */}
+            <Route path="/:username/wrapped" element={<WrappedPage />} />
             <Route path="/:owner" element={<UserHomePage />} />
 
             {/* Repository routes */}

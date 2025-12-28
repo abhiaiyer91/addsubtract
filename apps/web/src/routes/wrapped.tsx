@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import {
   Calendar,
   ChevronLeft,
@@ -345,25 +345,50 @@ function WrappedSkeleton() {
 }
 
 export function WrappedPage() {
+  const { username } = useParams<{ username: string }>();
+  const navigate = useNavigate();
   const { data: session, isPending: sessionPending } = useSession();
-  const user = session?.user;
+  const currentUser = session?.user;
+  
+  // Determine if viewing own wrapped or another user's
+  const isOwnWrapped = currentUser?.username === username;
   
   // Get current date for default selection
   const now = new Date();
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
   
-  // Fetch available periods
-  const { data: periods, isLoading: periodsLoading } = trpc.wrapped.availablePeriods.useQuery(
-    undefined,
-    { enabled: !!user }
+  // Fetch user info for the username
+  const { data: profileUser, isLoading: userLoading } = trpc.users.getByUsername.useQuery(
+    { username: username! },
+    { enabled: !!username }
   );
   
-  // Fetch wrapped data for selected period
+  // Fetch available periods - use different endpoints for own vs other user
+  const { data: periods, isLoading: periodsLoading } = trpc.wrapped.availablePeriods.useQuery(
+    undefined,
+    { enabled: isOwnWrapped && !!currentUser }
+  );
+  
+  const { data: otherUserPeriods, isLoading: otherPeriodsLoading } = trpc.wrapped.periodsForUser.useQuery(
+    { userId: profileUser?.id || '' },
+    { enabled: !isOwnWrapped && !!profileUser?.id }
+  );
+  
+  const availablePeriods = isOwnWrapped ? periods : otherUserPeriods;
+  
+  // Fetch wrapped data for selected period - use different endpoints for own vs other user
   const { data: wrapped, isLoading: wrappedLoading } = trpc.wrapped.forMonth.useQuery(
     { year: selectedYear, month: selectedMonth },
-    { enabled: !!user }
+    { enabled: isOwnWrapped && !!currentUser }
   );
+  
+  const { data: otherUserWrapped, isLoading: otherWrappedLoading } = trpc.wrapped.forUser.useQuery(
+    { userId: profileUser?.id || '', year: selectedYear, month: selectedMonth },
+    { enabled: !isOwnWrapped && !!profileUser?.id }
+  );
+  
+  const wrappedData = isOwnWrapped ? wrapped : otherUserWrapped;
   
   // Navigate to previous/next month
   const goToPreviousMonth = () => {
@@ -388,47 +413,60 @@ export function WrappedPage() {
   const canGoNext = selectedYear < now.getFullYear() || 
     (selectedYear === now.getFullYear() && selectedMonth < now.getMonth() + 1);
   
-  if (sessionPending) {
+  const isLoading = sessionPending || userLoading || 
+    (isOwnWrapped ? (wrappedLoading || periodsLoading) : (otherWrappedLoading || otherPeriodsLoading));
+  
+  if (isLoading) {
     return <WrappedSkeleton />;
   }
   
-  if (!user) {
+  // User not found
+  if (!profileUser) {
     return (
       <div className="container max-w-[800px] mx-auto py-16 text-center">
-        <div className="p-6 rounded-full bg-primary/10 w-fit mx-auto mb-6">
-          <Flame className="h-12 w-12 text-primary" />
+        <div className="p-6 rounded-full bg-muted w-fit mx-auto mb-6">
+          <Flame className="h-12 w-12 text-muted-foreground" />
         </div>
-        <h1 className="text-3xl font-bold mb-4">Your Monthly Wrapped</h1>
+        <h1 className="text-3xl font-bold mb-4">User Not Found</h1>
         <p className="text-muted-foreground mb-8 max-w-md mx-auto">
-          Sign in to see your personalized monthly activity summary, coding personality, and insights.
+          The user @{username} doesn't exist or their profile is private.
         </p>
-        <Link to="/login">
-          <Button size="lg">Sign In to View Your Wrapped</Button>
+        <Link to="/">
+          <Button size="lg">Go Home</Button>
         </Link>
       </div>
     );
   }
   
-  if (wrappedLoading || periodsLoading) {
-    return <WrappedSkeleton />;
-  }
+  // Determine display name
+  const displayName = isOwnWrapped ? 'Your' : `${profileUser.name || profileUser.username}'s`;
   
-  const personalityConfig = wrapped?.funStats?.personalityType
-    ? PERSONALITY_CONFIG[wrapped.funStats.personalityType] || PERSONALITY_CONFIG['Steady Coder']
+  const personalityConfig = wrappedData?.funStats?.personalityType
+    ? PERSONALITY_CONFIG[wrappedData.funStats.personalityType] || PERSONALITY_CONFIG['Steady Coder']
     : PERSONALITY_CONFIG['Ghost Developer'];
   
   return (
     <div className="container max-w-[1200px] mx-auto py-8 space-y-8">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-3">
-            <Flame className="h-8 w-8 text-orange-500" />
-            Your Wrapped
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Your monthly coding activity summary
-          </p>
+        <div className="flex items-center gap-4">
+          {!isOwnWrapped && (
+            <Avatar className="h-12 w-12">
+              <AvatarImage src={profileUser.avatarUrl || undefined} />
+              <AvatarFallback>
+                {(profileUser.username || profileUser.name || '?').slice(0, 2).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+          )}
+          <div>
+            <h1 className="text-3xl font-bold flex items-center gap-3">
+              <Flame className="h-8 w-8 text-orange-500" />
+              {displayName} Wrapped
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              {isOwnWrapped ? 'Your' : `@${profileUser.username}'s`} monthly coding activity summary
+            </p>
+          </div>
         </div>
         
         {/* Period selector */}
@@ -437,7 +475,7 @@ export function WrappedPage() {
             variant="outline"
             size="icon"
             onClick={goToPreviousMonth}
-            disabled={!periods?.length}
+            disabled={!availablePeriods?.length}
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
@@ -456,12 +494,12 @@ export function WrappedPage() {
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              {periods?.map((p) => (
+              {availablePeriods?.map((p) => (
                 <SelectItem key={`${p.year}-${p.month}`} value={`${p.year}-${p.month}`}>
                   {MONTH_NAMES[p.month - 1]} {p.year}
                 </SelectItem>
               ))}
-              {(!periods || periods.length === 0) && (
+              {(!availablePeriods || availablePeriods.length === 0) && (
                 <SelectItem value={`${selectedYear}-${selectedMonth}`}>
                   {MONTH_NAMES[selectedMonth - 1]} {selectedYear}
                 </SelectItem>
@@ -480,7 +518,7 @@ export function WrappedPage() {
         </div>
       </div>
       
-      {!wrapped ? (
+      {!wrappedData ? (
         <Card className="py-16">
           <CardContent className="text-center">
             <div className="p-6 rounded-full bg-muted w-fit mx-auto mb-6">
@@ -488,8 +526,8 @@ export function WrappedPage() {
             </div>
             <h2 className="text-xl font-semibold mb-2">No activity this month</h2>
             <p className="text-muted-foreground max-w-md mx-auto">
-              We don't have enough activity data for {MONTH_NAMES[selectedMonth - 1]} {selectedYear}.
-              Try selecting a different month or start coding to build your wrapped!
+              {isOwnWrapped ? "We don't have enough activity data" : `@${profileUser.username} doesn't have activity data`} for {MONTH_NAMES[selectedMonth - 1]} {selectedYear}.
+              {isOwnWrapped && " Try selecting a different month or start coding to build your wrapped!"}
             </p>
           </CardContent>
         </Card>
@@ -503,8 +541,8 @@ export function WrappedPage() {
                   {personalityConfig.icon}
                 </div>
                 <div>
-                  <p className="text-sm font-medium opacity-80">Your Coding Personality</p>
-                  <h2 className="text-2xl font-bold">{wrapped.funStats?.personalityType || 'Steady Coder'}</h2>
+                  <p className="text-sm font-medium opacity-80">{isOwnWrapped ? 'Your' : 'Their'} Coding Personality</p>
+                  <h2 className="text-2xl font-bold">{wrappedData.funStats?.personalityType || 'Steady Coder'}</h2>
                   <p className="text-sm opacity-80 mt-1">{personalityConfig.description}</p>
                 </div>
               </div>
@@ -512,19 +550,19 @@ export function WrappedPage() {
             <CardContent className="pt-6">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
                 <div>
-                  <p className="text-2xl font-bold">{wrapped.funStats?.mostActiveHourLabel || '—'}</p>
+                  <p className="text-2xl font-bold">{wrappedData.funStats?.mostActiveHourLabel || '—'}</p>
                   <p className="text-sm text-muted-foreground">Peak Hour</p>
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{wrapped.funStats?.mostActiveDay || '—'}</p>
+                  <p className="text-2xl font-bold">{wrappedData.funStats?.mostActiveDay || '—'}</p>
                   <p className="text-sm text-muted-foreground">Peak Day</p>
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{wrapped.funStats?.lateNightCommits || 0}</p>
+                  <p className="text-2xl font-bold">{wrappedData.funStats?.lateNightCommits || 0}</p>
                   <p className="text-sm text-muted-foreground">Late Night Commits</p>
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{wrapped.funStats?.weekendWarriorCommits || 0}</p>
+                  <p className="text-2xl font-bold">{wrappedData.funStats?.weekendWarriorCommits || 0}</p>
                   <p className="text-sm text-muted-foreground">Weekend Commits</p>
                 </div>
               </div>
@@ -536,26 +574,26 @@ export function WrappedPage() {
             <StatCard
               icon={<GitCommit className="h-5 w-5" />}
               label="Commits"
-              value={wrapped.totalCommits}
-              subValue={`${wrapped.avgCommitsPerActiveDay} per active day`}
+              value={wrappedData.totalCommits}
+              subValue={`${wrappedData.avgCommitsPerActiveDay} per active day`}
             />
             <StatCard
               icon={<GitPullRequest className="h-5 w-5" />}
               label="Pull Requests"
-              value={wrapped.totalPrsOpened}
-              subValue={`${wrapped.totalPrsMerged} merged`}
+              value={wrappedData.totalPrsOpened}
+              subValue={`${wrappedData.totalPrsMerged} merged`}
             />
             <StatCard
               icon={<Code2 className="h-5 w-5" />}
               label="Reviews"
-              value={wrapped.totalReviews}
-              subValue={`${wrapped.totalReviewsApproved} approved`}
+              value={wrappedData.totalReviews}
+              subValue={`${wrappedData.totalReviewsApproved} approved`}
             />
             <StatCard
               icon={<Flame className="h-5 w-5" />}
               label="Active Days"
-              value={wrapped.totalActiveDays}
-              subValue={`${wrapped.streaks?.longestStreak || 0} day streak`}
+              value={wrappedData.totalActiveDays}
+              subValue={`${wrappedData.streaks?.longestStreak || 0} day streak`}
             />
           </div>
           
@@ -576,8 +614,8 @@ export function WrappedPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {wrapped.dailyActivity && (
-                    <ActivityHeatmap dailyActivity={wrapped.dailyActivity} />
+                  {wrappedData.dailyActivity && (
+                    <ActivityHeatmap dailyActivity={wrappedData.dailyActivity} />
                   )}
                 </CardContent>
               </Card>
@@ -592,8 +630,8 @@ export function WrappedPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {wrapped.hourlyDistribution && (
-                    <HourlyChart hourlyDistribution={wrapped.hourlyDistribution} />
+                  {wrappedData.hourlyDistribution && (
+                    <HourlyChart hourlyDistribution={wrappedData.hourlyDistribution} />
                   )}
                 </CardContent>
               </Card>
@@ -608,8 +646,8 @@ export function WrappedPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {wrapped.dayOfWeekDistribution && (
-                    <DayOfWeekChart dayOfWeekDistribution={wrapped.dayOfWeekDistribution} />
+                  {wrappedData.dayOfWeekDistribution && (
+                    <DayOfWeekChart dayOfWeekDistribution={wrappedData.dayOfWeekDistribution} />
                   )}
                 </CardContent>
               </Card>
@@ -629,21 +667,21 @@ export function WrappedPage() {
               <CardContent className="space-y-4">
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Issues Opened</span>
-                  <span className="font-medium">{wrapped.totalIssuesOpened}</span>
+                  <span className="font-medium">{wrappedData.totalIssuesOpened}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Issues Closed</span>
-                  <span className="font-medium">{wrapped.totalIssuesClosed}</span>
+                  <span className="font-medium">{wrappedData.totalIssuesClosed}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Comments</span>
-                  <span className="font-medium">{wrapped.totalComments}</span>
+                  <span className="font-medium">{wrappedData.totalComments}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Stars Given</span>
                   <span className="font-medium flex items-center gap-1">
                     <Star className="h-4 w-4 text-yellow-500" />
-                    {wrapped.totalStarsGiven}
+                    {wrappedData.totalStarsGiven}
                   </span>
                 </div>
               </CardContent>
@@ -661,18 +699,18 @@ export function WrappedPage() {
                 <div>
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-muted-foreground">Current Streak</span>
-                    <span className="font-bold text-lg">{wrapped.streaks?.currentStreak || 0} days</span>
+                    <span className="font-bold text-lg">{wrappedData.streaks?.currentStreak || 0} days</span>
                   </div>
-                  <Progress value={Math.min((wrapped.streaks?.currentStreak || 0) / 30 * 100, 100)} />
+                  <Progress value={Math.min((wrappedData.streaks?.currentStreak || 0) / 30 * 100, 100)} />
                 </div>
                 <div>
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-muted-foreground">Longest Streak</span>
-                    <span className="font-bold text-lg">{wrapped.streaks?.longestStreak || 0} days</span>
+                    <span className="font-bold text-lg">{wrappedData.streaks?.longestStreak || 0} days</span>
                   </div>
-                  {wrapped.streaks?.longestStreakStart && wrapped.streaks?.longestStreakEnd && (
+                  {wrappedData.streaks?.longestStreakStart && wrappedData.streaks?.longestStreakEnd && (
                     <p className="text-xs text-muted-foreground">
-                      {new Date(wrapped.streaks.longestStreakStart).toLocaleDateString()} - {new Date(wrapped.streaks.longestStreakEnd).toLocaleDateString()}
+                      {new Date(wrappedData.streaks.longestStreakStart).toLocaleDateString()} - {new Date(wrappedData.streaks.longestStreakEnd).toLocaleDateString()}
                     </p>
                   )}
                 </div>
@@ -688,9 +726,9 @@ export function WrappedPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {wrapped.topRepositories && wrapped.topRepositories.length > 0 ? (
+                {wrappedData.topRepositories && wrappedData.topRepositories.length > 0 ? (
                   <div className="space-y-3">
-                    {wrapped.topRepositories.slice(0, 5).map((repo, index) => (
+                    {wrappedData.topRepositories.slice(0, 5).map((repo, index) => (
                       <div key={repo.repoId} className="flex items-center gap-3">
                         <span className="text-muted-foreground text-sm w-4">{index + 1}</span>
                         <div className="flex-1 min-w-0">
@@ -709,30 +747,30 @@ export function WrappedPage() {
           </div>
           
           {/* AI & CI Stats (if available) */}
-          {(wrapped.aiUsage || wrapped.ciStats) && (
+          {(wrappedData.aiUsage || wrappedData.ciStats) && (
             <div className="grid gap-4 md:grid-cols-2">
               {/* AI Usage */}
-              {wrapped.aiUsage && (
+              {wrappedData.aiUsage && (
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Bot className="h-5 w-5" />
                       AI Usage
                     </CardTitle>
-                    <CardDescription>Your AI agent activity this month</CardDescription>
+                    <CardDescription>{isOwnWrapped ? 'Your' : 'Their'} AI agent activity this month</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-3 gap-4 text-center">
                       <div>
-                        <p className="text-2xl font-bold">{wrapped.aiUsage.agentSessions}</p>
+                        <p className="text-2xl font-bold">{wrappedData.aiUsage.agentSessions}</p>
                         <p className="text-sm text-muted-foreground">Sessions</p>
                       </div>
                       <div>
-                        <p className="text-2xl font-bold">{wrapped.aiUsage.totalMessages}</p>
+                        <p className="text-2xl font-bold">{wrappedData.aiUsage.totalMessages}</p>
                         <p className="text-sm text-muted-foreground">Messages</p>
                       </div>
                       <div>
-                        <p className="text-2xl font-bold">{(wrapped.aiUsage.totalTokens / 1000).toFixed(1)}k</p>
+                        <p className="text-2xl font-bold">{(wrappedData.aiUsage.totalTokens / 1000).toFixed(1)}k</p>
                         <p className="text-sm text-muted-foreground">Tokens</p>
                       </div>
                     </div>
@@ -741,25 +779,25 @@ export function WrappedPage() {
               )}
               
               {/* CI Stats */}
-              {wrapped.ciStats && (
+              {wrappedData.ciStats && (
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Clock className="h-5 w-5" />
                       CI/CD Stats
                     </CardTitle>
-                    <CardDescription>Your workflow runs this month</CardDescription>
+                    <CardDescription>{isOwnWrapped ? 'Your' : 'Their'} workflow runs this month</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="text-center">
-                        <p className="text-2xl font-bold">{wrapped.ciStats.totalRuns}</p>
+                        <p className="text-2xl font-bold">{wrappedData.ciStats.totalRuns}</p>
                         <p className="text-sm text-muted-foreground">Total Runs</p>
                       </div>
                       <div className="text-center">
                         <div className="flex items-center justify-center gap-1">
-                          <p className="text-2xl font-bold">{wrapped.ciStats.successRate.toFixed(0)}%</p>
-                          {wrapped.ciStats.successRate >= 80 ? (
+                          <p className="text-2xl font-bold">{wrappedData.ciStats.successRate.toFixed(0)}%</p>
+                          {wrappedData.ciStats.successRate >= 80 ? (
                             <CheckCircle2 className="h-5 w-5 text-green-500" />
                           ) : (
                             <XCircle className="h-5 w-5 text-red-500" />
@@ -768,11 +806,11 @@ export function WrappedPage() {
                         <p className="text-sm text-muted-foreground">Success Rate</p>
                       </div>
                       <div className="text-center">
-                        <p className="text-2xl font-bold">{wrapped.ciStats.failedRuns}</p>
+                        <p className="text-2xl font-bold">{wrappedData.ciStats.failedRuns}</p>
                         <p className="text-sm text-muted-foreground">Failed Runs</p>
                       </div>
                       <div className="text-center">
-                        <p className="text-2xl font-bold">{wrapped.ciStats.avgDurationMinutes}m</p>
+                        <p className="text-2xl font-bold">{wrappedData.ciStats.avgDurationMinutes}m</p>
                         <p className="text-sm text-muted-foreground">Avg Duration</p>
                       </div>
                     </div>
@@ -783,18 +821,18 @@ export function WrappedPage() {
           )}
           
           {/* Top Collaborators (if available) */}
-          {wrapped.topCollaborators && wrapped.topCollaborators.length > 0 && (
+          {wrappedData.topCollaborators && wrappedData.topCollaborators.length > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Users className="h-5 w-5" />
                   Top Collaborators
                 </CardTitle>
-                <CardDescription>People you worked with most this month</CardDescription>
+                <CardDescription>People {isOwnWrapped ? 'you' : 'they'} worked with most this month</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {wrapped.topCollaborators.slice(0, 6).map((collaborator) => (
+                  {wrappedData.topCollaborators.slice(0, 6).map((collaborator) => (
                     <div key={collaborator.userId} className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
                       <Avatar>
                         <AvatarImage src={collaborator.avatarUrl || undefined} />

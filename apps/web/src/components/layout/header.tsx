@@ -156,7 +156,7 @@ export function Header() {
                       <User className="mr-2 h-4 w-4" />
                       Your profile
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => navigate('/wrapped')}>
+                    <DropdownMenuItem onClick={() => navigate(`/${user?.username}/wrapped`)}>
                       <Flame className="mr-2 h-4 w-4" />
                       Your Wrapped
                     </DropdownMenuItem>
@@ -246,7 +246,7 @@ export function Header() {
                                     New organization
                                   </Link>
                                   <Link
-                                    to="/wrapped"
+                                    to={`/${user?.username}/wrapped`}
                                     className="flex items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-lg transition-all"
                                     onClick={() => setMobileMenuOpen(false)}
                                   >
