@@ -1,5 +1,8 @@
-# Railway Configuration for Wit
+# Railway Configuration for Wit API Server
 # https://docs.railway.app/reference/config-as-code
+#
+# This deploys the API server (Git hosting, tRPC API, auth)
+# For the web UI, deploy from apps/web directory separately
 
 [build]
 builder = "nixpacks"
@@ -12,14 +15,31 @@ healthcheckTimeout = 30
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
 
-# Environment variables (set these in Railway dashboard)
-# Required:
-#   DATABASE_URL - Automatically set by Railway Postgres
-#   BETTER_AUTH_SECRET - Generate with: openssl rand -base64 32
-#   NODE_ENV=production
+# ===========================================
+# RAILWAY SETUP INSTRUCTIONS
+# ===========================================
 #
-# Optional:
-#   CORS_ORIGINS - Comma-separated list of allowed origins (e.g., https://wit.example.com)
-#   TRUSTED_ORIGINS - Same as CORS_ORIGINS, for auth
-#   OPENAI_API_KEY - For AI features
-#   ANTHROPIC_API_KEY - Alternative AI provider
+# 1. Create a new Railway project
+# 2. Add PostgreSQL from the Railway dashboard
+#    - DATABASE_URL is automatically set
+#
+# 3. Add a Volume for Git repos:
+#    - Mount path: /data
+#    - This persists your Git repositories
+#
+# 4. Set these environment variables:
+#
+# REQUIRED:
+#   NODE_ENV=production
+#   BETTER_AUTH_SECRET=<run: openssl rand -base64 32>
+#   CORS_ORIGINS=https://your-web-app.up.railway.app
+#   TRUSTED_ORIGINS=https://your-web-app.up.railway.app
+#
+# OPTIONAL (for AI features):
+#   OPENAI_API_KEY=sk-...
+#   ANTHROPIC_API_KEY=sk-ant-...
+#
+# 5. Deploy! Railway will:
+#    - Build the TypeScript code
+#    - Run database migrations
+#    - Start the API server

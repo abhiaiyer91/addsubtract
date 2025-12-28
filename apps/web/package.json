@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
+    "start": "serve dist -s -l ${PORT:-3000}",
     "lint": "eslint ."
   },
   "dependencies": {
@@ -53,7 +54,8 @@
     "wit": "*",
     "yaml": "^2.8.2",
     "zod": "^3.24.1",
-    "zustand": "^5.0.9"
+    "zustand": "^5.0.9",
+    "serve": "^14.2.4"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
