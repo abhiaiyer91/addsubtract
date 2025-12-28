@@ -41,7 +41,7 @@ export function PackageSettingsPage() {
   const utils = trpc.useUtils();
 
   // Get repository info
-  const { data: repoData, isLoading: repoLoading } = trpc.repo.get.useQuery(
+  const { data: repoData, isLoading: repoLoading } = trpc.repos.get.useQuery(
     { owner: owner!, repo: repo! },
     { enabled: !!owner && !!repo && authenticated }
   );
