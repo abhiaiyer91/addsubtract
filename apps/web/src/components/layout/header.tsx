@@ -13,6 +13,7 @@ import {
   Menu,
   X,
   Building2,
+  Flame,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -155,6 +156,10 @@ export function Header() {
                       <User className="mr-2 h-4 w-4" />
                       Your profile
                     </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate('/wrapped')}>
+                      <Flame className="mr-2 h-4 w-4" />
+                      Your Wrapped
+                    </DropdownMenuItem>
                     {/* Mobile-only: New repository option */}
                     <DropdownMenuItem onClick={() => navigate('/new')} className="md:hidden">
                       <Plus className="mr-2 h-4 w-4" />
@@ -232,16 +237,24 @@ export function Header() {
                     <Plus className="h-4 w-4" />
                     New repository
                   </Link>
-                  <Link
-                    to="/orgs/new"
-                    className="flex items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-lg transition-all"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    <Building2 className="h-4 w-4" />
-                    New organization
-                  </Link>
-                </>
-              )}
+<Link
+                                    to="/orgs/new"
+                                    className="flex items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-lg transition-all"
+                                    onClick={() => setMobileMenuOpen(false)}
+                                  >
+                                    <Building2 className="h-4 w-4" />
+                                    New organization
+                                  </Link>
+                                  <Link
+                                    to="/wrapped"
+                                    className="flex items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-lg transition-all"
+                                    onClick={() => setMobileMenuOpen(false)}
+                                  >
+                                    <Flame className="h-4 w-4" />
+                                    Your Wrapped
+                                  </Link>
+                                </>
+                              )}
               {!authenticated && (
                 <>
                   <Link
