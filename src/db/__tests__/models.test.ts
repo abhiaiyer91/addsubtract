@@ -28,13 +28,19 @@ describe.skipIf(shouldSkip)('Database Models', () => {
     const db = getDb();
     
     // Clean up tables in order (respecting foreign keys)
-    await db.execute(sql`TRUNCATE TABLE 
-      activities, webhooks, pr_labels, issue_labels, labels,
-      pr_comments, pr_reviews, pull_requests, issue_comments, issues,
-      collaborators, stars, watches, repositories,
-      team_members, teams, org_members, organizations,
-      oauth_accounts, sessions, users
-      CASCADE`);
+    // Wrap in try-catch to handle cases where tables haven't been created yet
+    // Note: "user" is the better-auth table, "users" is the legacy table
+    try {
+      await db.execute(sql`TRUNCATE TABLE
+        activities, webhooks, pr_labels, issue_labels, labels,
+        pr_comments, pr_reviews, pull_requests, issue_comments, issues,
+        collaborators, stars, watches, repositories,
+        team_members, teams, org_members, organizations,
+        account, session, verification, "user"
+        CASCADE`);
+    } catch {
+      // Tables may not exist yet, ignore truncate errors
+    }
   });
 
   describe('User Model', () => {

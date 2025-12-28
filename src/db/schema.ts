@@ -10,6 +10,9 @@ import {
   unique,
 } from 'drizzle-orm/pg-core';
 
+// Import better-auth user table for foreign key references
+import { user as authUser } from './auth-schema';
+
 // ============ ENUMS ============
 
 export const ownerTypeEnum = pgEnum('owner_type', ['user', 'organization']);
@@ -107,6 +110,9 @@ export const mergeQueueStrategyEnum = pgEnum('merge_queue_strategy', [
 ]);
 
 // ============ USERS ============
+// Note: The primary user table is now in auth-schema.ts (better-auth)
+// The legacy 'users' table below is kept for backward compatibility but should not be used for new code
+// All new user references should use the 'user' table from auth-schema.ts
 
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -122,6 +128,8 @@ export const users = pgTable('users', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+// Legacy auth tables - kept for migration compatibility but not used
+// Better-auth tables (session, account, verification) are in auth-schema.ts
 export const sessions = pgTable('sessions', {
   id: text('id').primaryKey(),
   userId: uuid('user_id')
@@ -152,9 +160,9 @@ export const oauthAccounts = pgTable(
 
 export const sshKeys = pgTable('ssh_keys', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id')
+  userId: text('user_id')
     .notNull()
-    .references(() => users.id, { onDelete: 'cascade' }),
+    .references(() => authUser.id, { onDelete: 'cascade' }),
   title: text('title').notNull(),
   publicKey: text('public_key').notNull(),
   fingerprint: text('fingerprint').notNull().unique(),
@@ -167,9 +175,9 @@ export const sshKeys = pgTable('ssh_keys', {
 
 export const personalAccessTokens = pgTable('personal_access_tokens', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id')
+  userId: text('user_id')
     .notNull()
-    .references(() => users.id, { onDelete: 'cascade' }),
+    .references(() => authUser.id, { onDelete: 'cascade' }),
   name: text('name').notNull(), // User-provided name like "CI Token"
   tokenHash: text('token_hash').notNull(), // SHA256 hash (never store raw!)
   tokenPrefix: text('token_prefix').notNull(), // First 8 chars: "wit_abc1" for identification
@@ -225,9 +233,9 @@ export const teamMembers = pgTable(
     teamId: uuid('team_id')
       .notNull()
       .references(() => teams.id, { onDelete: 'cascade' }),
-    userId: uuid('user_id')
+    userId: text('user_id')
       .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
+      .references(() => authUser.id, { onDelete: 'cascade' }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => ({

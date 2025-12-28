@@ -138,16 +138,19 @@ class MergeQueueHandler {
         // Perform merge
         const mergeResult = await mergePullRequest(
           diskPath,
-          entry.targetBranch,
           pr.sourceBranch,
-          'merge',
-          `Merge PR #${pr.number}: ${pr.title}`,
-          pr.authorId
+          entry.targetBranch,
+          {
+            strategy: 'merge',
+            message: `Merge PR #${pr.number}: ${pr.title}`,
+            authorName: 'Merge Queue',
+            authorEmail: 'merge-queue@wit.local',
+          }
         );
 
         if (!mergeResult.success) {
           await mergeQueueEntryModel.updateState(entry.id, 'failed', {
-            errorMessage: mergeResult.message || 'Merge failed',
+            errorMessage: mergeResult.error || 'Merge failed',
           });
           continue;
         }
@@ -157,20 +160,14 @@ class MergeQueueHandler {
         await prModel.merge(entry.prId, 'system', mergeResult.mergeSha!);
 
         // Emit merge event
-        eventBus.emit({
-          id: crypto.randomUUID(),
-          type: 'pr.merged',
-          timestamp: new Date(),
-          actorId: 'system',
-          payload: {
-            prId: entry.prId,
-            prNumber: pr.number,
-            prTitle: pr.title,
-            repoId: entry.repoId,
-            repoFullName: '', // Would need to look up
-            authorId: pr.authorId,
-            mergeStrategy: 'merge',
-          },
+        eventBus.emit('pr.merged', 'system', {
+          prId: entry.prId,
+          prNumber: pr.number,
+          prTitle: pr.title,
+          repoId: entry.repoId,
+          repoFullName: '', // Would need to look up
+          authorId: pr.authorId,
+          mergeStrategy: 'merge',
         });
 
         console.log(`[MergeQueue] Merged PR #${pr.number}`);

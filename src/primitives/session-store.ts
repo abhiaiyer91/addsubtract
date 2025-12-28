@@ -14,7 +14,14 @@
  * - Backed up to database for important sessions
  */
 
-import type { Redis } from 'ioredis';
+// Redis type - optional dependency
+type Redis = {
+  get(key: string): Promise<string | null>;
+  set(key: string, value: string, mode?: string, duration?: number): Promise<'OK' | null>;
+  del(key: string): Promise<number>;
+  keys(pattern: string): Promise<string[]>;
+  expire(key: string, seconds: number): Promise<number>;
+};
 
 /**
  * Serialized file for storage
@@ -274,7 +281,7 @@ export class SessionStore {
     const data = JSON.stringify(session);
     
     // Set with TTL
-    await this.config.redis.setex(key, this.config.maxSessionAge, data);
+    await this.config.redis.set(key, data, 'EX', this.config.maxSessionAge);
   }
 
   private evictIfNeeded(): void {
@@ -318,8 +325,22 @@ export class SessionStore {
 export async function createSessionStore(redisUrl?: string): Promise<SessionStore> {
   if (redisUrl) {
     try {
-      const { default: Redis } = await import('ioredis');
-      const redis = new Redis(redisUrl);
+      // Dynamic import for optional ioredis dependency
+       
+      let ioredis: any;
+      try {
+        // Use indirect require to avoid TypeScript module resolution
+        const moduleName = 'ioredis';
+        ioredis = await eval(`import('${moduleName}')`);
+      } catch {
+        console.warn('ioredis not installed, using in-memory session store');
+        return new SessionStore();
+      }
+      if (!ioredis) {
+        console.warn('ioredis not installed, using in-memory session store');
+        return new SessionStore();
+      }
+      const redis = new (ioredis as any).default(redisUrl);
       
       // Test connection
       await redis.ping();

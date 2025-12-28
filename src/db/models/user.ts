@@ -65,16 +65,18 @@ export const userModel = {
    */
   async create(data: { 
     id?: string;
-    name: string; 
+    name?: string; 
     email: string; 
     username?: string;
     avatarUrl?: string;
   }): Promise<User> {
     const db = getDb();
     const id = data.id || crypto.randomUUID().replace(/-/g, '').slice(0, 32);
+    // Default name to username or email prefix if not provided
+    const name = data.name || data.username || data.email.split('@')[0];
     const [created] = await db.insert(user).values({
       id,
-      name: data.name,
+      name,
       email: data.email,
       username: data.username || null,
       avatarUrl: data.avatarUrl || null,
@@ -113,5 +115,14 @@ export const userModel = {
   async isEmailAvailable(email: string): Promise<boolean> {
     const found = await this.findByEmail(email);
     return !found;
+  },
+
+  /**
+   * Delete a user by ID
+   */
+  async delete(id: string): Promise<boolean> {
+    const db = getDb();
+    const result = await db.delete(user).where(eq(user.id, id)).returning();
+    return result.length > 0;
   },
 };

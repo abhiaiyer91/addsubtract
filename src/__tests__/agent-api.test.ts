@@ -4,7 +4,7 @@
  * Tests the tRPC endpoints for the wit coding agent.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Mock the database
 vi.mock('../db', () => ({
@@ -71,6 +71,12 @@ vi.mock('../db/models', () => ({
   },
   repoModel: {
     findById: vi.fn().mockResolvedValue({ id: '00000000-0000-0000-0000-000000000003', name: 'test-repo' }),
+    findByIdWithOwner: vi.fn().mockResolvedValue(null),
+  },
+  repoAiKeyModel: {
+    listKeys: vi.fn().mockResolvedValue([]),
+    getDecryptedKey: vi.fn().mockResolvedValue(null),
+    getAnyKey: vi.fn().mockResolvedValue(null),
   },
 }));
 
@@ -125,28 +131,48 @@ describe('Agent API Router', () => {
   // STATUS ENDPOINT
   // ===========================================
   describe('status', () => {
-    it('should return AI status', async () => {
-      const ctx = createTestContext();
-      const result = await callProcedure<{ available: boolean; model: string; provider: string }>(
-        'agent.status',
-        undefined,
-        ctx
-      );
-
-      expect(result.available).toBe(true);
-      expect(result.model).toBe('openai/gpt-4o');
-      expect(result.provider).toBe('openai');
+    const originalAnthropicKey = process.env.ANTHROPIC_API_KEY;
+    const originalOpenAIKey = process.env.OPENAI_API_KEY;
+    
+    beforeEach(() => {
+      // Set API keys for status tests
+      process.env.ANTHROPIC_API_KEY = 'test-anthropic-key';
+      process.env.OPENAI_API_KEY = 'test-openai-key';
+    });
+    
+    afterEach(() => {
+      // Restore original keys
+      if (originalAnthropicKey) {
+        process.env.ANTHROPIC_API_KEY = originalAnthropicKey;
+      } else {
+        delete process.env.ANTHROPIC_API_KEY;
+      }
+      if (originalOpenAIKey) {
+        process.env.OPENAI_API_KEY = originalOpenAIKey;
+      } else {
+        delete process.env.OPENAI_API_KEY;
+      }
     });
 
-    it('should work without authentication', async () => {
-      const ctx = createTestContext(); // No user
-      const result = await callProcedure<{ available: boolean }>(
+    it('should return AI status', async () => {
+      const ctx = createTestContext(TEST_USER_ID);
+      const result = await callProcedure<{ available: boolean; model: string; provider: string }>(
         'agent.status',
-        undefined,
+        {},
         ctx
       );
 
       expect(result.available).toBe(true);
+      // Anthropic is preferred when available
+      expect(result.provider).toBe('anthropic');
+    });
+
+    it('should require authentication', async () => {
+      const ctx = createTestContext(); // No user
+
+      await expect(
+        callProcedure('agent.status', {}, ctx)
+      ).rejects.toThrow('Not authenticated');
     });
   });
 
@@ -341,6 +367,22 @@ describe('Agent API Router', () => {
   // CHAT ENDPOINT
   // ===========================================
   describe('chat', () => {
+    const originalAnthropicKey = process.env.ANTHROPIC_API_KEY;
+    
+    beforeEach(() => {
+      // Set API key for chat tests
+      process.env.ANTHROPIC_API_KEY = 'test-api-key';
+    });
+    
+    afterEach(() => {
+      // Restore original key
+      if (originalAnthropicKey) {
+        process.env.ANTHROPIC_API_KEY = originalAnthropicKey;
+      } else {
+        delete process.env.ANTHROPIC_API_KEY;
+      }
+    });
+
     it('should send message and get response', async () => {
       const mockSession = { id: TEST_SESSION_ID, userId: TEST_USER_ID, status: 'active' };
       mockAgentSessionModel.findByIdForUser.mockResolvedValue(mockSession as never);
@@ -363,7 +405,9 @@ describe('Agent API Router', () => {
     });
 
     it('should throw error when AI is not configured', async () => {
-      vi.mocked(isAIAvailable).mockReturnValue(false);
+      // Remove API key
+      delete process.env.ANTHROPIC_API_KEY;
+      delete process.env.OPENAI_API_KEY;
 
       const mockSession = { id: TEST_SESSION_ID, userId: TEST_USER_ID, status: 'active' };
       mockAgentSessionModel.findByIdForUser.mockResolvedValue(mockSession as never);
@@ -373,9 +417,6 @@ describe('Agent API Router', () => {
       await expect(
         callProcedure('agent.chat', { sessionId: TEST_SESSION_ID, message: 'Hello' }, ctx)
       ).rejects.toThrow('AI is not configured');
-
-      // Reset mock
-      vi.mocked(isAIAvailable).mockReturnValue(true);
     });
 
     it('should throw error for inactive session', async () => {

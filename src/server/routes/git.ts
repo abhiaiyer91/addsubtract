@@ -615,7 +615,7 @@ async function handleDatabaseIntegration(
     const repoName = repo.replace(/\.git$/, '');
 
     // Get or create repository in database
-    let dbRepoResult = await repoModel.findByPath(owner, repoName);
+    const dbRepoResult = await repoModel.findByPath(owner, repoName);
     let dbRepo = dbRepoResult?.repo;
     let dbUser = dbRepoResult?.owner && 'username' in dbRepoResult.owner ? dbRepoResult.owner : null;
 

@@ -181,13 +181,14 @@ export const reposRouter = router({
         });
       }
 
-      const diskPath = `/repos/${ctx.user.username}/${input.name}.git`;
+      const username = ctx.user.username || ctx.user.id;
+      const diskPath = `/repos/${username}/${input.name}.git`;
 
       // Create the bare repository on disk
       const reposDir = process.env.REPOS_DIR || './repos';
       const repoManager = new RepoManager(reposDir);
       try {
-        repoManager.initBareRepo(ctx.user.username, input.name);
+        repoManager.initBareRepo(username, input.name);
       } catch (error) {
         // If the repo already exists on disk, that's fine
         if (error instanceof Error && !error.message.includes('already exists')) {
@@ -437,10 +438,7 @@ export const reposRouter = router({
       // Create fork on disk
       let storageResult;
       try {
-        const reposDir = process.env.REPOS_DIR || './repos';
-        const sourceAbsolutePath = path.isAbsolute(sourceRepo.diskPath) 
-          ? sourceRepo.diskPath 
-          : path.join(process.cwd(), reposDir, sourceRepo.diskPath.replace(/^\/repos\//, ''));
+        const sourceAbsolutePath = resolveDiskPath(sourceRepo.diskPath);
 
         storageResult = forkRepository(sourceAbsolutePath, targetDiskPath);
       } catch (error) {
@@ -1524,7 +1522,6 @@ export const reposRouter = router({
       try {
         // Import wit core classes
         const { Blob, Tree, Commit } = await import('../../../core/object');
-        const { Author } = await import('../../../core/types');
 
         // Get user info for commit author
         const user = await userModel.findById(ctx.user.id);
@@ -1631,15 +1628,17 @@ export const reposRouter = router({
         ]);
 
         // Emit event
-        eventBus.emit('commit.created', {
-          repo: result.repo,
-          commit: {
+        eventBus.emit('repo.pushed', ctx.user.id, {
+          repoId: result.repo.id,
+          repoFullName: `${ctx.user.username || ctx.user.id}/${result.repo.name}`,
+          ref: `refs/heads/${input.ref}`,
+          beforeSha: currentCommitHash || null,
+          afterSha: newSha,
+          commits: [{
             sha: newSha,
             message: input.message,
-            author: { name: authorName, email: authorEmail },
-          },
-          branch: input.ref,
-          userId: ctx.user.id,
+            author: authorName,
+          }],
         });
 
         return {

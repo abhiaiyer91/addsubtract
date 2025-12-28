@@ -1064,8 +1064,7 @@ export const issueCommentModel = {
       .set({ updatedAt: new Date() })
       .where(eq(issues.id, data.issueId));
 
-    // Return comment with authorId alias
-    return { ...comment, authorId: comment.userId };
+    return comment;
   },
 
   /**

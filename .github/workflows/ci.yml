@@ -27,6 +27,9 @@ jobs:
 
     env:
       DATABASE_URL: postgresql://wit:wit@localhost:5432/wit
+      BETTER_AUTH_SECRET: test-secret-for-ci-only-not-for-production
+      REPOS_DIR: /tmp/wit-test-repos
+      NODE_ENV: test
 
     steps:
       - name: Checkout repository
@@ -58,7 +61,7 @@ jobs:
         run: npm run build
 
       - name: Run database migrations
-        run: npm run db:push
+        run: npx drizzle-kit push --force
 
       - name: Run tests with coverage
         run: npm run test:coverage

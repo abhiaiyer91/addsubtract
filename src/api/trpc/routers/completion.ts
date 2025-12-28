@@ -87,9 +87,7 @@ ${suffix.slice(0, 500)}
 Complete the code at the cursor position. Output ONLY the completion text, nothing else.`;
 
   // Generate completion using Mastra agent
-  const response = await agent.generate(userPrompt, {
-    maxTokens,
-  });
+  const response = await agent.generate(userPrompt);
 
   // Extract text from response
   const completion = typeof response.text === 'string' ? response.text : '';

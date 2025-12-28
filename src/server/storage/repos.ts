@@ -63,7 +63,7 @@ export function resolveDiskPath(storedPath: string): string {
  * Manages bare repositories organized by owner/repo structure
  */
 export class RepoManager {
-  private repoCache: Map<string, Repository> = new Map();
+  private repoCache: Map<string, BareRepository> = new Map();
 
   constructor(private baseDir: string) {
     // Ensure base directory exists
@@ -114,7 +114,7 @@ export class RepoManager {
   /**
    * Initialize a new bare repository
    */
-  initBareRepo(owner: string, name: string): Repository {
+  initBareRepo(owner: string, name: string): BareRepository {
     const repoPath = this.getRepoPath(owner, name);
 
     if (exists(repoPath)) {
@@ -270,7 +270,7 @@ export class BareRepository extends Repository {
     if (!hash) return null;
 
     const commit = this.objects.readCommit(hash);
-    const blobHash = this.findBlobInTree(commit.treeHash, filePath.split('/'));
+    const blobHash = this.findBlobInTreeByPath(commit.treeHash, filePath.split('/'));
 
     if (!blobHash) return null;
 
@@ -281,7 +281,7 @@ export class BareRepository extends Repository {
   /**
    * Find a blob in a tree by path
    */
-  private findBlobInTree(treeHash: string, pathParts: string[]): string | null {
+  private findBlobInTreeByPath(treeHash: string, pathParts: string[]): string | null {
     const tree = this.objects.readTree(treeHash);
 
     for (const entry of tree.entries) {
@@ -290,7 +290,7 @@ export class BareRepository extends Repository {
           return entry.mode === '40000' ? null : entry.hash;
         }
         if (entry.mode === '40000') {
-          return this.findBlobInTree(entry.hash, pathParts.slice(1));
+          return this.findBlobInTreeByPath(entry.hash, pathParts.slice(1));
         }
       }
     }
@@ -351,13 +351,13 @@ export class BareRepository extends Repository {
    */
   private checkoutToWorktree(worktreePath: string, commitHash: string): void {
     const commit = this.objects.readCommit(commitHash);
-    this.checkoutTreeRecursive(worktreePath, commit.treeHash, '');
+    this.checkoutTreeToWorktree(worktreePath, commit.treeHash, '');
   }
 
   /**
    * Recursively checkout tree entries to worktree
    */
-  private checkoutTreeRecursive(basePath: string, treeHash: string, prefix: string): void {
+  private checkoutTreeToWorktree(basePath: string, treeHash: string, prefix: string): void {
     const tree = this.objects.readTree(treeHash);
 
     for (const entry of tree.entries) {
@@ -366,7 +366,7 @@ export class BareRepository extends Repository {
 
       if (entry.mode === '40000') {
         mkdirp(fullPath);
-        this.checkoutTreeRecursive(basePath, entry.hash, relativePath);
+        this.checkoutTreeToWorktree(basePath, entry.hash, relativePath);
       } else {
         const blob = this.objects.readBlob(entry.hash);
         mkdirp(path.dirname(fullPath));

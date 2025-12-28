@@ -211,17 +211,11 @@ export const mergeQueueRouter = router({
       });
 
       // Emit event
-      eventBus.emit({
-        id: crypto.randomUUID(),
-        type: 'merge_queue.added' as any,
-        timestamp: new Date(),
-        actorId: ctx.user.id,
-        payload: {
-          prId: pr.id,
-          prNumber: pr.number,
-          repoId: pr.repoId,
-          position: entry.position,
-        },
+      eventBus.emit('merge_queue.added' as any, ctx.user.id, {
+        prId: pr.id,
+        prNumber: pr.number,
+        repoId: pr.repoId,
+        position: entry.position,
       });
 
       return {
@@ -517,15 +511,9 @@ export const mergeQueueRouter = router({
       }
 
       // Emit event to trigger processing
-      eventBus.emit({
-        id: crypto.randomUUID(),
-        type: 'merge_queue.process' as any,
-        timestamp: new Date(),
-        actorId: ctx.user.id,
-        payload: {
-          repoId: input.repoId,
-          targetBranch: input.targetBranch,
-        },
+      eventBus.emit('merge_queue.process' as any, ctx.user.id, {
+        repoId: input.repoId,
+        targetBranch: input.targetBranch,
       });
 
       return { success: true, message: 'Queue processing triggered' };
