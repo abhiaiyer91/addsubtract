@@ -142,7 +142,7 @@ export function MarkdownPreview({
   onChange,
   readOnly = false,
 }: MarkdownPreviewProps) {
-  const [viewMode, setViewMode] = useState<ViewMode>('preview');
+  const [viewMode, setViewMode] = useState<ViewMode>(readOnly ? 'preview' : 'source');
   const [editContent, setEditContent] = useState(content);
   
   const sidenotes = useMemo(() => extractSidenotes(content), [content]);

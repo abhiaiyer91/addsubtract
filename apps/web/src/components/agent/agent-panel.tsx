@@ -1336,8 +1336,8 @@ export function AgentPanel({ isOpen, onClose, repoId, repoName, owner, embedded 
             </p>
             {repoId && owner && repoName && (
               <Button 
-                size="sm" 
-                className="bg-zinc-800 hover:bg-zinc-700"
+                size="sm"
+                variant="outline"
                 onClick={() => {
                   setIDEMode(false);
                   navigate(`/${owner}/${repoName}/settings/ai`);
