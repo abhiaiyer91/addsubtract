@@ -866,7 +866,7 @@ function SessionDropdown({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-64">
-        <DropdownMenuItem onClick={onNew} className="gap-2">
+        <DropdownMenuItem onSelect={onNew} className="gap-2">
           <Plus className="h-4 w-4" />
           <span>New chat</span>
         </DropdownMenuItem>
@@ -875,7 +875,7 @@ function SessionDropdown({
           {sessions.map((session) => (
             <DropdownMenuItem
               key={session.id}
-              onClick={() => onSelect(session.id)}
+              onSelect={() => onSelect(session.id)}
               className={cn(
                 "gap-2",
                 session.id === activeSessionId && "bg-zinc-800"
