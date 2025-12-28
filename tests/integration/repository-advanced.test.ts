@@ -181,8 +181,8 @@ describe('Repository Advanced Features', () => {
 
       await userApi.repos.star.mutate({ repoId: starRepoId });
 
-      const isStarred = await userApi.repos.isStarred.query({ repoId: starRepoId });
-      expect(isStarred).toBe(true);
+      const result = await userApi.repos.isStarred.query({ repoId: starRepoId });
+      expect(result.starred).toBe(true);
     });
 
     it('unstars a repository', async () => {
@@ -191,8 +191,8 @@ describe('Repository Advanced Features', () => {
       await userApi.repos.star.mutate({ repoId: starRepoId });
       await userApi.repos.unstar.mutate({ repoId: starRepoId });
 
-      const isStarred = await userApi.repos.isStarred.query({ repoId: starRepoId });
-      expect(isStarred).toBe(false);
+      const result = await userApi.repos.isStarred.query({ repoId: starRepoId });
+      expect(result.starred).toBe(false);
     });
 
     it('checks if repository is starred', async () => {
@@ -200,14 +200,14 @@ describe('Repository Advanced Features', () => {
 
       // Not starred initially
       const beforeStar = await userApi.repos.isStarred.query({ repoId: starRepoId });
-      expect(beforeStar).toBe(false);
+      expect(beforeStar.starred).toBe(false);
 
       // Star it
       await userApi.repos.star.mutate({ repoId: starRepoId });
 
       // Now starred
       const afterStar = await userApi.repos.isStarred.query({ repoId: starRepoId });
-      expect(afterStar).toBe(true);
+      expect(afterStar.starred).toBe(true);
     });
 
     it('lists stargazers', async () => {
@@ -253,8 +253,8 @@ describe('Repository Advanced Features', () => {
 
       await userApi.repos.watch.mutate({ repoId: watchRepoId });
 
-      const isWatching = await userApi.repos.isWatching.query({ repoId: watchRepoId });
-      expect(isWatching).toBe(true);
+      const result = await userApi.repos.isWatching.query({ repoId: watchRepoId });
+      expect(result.watching).toBe(true);
     });
 
     it('unwatches a repository', async () => {
@@ -263,20 +263,20 @@ describe('Repository Advanced Features', () => {
       await userApi.repos.watch.mutate({ repoId: watchRepoId });
       await userApi.repos.unwatch.mutate({ repoId: watchRepoId });
 
-      const isWatching = await userApi.repos.isWatching.query({ repoId: watchRepoId });
-      expect(isWatching).toBe(false);
+      const result = await userApi.repos.isWatching.query({ repoId: watchRepoId });
+      expect(result.watching).toBe(false);
     });
 
     it('checks if repository is watched', async () => {
       const userApi = createAuthenticatedClient(userToken);
 
       const beforeWatch = await userApi.repos.isWatching.query({ repoId: watchRepoId });
-      expect(beforeWatch).toBe(false);
+      expect(beforeWatch.watching).toBe(false);
 
       await userApi.repos.watch.mutate({ repoId: watchRepoId });
 
       const afterWatch = await userApi.repos.isWatching.query({ repoId: watchRepoId });
-      expect(afterWatch).toBe(true);
+      expect(afterWatch.watching).toBe(true);
     });
 
     it('lists watchers', async () => {
@@ -529,8 +529,8 @@ describe('Repository Advanced Features', () => {
       try {
         await userApi.repos.star.mutate({ repoId: repo.id });
         // If it succeeds, verify still starred
-        const isStarred = await userApi.repos.isStarred.query({ repoId: repo.id });
-        expect(isStarred).toBe(true);
+        const result = await userApi.repos.isStarred.query({ repoId: repo.id });
+        expect(result.starred).toBe(true);
       } catch (error: any) {
         // If it throws, that's also acceptable
         expect(error.message).toBeDefined();

@@ -602,7 +602,8 @@ export const reposRouter = router({
       })
     )
     .query(async ({ input, ctx }) => {
-      return starModel.exists(input.repoId, ctx.user.id);
+      const starred = await starModel.exists(input.repoId, ctx.user.id);
+      return { starred };
     }),
 
   /**
@@ -643,7 +644,8 @@ export const reposRouter = router({
       })
     )
     .query(async ({ input, ctx }) => {
-      return watchModel.exists(input.repoId, ctx.user.id);
+      const watching = await watchModel.exists(input.repoId, ctx.user.id);
+      return { watching };
     }),
 
   /**
