@@ -76,6 +76,17 @@ export function createAuth() {
       },
     },
     
+    // Cookie settings for cross-domain auth
+    advanced: {
+      crossSubDomainCookies: {
+        enabled: isProduction,
+      },
+      defaultCookieAttributes: {
+        secure: isProduction,
+        sameSite: isProduction ? 'none' : 'lax',
+      },
+    },
+    
     // User configuration - add custom fields
     user: {
       additionalFields: {
