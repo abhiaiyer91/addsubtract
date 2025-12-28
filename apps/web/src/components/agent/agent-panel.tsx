@@ -1489,6 +1489,20 @@ function PanelWrapper({
   owner?: string;
   repoName?: string;
 }) {
+  // Handle escape key to close panel
+  useEffect(() => {
+    if (!isOpen || embedded) return;
+    
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, embedded, onClose]);
+
   if (embedded) {
     return (
       <div className="flex flex-col h-full bg-zinc-950 overflow-hidden">
