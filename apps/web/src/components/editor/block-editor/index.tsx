@@ -109,6 +109,8 @@ export function BlockEditor({
 
   const containerRef = useRef<HTMLDivElement>(null);
   const isInitialMount = useRef(true);
+  // Use a ref to track the last value we processed to avoid sync loops
+  const lastExternalValue = useRef<string>(value);
 
   // DnD sensors
   const sensors = useSensors(
@@ -144,46 +146,53 @@ export function BlockEditor({
     }
 
     const markdown = blocksToMarkdown(blocks);
+    // Update the ref so we don't process our own changes
+    lastExternalValue.current = markdown;
     onChange(markdown);
   }, [blocks, onChange]);
 
   // Update blocks when external value changes
   useEffect(() => {
-    // Only update if the markdown differs significantly
-    const currentMarkdown = blocksToMarkdown(blocks);
-    if (value !== currentMarkdown) {
+    // Only update if the external value changed (not from our own onChange)
+    if (value !== lastExternalValue.current) {
+      lastExternalValue.current = value;
       const newBlocks = markdownToBlocks(value);
-      // Only update if structure is different
-      if (JSON.stringify(newBlocks) !== JSON.stringify(blocks)) {
-        setBlocks(newBlocks);
-      }
+      setBlocks(newBlocks);
     }
   }, [value]);
 
-  // Recalculate list numbers when blocks change
-  useEffect(() => {
-    let hasChanges = false;
-    let currentNumber = 1;
-    const updatedBlocks = blocks.map((block, index) => {
-      if (block.type === 'numberedList') {
-        // Check if previous block is also a numbered list
-        const prevBlock = blocks[index - 1];
-        if (prevBlock?.type !== 'numberedList') {
-          currentNumber = 1;
-        }
-        if (block.listNumber !== currentNumber) {
-          hasChanges = true;
-          return { ...block, listNumber: currentNumber++ };
-        }
-        currentNumber++;
-      }
-      return block;
-    });
+  // Compute list numbers - derived state, not stored
+  // This creates a signature of numbered list positions to detect when we need to update
+  const numberedListSignature = blocks
+    .map((b, i) => (b.type === 'numberedList' ? i : -1))
+    .filter((i) => i !== -1)
+    .join(',');
 
-    if (hasChanges) {
-      setBlocks(updatedBlocks);
-    }
-  }, [blocks]);
+  // Recalculate list numbers when numbered list structure changes
+  useEffect(() => {
+    setBlocks((prevBlocks) => {
+      let hasChanges = false;
+      let currentNumber = 1;
+      const updatedBlocks = prevBlocks.map((block, index) => {
+        if (block.type === 'numberedList') {
+          // Check if previous block is also a numbered list
+          const prevBlock = prevBlocks[index - 1];
+          if (prevBlock?.type !== 'numberedList') {
+            currentNumber = 1;
+          }
+          if (block.listNumber !== currentNumber) {
+            hasChanges = true;
+            return { ...block, listNumber: currentNumber++ };
+          }
+          currentNumber++;
+        }
+        return block;
+      });
+
+      // Only return new array if there were changes to avoid infinite loop
+      return hasChanges ? updatedBlocks : prevBlocks;
+    });
+  }, [numberedListSignature]);
 
   // Find block index
   const findBlockIndex = useCallback(
