@@ -18,6 +18,7 @@ import {
   FolderKanban,
   RefreshCw,
   Package,
+  Target,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -266,6 +267,7 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
     if (path.includes('/pulls') || path.includes('/pull/')) return 'pulls';
     if (path.includes('/stacks')) return 'stacks';
     if (path.includes('/journal')) return 'journal';
+    if (path.includes('/planning')) return 'planning';
     if (path.includes('/package') && !path.includes('/settings/package')) return 'package';
     if (path.includes('/settings')) return 'settings';
     return 'code';
@@ -505,6 +507,12 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
             <BookOpen className="h-4 w-4" />
             <span className="hidden sm:inline">Journal</span>
           </Link>
+          {authenticated && (
+            <Link to={`/${owner}/${repo}/planning`} className={tabClass('planning')}>
+              <Target className="h-4 w-4" />
+              <span className="hidden sm:inline">Planning</span>
+            </Link>
+          )}
           {packageData && (
             <Link to={`/${owner}/${repo}/package`} className={tabClass('package')}>
               <Package className="h-4 w-4" />
