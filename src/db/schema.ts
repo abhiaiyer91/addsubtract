@@ -1535,6 +1535,164 @@ export const agentFileChanges = pgTable('agent_file_changes', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+// ============ AGENT PLANNING WORKFLOWS ============
+
+export const planningSessionStatusEnum = pgEnum('planning_session_status', [
+  'planning',      // In planning loop - user is iterating with AI
+  'ready',         // Plan is finalized, ready to execute
+  'executing',     // Agent tasks are running
+  'completed',     // All tasks completed
+  'failed',        // Execution failed
+  'cancelled',     // User cancelled
+]);
+
+export const agentTaskStatusEnum = pgEnum('agent_task_status', [
+  'pending',       // Not yet started
+  'queued',        // Waiting to be picked up by an agent
+  'running',       // Agent is working on it
+  'completed',     // Task completed successfully
+  'failed',        // Task failed
+  'cancelled',     // Task was cancelled
+]);
+
+export const agentTaskPriorityEnum = pgEnum('agent_task_priority', [
+  'low',
+  'medium',
+  'high',
+  'critical',
+]);
+
+/**
+ * Planning sessions table
+ * Tracks user planning sessions where they can iterate on a plan
+ * before spawning parallel coding agents
+ */
+export const planningSessions = pgTable('planning_sessions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  
+  // User who created the session
+  userId: text('user_id').notNull(), // References better-auth user.id
+  
+  // Repository context
+  repoId: uuid('repo_id')
+    .notNull()
+    .references(() => repositories.id, { onDelete: 'cascade' }),
+  
+  // Session title
+  title: text('title'),
+  
+  // The original planning prompt
+  planningPrompt: text('planning_prompt').notNull(),
+  
+  // Current refined plan (updated after each planning iteration)
+  currentPlan: text('current_plan'),
+  
+  // Number of planning iterations
+  iterationCount: integer('iteration_count').notNull().default(0),
+  
+  // Status
+  status: planningSessionStatusEnum('status').notNull().default('planning'),
+  
+  // Branch to work on (optional - will create new branches for tasks if not set)
+  baseBranch: text('base_branch').default('main'),
+  
+  // Max concurrent agents to run
+  maxConcurrency: integer('max_concurrency').notNull().default(3),
+  
+  // Execution summary after completion
+  executionSummary: text('execution_summary'),
+  
+  // Timestamps
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  startedAt: timestamp('started_at', { withTimezone: true }),
+  completedAt: timestamp('completed_at', { withTimezone: true }),
+});
+
+/**
+ * Planning messages table
+ * Stores the conversation during the planning phase
+ */
+export const planningMessages = pgTable('planning_messages', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  
+  // Parent planning session
+  sessionId: uuid('session_id')
+    .notNull()
+    .references(() => planningSessions.id, { onDelete: 'cascade' }),
+  
+  // Message role
+  role: agentMessageRoleEnum('role').notNull(),
+  
+  // Message content
+  content: text('content').notNull(),
+  
+  // Iteration number this message belongs to
+  iteration: integer('iteration').notNull().default(0),
+  
+  // Timestamp
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+/**
+ * Agent tasks table
+ * Individual tasks that are spawned from a planning session
+ * Each task is executed by a separate coding agent
+ */
+export const agentTasks = pgTable('agent_tasks', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  
+  // Parent planning session
+  sessionId: uuid('session_id')
+    .notNull()
+    .references(() => planningSessions.id, { onDelete: 'cascade' }),
+  
+  // Task number within the session (for ordering)
+  taskNumber: integer('task_number').notNull(),
+  
+  // Task title (brief description)
+  title: text('title').notNull(),
+  
+  // Detailed task description/prompt for the coding agent
+  description: text('description').notNull(),
+  
+  // Target files (optional hint for the agent)
+  targetFiles: text('target_files'), // JSON array of file paths
+  
+  // Task dependencies (other task IDs that must complete first)
+  dependsOn: text('depends_on'), // JSON array of task UUIDs
+  
+  // Priority
+  priority: agentTaskPriorityEnum('priority').notNull().default('medium'),
+  
+  // Status
+  status: agentTaskStatusEnum('status').notNull().default('pending'),
+  
+  // Branch created for this task
+  branchName: text('branch_name'),
+  
+  // Agent session ID (links to agentSessions when running)
+  agentSessionId: uuid('agent_session_id')
+    .references(() => agentSessions.id, { onDelete: 'set null' }),
+  
+  // Result summary after completion
+  resultSummary: text('result_summary'),
+  
+  // Files changed by this task
+  filesChanged: text('files_changed'), // JSON array of { path, action }
+  
+  // Commit SHA if changes were committed
+  commitSha: text('commit_sha'),
+  
+  // Error message if failed
+  errorMessage: text('error_message'),
+  
+  // Timestamps
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  startedAt: timestamp('started_at', { withTimezone: true }),
+  completedAt: timestamp('completed_at', { withTimezone: true }),
+});
+
 // ============ REPOSITORY AI KEYS ============
 
 export const aiProviderEnum = pgEnum('ai_provider', [
@@ -2041,6 +2199,18 @@ export type NewAgentMessage = typeof agentMessages.$inferInsert;
 
 export type AgentFileChange = typeof agentFileChanges.$inferSelect;
 export type NewAgentFileChange = typeof agentFileChanges.$inferInsert;
+
+export type PlanningSession = typeof planningSessions.$inferSelect;
+export type NewPlanningSession = typeof planningSessions.$inferInsert;
+export type PlanningSessionStatus = (typeof planningSessionStatusEnum.enumValues)[number];
+
+export type PlanningMessage = typeof planningMessages.$inferSelect;
+export type NewPlanningMessage = typeof planningMessages.$inferInsert;
+
+export type AgentTask = typeof agentTasks.$inferSelect;
+export type NewAgentTask = typeof agentTasks.$inferInsert;
+export type AgentTaskStatus = (typeof agentTaskStatusEnum.enumValues)[number];
+export type AgentTaskPriority = (typeof agentTaskPriorityEnum.enumValues)[number];
 
 export type Notification = typeof notifications.$inferSelect;
 export type NewNotification = typeof notifications.$inferInsert;

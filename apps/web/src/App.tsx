@@ -53,6 +53,8 @@ import { MilestonesPage } from './routes/repo/milestones';
 import { JournalPage } from './routes/repo/journal';
 import { JournalPageDetail } from './routes/repo/journal/page-detail';
 import { NewJournalPage } from './routes/repo/journal/page-new';
+import PlanningPage from './routes/repo/planning';
+import PlanningSessionPage from './routes/repo/planning/session';
 import { SettingsPage } from './routes/settings';
 import { SSHKeysPage } from './routes/settings/keys';
 import { TokensPage } from './routes/settings/tokens';
@@ -186,6 +188,10 @@ export function App() {
             <Route path="/:owner/:repo/journal" element={<JournalPage />} />
             <Route path="/:owner/:repo/journal/new" element={<NewJournalPage />} />
             <Route path="/:owner/:repo/journal/:slug" element={<JournalPageDetail />} />
+
+            {/* Planning Workflows (Multi-Agent) */}
+            <Route path="/:owner/:repo/planning" element={<PlanningPage />} />
+            <Route path="/:owner/:repo/planning/:sessionId" element={<PlanningSessionPage />} />
 
             {/* Repository settings */}
             <Route path="/:owner/:repo/settings" element={<RepoSettingsPage />} />

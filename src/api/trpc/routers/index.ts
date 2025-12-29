@@ -34,6 +34,7 @@ import { completionRouter } from './completion';
 import { packagesRouter } from './packages';
 import { oauthAppsRouter } from './oauth-apps';
 import { adminRouter } from './admin';
+import { planningWorkflowRouter } from './planning-workflow';
 
 /**
  * Main application router
@@ -75,6 +76,7 @@ export const appRouter = router({
   packages: packagesRouter,
   oauthApps: oauthAppsRouter,
   admin: adminRouter,
+  planningWorkflow: planningWorkflowRouter,
 });
 
 /**
@@ -118,4 +120,5 @@ export {
   packagesRouter,
   oauthAppsRouter,
   adminRouter,
+  planningWorkflowRouter,
 };

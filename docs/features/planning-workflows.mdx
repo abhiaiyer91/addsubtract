@@ -1,0 +1,231 @@
+---
+title: "Planning Workflows"
+description: "Plan complex tasks with AI and execute them with parallel coding agents"
+---
+
+# Planning Workflows
+
+Planning Workflows is a powerful feature that helps you break down complex development tasks into discrete, parallelizable units of work, and then execute them with multiple AI coding agents running simultaneously.
+
+## Overview
+
+The workflow consists of three phases:
+
+1. **Planning Phase**: Iterate with an AI planning agent to create a detailed implementation plan
+2. **Task Review**: Review and customize the generated tasks before execution
+3. **Execution Phase**: Execute tasks with parallel coding agents
+
+## How It Works
+
+### 1. Planning Phase
+
+Start by describing what you want to build. The planning agent will:
+
+- Ask clarifying questions to understand your requirements
+- Explore your codebase to understand the structure and conventions
+- Propose a structured implementation plan
+- Break down the work into discrete, parallelizable tasks
+
+You can iterate on the plan as many times as needed until you're satisfied.
+
+```bash
+# Via CLI
+wit plan "Add user authentication with email/password and OAuth"
+```
+
+### 2. Task Generation
+
+Once the plan is finalized, the system generates structured tasks. Each task includes:
+
+- **Title**: Brief description of the task
+- **Description**: Detailed instructions for the coding agent
+- **Target Files**: Files that will be created or modified
+- **Priority**: Critical, High, Medium, or Low
+- **Dependencies**: Other tasks that must complete first
+
+You can:
+- Add, edit, or remove tasks
+- Adjust priorities
+- Modify dependencies
+
+### 3. Parallel Execution
+
+When you're ready, start execution. The system:
+
+- Respects task dependencies
+- Runs up to N tasks concurrently (configurable)
+- Creates separate branches for each task
+- Tracks progress in real-time
+
+## Usage
+
+### Web Interface
+
+1. Navigate to your repository
+2. Click **Planning** in the navigation
+3. Click **New Session**
+4. Describe what you want to build
+5. Iterate on the plan with the AI
+6. Review and customize tasks
+7. Click **Start Execution**
+
+### API
+
+```typescript
+import { 
+  startPlanningSession,
+  iteratePlan,
+  finalizeTasks,
+  executeTasks 
+} from 'wit/ai/workflows';
+
+// Start a planning session
+const session = await startPlanningSession({
+  userId: 'user-123',
+  repoId: 'repo-456',
+  planningPrompt: 'Add user authentication with email/password and OAuth support',
+  maxConcurrency: 3,
+});
+
+// Iterate on the plan
+const result = await iteratePlan({
+  sessionId: session.id,
+  userMessage: 'Focus on security best practices',
+});
+
+// Finalize tasks
+const tasks = await finalizeTasks({
+  sessionId: session.id,
+  tasks: [
+    { title: 'Create auth types', description: '...', priority: 'high' },
+    { title: 'Implement password hashing', description: '...', priority: 'high' },
+    // ...
+  ],
+});
+
+// Execute
+const results = await executeTasks({
+  sessionId: session.id,
+});
+```
+
+## Task Structure
+
+### Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| title | string | Brief task title (max 200 chars) |
+| description | string | Detailed instructions for the agent |
+| targetFiles | string[] | Files to create or modify |
+| priority | enum | `low`, `medium`, `high`, `critical` |
+| dependsOn | number[] | Task numbers that must complete first |
+
+### Best Practices
+
+1. **Be Specific**: Give each task clear, actionable instructions
+2. **Minimize Dependencies**: Maximize parallelism by reducing dependencies
+3. **Reasonable Scope**: Tasks should be completable in one coding session
+4. **Include Context**: Reference existing code patterns and conventions
+
+## Execution
+
+### Concurrency
+
+Set `maxConcurrency` to control how many agents run simultaneously:
+
+- **1**: Sequential execution (safest, slowest)
+- **3**: Default - good balance of speed and safety
+- **5-10**: Maximum parallelism (faster, requires good task isolation)
+
+### Error Handling
+
+- **Critical tasks**: If a critical task fails, execution stops
+- **Non-critical tasks**: Execution continues, failure is logged
+- **Retry**: Failed tasks can be retried individually
+
+### Branching Strategy
+
+Each task creates its own branch:
+- Format: `task-{number}-{timestamp}`
+- All branches are based on the session's base branch
+- Changes are committed automatically
+
+## Monitoring
+
+### Session Status
+
+| Status | Description |
+|--------|-------------|
+| `planning` | In planning phase with AI |
+| `ready` | Tasks finalized, ready to execute |
+| `executing` | Tasks are running |
+| `completed` | All tasks completed |
+| `failed` | Execution failed |
+| `cancelled` | User cancelled |
+
+### Task Status
+
+| Status | Description |
+|--------|-------------|
+| `pending` | Not yet started |
+| `queued` | Waiting for dependencies |
+| `running` | Agent is working |
+| `completed` | Task completed successfully |
+| `failed` | Task failed |
+| `cancelled` | Task was cancelled |
+
+## Example Workflow
+
+```
+User: "Add a user settings page with profile editing and notification preferences"
+
+Planning Agent: I'll analyze the codebase and create a plan...
+
+[Explores codebase, identifies patterns]
+
+Planning Agent: Here's my proposed plan:
+
+1. Create TypeScript types for user settings
+2. Add database schema for notification preferences
+3. Create API endpoints for reading/updating settings
+4. Build the settings page component
+5. Add form validation
+6. Write tests
+
+Would you like me to adjust anything?
+
+User: "Also add email verification for profile updates"
+
+Planning Agent: Great, I'll add that. Updated plan:
+
+1. Create TypeScript types for user settings
+2. Add database schema for notification preferences
+3. Create API endpoints for reading/updating settings
+4. Implement email verification flow
+5. Build the settings page component
+6. Add form validation
+7. Write tests
+
+[User finalizes tasks]
+
+[Execution starts - 3 agents running in parallel]
+
+Task 1: Completed ✓
+Task 2: Completed ✓
+Task 3: Running...
+Task 4: Queued (depends on 3)
+Task 5: Running...
+Task 6: Pending
+Task 7: Pending
+
+...
+
+All tasks completed!
+```
+
+## See Also
+
+- [AI Agents](/features/ai-agents) - Individual agent modes
+- [Code Generation Workflow](/features/ai-powered) - Single-task code generation
+- [CI/CD](/features/ci-cd) - Automated testing and deployment

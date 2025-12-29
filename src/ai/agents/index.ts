@@ -5,6 +5,7 @@
  * - PM: Creates issues, PRs, manages projects
  * - Code: Writes code, edits files, commits changes
  * - Triage: Automatically categorizes and prioritizes new issues
+ * - Planning: Helps users plan tasks and spawn parallel agents
  */
 
 export { createPMAgent, PM_AGENT_INSTRUCTIONS } from './pm-agent.js';
@@ -17,3 +18,10 @@ export {
   type TriageContext,
   type TriageResult,
 } from './triage-agent.js';
+export {
+  createPlanningAgent,
+  parseTasksFromResponse,
+  PLANNING_AGENT_INSTRUCTIONS,
+  TaskGenerationSchema,
+  type TaskGeneration,
+} from './planning-agent.js';

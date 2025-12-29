@@ -26,3 +26,22 @@ export {
   type CodeGenerationInput,
   type CodeGenerationOutput,
 } from './code-generation.workflow.js';
+
+// Planning Workflow (Multi-Agent Parallel Execution)
+export {
+  startPlanningSession,
+  iteratePlan,
+  generateTasks,
+  finalizeTasks,
+  executeTasks,
+  cancelSession,
+  getSessionDetails,
+  type StartPlanningInput,
+  type PlanningIterationInput,
+  type FinalizeTasksInput,
+  type ExecuteTasksInput,
+  type TaskExecutionResult,
+  type PlanningSession,
+  type AgentTask,
+  type TaskGeneration,
+} from './planning-workflow.js';

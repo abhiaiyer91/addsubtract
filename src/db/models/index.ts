@@ -108,6 +108,17 @@ export {
   agentFileChangeModel,
 } from './agent';
 
+// Planning Workflow models (multi-agent parallel execution)
+export {
+  planningSessionModel,
+  planningMessageModel,
+  agentTaskModel,
+  getPlanningSessionFull,
+  type PlanningSessionWithTasks,
+  type PlanningSessionWithMessages,
+  type PlanningSessionFull,
+} from './planning-workflow';
+
 // Repository AI Keys model
 export { repoAiKeyModel, type RepoAiKeyInfo } from './repo-ai-keys';
 
