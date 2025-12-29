@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { GitBranch } from 'lucide-react';
 
 export function Footer() {
@@ -23,6 +24,12 @@ export function Footer() {
             >
               Docs
             </a>
+            <Link
+              to="/contribute"
+              className="px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-full transition-all duration-200"
+            >
+              Contribute
+            </Link>
             <a
               href="https://github.com/abhiaiyer91/wit"
               target="_blank"

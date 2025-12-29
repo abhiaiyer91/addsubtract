@@ -39,6 +39,7 @@ export {
   labelModel,
   issueLabelModel,
   issueInboxModel,
+  contributionIssuesModel,
   ISSUE_STATUSES,
   ISSUE_PRIORITIES,
   PRIORITY_CONFIG,
@@ -180,3 +181,17 @@ export {
   type AuditLogEntry,
   type AdminContext,
 } from './admin';
+
+// Sandbox models (code execution environments)
+export {
+  sandboxConfigModel,
+  sandboxKeyModel,
+  sandboxSessionModel,
+  isRepoOwner as isSandboxRepoOwner,
+  getDefaultConfig as getDefaultSandboxConfig,
+  type SandboxProvider,
+  type SandboxNetworkMode,
+  type SandboxConfig,
+  type SandboxKeyInfo,
+  type SandboxSession,
+} from './sandbox';

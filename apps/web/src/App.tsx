@@ -43,6 +43,7 @@ import { CollaboratorsPage } from './routes/repo/settings/collaborators';
 import { BranchProtectionPage } from './routes/repo/settings/branches';
 import { WebhooksPage } from './routes/repo/settings/webhooks';
 import { AgentsSettingsPage } from './routes/repo/settings/agents';
+import { SandboxSettingsPage } from './routes/repo/settings/sandbox';
 import { PackageSettingsPage } from './routes/repo/settings/package';
 import { PackagePage } from './routes/repo/package';
 import { ReleasesPage } from './routes/repo/releases';
@@ -74,6 +75,7 @@ import { SearchPage } from './routes/search';
 import { InboxPage } from './routes/inbox';
 import { WrappedPage } from './routes/wrapped';
 import { LeaderboardPage } from './routes/leaderboard';
+import { ContributePage } from './routes/contribute';
 
 // Scroll to top on route change
 function ScrollToTop() {
@@ -123,6 +125,7 @@ export function App() {
             <Route path="/search" element={<SearchPage />} />
             <Route path="/inbox" element={<InboxPage />} />
             <Route path="/leaderboard" element={<LeaderboardPage />} />
+            <Route path="/contribute" element={<ContributePage />} />
 
             {/* Organization routes */}
             <Route path="/org/:slug" element={<OrgPage />} />
@@ -195,6 +198,7 @@ export function App() {
             <Route path="/:owner/:repo/settings/branches" element={<BranchProtectionPage />} />
             <Route path="/:owner/:repo/settings/webhooks" element={<WebhooksPage />} />
             <Route path="/:owner/:repo/settings/agents" element={<AgentsSettingsPage />} />
+            <Route path="/:owner/:repo/settings/sandbox" element={<SandboxSettingsPage />} />
             <Route path="/:owner/:repo/settings/package" element={<PackageSettingsPage />} />
           </Route>
         </Routes>

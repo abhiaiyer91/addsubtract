@@ -525,7 +525,12 @@ export function IDELayout({ owner, repo, repoId, defaultRef }: IDELayoutProps) {
                 className="h-1 cursor-ns-resize hover:bg-primary/50 transition-colors"
                 onMouseDown={() => startResize('terminal')}
               />
-              <TerminalPanel height={terminalHeight} />
+              <TerminalPanel 
+                height={terminalHeight} 
+                repoId={repoId}
+                owner={owner}
+                repo={repo}
+              />
             </>
           )}
         </div>

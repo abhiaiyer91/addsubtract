@@ -16,6 +16,7 @@ import {
   Flame,
   Trophy,
   Github,
+  Heart,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -75,6 +76,15 @@ export function Header() {
             >
               <Trophy className="h-4 w-4" />
               <span>Leaderboard</span>
+            </Link>
+
+            {/* Contribute link */}
+            <Link
+              to="/contribute"
+              className="hidden md:flex items-center gap-1.5 px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-lg transition-all"
+            >
+              <Heart className="h-4 w-4" />
+              <span>Contribute</span>
             </Link>
           </div>
 
@@ -242,6 +252,15 @@ export function Header() {
               >
                 <Trophy className="h-4 w-4" />
                 Leaderboard
+              </Link>
+              {/* Contribute - visible to all */}
+              <Link
+                to="/contribute"
+                className="flex items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-lg transition-all"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <Heart className="h-4 w-4" />
+                Contribute
               </Link>
               {authenticated && (
                 <>

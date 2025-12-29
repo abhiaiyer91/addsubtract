@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { FileTree } from '@/components/repo/file-tree';
 import { BranchSelector } from '@/components/repo/branch-selector';
+import { LanguageBar } from '@/components/repo/language-bar';
 import { Markdown } from '@/components/markdown/renderer';
 import { RepoLayout } from './components/repo-layout';
 import { useSession } from '@/lib/auth-client';
@@ -61,10 +62,21 @@ export function RepoPage() {
     { enabled: !!repoData?.repo.id }
   );
 
+  // Fetch languages
+  const { data: languagesData } = trpc.repos.getLanguages.useQuery(
+    {
+      owner: owner!,
+      repo: repo!,
+      ref: repoData?.repo.defaultBranch || 'main',
+    },
+    { enabled: !!repoData }
+  );
+
   const repoInfo = repoData?.repo;
   const ownerInfo = repoData?.owner;
   const ownerUsername = (ownerInfo && 'username' in ownerInfo ? ownerInfo.username : null) || owner!;
   const tree = treeData?.entries || [];
+  const treeError = treeData?.error;
   const readme = readmeData?.encoding === 'utf-8' ? readmeData.content : null;
   const isOwner = session?.user?.id === repoInfo?.ownerId;
 
@@ -128,6 +140,7 @@ export function RepoPage() {
             owner={ownerUsername}
             repo={repoInfo?.name || repo!}
             currentRef={repoInfo?.defaultBranch || 'main'}
+            error={treeError}
           />
 
           {/* README */}
@@ -171,6 +184,14 @@ export function RepoPage() {
               </span>
             </div>
           </div>
+
+          {/* Languages */}
+          {languagesData && languagesData.length > 0 && (
+            <div className="border rounded-lg p-4 space-y-3">
+              <h3 className="font-semibold text-sm">Languages</h3>
+              <LanguageBar languages={languagesData} />
+            </div>
+          )}
 
           {/* Releases */}
           <div className="border rounded-lg p-4 space-y-3">
