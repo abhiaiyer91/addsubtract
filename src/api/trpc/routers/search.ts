@@ -10,7 +10,6 @@ import { router, publicProcedure, protectedProcedure } from '../trpc';
 import { repoModel, collaboratorModel, userModel, issueModel, prModel, userAiKeyModel } from '../../../db/models';
 import { resolveDiskPath, BareRepository } from '../../../server/storage/repos';
 import { exists } from '../../../utils/fs';
-import { isAIAvailable } from '../../../ai/mastra';
 import { generateEmbedding, detectLanguage, cosineSimilarity } from '../../../search/embeddings';
 
 /**
@@ -318,7 +317,7 @@ export const searchRouter = router({
               });
             }
           }
-        } catch (e) {
+        } catch (_e) {
           // Issue search not yet implemented, skip
         }
       }

@@ -6,10 +6,9 @@
  */
 
 import { z } from 'zod';
-import { router, protectedProcedure, publicProcedure } from '../trpc';
+import { router, protectedProcedure } from '../trpc';
 import { TRPCError } from '@trpc/server';
-import * as path from 'path';
-import { VirtualRepository, VirtualRepositoryManager } from '../../../primitives/virtual-repository';
+import { VirtualRepositoryManager } from '../../../primitives/virtual-repository';
 import { setVirtualRepo, getVirtualRepo, clearVirtualRepo } from '../../../ai/tools/virtual-write-file';
 import { getRepoDiskPath, resolveDiskPath } from '../../../server/storage/repos';
 import { getDb } from '../../../db';

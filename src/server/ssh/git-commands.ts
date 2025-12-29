@@ -243,7 +243,7 @@ export class GitCommandHandler {
   private async sendRefAdvertisement(
     channel: SSHChannel,
     advertisement: RefAdvertisement,
-    service: 'upload-pack' | 'receive-pack'
+    _service: 'upload-pack' | 'receive-pack'
   ): Promise<void> {
     const parts: Buffer[] = [];
 
@@ -416,7 +416,7 @@ export class GitCommandHandler {
             toVisit.push(entry.hash);
           }
         }
-      } catch (err) {
+      } catch (_err) {
         // Object not found, skip
         console.warn(`Object not found: ${hash}`);
       }

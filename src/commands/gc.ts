@@ -24,7 +24,7 @@
 import * as path from 'path';
 import * as fs from 'fs';
 import { Repository } from '../core/repository';
-import { TsgitError, ErrorCode } from '../core/errors';
+import { TsgitError } from '../core/errors';
 import { exists, readFile, writeFile, mkdirp, readFileText, readDir, isDirectory } from '../utils/fs';
 import { ReflogManager } from './reflog';
 

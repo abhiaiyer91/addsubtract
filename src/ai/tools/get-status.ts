@@ -43,7 +43,7 @@ export const getStatusTool = createTool({
         hasChanges,
         isClean: !hasChanges,
       };
-    } catch (error) {
+    } catch (_error) {
       return {
         branch: null,
         staged: [],

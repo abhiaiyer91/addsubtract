@@ -15,7 +15,6 @@
  */
 
 import * as path from 'path';
-import * as fs from 'fs';
 import { exists, readFile, writeFile, mkdirp } from '../utils/fs';
 import { TsgitError, ErrorCode } from './errors';
 

@@ -68,7 +68,7 @@ export const getMergeConflictsTool = createTool({
         resolved: state.resolved,
         unresolved: state.conflicts.length - state.resolved.length,
       };
-    } catch (error) {
+    } catch (_error) {
       return {
         inProgress: false,
         conflicts: [],

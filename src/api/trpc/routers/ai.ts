@@ -6,7 +6,6 @@
 
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
-import * as path from 'path';
 import { router, protectedProcedure, publicProcedure } from '../trpc';
 import { repoModel, prModel, collaboratorModel } from '../../../db/models';
 import { resolveDiskPath, BareRepository } from '../../../server/storage/repos';

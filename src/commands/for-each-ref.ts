@@ -21,7 +21,7 @@
 
 import * as path from 'path';
 import { Repository } from '../core/repository';
-import { TsgitError, ErrorCode } from '../core/errors';
+import { TsgitError } from '../core/errors';
 import { exists, readDir, readFileText, isDirectory } from '../utils/fs';
 import { shortHash } from '../utils/hash';
 

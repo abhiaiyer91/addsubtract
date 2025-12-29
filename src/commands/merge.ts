@@ -5,7 +5,7 @@
 
 import { Repository } from '../core/repository';
 import { MergeManager, MergeOptions, formatMergeResult, formatConflict } from '../core/merge';
-import { TsgitError, ErrorCode } from '../core/errors';
+import { TsgitError } from '../core/errors';
 import { HookManager } from '../core/hooks';
 
 /**

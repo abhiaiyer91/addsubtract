@@ -29,7 +29,7 @@ The PR will be created on the wit server (requires authentication).`,
     targetBranch: z.string().optional(),
     message: z.string(),
   }),
-  execute: async ({ title, body, targetBranch = 'main', draft = false }) => {
+  execute: async ({ title, body, targetBranch = 'main', draft: _draft = false }) => {
     try {
       const repo = Repository.find();
 

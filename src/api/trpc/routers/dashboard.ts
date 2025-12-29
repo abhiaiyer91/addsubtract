@@ -15,7 +15,6 @@ import {
   inboxModel,
   issueInboxModel,
   activityModel,
-  repoModel,
 } from '../../../db/models';
 
 export const dashboardRouter = router({

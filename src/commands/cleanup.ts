@@ -6,7 +6,7 @@
  */
 
 import { Repository } from '../core/repository';
-import { TsgitError, ErrorCode } from '../core/errors';
+import { TsgitError } from '../core/errors';
 import * as readline from 'readline';
 
 const colors = {

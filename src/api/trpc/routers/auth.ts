@@ -17,7 +17,7 @@ export const authRouter = router({
         name: z.string().optional(),
       })
     )
-    .mutation(async ({ input, ctx }) => {
+    .mutation(async ({ input, ctx: _ctx }) => {
       const auth = createAuth();
       
       // Register the user
@@ -203,7 +203,7 @@ export const authRouter = router({
         headers: ctx.req.headers,
       });
       return { success: true };
-    } catch (error) {
+    } catch (_error) {
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
         message: 'Failed to revoke sessions',

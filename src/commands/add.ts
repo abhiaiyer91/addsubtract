@@ -1,6 +1,6 @@
 import * as path from 'path';
 import { Repository } from '../core/repository';
-import { TsgitError, Errors } from '../core/errors';
+import { TsgitError } from '../core/errors';
 import { exists, isDirectory, walkDir, loadIgnorePatterns } from '../utils/fs';
 
 export function add(files: string[]): void {

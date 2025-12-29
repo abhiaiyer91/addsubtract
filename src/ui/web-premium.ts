@@ -8,20 +8,16 @@ import * as http from 'http';
 import * as path from 'path';
 import * as url from 'url';
 import { Repository } from '../core/repository';
-import { buildGraph, GraphNode, GraphEdge } from './graph';
+import { buildGraph } from './graph';
 import { renderDiffHTML, getDiffStyles, getWordDiffStyles } from './diff-viewer';
 import { buildFileTree, renderFileTreeHTML, getFileTreeStyles } from './file-tree';
 import { SearchEngine, renderSearchResultsHTML, getSearchStyles } from './search';
 import { getTheme, Theme, getThemeNames } from './themes';
-import { IssueManager, Issue, IssueStatus, IssuePriority } from '../core/issues';
+import { IssueManager } from '../core/issues';
 import { renderBoard, renderIssueList, renderIssueDetail, getIssueBoardStyles, getIssueBoardScript } from './issue-board';
 import { 
   CollaboratorManager, 
-  CollaboratorRole, 
-  Collaborator, 
-  Team,
-  ROLE_PERMISSIONS,
-  ROLE_HIERARCHY 
+  CollaboratorRole,
 } from '../core/collaborators';
 
 const DEFAULT_PORT = 3847;

@@ -461,12 +461,12 @@ async function fetchFromRemoteAsync(
 /**
  * Fetch from a remote (network) - sync wrapper that returns pending result
  */
-function fetchFromRemote(
-  repo: Repository,
-  remoteManager: RemoteManager,
-  remote: RemoteConfig,
-  refspec?: string,
-  options: FetchOptions = {}
+function _fetchFromRemote(
+  _repo: Repository,
+  _remoteManager: RemoteManager,
+  _remote: RemoteConfig,
+  _refspec?: string,
+  _options: FetchOptions = {}
 ): FetchResult {
   // This is now a placeholder that indicates async is needed
   // The actual work is done in fetchFromRemoteAsync

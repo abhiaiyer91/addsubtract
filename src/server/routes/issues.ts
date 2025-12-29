@@ -349,7 +349,7 @@ export function createIssueRoutes(): Hono {
    */
   app.post('/:owner/:repo/issues/:number/reject', async (c) => {
     const { owner, repo, number } = c.req.param();
-    const body = await c.req.json();
+    const _body = await c.req.json();
     const user = c.get('user');
 
     const dbRepo = await getRepo(owner, repo);

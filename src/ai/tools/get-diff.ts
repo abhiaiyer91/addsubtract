@@ -127,7 +127,7 @@ export const getDiffTool = createTool({
         filesChanged: diffs.length,
         summary,
       };
-    } catch (error) {
+    } catch (_error) {
       return {
         diffs: [],
         totalAdditions: 0,

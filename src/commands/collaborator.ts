@@ -27,9 +27,6 @@ import { Repository } from '../core/repository';
 import {
   CollaboratorManager,
   CollaboratorRole,
-  Collaborator,
-  Invitation,
-  Team,
   ROLE_HIERARCHY,
   ROLE_PERMISSIONS,
 } from '../core/collaborators';

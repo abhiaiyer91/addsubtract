@@ -52,7 +52,7 @@ export const getLogTool = createTool({
         commits: formattedCommits,
         totalShown: formattedCommits.length,
       };
-    } catch (error) {
+    } catch (_error) {
       return {
         commits: [],
         totalShown: 0,

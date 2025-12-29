@@ -5,7 +5,6 @@
  * Reviews are triggered asynchronously when PRs are created or updated.
  */
 
-import * as path from 'path';
 import { prModel, prReviewModel, prCommentModel, repoModel, userModel } from '../../db/models';
 import { resolveDiskPath, BareRepository } from '../../server/storage/repos';
 import { exists } from '../../utils/fs';

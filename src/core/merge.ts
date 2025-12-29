@@ -5,9 +5,7 @@
 
 import * as path from 'path';
 import { Repository } from './repository';
-import { Commit, Tree, Blob } from './object';
-import { TreeEntry } from './types';
-import { diff, DiffLine } from './diff';
+import { DiffLine } from './diff';
 import { exists, readFile, writeFile, mkdirp, deleteFile } from '../utils/fs';
 import { TsgitError, ErrorCode } from './errors';
 

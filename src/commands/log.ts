@@ -1,5 +1,4 @@
 import { Repository } from '../core/repository';
-import { Commit } from '../core/object';
 
 const colors = {
   yellow: (s: string) => `\x1b[33m${s}\x1b[0m`,

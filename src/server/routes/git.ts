@@ -386,7 +386,7 @@ function collectObjectsToSend(
           queue.push(entry.hash);
         }
       }
-    } catch (error) {
+    } catch (_error) {
       // Object not found - skip
       console.warn(`[server] Object not found: ${hash}`);
     }

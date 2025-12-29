@@ -12,9 +12,9 @@
 
 import * as path from 'path';
 import { Repository } from '../core/repository';
-import { Commit, Tree, Blob } from '../core/object';
+import { Commit } from '../core/object';
 import { TsgitError, ErrorCode } from '../core/errors';
-import { Author, TreeEntry } from '../core/types';
+import { Author } from '../core/types';
 import { exists, readFile, writeFile, mkdirp } from '../utils/fs';
 
 const colors = {
@@ -258,7 +258,7 @@ export class RevertManager {
     const commitTree = this.getFileTree(commitHash);
     const headTree = this.getHeadTree();
 
-    // Calculate the changes in the commit (we'll reverse these)
+    // Calculate the changes in the commit (comparing parent to commit tree - we'll reverse these)
     const changes = this.calculateDiff(parentTree, commitTree);
 
     // Apply reversed changes

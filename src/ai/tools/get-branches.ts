@@ -40,7 +40,7 @@ export const getBranchesTool = createTool({
         branches,
         totalBranches: branches.length,
       };
-    } catch (error) {
+    } catch (_error) {
       return {
         current: null,
         branches: [],
