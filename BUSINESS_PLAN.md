@@ -338,6 +338,10 @@ wit is an experiment in a new kind of company: **one human + an army of AI agent
 
 Traditional startups hire engineers, designers, and marketers. We deploy agents. This isn't a cost-cutting measure—it's a fundamental bet that AI can now do 90% of what a software company needs.
 
+**The core thesis: If AI can build the product, AI can run the company.**
+
+We're proving this in real-time. The same AI that wrote wit's 66 commands, 76 UI components, and 59 test files can also write documentation, respond to issues, triage bugs, and create marketing content. There's no reason to hire humans for work that AI does better, faster, and cheaper.
+
 ### Current Team
 
 | Role | Who | Responsibilities |
