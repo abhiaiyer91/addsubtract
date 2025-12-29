@@ -464,9 +464,16 @@ export const githubImportRouter = router({
         };
       } catch (error) {
         if (error instanceof TRPCError) throw error;
+        
+        // Clean up error message (remove HTML if present)
+        let message = error instanceof Error ? error.message : 'Import failed';
+        if (message.includes('<!DOCTYPE') || message.includes('<html')) {
+          message = 'GitHub is temporarily unavailable. Please try again in a few minutes.';
+        }
+        
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
-          message: error instanceof Error ? error.message : 'Import failed',
+          message,
         });
       }
     }),
