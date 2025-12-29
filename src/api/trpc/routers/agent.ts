@@ -14,12 +14,11 @@ import { observable } from '@trpc/server/observable';
 import { router, publicProcedure, protectedProcedure } from '../trpc';
 import {
   agentSessionModel,
-  agentMessageModel,
   agentFileChangeModel,
   repoModel,
   repoAiKeyModel,
 } from '../../../db/models';
-import { getTsgitAgent, isAIAvailable, getAIInfo } from '../../../ai/mastra';
+import { getTsgitAgent, isAIAvailable, getAIInfo, getMemory } from '../../../ai/mastra';
 import { AGENT_MODES, type AgentMode, type AgentContext } from '../../../ai/types';
 
 // Lazy import to avoid circular dependencies
@@ -265,7 +264,7 @@ export const agentRouter = router({
     }),
 
   /**
-   * Get messages for a session
+   * Get messages for a session from Mastra Memory
    */
   getMessages: protectedProcedure
     .input(
@@ -289,10 +288,46 @@ export const agentRouter = router({
         });
       }
 
-      return agentMessageModel.listBySession(input.sessionId, {
-        limit: input.limit,
-        offset: input.offset,
-      });
+      // Use Mastra Memory to get messages
+      // The session ID is used as the thread ID
+      const memory = getMemory();
+      try {
+        const { messages } = await memory.recall({
+          threadId: input.sessionId,
+        });
+
+        // Transform Mastra messages to the expected format
+        return messages.map((msg: any, index: number) => {
+          // Extract text content from Mastra message format
+          let content = '';
+          let toolCalls: string | undefined;
+          
+          if (typeof msg.content === 'string') {
+            content = msg.content;
+          } else if (msg.content?.parts) {
+            const textParts = msg.content.parts.filter((p: any) => p.type === 'text');
+            content = textParts.map((p: any) => p.text).join('');
+            
+            const toolParts = msg.content.parts.filter((p: any) => p.type === 'tool-invocation');
+            if (toolParts.length > 0) {
+              toolCalls = JSON.stringify(toolParts.map((p: any) => p.toolInvocation));
+            }
+          }
+
+          return {
+            id: msg.id || `msg-${index}`,
+            sessionId: input.sessionId,
+            role: msg.role,
+            content,
+            toolCalls,
+            createdAt: msg.createdAt || new Date(),
+          };
+        });
+      } catch (error) {
+        console.error('[agent.getMessages] Error fetching from Mastra Memory:', error);
+        // Return empty array if thread doesn't exist yet
+        return [];
+      }
     }),
 
   /**
@@ -394,6 +429,50 @@ export const agentRouter = router({
         });
       }
 
+      // Use the session ID as the Mastra thread ID
+      const threadId = input.sessionId;
+      const resourceId = session.repoId || `user:${ctx.user.id}`;
+
+      // Ensure the Mastra thread exists for this session
+      const memory = getMemory();
+      try {
+        const existingThread = await memory.getThreadById({ threadId });
+        if (!existingThread) {
+          await memory.saveThread({
+            thread: {
+              id: threadId,
+              resourceId,
+              title: session.title || `Session ${threadId.slice(0, 8)}`,
+              metadata: {
+                repoId: session.repoId,
+                userId: ctx.user.id,
+                branch: session.branch,
+                mode: session.mode,
+              },
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+          });
+        }
+      } catch {
+        // Thread doesn't exist, create it
+        await memory.saveThread({
+          thread: {
+            id: threadId,
+            resourceId,
+            title: session.title || `Session ${threadId.slice(0, 8)}`,
+            metadata: {
+              repoId: session.repoId,
+              userId: ctx.user.id,
+              branch: session.branch,
+              mode: session.mode,
+            },
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        });
+      }
+
       // Build agent context if we have a repository
       let agentContext: AgentContext | null = null;
       if (session.repoId) {
@@ -419,28 +498,6 @@ export const agentRouter = router({
         }
       }
 
-      // Save user message
-      const userMessage = await agentMessageModel.create({
-        sessionId: input.sessionId,
-        role: 'user',
-        content: input.message,
-      });
-
-      // Get conversation history for context
-      const history = await agentMessageModel.getRecentMessages(input.sessionId, 20);
-      
-      // Build prompt with conversation history
-      let contextPrompt = '';
-      if (history.length > 0) {
-        contextPrompt = 'Previous conversation:\n';
-        for (const msg of history) {
-          const role = msg.role === 'user' ? 'User' : msg.role === 'assistant' ? 'Assistant' : 'System';
-          const content = msg.content.length > 500 ? msg.content.slice(0, 500) + '...' : msg.content;
-          contextPrompt += `${role}: ${content}\n`;
-        }
-        contextPrompt += '\n---\n\n';
-      }
-
       // Get agent based on mode (or fallback to general agent)
       // Treat legacy 'questions' mode as 'pm'
       const sessionMode = (session.mode === 'questions' ? 'pm' : session.mode || 'pm') as AgentMode;
@@ -451,44 +508,41 @@ export const agentRouter = router({
         ? await getAgentForMode(sessionMode, agentContext, modelId)
         : getTsgitAgent();
       
-      const fullPrompt = contextPrompt + `User: ${input.message}`;
-      
       try {
-        const result = await agent.generate(fullPrompt);
-
-        // Save assistant message
-        const assistantMessage = await agentMessageModel.create({
-          sessionId: input.sessionId,
-          role: 'assistant',
-          content: result.text,
-          toolCalls: result.toolCalls ? JSON.stringify(result.toolCalls) : undefined,
+        // Use Mastra memory by passing threadId and resourceId
+        // Mastra will automatically:
+        // 1. Load conversation history from the thread
+        // 2. Save the user message and assistant response
+        const result = await agent.generate(input.message, {
+          threadId,
+          resourceId,
         });
 
         // Auto-generate title if first message and no title
-        if (!session.title && history.length <= 1) {
-          const title = input.message.slice(0, 100) + (input.message.length > 100 ? '...' : '');
-          await agentSessionModel.update(input.sessionId, { title });
+        if (!session.title) {
+          try {
+            const { messages } = await memory.recall({ threadId });
+            if (messages.length <= 2) {
+              const title = input.message.slice(0, 100) + (input.message.length > 100 ? '...' : '');
+              await agentSessionModel.update(input.sessionId, { title });
+            }
+          } catch {
+            // Ignore title generation errors
+          }
         }
 
         // Restore original API keys
         restoreKeys();
 
         return {
-          userMessage,
-          assistantMessage,
+          threadId,
+          response: result.text,
           toolCalls: result.toolCalls,
           provider, // Return which provider was used
         };
       } catch (error) {
         // Restore original API keys
         restoreKeys();
-
-        // Save error message
-        await agentMessageModel.create({
-          sessionId: input.sessionId,
-          role: 'system',
-          content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        });
 
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -500,6 +554,7 @@ export const agentRouter = router({
   /**
    * Stream a chat response (using server-sent events pattern)
    * Returns a subscription that emits chunks
+   * Uses Mastra Memory for conversation history
    */
   chatStream: protectedProcedure
     .input(
@@ -537,50 +592,72 @@ export const agentRouter = router({
               return;
             }
 
-            // Save user message
-            await agentMessageModel.create({
-              sessionId: input.sessionId,
-              role: 'user',
-              content: input.message,
-            });
+            // Use the session ID as the Mastra thread ID
+            const threadId = input.sessionId;
+            const resourceId = session.repoId || `user:${ctx.user.id}`;
 
-            // Get conversation history and build prompt
-            const history = await agentMessageModel.getRecentMessages(input.sessionId, 20);
-            let contextPrompt = '';
-            if (history.length > 0) {
-              contextPrompt = 'Previous conversation:\n';
-              for (const msg of history) {
-                const role = msg.role === 'user' ? 'User' : msg.role === 'assistant' ? 'Assistant' : 'System';
-                const content = msg.content.length > 500 ? msg.content.slice(0, 500) + '...' : msg.content;
-                contextPrompt += `${role}: ${content}\n`;
+            // Ensure the Mastra thread exists
+            const memory = getMemory();
+            try {
+              const existingThread = await memory.getThreadById({ threadId });
+              if (!existingThread) {
+                await memory.saveThread({
+                  thread: {
+                    id: threadId,
+                    resourceId,
+                    title: session.title || `Session ${threadId.slice(0, 8)}`,
+                    metadata: {
+                      repoId: session.repoId,
+                      userId: ctx.user.id,
+                      branch: session.branch,
+                      mode: session.mode,
+                    },
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                  },
+                });
               }
-              contextPrompt += '\n---\n\n';
+            } catch {
+              await memory.saveThread({
+                thread: {
+                  id: threadId,
+                  resourceId,
+                  title: session.title || `Session ${threadId.slice(0, 8)}`,
+                  metadata: {
+                    repoId: session.repoId,
+                    userId: ctx.user.id,
+                    branch: session.branch,
+                    mode: session.mode,
+                  },
+                  createdAt: new Date(),
+                  updatedAt: new Date(),
+                },
+              });
             }
 
-            // Get agent and stream response
+            // Get agent and stream response with Mastra memory
             const agent = getTsgitAgent();
-            const fullPrompt = contextPrompt + `User: ${input.message}`;
-            const result = await agent.stream(fullPrompt);
-
-            let fullResponse = '';
+            const result = await agent.stream(input.message, {
+              threadId,
+              resourceId,
+            });
 
             // Stream text chunks
             for await (const chunk of result.textStream) {
-              fullResponse += chunk;
               emit.next({ type: 'text', content: chunk });
             }
 
-            // Save assistant message (tool calls are handled internally by the agent)
-            await agentMessageModel.create({
-              sessionId: input.sessionId,
-              role: 'assistant',
-              content: fullResponse,
-            });
-
             // Auto-generate title if needed
-            if (!session.title && history.length <= 1) {
-              const title = input.message.slice(0, 100) + (input.message.length > 100 ? '...' : '');
-              await agentSessionModel.update(input.sessionId, { title });
+            if (!session.title) {
+              try {
+                const { messages } = await memory.recall({ threadId });
+                if (messages.length <= 2) {
+                  const title = input.message.slice(0, 100) + (input.message.length > 100 ? '...' : '');
+                  await agentSessionModel.update(input.sessionId, { title });
+                }
+              } catch {
+                // Ignore title generation errors
+              }
             }
 
             emit.next({ type: 'done', content: '' });

@@ -104,10 +104,10 @@ export {
   type StackWithDetails,
 } from './stack';
 
-// Agent models (coding agent sessions and messages)
+// Agent models (coding agent sessions and file changes)
+// Note: Conversation history is managed by Mastra Memory (see src/ai/services/conversation.ts)
 export {
   agentSessionModel,
-  agentMessageModel,
   agentFileChangeModel,
 } from './agent';
 

@@ -16,7 +16,6 @@ import {
   repositories,
   workflowRuns,
   agentSessions,
-  agentMessages,
 } from '../schema';
 import { user } from '../auth-schema';
 
@@ -584,26 +583,12 @@ export const wrappedModel = {
         );
       
       if (Number(sessionStats?.count) > 0) {
-        const [messageStats] = await db
-          .select({
-            messageCount: count(),
-            totalPromptTokens: sql<number>`COALESCE(SUM(${agentMessages.promptTokens}), 0)`,
-            totalCompletionTokens: sql<number>`COALESCE(SUM(${agentMessages.completionTokens}), 0)`,
-          })
-          .from(agentMessages)
-          .innerJoin(agentSessions, eq(agentMessages.sessionId, agentSessions.id))
-          .where(
-            and(
-              eq(agentSessions.userId, userId),
-              gte(agentSessions.createdAt, period.startDate),
-              lte(agentSessions.createdAt, period.endDate)
-            )
-          );
-        
+        // Note: Message counts and token usage are now tracked in Mastra Memory
+        // We only track session counts here
         aiUsage = {
           agentSessions: Number(sessionStats.count),
-          totalMessages: Number(messageStats?.messageCount || 0),
-          totalTokens: Number(messageStats?.totalPromptTokens || 0) + Number(messageStats?.totalCompletionTokens || 0),
+          totalMessages: 0, // Now tracked in Mastra Memory
+          totalTokens: 0,   // Now tracked in Mastra Memory
         };
       }
     } catch {

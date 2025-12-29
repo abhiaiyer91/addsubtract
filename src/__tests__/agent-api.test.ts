@@ -11,6 +11,35 @@ vi.mock('../db', () => ({
   getDb: () => ({}),
 }));
 
+// Mock Mastra Memory
+const mockMessages: Map<string, any[]> = new Map();
+const mockThreads: Map<string, any> = new Map();
+
+const mockMemory = {
+  saveThread: vi.fn(async ({ thread }) => {
+    mockThreads.set(thread.id, thread);
+    if (!mockMessages.has(thread.id)) {
+      mockMessages.set(thread.id, []);
+    }
+    return thread;
+  }),
+  getThreadById: vi.fn(async ({ threadId }) => {
+    return mockThreads.get(threadId) || null;
+  }),
+  recall: vi.fn(async ({ threadId }) => {
+    const messages = mockMessages.get(threadId) || [];
+    return { messages };
+  }),
+  saveMessages: vi.fn(async ({ messages }) => {
+    for (const msg of messages) {
+      const threadMessages = mockMessages.get(msg.threadId) || [];
+      threadMessages.push(msg);
+      mockMessages.set(msg.threadId, threadMessages);
+    }
+    return { messages };
+  }),
+};
+
 // Mock the AI module
 vi.mock('../ai/mastra', () => ({
   isAIAvailable: vi.fn().mockReturnValue(true),
@@ -32,6 +61,7 @@ vi.mock('../ai/mastra', () => ({
       then: (fn: (result: unknown) => unknown) => fn({ toolCalls: [] }),
     }),
   }),
+  getMemory: () => mockMemory,
 }));
 
 // Test UUIDs - defined before mocks so they can be used in mock factory
@@ -52,13 +82,6 @@ vi.mock('../db/models', () => ({
     update: vi.fn(),
     delete: vi.fn(),
     touch: vi.fn(),
-  },
-  agentMessageModel: {
-    create: vi.fn(),
-    findById: vi.fn(),
-    listBySession: vi.fn(),
-    getRecentMessages: vi.fn(),
-    deleteBySession: vi.fn(),
   },
   agentFileChangeModel: {
     create: vi.fn(),
@@ -86,7 +109,6 @@ import { router } from '../api/trpc/trpc';
 import { isAIAvailable, getTsgitAgent } from '../ai/mastra';
 import { 
   agentSessionModel, 
-  agentMessageModel, 
   agentFileChangeModel 
 } from '../db/models';
 
@@ -119,7 +141,6 @@ async function callProcedure<T>(
 
 // Get references to mocked models
 const mockAgentSessionModel = vi.mocked(agentSessionModel);
-const mockAgentMessageModel = vi.mocked(agentMessageModel);
 const mockAgentFileChangeModel = vi.mocked(agentFileChangeModel);
 
 describe('Agent API Router', () => {
@@ -372,6 +393,9 @@ describe('Agent API Router', () => {
     beforeEach(() => {
       // Set API key for chat tests
       process.env.ANTHROPIC_API_KEY = 'test-api-key';
+      // Clear mock data
+      mockMessages.clear();
+      mockThreads.clear();
     });
     
     afterEach(() => {
@@ -383,25 +407,26 @@ describe('Agent API Router', () => {
       }
     });
 
-    it('should send message and get response', async () => {
+    it('should send message and get response using Mastra Memory', async () => {
       const mockSession = { id: TEST_SESSION_ID, userId: TEST_USER_ID, status: 'active' };
       mockAgentSessionModel.findByIdForUser.mockResolvedValue(mockSession as never);
-      mockAgentMessageModel.create.mockResolvedValue({ id: TEST_MSG_ID } as never);
-      mockAgentMessageModel.getRecentMessages.mockResolvedValue([] as never);
 
       const ctx = createTestContext(TEST_USER_ID);
       const result = await callProcedure<{
-        userMessage: { id: string };
-        assistantMessage: { id: string };
+        threadId: string;
+        response: string;
       }>(
         'agent.chat',
         { sessionId: TEST_SESSION_ID, message: 'Hello, can you help me?' },
         ctx
       );
 
-      expect(result.userMessage).toBeDefined();
-      expect(result.assistantMessage).toBeDefined();
-      expect(mockAgentMessageModel.create).toHaveBeenCalledTimes(2);
+      // Now returns threadId and response instead of separate message objects
+      expect(result.threadId).toBe(TEST_SESSION_ID);
+      expect(result.response).toBe('I can help you with that!');
+      
+      // Verify Mastra Memory was used
+      expect(mockMemory.saveThread).toHaveBeenCalled();
     });
 
     it('should throw error when AI is not configured', async () => {
@@ -430,15 +455,9 @@ describe('Agent API Router', () => {
       ).rejects.toThrow('Session is not active');
     });
 
-    it('should use conversation history for context', async () => {
+    it('should use Mastra threadId for conversation context', async () => {
       const mockSession = { id: TEST_SESSION_ID, userId: TEST_USER_ID, status: 'active' };
-      const mockHistory = [
-        { role: 'user', content: 'Previous message' },
-        { role: 'assistant', content: 'Previous response' },
-      ];
       mockAgentSessionModel.findByIdForUser.mockResolvedValue(mockSession as never);
-      mockAgentMessageModel.create.mockResolvedValue({ id: TEST_MSG_ID } as never);
-      mockAgentMessageModel.getRecentMessages.mockResolvedValue(mockHistory as never);
 
       const ctx = createTestContext(TEST_USER_ID);
       await callProcedure(
@@ -447,12 +466,13 @@ describe('Agent API Router', () => {
         ctx
       );
 
-      // Verify agent was called with prompt that includes history context
+      // Verify agent was called with threadId for Mastra memory
       expect(getTsgitAgent().generate).toHaveBeenCalledWith(
-        expect.stringContaining('Previous message')
-      );
-      expect(getTsgitAgent().generate).toHaveBeenCalledWith(
-        expect.stringContaining('Follow up question')
+        'Follow up question',
+        expect.objectContaining({
+          threadId: TEST_SESSION_ID,
+          resourceId: expect.any(String),
+        })
       );
     });
   });

@@ -26,7 +26,6 @@ import {
   organizations,
   workflowRuns,
   agentSessions,
-  agentMessages,
   activities,
 } from '../schema';
 import type { UserRole } from '../auth-schema';
@@ -180,13 +179,8 @@ export async function getSystemStats(): Promise<SystemStats> {
       failed: sql<number>`count(*) filter (where ${workflowRuns.conclusion} = 'failure')`,
     }).from(workflowRuns),
 
-    // AI stats
-    Promise.all([
-      db.select({ count: count() }).from(agentSessions),
-      db.select({ 
-        tokens: sql<number>`coalesce(sum(${agentMessages.promptTokens}) + sum(${agentMessages.completionTokens}), 0)` 
-      }).from(agentMessages),
-    ]),
+    // AI stats (token usage now tracked in Mastra Memory)
+    db.select({ count: count() }).from(agentSessions),
   ]);
 
   // Calculate active users (users with activity in last 30 days)
@@ -231,8 +225,8 @@ export async function getSystemStats(): Promise<SystemStats> {
       failed: workflowStats[0]?.failed ?? 0,
     },
     ai: {
-      totalSessions: aiStats[0][0]?.count ?? 0,
-      totalTokens: Number(aiStats[1][0]?.tokens ?? 0),
+      totalSessions: aiStats[0]?.count ?? 0,
+      totalTokens: 0, // Now tracked in Mastra Memory
     },
   };
 }
