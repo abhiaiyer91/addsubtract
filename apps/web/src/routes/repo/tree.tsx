@@ -34,6 +34,8 @@ export function TreePage() {
     type: entry.type,
     size: entry.size,
   })) || [];
+  
+  const treeError = treeData?.error;
 
   const branches = branchesData?.map(b => ({
     name: b.name,
@@ -69,6 +71,7 @@ export function TreePage() {
           repo={repo!}
           currentRef={currentRef}
           currentPath={currentPath}
+          error={treeError}
         />
       </div>
     </RepoLayout>

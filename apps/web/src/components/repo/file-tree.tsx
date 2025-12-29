@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { File, Folder, ChevronRight } from 'lucide-react';
+import { File, Folder, ChevronRight, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export interface TreeEntry {
@@ -15,9 +15,10 @@ interface FileTreeProps {
   repo: string;
   currentRef: string;
   currentPath?: string;
+  error?: string;
 }
 
-export function FileTree({ entries, owner, repo, currentRef, currentPath }: FileTreeProps) {
+export function FileTree({ entries, owner, repo, currentRef, currentPath, error }: FileTreeProps) {
   // Sort: directories first, then files
   const sorted = [...entries].sort((a, b) => {
     if (a.type !== b.type) return a.type === 'directory' ? -1 : 1;
@@ -52,7 +53,15 @@ export function FileTree({ entries, owner, repo, currentRef, currentPath }: File
         </div>
       )}
 
-      {sorted.length === 0 ? (
+      {error ? (
+        <div className="px-4 py-8 text-center">
+          <div className="flex flex-col items-center gap-2">
+            <AlertCircle className="h-8 w-8 text-destructive" />
+            <p className="text-destructive font-medium">Unable to load files</p>
+            <p className="text-sm text-muted-foreground max-w-md">{error}</p>
+          </div>
+        </div>
+      ) : sorted.length === 0 ? (
         <div className="px-4 py-8 text-center text-muted-foreground">
           This directory is empty
         </div>
