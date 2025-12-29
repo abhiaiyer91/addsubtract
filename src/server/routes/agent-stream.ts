@@ -1,7 +1,8 @@
 /**
  * Agent Streaming Routes
  * 
- * SSE endpoint for streaming agent chat responses
+ * SSE endpoint for streaming agent chat responses.
+ * Uses Mastra Memory for conversation history management.
  */
 
 import { Hono } from 'hono';
@@ -9,12 +10,12 @@ import { streamSSE } from 'hono/streaming';
 import * as path from 'path';
 import {
   agentSessionModel,
-  agentMessageModel,
   repoModel,
   repoAiKeyModel,
 } from '../../db/models';
 import { type AgentMode, type AgentContext } from '../../ai/types';
 import { createAuth } from '../../lib/auth';
+import { getMemory } from '../../ai/mastra.js';
 
 // Lazy import to avoid circular dependencies
 async function getAgentForMode(mode: AgentMode, context: AgentContext, model: string) {
@@ -108,12 +109,51 @@ export function createAgentStreamRoutes() {
       return c.json({ error: 'AI is not configured' }, 412);
     }
 
-    // Save user message first
-    const userMessage = await agentMessageModel.create({
-      sessionId,
-      role: 'user',
-      content: message,
-    });
+    // Use the session ID as the Mastra thread ID for conversation history
+    // This ensures conversation continuity across the session
+    const threadId = sessionId;
+    const resourceId = agentSession.repoId || `user:${userId}`;
+
+    // Ensure the Mastra thread exists for this session
+    const memory = getMemory();
+    try {
+      const existingThread = await memory.getThreadById({ threadId });
+      if (!existingThread) {
+        // Create a new Mastra thread for this session
+        await memory.saveThread({
+          thread: {
+            id: threadId,
+            resourceId,
+            title: agentSession.title || `Session ${sessionId.slice(0, 8)}`,
+            metadata: {
+              repoId: agentSession.repoId,
+              userId,
+              branch: agentSession.branch,
+              mode: agentSession.mode,
+            },
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        });
+      }
+    } catch (error) {
+      console.log('[agent-stream] Creating new Mastra thread for session');
+      await memory.saveThread({
+        thread: {
+          id: threadId,
+          resourceId,
+          title: agentSession.title || `Session ${sessionId.slice(0, 8)}`,
+          metadata: {
+            repoId: agentSession.repoId,
+            userId,
+            branch: agentSession.branch,
+            mode: agentSession.mode,
+          },
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      });
+    }
 
     // Build agent context
     let agentContext: AgentContext | null = null;
@@ -135,19 +175,6 @@ export function createAgentStreamRoutes() {
           };
         }
       }
-    }
-
-    // Get conversation history
-    const history = await agentMessageModel.getRecentMessages(sessionId, 20);
-    let contextPrompt = '';
-    if (history.length > 0) {
-      contextPrompt = 'Previous conversation:\n';
-      for (const msg of history) {
-        const role = msg.role === 'user' ? 'User' : msg.role === 'assistant' ? 'Assistant' : 'System';
-        const content = msg.content.length > 500 ? msg.content.slice(0, 500) + '...' : msg.content;
-        contextPrompt += `${role}: ${content}\n`;
-      }
-      contextPrompt += '\n---\n\n';
     }
 
     // Set API key temporarily
@@ -176,10 +203,10 @@ export function createAgentStreamRoutes() {
     // Stream the response
     return streamSSE(c, async (stream) => {
       try {
-        // Send user message ID first
+        // Send session info first
         await stream.writeSSE({
-          event: 'user_message',
-          data: JSON.stringify({ id: userMessage.id }),
+          event: 'session_info',
+          data: JSON.stringify({ threadId, resourceId }),
         });
 
         // Get agent
@@ -194,14 +221,19 @@ export function createAgentStreamRoutes() {
           agent = getTsgitAgent();
         }
 
-        const fullPrompt = contextPrompt + `User: ${message}`;
-
-        // Use stream if available, otherwise fall back to generate
+        // Use stream with threadId for Mastra memory integration
+        // Mastra will automatically:
+        // 1. Load conversation history from the thread
+        // 2. Save the user message and assistant response
         let fullResponse = '';
         let toolCallsWithResults: any[] = [];
 
         if (agent.stream) {
-          const result = await agent.stream(fullPrompt);
+          // Pass threadId and resourceId to enable Mastra memory
+          const result = await agent.stream(message, {
+            threadId,
+            resourceId,
+          });
 
           // Stream text chunks
           for await (const chunk of result.textStream) {
@@ -234,8 +266,11 @@ export function createAgentStreamRoutes() {
             result: toolResultsMap.get(tc.toolCallId),
           }));
         } else {
-          // Fallback to generate
-          const result = await agent.generate(fullPrompt);
+          // Fallback to generate with memory
+          const result = await agent.generate(message, {
+            threadId,
+            resourceId,
+          });
           fullResponse = result.text || '';
           
           // Merge tool calls with results from steps
@@ -273,25 +308,24 @@ export function createAgentStreamRoutes() {
           });
         }
 
-        // Save assistant message
-        const assistantMessage = await agentMessageModel.create({
-          sessionId,
-          role: 'assistant',
-          content: fullResponse,
-          toolCalls: toolCallsWithResults.length > 0 ? JSON.stringify(toolCallsWithResults) : undefined,
-        });
-
-        // Auto-generate title if needed
-        if (!agentSession.title && history.length <= 1) {
-          const title = message.slice(0, 100) + (message.length > 100 ? '...' : '');
-          await agentSessionModel.update(sessionId, { title });
+        // Auto-generate title if needed (check thread messages count)
+        if (!agentSession.title) {
+          try {
+            const { messages } = await memory.recall({ threadId });
+            if (messages.length <= 2) {
+              const title = message.slice(0, 100) + (message.length > 100 ? '...' : '');
+              await agentSessionModel.update(sessionId, { title });
+            }
+          } catch {
+            // Ignore errors when generating title
+          }
         }
 
         // Send completion
         await stream.writeSSE({
           event: 'done',
           data: JSON.stringify({ 
-            assistantMessageId: assistantMessage.id,
+            threadId,
             provider,
           }),
         });

@@ -1,20 +1,20 @@
 /**
- * Agent Session and Message Models
+ * Agent Session and File Change Models
  * 
  * Handles database operations for the wit coding agent's
- * conversation history and file change tracking.
+ * session management and file change tracking.
+ * 
+ * NOTE: Conversation history is managed by Mastra Memory.
+ * See src/ai/services/conversation.ts for the conversation API.
  */
 
 import { eq, and, desc } from 'drizzle-orm';
 import { getDb } from '../index';
 import {
   agentSessions,
-  agentMessages,
   agentFileChanges,
   type AgentSession,
   type NewAgentSession,
-  type AgentMessage,
-  type NewAgentMessage,
   type AgentFileChange,
   type NewAgentFileChange,
 } from '../schema';
@@ -114,7 +114,7 @@ export const agentSessionModel = {
   },
 
   /**
-   * Delete a session (cascades to messages and file changes)
+   * Delete a session (cascades to file changes)
    */
   async delete(id: string): Promise<boolean> {
     const db = getDb();
@@ -134,86 +134,6 @@ export const agentSessionModel = {
       .update(agentSessions)
       .set({ updatedAt: new Date() })
       .where(eq(agentSessions.id, id));
-  },
-};
-
-// ============ AGENT MESSAGE MODEL ============
-
-export const agentMessageModel = {
-  /**
-   * Create a new message
-   */
-  async create(data: NewAgentMessage): Promise<AgentMessage> {
-    const db = getDb();
-    const [message] = await db
-      .insert(agentMessages)
-      .values(data)
-      .returning();
-
-    // Update session timestamp
-    await agentSessionModel.touch(data.sessionId);
-
-    return message;
-  },
-
-  /**
-   * Find a message by ID
-   */
-  async findById(id: string): Promise<AgentMessage | undefined> {
-    const db = getDb();
-    const [message] = await db
-      .select()
-      .from(agentMessages)
-      .where(eq(agentMessages.id, id));
-    return message;
-  },
-
-  /**
-   * List messages for a session
-   */
-  async listBySession(
-    sessionId: string,
-    options: { limit?: number; offset?: number } = {}
-  ): Promise<AgentMessage[]> {
-    const db = getDb();
-    const { limit = 100, offset = 0 } = options;
-
-    return db
-      .select()
-      .from(agentMessages)
-      .where(eq(agentMessages.sessionId, sessionId))
-      .orderBy(agentMessages.createdAt)
-      .limit(limit)
-      .offset(offset);
-  },
-
-  /**
-   * Get the last N messages for context
-   */
-  async getRecentMessages(sessionId: string, count: number = 10): Promise<AgentMessage[]> {
-    const db = getDb();
-    
-    const messages = await db
-      .select()
-      .from(agentMessages)
-      .where(eq(agentMessages.sessionId, sessionId))
-      .orderBy(desc(agentMessages.createdAt))
-      .limit(count);
-
-    // Reverse to get chronological order
-    return messages.reverse();
-  },
-
-  /**
-   * Delete messages for a session
-   */
-  async deleteBySession(sessionId: string): Promise<number> {
-    const db = getDb();
-    const result = await db
-      .delete(agentMessages)
-      .where(eq(agentMessages.sessionId, sessionId))
-      .returning();
-    return result.length;
   },
 };
 

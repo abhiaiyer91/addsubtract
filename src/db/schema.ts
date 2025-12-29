@@ -1486,13 +1486,6 @@ export const agentModeEnum = pgEnum('agent_mode', [
   'code',
 ]);
 
-export const agentMessageRoleEnum = pgEnum('agent_message_role', [
-  'user',
-  'assistant',
-  'tool',
-  'system',
-]);
-
 /**
  * Agent sessions table
  * Tracks conversations between users and the wit coding agent
@@ -1524,37 +1517,11 @@ export const agentSessions = pgTable('agent_sessions', {
 });
 
 /**
- * Agent messages table
- * Stores all messages in agent conversations
- */
-export const agentMessages = pgTable('agent_messages', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  
-  // Parent session
-  sessionId: uuid('session_id')
-    .notNull()
-    .references(() => agentSessions.id, { onDelete: 'cascade' }),
-  
-  // Message role
-  role: agentMessageRoleEnum('role').notNull(),
-  
-  // Message content
-  content: text('content').notNull(),
-  
-  // Tool calls made by the assistant (JSON array)
-  toolCalls: text('tool_calls'), // JSON: [{ name, args, result }]
-  
-  // Token usage for this message
-  promptTokens: integer('prompt_tokens'),
-  completionTokens: integer('completion_tokens'),
-  
-  // Timestamp
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-});
-
-/**
  * Agent file changes table
  * Tracks proposed file changes before they're applied
+ * 
+ * Note: Conversation history/messages are stored in Mastra Memory.
+ * See src/ai/services/conversation.ts for the conversation API.
  */
 export const agentFileChanges = pgTable('agent_file_changes', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -1563,10 +1530,6 @@ export const agentFileChanges = pgTable('agent_file_changes', {
   sessionId: uuid('session_id')
     .notNull()
     .references(() => agentSessions.id, { onDelete: 'cascade' }),
-  
-  // Message that proposed this change
-  messageId: uuid('message_id')
-    .references(() => agentMessages.id, { onDelete: 'cascade' }),
   
   // File path relative to repo root
   filePath: text('file_path').notNull(),
@@ -2232,9 +2195,6 @@ export type AiProvider = (typeof aiProviderEnum.enumValues)[number];
 
 export type AgentSession = typeof agentSessions.$inferSelect;
 export type NewAgentSession = typeof agentSessions.$inferInsert;
-
-export type AgentMessage = typeof agentMessages.$inferSelect;
-export type NewAgentMessage = typeof agentMessages.$inferInsert;
 
 export type AgentFileChange = typeof agentFileChanges.$inferSelect;
 export type NewAgentFileChange = typeof agentFileChanges.$inferInsert;
