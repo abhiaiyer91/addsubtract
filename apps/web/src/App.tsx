@@ -75,6 +75,7 @@ import { SearchPage } from './routes/search';
 import { InboxPage } from './routes/inbox';
 import { WrappedPage } from './routes/wrapped';
 import { LeaderboardPage } from './routes/leaderboard';
+import { ContributePage } from './routes/contribute';
 
 // Scroll to top on route change
 function ScrollToTop() {
@@ -124,6 +125,7 @@ export function App() {
             <Route path="/search" element={<SearchPage />} />
             <Route path="/inbox" element={<InboxPage />} />
             <Route path="/leaderboard" element={<LeaderboardPage />} />
+            <Route path="/contribute" element={<ContributePage />} />
 
             {/* Organization routes */}
             <Route path="/org/:slug" element={<OrgPage />} />

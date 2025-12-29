@@ -39,6 +39,7 @@ export {
   labelModel,
   issueLabelModel,
   issueInboxModel,
+  contributionIssuesModel,
   ISSUE_STATUSES,
   ISSUE_PRIORITIES,
   PRIORITY_CONFIG,
