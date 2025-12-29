@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { FileTree } from '@/components/repo/file-tree';
 import { BranchSelector } from '@/components/repo/branch-selector';
+import { LanguageBar } from '@/components/repo/language-bar';
 import { Markdown } from '@/components/markdown/renderer';
 import { RepoLayout } from './components/repo-layout';
 import { useSession } from '@/lib/auth-client';
@@ -59,6 +60,16 @@ export function RepoPage() {
   const { data: packageData } = trpc.packages.getByRepoId.useQuery(
     { repoId: repoData?.repo.id ?? '' },
     { enabled: !!repoData?.repo.id }
+  );
+
+  // Fetch languages
+  const { data: languagesData } = trpc.repos.getLanguages.useQuery(
+    {
+      owner: owner!,
+      repo: repo!,
+      ref: repoData?.repo.defaultBranch || 'main',
+    },
+    { enabled: !!repoData }
   );
 
   const repoInfo = repoData?.repo;
@@ -173,6 +184,14 @@ export function RepoPage() {
               </span>
             </div>
           </div>
+
+          {/* Languages */}
+          {languagesData && languagesData.length > 0 && (
+            <div className="border rounded-lg p-4 space-y-3">
+              <h3 className="font-semibold text-sm">Languages</h3>
+              <LanguageBar languages={languagesData} />
+            </div>
+          )}
 
           {/* Releases */}
           <div className="border rounded-lg p-4 space-y-3">

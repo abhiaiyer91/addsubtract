@@ -20,6 +20,11 @@ import { getGlobalEmailService } from '../../../core/email';
 import { getDb } from '../../../db';
 import { user } from '../../../db/auth-schema';
 import { eq } from 'drizzle-orm';
+import { 
+  calculateLanguageStats, 
+  shouldIgnorePath, 
+  type LanguageStats 
+} from '../../../core/language-detection';
 
 /**
  * Helper to get a BareRepository from disk path, auto-creating if needed
@@ -709,6 +714,106 @@ export const reposRouter = router({
     )
     .query(async ({ input }) => {
       return repoModel.listForks(input.repoId);
+    }),
+
+  /**
+   * Get language statistics for a repository (GitHub-style)
+   */
+  getLanguages: publicProcedure
+    .input(
+      z.object({
+        owner: z.string(),
+        repo: z.string(),
+        ref: z.string().default('HEAD'),
+      })
+    )
+    .query(async ({ input, ctx }): Promise<LanguageStats[]> => {
+      const result = await repoModel.findByPath(input.owner, input.repo);
+
+      if (!result) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Repository not found',
+        });
+      }
+
+      // Check access for private repos
+      if (result.repo.isPrivate) {
+        if (!ctx.user) {
+          throw new TRPCError({
+            code: 'UNAUTHORIZED',
+            message: 'Authentication required',
+          });
+        }
+
+        const isOwner = result.repo.ownerId === ctx.user.id;
+        const hasAccess = isOwner || (await collaboratorModel.hasPermission(result.repo.id, ctx.user.id, 'read'));
+
+        if (!hasAccess) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'You do not have access to this repository',
+          });
+        }
+      }
+
+      // Get the bare repository
+      const bareRepo = getRepoFromDisk(result.repo.diskPath);
+      if (!bareRepo) {
+        return [];
+      }
+
+      try {
+        // Resolve the ref to a commit
+        const commitHash = bareRepo.refs.resolve(input.ref);
+        if (!commitHash) {
+          return [];
+        }
+
+        // Read the commit to get the tree
+        const commit = bareRepo.objects.readCommit(commitHash);
+        
+        // Recursively collect all files with their sizes
+        const files: Array<{ path: string; size: number }> = [];
+        
+        const collectFiles = (treeHash: string, prefix: string = ''): void => {
+          try {
+            const tree = bareRepo.objects.readTree(treeHash);
+            
+            for (const entry of tree.entries) {
+              const fullPath = prefix ? `${prefix}/${entry.name}` : entry.name;
+              
+              if (entry.mode === '40000') {
+                // Directory - check if should be ignored
+                if (!shouldIgnorePath(entry.name)) {
+                  collectFiles(entry.hash, fullPath);
+                }
+              } else {
+                // File - get its size
+                try {
+                  const blob = bareRepo.objects.readBlob(entry.hash);
+                  files.push({
+                    path: fullPath,
+                    size: blob.content.length,
+                  });
+                } catch {
+                  // Skip files we can't read
+                }
+              }
+            }
+          } catch {
+            // Skip trees we can't read
+          }
+        };
+        
+        collectFiles(commit.treeHash);
+        
+        // Calculate language statistics
+        return calculateLanguageStats(files);
+      } catch (error) {
+        console.error('[repos.getLanguages] Error:', error);
+        return [];
+      }
     }),
 
   /**

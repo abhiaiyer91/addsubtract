@@ -26,12 +26,24 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loading } from '@/components/ui/loading';
+import { LanguageDot } from '@/components/repo/language-bar';
 import { trpc } from '@/lib/trpc';
 import { useSession } from '@/lib/auth-client';
 import { formatRelativeTime, cn } from '@/lib/utils';
 
 // Repository card
 function RepoCard({ repo, owner }: { repo: any; owner: string }) {
+  // Fetch primary language for the repo
+  const { data: languages } = trpc.repos.getLanguages.useQuery(
+    { owner, repo: repo.name },
+    { 
+      enabled: !!owner && !!repo.name,
+      staleTime: 1000 * 60 * 5, // Cache for 5 minutes
+    }
+  );
+  
+  const primaryLanguage = languages && languages.length > 0 ? languages[0] : null;
+
   return (
     <Link to={`/${owner}/${repo.name}`} className="block group">
       <div className="p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors">
@@ -51,6 +63,9 @@ function RepoCard({ repo, owner }: { repo: any; owner: string }) {
               </p>
             )}
             <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+              {primaryLanguage && (
+                <LanguageDot language={primaryLanguage} />
+              )}
               <span className="flex items-center gap-1">
                 <Star className="h-3 w-3" />
                 {repo.starsCount || 0}
@@ -69,6 +84,17 @@ function RepoCard({ repo, owner }: { repo: any; owner: string }) {
 
 // Watched repository card (includes owner name since watched repos can belong to different owners)
 function WatchedRepoCard({ repo }: { repo: any }) {
+  // Fetch primary language for the repo
+  const { data: languages } = trpc.repos.getLanguages.useQuery(
+    { owner: repo.ownerName, repo: repo.name },
+    { 
+      enabled: !!repo.ownerName && !!repo.name,
+      staleTime: 1000 * 60 * 5, // Cache for 5 minutes
+    }
+  );
+  
+  const primaryLanguage = languages && languages.length > 0 ? languages[0] : null;
+
   return (
     <Link to={`/${repo.ownerName}/${repo.name}`} className="block group">
       <div className="p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors">
@@ -88,6 +114,9 @@ function WatchedRepoCard({ repo }: { repo: any }) {
               </p>
             )}
             <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+              {primaryLanguage && (
+                <LanguageDot language={primaryLanguage} />
+              )}
               <span className="flex items-center gap-1">
                 <Star className="h-3 w-3" />
                 {repo.starsCount || 0}
