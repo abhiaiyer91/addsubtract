@@ -368,7 +368,28 @@ Not grep. Understanding.
 
 **Success metric:** New user productive in 5 minutes.
 
-### Phase 3: Community & Growth
+### Phase 3: AI Collaboration (The Future)
+
+**Goal:** Make wit the best platform for human-AI engineering collaboration.
+
+| Task | Priority | Status |
+|------|----------|--------|
+| AI Attribution & Provenance | P0 | Schema Ready |
+| `wit log --ai-authored` command | P1 | TODO |
+| AI reasoning panel in PR view | P1 | TODO |
+| Intent-driven development (`wit intent`) | P1 | TODO |
+| Pattern learning from code reviews | P2 | TODO |
+| Decision journal (`wit decision`) | P2 | TODO |
+| Multi-agent orchestration | P2 | TODO |
+| Collaborative AI sessions | P2 | TODO |
+
+**Success metric:** Teams can trace any AI contribution back to the prompt that created it.
+
+See [AI Collaboration Design Doc](/docs/features/ai-collaboration.mdx) for the full vision.
+
+---
+
+### Phase 4: Community & Growth
 
 **Goal:** Build an active contributor community.
 

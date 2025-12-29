@@ -121,6 +121,7 @@
         "features/smart-status",
         "features/ai-powered",
         "features/ai-agents",
+        "features/ai-collaboration",
         "features/search",
         "features/review"
       ]

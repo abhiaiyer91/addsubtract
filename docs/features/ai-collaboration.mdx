@@ -1,0 +1,551 @@
+---
+title: "AI Collaboration"
+description: "Engineering collaboration reimagined for the AI era"
+---
+
+# AI Collaboration in wit
+
+*This document outlines wit's vision for engineering collaboration when AI is a first-class participant in the development process.*
+
+## The Thesis
+
+**The future of engineering isn't AI replacing developers. It's AI as a teammate.**
+
+Traditional collaboration tools (GitHub, GitLab, etc.) were designed for human-to-human workflows. They bolt on AI as an afterthought—a bot that comments on PRs, a copilot that suggests code. But what happens when AI agents are writing 30-50% of your code?
+
+wit is designed from the ground up for a world where:
+- AI agents create branches, commits, and PRs
+- Humans review AI work (and AI reviews human work)
+- Multiple AI agents collaborate on complex tasks
+- Context flows seamlessly between human and AI sessions
+- Every contribution—human or AI—is traceable and accountable
+
+---
+
+## Core Principles
+
+### 1. Transparency Over Magic
+
+When AI does something, you should know:
+- **What** it did
+- **Why** it made those choices
+- **What alternatives** it considered
+- **How confident** it was
+
+No black boxes. Every AI action leaves a trail.
+
+### 2. Human Oversight, Not Human Bottleneck
+
+AI should accelerate humans, not wait for them. But humans should always be able to:
+- Pause AI workflows
+- Review before merge
+- Undo any AI action
+- Understand the full history
+
+### 3. Context is King
+
+The biggest failure mode of AI tools is losing context. wit preserves:
+- Conversation history across sessions
+- Intent behind changes (not just the diff)
+- Relationships between issues, PRs, and commits
+- Codebase knowledge that accumulates over time
+
+### 4. Attribution Matters
+
+When AI writes code, it's not anonymous. You should know:
+- Which AI agent made the change
+- What prompt/instruction triggered it
+- Who authorized the action
+- The lineage of AI decisions
+
+---
+
+## Feature Areas
+
+### AI Attribution & Provenance
+
+Track AI contributions with the same rigor as human contributions.
+
+```bash
+# See AI-generated commits
+wit log --ai-authored
+
+# See which agent made a change
+wit blame --show-ai-agent src/auth.ts
+
+# View the prompt that generated a commit
+wit show abc123 --show-prompt
+```
+
+**Database additions:**
+- `ai_author_id` on commits (which agent)
+- `ai_prompt_hash` linking to the instruction that triggered the change
+- `ai_confidence_score` for AI-generated content
+- `ai_session_id` for grouping related AI actions
+
+**Why it matters:** In a year, when something breaks, you need to know if a human wrote it, which AI wrote it, and what instructions it was following.
+
+---
+
+### Intent-Driven Development
+
+Start with what you want, not how to do it.
+
+```bash
+# Create a feature from description
+wit intent "Add rate limiting to the API endpoints"
+
+# wit AI:
+# - Creates a plan
+# - Shows affected files
+# - Asks for confirmation
+# - Implements in small, reviewable commits
+# - Opens a PR with full context
+```
+
+**The workflow:**
+
+1. **Intent Capture**
+   ```
+   wit intent "users should be able to export their data as CSV"
+   ```
+
+2. **AI Planning**
+   ```
+   Analyzing codebase...
+
+   Proposed approach:
+   1. Add export endpoint to UserController
+   2. Create CSVExporter utility
+   3. Add "Export Data" button to settings page
+   4. Write tests
+
+   Affected files: 4 new, 2 modified
+   Estimated complexity: Medium
+
+   [Proceed] [Modify plan] [Cancel]
+   ```
+
+3. **Incremental Implementation**
+   Each step is a commit. Each commit is reviewable. Any step can be undone.
+
+4. **Automatic PR**
+   ```
+   Created PR #47: "feat: Add CSV export for user data"
+   
+   AI provided:
+   - Detailed description
+   - Test plan
+   - Implementation notes
+   - Alternative approaches considered
+   ```
+
+---
+
+### AI-Human Review Loops
+
+Reviews should be a conversation, not a gate.
+
+**AI as First Reviewer:**
+```bash
+# AI reviews before human eyes see it
+wit pr create --auto-review
+
+# AI catches:
+# - Security issues (blocks PR)
+# - Performance concerns (warning)
+# - Style issues (auto-fix available)
+# - Missing tests (suggests additions)
+```
+
+**Human Reviews AI Work:**
+```bash
+# Review AI-generated changes with context
+wit review --ai-changes
+
+# Shows:
+# - Original intent/instruction
+# - AI's reasoning for each change
+# - Confidence scores
+# - Alternative approaches it considered
+```
+
+**Review Learning:**
+When humans approve or reject AI changes, wit learns:
+- Patterns that get approved → reinforce
+- Patterns that get rejected → avoid
+- Feedback comments → incorporate
+
+---
+
+### Multi-Agent Orchestration
+
+Complex features need multiple specialized agents.
+
+**Agent Types (already implemented):**
+- **Questions** - Read-only codebase understanding
+- **Code** - Write and edit code
+- **PM** - Issue and project management
+- **Triage** - Categorize and prioritize
+
+**New: Orchestrator Agent**
+
+```bash
+wit agent --orchestrate "Implement user authentication with OAuth"
+
+# Orchestrator:
+# 1. Questions Agent: "How is auth currently handled?"
+# 2. PM Agent: Creates tracking issue, breaks into subtasks
+# 3. Code Agent: Implements each subtask
+# 4. Triage Agent: Labels and prioritizes the PR
+# 5. Review Agent: Self-reviews before human review
+```
+
+**Agent Handoffs:**
+Agents can delegate to each other with full context:
+```typescript
+// Internal: Code Agent delegates to Questions Agent
+const context = await questionsAgent.query(
+  "What authentication patterns exist in this codebase?"
+);
+// Questions Agent's findings inform Code Agent's implementation
+```
+
+---
+
+### Collaborative AI Sessions
+
+Multiple people (and AI) working on the same problem.
+
+**Live Collaboration:**
+```bash
+# Start a collaborative session
+wit session start --invite @alice @bob
+
+# Everyone sees:
+# - Shared terminal/editor view
+# - AI suggestions visible to all
+# - Real-time code changes
+# - Chat integrated with code context
+```
+
+**Async Collaboration:**
+```bash
+# Hand off to AI overnight
+wit session handoff "Continue implementing the payment flow"
+
+# AI works async, creates commits
+# Human reviews in the morning
+wit session resume
+```
+
+**Session Memory:**
+Every session has persistent context:
+- What was discussed
+- What was tried and didn't work
+- Decisions and their rationale
+- Links to relevant issues/PRs
+
+---
+
+### Knowledge Capture
+
+Your codebase should get smarter over time.
+
+**Pattern Learning:**
+- AI observes code review feedback
+- Learns project-specific patterns
+- "In this codebase, we always use X for Y"
+
+```bash
+# See learned patterns
+wit patterns list
+
+# Output:
+# - "Error handling uses Result<T, E> pattern"
+# - "API endpoints follow RESTful conventions"
+# - "Tests use AAA (Arrange-Act-Assert) structure"
+```
+
+**Architecture Understanding:**
+```bash
+wit ai "explain the architecture"
+
+# Returns:
+# - System diagram (generated)
+# - Key abstractions
+# - Data flow
+# - Dependencies
+# All auto-updated as code changes
+```
+
+**Decision Journal:**
+```bash
+wit decision "Why we chose Postgres over MySQL"
+
+# Recorded in .wit/decisions/
+# AI can reference when making related choices
+```
+
+---
+
+### AI-Aware Conflict Resolution
+
+Conflicts between AI and human changes need special handling.
+
+```bash
+wit merge feature-branch
+
+# Conflict detected:
+# - Human changed: src/auth.ts (2 days ago)
+# - AI changed: src/auth.ts (1 hour ago)
+
+# AI Analysis:
+# "Both changes affect the login flow. The human change adds
+# rate limiting. My change adds OAuth support. These can be
+# combined—rate limiting should apply to OAuth too."
+
+# Options:
+# [1] Apply AI's suggested merge
+# [2] Keep human changes, discard AI
+# [3] Keep AI changes, discard human
+# [4] Manual resolution
+```
+
+---
+
+### Continuous Integration with AI
+
+CI that understands AI-generated code.
+
+```yaml
+# .wit/ci.yml
+on:
+  pull_request:
+    ai_authored: true  # Only for AI PRs
+
+jobs:
+  enhanced_review:
+    steps:
+      - name: Security scan (stricter for AI code)
+        run: wit security-scan --strict
+
+      - name: Verify AI reasoning
+        run: wit verify-reasoning
+        # Checks that AI's stated reasoning matches the code
+
+      - name: Human approval gate
+        if: files_changed > 10 || touches_security
+        require: manual_approval
+```
+
+**AI-Specific Checks:**
+- Did AI follow the stated plan?
+- Are AI confidence scores above threshold?
+- Does AI code match codebase patterns?
+- Were AI alternatives properly considered?
+
+---
+
+### The Wit Web: Collaboration Hub
+
+The web UI becomes the collaboration hub.
+
+**AI Activity Feed:**
+See what AI agents are doing across your repos:
+```
+@wit-code-agent created branch "fix-login-bug" in myapp
+@wit-triage-agent labeled issue #42 as "high-priority"
+@wit-review-agent requested changes on PR #89
+```
+
+**AI Chat in PR/Issue Context:**
+```
+You: "Why did you choose to use a Map here instead of an object?"
+
+@wit-code-agent: "I used Map because:
+1. The keys are dynamically generated user IDs (not static)
+2. Map has better performance for frequent additions/deletions
+3. Map preserves insertion order which matters for the LRU cache behavior
+
+Would you prefer an object? I can refactor if there's a codebase convention I missed."
+```
+
+**Collaborative Workspace:**
+- Split view: AI changes on left, human changes on right
+- Approval workflows for AI actions
+- "AI desk" showing pending AI work for review
+
+---
+
+## Implementation Priorities
+
+### Phase 1: Attribution (Foundation)
+1. Add AI author tracking to commits
+2. Store prompts/instructions that triggered AI actions
+3. `wit log --ai-authored` and `wit blame --show-ai-agent`
+4. AI activity feed in web UI
+
+### Phase 2: Intent-Driven Development
+1. `wit intent` command
+2. AI planning and confirmation flow
+3. Incremental implementation with reviewable commits
+4. Automatic PR generation with context
+
+### Phase 3: Enhanced Review
+1. AI as first reviewer (pre-human)
+2. Review learning from human feedback
+3. Confidence scores on AI changes
+4. "AI reasoning" panel in PR view
+
+### Phase 4: Multi-Agent & Sessions
+1. Orchestrator agent
+2. Agent handoffs with context
+3. Collaborative sessions
+4. Session memory and resume
+
+### Phase 5: Knowledge & Learning
+1. Pattern recognition and storage
+2. Architecture understanding
+3. Decision journal
+4. Codebase-specific AI tuning
+
+---
+
+## Database Schema Additions
+
+```sql
+-- AI session tracking
+CREATE TABLE ai_sessions (
+  id TEXT PRIMARY KEY,
+  repo_id TEXT NOT NULL,
+  started_at TIMESTAMP NOT NULL,
+  ended_at TIMESTAMP,
+  user_id TEXT,  -- Human who initiated
+  agent_type TEXT NOT NULL,
+  context JSONB,  -- Preserved context
+  parent_session_id TEXT  -- For handoffs
+);
+
+-- AI actions within sessions
+CREATE TABLE ai_actions (
+  id TEXT PRIMARY KEY,
+  session_id TEXT NOT NULL,
+  action_type TEXT NOT NULL,  -- 'commit', 'file_edit', 'pr_create', etc.
+  input_prompt TEXT,
+  output_result JSONB,
+  confidence_score REAL,
+  alternatives_considered JSONB,
+  created_at TIMESTAMP NOT NULL
+);
+
+-- Learned patterns
+CREATE TABLE codebase_patterns (
+  id TEXT PRIMARY KEY,
+  repo_id TEXT NOT NULL,
+  pattern_type TEXT NOT NULL,  -- 'naming', 'error_handling', 'testing', etc.
+  description TEXT NOT NULL,
+  examples JSONB,
+  confidence REAL,
+  last_updated TIMESTAMP
+);
+
+-- Decision records
+CREATE TABLE decisions (
+  id TEXT PRIMARY KEY,
+  repo_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  context TEXT NOT NULL,
+  decision TEXT NOT NULL,
+  alternatives JSONB,
+  created_by TEXT NOT NULL,
+  created_at TIMESTAMP NOT NULL
+);
+
+-- AI attribution on existing tables
+ALTER TABLE commits ADD COLUMN ai_session_id TEXT;
+ALTER TABLE commits ADD COLUMN ai_confidence REAL;
+ALTER TABLE pull_requests ADD COLUMN ai_reasoning TEXT;
+ALTER TABLE pull_requests ADD COLUMN auto_reviewed BOOLEAN DEFAULT FALSE;
+```
+
+---
+
+## API Additions
+
+```typescript
+// New tRPC routers
+
+// AI Sessions
+aiSession.create({ repoId, agentType, initialContext })
+aiSession.resume({ sessionId })
+aiSession.handoff({ sessionId, newAgentType, instructions })
+aiSession.getHistory({ sessionId })
+
+// Intent-driven development
+intent.create({ repoId, description })
+intent.getPlan({ intentId })
+intent.execute({ intentId, options })
+intent.pause({ intentId })
+
+// Knowledge
+patterns.list({ repoId })
+patterns.suggest({ repoId, context })
+decisions.create({ repoId, title, context, decision })
+decisions.query({ repoId, question })
+
+// Attribution
+attribution.getAICommits({ repoId, since, agentType? })
+attribution.getPromptForCommit({ commitId })
+attribution.getReasoningForPR({ prId })
+```
+
+---
+
+## CLI Additions
+
+```bash
+# Attribution
+wit log --ai-authored          # Show only AI commits
+wit blame --show-ai-agent      # Show which AI made each change
+wit show <commit> --show-prompt # Show the instruction that triggered it
+
+# Intent
+wit intent "<description>"     # Start intent-driven development
+wit intent status              # Check progress
+wit intent pause/resume        # Control flow
+
+# Sessions
+wit session start              # Start collaborative session
+wit session invite <user>      # Invite collaborators
+wit session handoff "<instructions>" # Hand off to AI
+
+# Knowledge
+wit patterns list              # Show learned patterns
+wit patterns suggest           # Get pattern suggestions for current code
+wit decision "<title>"         # Record a decision
+
+# AI Activity
+wit ai activity                # Show recent AI actions
+wit ai explain <commit>        # Explain AI reasoning
+```
+
+---
+
+## The Vision
+
+In 2025 and beyond, engineering teams will be human-AI hybrids. The teams that thrive will be those with:
+
+1. **Clear attribution** - Know who (human or AI) did what
+2. **Preserved context** - Never lose the "why" behind decisions
+3. **Fluid handoffs** - Seamlessly pass work between human and AI
+4. **Continuous learning** - AI that gets smarter about your codebase
+5. **Appropriate oversight** - Human control without human bottleneck
+
+wit is building for this future. Not AI that replaces developers, but AI that makes every developer 10x more effective while maintaining the trust, traceability, and collaboration that professional software development requires.
+
+---
+
+*This is a living document. As we learn more about how AI and humans collaborate on code, we'll update these designs.*
+
+*— Claude, Technical Founder of wit*
