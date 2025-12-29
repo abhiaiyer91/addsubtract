@@ -1,12 +1,13 @@
 /**
  * GitHub Command
- * Manage GitHub authentication for push/pull operations
+ * Manage GitHub authentication and import for push/pull operations
  * 
  * Usage:
  *   wit github login           # Authenticate with GitHub
  *   wit github logout          # Remove stored credentials
  *   wit github status          # Show authentication status
  *   wit github token           # Print the current token (for scripting)
+ *   wit github import <repo>   # Import a repository from GitHub
  */
 
 import { TsgitError, ErrorCode } from '../core/errors';
@@ -16,6 +17,7 @@ import {
   loadGitHubCredentials,
   getGitHubToken,
 } from '../core/github';
+import { handleGitHubImport } from './github-import';
 
 const colors = {
   green: (s: string) => `\x1b[32m${s}\x1b[0m`,
@@ -146,22 +148,27 @@ function printHelp(): void {
   console.log(`
 ${colors.bold('GitHub Integration')}
 
-Authenticate with GitHub to enable push/pull operations for private repositories
-and to increase API rate limits.
+Authenticate with GitHub and import repositories to migrate to wit.
 
 ${colors.bold('Usage:')}
   wit github <subcommand>
 
 ${colors.bold('Subcommands:')}
-  login     Authenticate with GitHub using device flow
-  logout    Remove stored GitHub credentials
-  status    Show current authentication status
-  token     Print the current access token (for scripting)
+  login                   Authenticate with GitHub using device flow
+  logout                  Remove stored GitHub credentials
+  status                  Show current authentication status
+  token                   Print the current access token (for scripting)
+  import <owner/repo>     Import a repository from GitHub
 
 ${colors.bold('Examples:')}
-  wit github login      # Start interactive login
-  wit github status     # Check if you're logged in
-  wit github logout     # Log out from GitHub
+  wit github login                    # Start interactive login
+  wit github status                   # Check if you're logged in
+  wit github logout                   # Log out from GitHub
+  wit github import facebook/react    # Import a GitHub repository
+  wit github import owner/repo --name my-repo
+
+${colors.bold('Import Options:')}
+  Run "wit github import --help" for full import options.
 
 ${colors.bold('Environment Variables:')}
   GITHUB_TOKEN          GitHub personal access token
@@ -204,6 +211,11 @@ export async function handleGitHub(args: string[]): Promise<void> {
       await handleToken();
       break;
 
+    case 'import':
+      // Pass remaining args to the import handler
+      await handleGitHubImport(args.slice(1));
+      break;
+
     case undefined:
       // No subcommand - show status by default
       await handleStatus();
@@ -212,7 +224,7 @@ export async function handleGitHub(args: string[]): Promise<void> {
     default:
       console.error(colors.red('error: ') + `Unknown github subcommand: '${subcommand}'`);
       console.error();
-      console.error('Available subcommands: login, logout, status, token');
+      console.error('Available subcommands: login, logout, status, token, import');
       console.error('Run "wit github --help" for more information');
       process.exit(1);
   }
