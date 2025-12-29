@@ -256,29 +256,34 @@ export function UserHomePage() {
   const repos = reposData || [];
 
   return (
-    <div className="container max-w-[1400px] py-6 space-y-6">
-      {/* Profile Header */}
-      <div className="flex items-start gap-6">
-        <Avatar className="h-20 w-20 rounded-xl">
+    <div className="container max-w-[1400px] py-4 md:py-6 space-y-4 md:space-y-6 px-4 md:px-6">
+      {/* Profile Header - Mobile optimized */}
+      <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-6">
+        <Avatar className="h-16 w-16 sm:h-20 sm:w-20 rounded-xl shrink-0">
           <AvatarImage src={user.avatarUrl || undefined} />
-          <AvatarFallback className="text-2xl rounded-xl">
+          <AvatarFallback className="text-xl sm:text-2xl rounded-xl">
             {(user.username || user.name || 'U').slice(0, 2).toUpperCase()}
           </AvatarFallback>
         </Avatar>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold">{user.name || user.username}</h1>
+        <div className="flex-1 min-w-0 w-full sm:w-auto">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <h1 className="text-xl sm:text-2xl font-bold truncate">{user.name || user.username}</h1>
             {!isOwnProfile && (
-              <Button size="sm">Follow</Button>
+              <Button size="sm" className="h-8">Follow</Button>
+            )}
+            {isOwnProfile && (
+              <Button variant="outline" size="sm" className="h-8 sm:hidden" asChild>
+                <Link to="/settings">Edit</Link>
+              </Button>
             )}
           </div>
-          <p className="text-muted-foreground">@{user.username}</p>
+          <p className="text-muted-foreground text-sm sm:text-base">@{user.username}</p>
           {user.bio && (
-            <p className="text-sm mt-2">{user.bio}</p>
+            <p className="text-sm mt-2 line-clamp-2 sm:line-clamp-none">{user.bio}</p>
           )}
         </div>
         {isOwnProfile && (
-          <Button variant="outline" size="sm" asChild>
+          <Button variant="outline" size="sm" className="hidden sm:flex" asChild>
             <Link to="/settings">Edit profile</Link>
           </Button>
         )}
@@ -287,47 +292,47 @@ export function UserHomePage() {
 
 
       {/* Main Content */}
-      <div className="grid lg:grid-cols-3 gap-6">
+      <div className="grid lg:grid-cols-3 gap-4 lg:gap-6">
         {/* Left Column - Repos */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Quick Stats for own profile */}
+        <div className="lg:col-span-2 space-y-4 lg:space-y-6">
+          {/* Quick Stats for own profile - scrollable on mobile */}
           {isOwnProfile && (
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-3 gap-2 sm:gap-4">
               <Card>
-                <CardContent className="pt-4 pb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-primary/10">
-                      <Code2 className="h-4 w-4 text-primary" />
+                <CardContent className="p-3 sm:pt-4 sm:pb-4">
+                  <div className="flex flex-col sm:flex-row items-center sm:items-center gap-2 sm:gap-3 text-center sm:text-left">
+                    <div className="p-1.5 sm:p-2 rounded-lg bg-primary/10">
+                      <Code2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary" />
                     </div>
                     <div>
-                      <p className="text-2xl font-bold">{repos.length}</p>
-                      <p className="text-xs text-muted-foreground mt-1">Repositories</p>
+                      <p className="text-lg sm:text-2xl font-bold">{repos.length}</p>
+                      <p className="text-[10px] sm:text-xs text-muted-foreground">Repos</p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
               <Card>
-                <CardContent className="pt-4 pb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-purple-500/10">
-                      <GitPullRequest className="h-4 w-4 text-purple-500" />
+                <CardContent className="p-3 sm:pt-4 sm:pb-4">
+                  <div className="flex flex-col sm:flex-row items-center sm:items-center gap-2 sm:gap-3 text-center sm:text-left">
+                    <div className="p-1.5 sm:p-2 rounded-lg bg-purple-500/10">
+                      <GitPullRequest className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-purple-500" />
                     </div>
                     <div>
-                      <p className="text-2xl font-bold">{(prSummary?.awaitingReview || 0) + (prSummary?.myPrsOpen || 0)}</p>
-                      <p className="text-xs text-muted-foreground mt-1">Open PRs</p>
+                      <p className="text-lg sm:text-2xl font-bold">{(prSummary?.awaitingReview || 0) + (prSummary?.myPrsOpen || 0)}</p>
+                      <p className="text-[10px] sm:text-xs text-muted-foreground">PRs</p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
               <Card>
-                <CardContent className="pt-4 pb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-green-500/10">
-                      <CircleDot className="h-4 w-4 text-green-500" />
+                <CardContent className="p-3 sm:pt-4 sm:pb-4">
+                  <div className="flex flex-col sm:flex-row items-center sm:items-center gap-2 sm:gap-3 text-center sm:text-left">
+                    <div className="p-1.5 sm:p-2 rounded-lg bg-green-500/10">
+                      <CircleDot className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-green-500" />
                     </div>
                     <div>
-                      <p className="text-2xl font-bold">{(issueSummary?.assignedToMe || 0) + (issueSummary?.createdByMe || 0)}</p>
-                      <p className="text-xs text-muted-foreground mt-1">Open Issues</p>
+                      <p className="text-lg sm:text-2xl font-bold">{(issueSummary?.assignedToMe || 0) + (issueSummary?.createdByMe || 0)}</p>
+                      <p className="text-[10px] sm:text-xs text-muted-foreground">Issues</p>
                     </div>
                   </div>
                 </CardContent>
