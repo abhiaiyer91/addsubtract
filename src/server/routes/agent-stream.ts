@@ -198,7 +198,7 @@ export function createAgentStreamRoutes() {
 
         // Use stream if available, otherwise fall back to generate
         let fullResponse = '';
-        let toolCalls: any[] = [];
+        let toolCallsWithResults: any[] = [];
 
         if (agent.stream) {
           const result = await agent.stream(fullPrompt);
@@ -212,15 +212,51 @@ export function createAgentStreamRoutes() {
             });
           }
 
-          // Get tool calls if any
-          if (result.toolCalls) {
-            toolCalls = result.toolCalls;
+          // Merge tool calls with their results from steps
+          const toolCalls = result.toolCalls || [];
+          const steps = result.steps || [];
+          
+          // Build a map of tool results by toolCallId
+          const toolResultsMap = new Map<string, any>();
+          for (const step of steps) {
+            if (step.toolResults) {
+              for (const tr of step.toolResults) {
+                toolResultsMap.set(tr.toolCallId, tr.result);
+              }
+            }
           }
+          
+          // Merge tool calls with their results
+          toolCallsWithResults = toolCalls.map((tc: any) => ({
+            toolName: tc.toolName,
+            toolCallId: tc.toolCallId,
+            args: tc.input || tc.args,
+            result: toolResultsMap.get(tc.toolCallId),
+          }));
         } else {
           // Fallback to generate
           const result = await agent.generate(fullPrompt);
           fullResponse = result.text || '';
-          toolCalls = result.toolCalls || [];
+          
+          // Merge tool calls with results from steps
+          const toolCalls = result.toolCalls || [];
+          const steps = result.steps || [];
+          
+          const toolResultsMap = new Map<string, any>();
+          for (const step of steps) {
+            if (step.toolResults) {
+              for (const tr of step.toolResults) {
+                toolResultsMap.set(tr.toolCallId, tr.result);
+              }
+            }
+          }
+          
+          toolCallsWithResults = toolCalls.map((tc: any) => ({
+            toolName: tc.toolName,
+            toolCallId: tc.toolCallId,
+            args: tc.input || tc.args,
+            result: toolResultsMap.get(tc.toolCallId),
+          }));
 
           // Send the full response as a single chunk
           await stream.writeSSE({
@@ -229,11 +265,11 @@ export function createAgentStreamRoutes() {
           });
         }
 
-        // Send tool calls if any
-        if (toolCalls.length > 0) {
+        // Send tool calls with results if any
+        if (toolCallsWithResults.length > 0) {
           await stream.writeSSE({
             event: 'tool_calls',
-            data: JSON.stringify({ toolCalls }),
+            data: JSON.stringify({ toolCalls: toolCallsWithResults }),
           });
         }
 
@@ -242,7 +278,7 @@ export function createAgentStreamRoutes() {
           sessionId,
           role: 'assistant',
           content: fullResponse,
-          toolCalls: toolCalls.length > 0 ? JSON.stringify(toolCalls) : undefined,
+          toolCalls: toolCallsWithResults.length > 0 ? JSON.stringify(toolCallsWithResults) : undefined,
         });
 
         // Auto-generate title if needed

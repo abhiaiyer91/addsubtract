@@ -25,6 +25,7 @@ import { createCycleRoutes } from './routes/cycles';
 import { createAgentStreamRoutes } from './routes/agent-stream';
 import { createPackageRoutes } from './routes/packages';
 import { createOAuthRoutes } from './routes/oauth';
+import { createSandboxRoutes } from './routes/sandbox-ws';
 import { RepoManager } from './storage/repos';
 import { syncReposToDatabase } from './storage/sync';
 import { appRouter, createContext } from '../api/trpc';
@@ -169,11 +170,13 @@ export function createApp(repoManager: RepoManager, options: { verbose?: boolean
   const cycleRoutes = createCycleRoutes();
   const agentStreamRoutes = createAgentStreamRoutes();
   const oauthRoutes = createOAuthRoutes();
+  const sandboxRoutes = createSandboxRoutes();
   
   app.route('/api/repos', issueRoutes);
   app.route('/api/repos', projectRoutes);
   app.route('/api/repos', cycleRoutes);
   app.route('/api/agent', agentStreamRoutes);
+  app.route('/api/sandbox', sandboxRoutes);
   app.route('/oauth', oauthRoutes);
 
   // Package registry routes (npm-compatible)

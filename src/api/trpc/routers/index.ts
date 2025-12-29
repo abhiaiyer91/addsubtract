@@ -34,6 +34,7 @@ import { completionRouter } from './completion';
 import { packagesRouter } from './packages';
 import { oauthAppsRouter } from './oauth-apps';
 import { adminRouter } from './admin';
+import { sandboxRouter } from './sandbox';
 import { githubImportRouter } from './github-import';
 
 /**
@@ -76,6 +77,7 @@ export const appRouter = router({
   packages: packagesRouter,
   oauthApps: oauthAppsRouter,
   admin: adminRouter,
+  sandbox: sandboxRouter,
   githubImport: githubImportRouter,
 });
 
@@ -120,5 +122,6 @@ export {
   packagesRouter,
   oauthAppsRouter,
   adminRouter,
+  sandboxRouter,
   githubImportRouter,
 };

@@ -78,11 +78,27 @@ interface ToolCallPayload {
   args: Record<string, unknown>;
 }
 
+interface ToolCallResult {
+  success?: boolean;
+  exitCode?: number;
+  stdout?: string;
+  stderr?: string;
+  output?: string;
+  content?: string;
+  errorMessage?: string;
+  sandbox?: boolean;
+  duration?: number;
+  commitHash?: string;
+  [key: string]: unknown;
+}
+
 interface ToolCall {
   type?: string;
   payload?: ToolCallPayload;
   toolName?: string;
+  toolCallId?: string;
   args?: Record<string, unknown>;
+  result?: ToolCallResult;
 }
 
 interface Message {
@@ -106,6 +122,7 @@ interface AgentPanelProps {
 
 // Tool status and icons
 const TOOL_CONFIG: Record<string, { icon: React.ElementType; label: string; color: string }> = {
+  // camelCase variants (from some agents)
   writeFile: { icon: FileCode, label: 'Create file', color: 'text-green-400' },
   readFile: { icon: Eye, label: 'Read file', color: 'text-blue-400' },
   editFile: { icon: Pencil, label: 'Edit file', color: 'text-yellow-400' },
@@ -117,6 +134,17 @@ const TOOL_CONFIG: Record<string, { icon: React.ElementType; label: string; colo
   commit: { icon: GitCommit, label: 'Commit', color: 'text-green-400' },
   runCommand: { icon: Terminal, label: 'Run command', color: 'text-amber-400' },
   search: { icon: Search, label: 'Search', color: 'text-indigo-400' },
+  // kebab-case variants (from code-agent)
+  'read-file': { icon: Eye, label: 'Read file', color: 'text-blue-400' },
+  'write-file': { icon: FileCode, label: 'Create file', color: 'text-green-400' },
+  'edit-file': { icon: Pencil, label: 'Edit file', color: 'text-yellow-400' },
+  'delete-file': { icon: Trash2, label: 'Delete file', color: 'text-red-400' },
+  'list-directory': { icon: FolderOpen, label: 'List directory', color: 'text-purple-400' },
+  'create-branch': { icon: GitBranch, label: 'Create branch', color: 'text-orange-400' },
+  'get-history': { icon: GitCommit, label: 'Git history', color: 'text-cyan-400' },
+  'get-status': { icon: GitCommit, label: 'Git status', color: 'text-cyan-400' },
+  'run-command': { icon: Terminal, label: 'Run command', color: 'text-amber-400' },
+  'wit-run-command': { icon: Terminal, label: 'Run command', color: 'text-amber-400' },
 };
 
 // Simple code block component with copy button and file path
@@ -371,15 +399,35 @@ function ToolCallDisplay({ tool, isLast }: { tool: ToolCall; isLast?: boolean })
   const [expanded, setExpanded] = useState(false);
   const toolName = tool.payload?.toolName || tool.toolName || 'unknown';
   const args = tool.payload?.args || tool.args || {};
+  const result = tool.result || {};
   
   const config = TOOL_CONFIG[toolName] || { icon: FileCode, label: toolName, color: 'text-zinc-400' };
   const Icon = config.icon;
   
-  // Get file path and content info
+  // Get file path and content info from args
   const filePath = (args.path as string) || '';
   const content = args.content as string | undefined;
   const oldText = args.oldText as string | undefined;
   const newText = args.newText as string | undefined;
+  
+  // Command-specific: get args from input, results from result
+  const command = args.command as string | undefined;
+  const commandArgs = args.args as string[] | undefined;
+  
+  // Get result data - check both result object and args for backwards compatibility
+  const stdout = (result.stdout as string) || (args.stdout as string) || undefined;
+  const stderr = (result.stderr as string) || (args.stderr as string) || undefined;
+  const exitCode = result.exitCode !== undefined ? (result.exitCode as number) : (args.exitCode as number | undefined);
+  const output = (result.output as string) || (result.content as string) || undefined;
+  const isSandbox = result.sandbox as boolean | undefined;
+  const duration = result.duration as number | undefined;
+  const errorMessage = result.errorMessage as string | undefined;
+  
+  // Check if this is a command tool
+  const isCommandTool = toolName === 'runCommand' || toolName === 'run-command' || toolName === 'wit-run-command';
+  const fullCommand = command ? (commandArgs?.length ? `${command} ${commandArgs.join(' ')}` : command) : '';
+  const commandOutput = stdout || output || '';
+  const commandSuccess = result.success !== undefined ? result.success : (exitCode === 0 || exitCode === undefined);
   
   // Calculate diff stats for edits
   const getDiffStats = () => {
@@ -399,7 +447,11 @@ function ToolCallDisplay({ tool, isLast }: { tool: ToolCall; isLast?: boolean })
   };
   
   const diffStats = getDiffStats();
-  const hasExpandableContent = content || (oldText && newText);
+  const hasExpandableContent = content || (oldText && newText) || (isCommandTool && (commandOutput || stderr));
+
+  // Auto-expand command outputs
+  const [autoExpanded] = useState(isCommandTool);
+  const isExpanded = expanded || autoExpanded;
 
   return (
     <div className={cn("relative", !isLast && "pb-2")}>
@@ -412,7 +464,7 @@ function ToolCallDisplay({ tool, isLast }: { tool: ToolCall; isLast?: boolean })
         onClick={() => hasExpandableContent && setExpanded(!expanded)}
         className={cn(
           "flex items-start gap-2.5 w-full text-left group",
-          hasExpandableContent && "cursor-pointer"
+          hasExpandableContent && !isCommandTool && "cursor-pointer"
         )}
       >
         {/* Icon */}
@@ -425,12 +477,17 @@ function ToolCallDisplay({ tool, isLast }: { tool: ToolCall; isLast?: boolean })
         
         {/* Content */}
         <div className="flex-1 min-w-0 pt-0.5">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs font-medium text-zinc-300">{config.label}</span>
             {filePath && (
               <span className="text-xs text-zinc-500 font-mono truncate max-w-[200px]">
                 {filePath}
               </span>
+            )}
+            {isCommandTool && fullCommand && (
+              <code className="text-xs text-zinc-400 font-mono bg-zinc-800 px-1.5 py-0.5 rounded truncate max-w-[250px]">
+                {fullCommand}
+              </code>
             )}
             {diffStats && (
               <span className="flex items-center gap-1 text-xs">
@@ -442,7 +499,25 @@ function ToolCallDisplay({ tool, isLast }: { tool: ToolCall; isLast?: boolean })
                 )}
               </span>
             )}
-            {hasExpandableContent && (
+            {isCommandTool && (exitCode !== undefined || result.success !== undefined) && (
+              <span className={cn(
+                "text-[10px] px-1.5 py-0.5 rounded",
+                commandSuccess ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"
+              )}>
+                {exitCode !== undefined ? `exit ${exitCode}` : (commandSuccess ? 'success' : 'failed')}
+              </span>
+            )}
+            {isSandbox && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400">
+                sandbox
+              </span>
+            )}
+            {duration !== undefined && (
+              <span className="text-[10px] text-zinc-500">
+                {duration < 1000 ? `${duration}ms` : `${(duration / 1000).toFixed(1)}s`}
+              </span>
+            )}
+            {hasExpandableContent && !isCommandTool && (
               <ChevronRight className={cn(
                 "h-3 w-3 text-zinc-600 transition-transform",
                 expanded && "rotate-90"
@@ -452,8 +527,29 @@ function ToolCallDisplay({ tool, isLast }: { tool: ToolCall; isLast?: boolean })
         </div>
       </button>
       
-      {/* Expanded content */}
-      {expanded && hasExpandableContent && (
+      {/* Command output - always shown for commands */}
+      {isCommandTool && (commandOutput || stderr || errorMessage) && (
+        <div className="ml-8 mt-2 rounded-md overflow-hidden border border-zinc-800 bg-zinc-950">
+          {commandOutput && (
+            <pre className="p-3 text-xs font-mono text-zinc-300 whitespace-pre-wrap break-all max-h-48 overflow-y-auto">
+              {commandOutput}
+            </pre>
+          )}
+          {stderr && (
+            <pre className="p-3 text-xs font-mono text-red-400 whitespace-pre-wrap break-all max-h-24 overflow-y-auto border-t border-zinc-800 bg-red-500/5">
+              {stderr}
+            </pre>
+          )}
+          {errorMessage && !stderr && (
+            <pre className="p-3 text-xs font-mono text-red-400 whitespace-pre-wrap break-all max-h-24 overflow-y-auto bg-red-500/5">
+              Error: {errorMessage}
+            </pre>
+          )}
+        </div>
+      )}
+      
+      {/* Expanded content for file operations */}
+      {!isCommandTool && isExpanded && hasExpandableContent && (
         <div className="ml-8 mt-2 rounded-md overflow-hidden border border-zinc-800 bg-zinc-900/50">
           {toolName === 'editFile' && oldText && newText ? (
             <div className="text-xs font-mono">
