@@ -9,13 +9,13 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
       exclude: ['node_modules/', 'dist/', 'src/__tests__/**', 'src/cli.ts', 'src/ui/**', 'tests/**/*.test.ts'],
-      // TODO: Increase thresholds to 80% once test coverage improves
-      // Current baseline is ~40%, setting thresholds at 30% to provide buffer
+      // Coverage thresholds - set to current baseline
+      // Target: Increase to 50%+ as coverage improves
       thresholds: {
-        lines: 30,
-        branches: 25,
-        functions: 30,
-        statements: 30,
+        lines: 35,
+        branches: 30,
+        functions: 35,
+        statements: 35,
       },
     },
     testTimeout: 30000, // Increased for integration tests

@@ -227,8 +227,9 @@ export function startServer(options: ServerOptions): WitServer {
     console.warn('⚠ DATABASE_URL not set - running without database');
   }
 
-  // Resolve repos directory
+  // Resolve repos directory and set environment variable for other code to use
   const absoluteReposDir = path.resolve(reposDir);
+  process.env.REPOS_DIR = absoluteReposDir;
 
   // Create repository manager
   const repoManager = new RepoManager(absoluteReposDir);

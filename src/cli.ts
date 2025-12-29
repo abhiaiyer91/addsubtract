@@ -7,7 +7,7 @@ import {
   init,
   parseInitArgs,
   add,
-  commit,
+  // commit is now handled by handleCommit which supports async hooks
   status,
   log,
   branch,
@@ -932,6 +932,8 @@ function main(): void {
           options['no-commit'] ? ['--no-commit'] : [],
           options.mainline ? ['-m', options.mainline as string] : []
         ));
+        break;
+
       // Remote commands
       case 'remote':
         // Pass through all remaining args including -v for verbose
