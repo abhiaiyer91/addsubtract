@@ -67,7 +67,26 @@ export const reposRouter = router({
       })
     )
     .query(async ({ input, ctx }) => {
-      // First, find the owner
+      // Find the owner based on type
+      if (input.ownerType === 'organization') {
+        const org = await orgModel.findByName(input.owner);
+        if (!org) {
+          return [];
+        }
+
+        // Check if user is a member of the org
+        const isMember = ctx.user
+          ? await orgMemberModel.find(org.id, ctx.user.id)
+          : null;
+
+        // Members can see all repos, non-members only public
+        if (isMember) {
+          return repoModel.listByOwner(org.id, 'organization');
+        }
+        return repoModel.listPublicByOwner(org.id, 'organization');
+      }
+
+      // For users, find by username
       const owner = await userModel.findByUsername(input.owner);
 
       if (!owner) {
@@ -76,10 +95,10 @@ export const reposRouter = router({
 
       // If viewing own repos, show all; otherwise only public
       if (ctx.user?.id === owner.id) {
-        return repoModel.listByOwner(owner.id, input.ownerType);
+        return repoModel.listByOwner(owner.id, 'user');
       }
 
-      return repoModel.listPublicByOwner(owner.id, input.ownerType);
+      return repoModel.listPublicByOwner(owner.id, 'user');
     }),
 
   /**

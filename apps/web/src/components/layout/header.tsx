@@ -376,7 +376,7 @@ function OrganizationSwitcher() {
           </DropdownMenuItem>
         ))}
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => navigate('/orgs/new')}>
+        <DropdownMenuItem onClick={() => navigate('/org/new')}>
           <Plus className="mr-2 h-4 w-4" />
           Create organization
         </DropdownMenuItem>
