@@ -28,6 +28,9 @@ import {
   // AI commands
   handleAI,
   handleAgent,
+  handleIntent,
+  handleDecision,
+  handlePatterns,
   // Quality of Life commands
   handleAmend,
   handleWip,
@@ -144,6 +147,9 @@ Core Commands:
   commit -m <message>   Record changes to the repository
   status                Show the working tree status
   log [--oneline]       Show commit logs
+  log --ai-authored     Show only AI-authored commits
+  log --show-ai-agent   Show which AI agent made each commit
+  log --show-prompt     Show the prompt that generated each commit
   diff [--staged]       Show changes between commits/index/working tree
 
 Branch & Navigation:
@@ -348,6 +354,19 @@ AI-Powered Features:
   agent ask <query>     One-shot question to the coding agent
   agent status          Show agent configuration
   
+  intent "<desc>"       Intent-driven development (describe, AI implements)
+  intent status         Show active intent progress
+  intent execute        Continue executing current intent
+  intent list           List all intents
+  
+  decision              List architectural decisions (ADRs)
+  decision create       Create a new decision
+  decision suggest      AI suggests decisions from code
+  
+  patterns              List learned codebase patterns
+  patterns analyze      Discover new patterns from code
+  patterns approve      Approve a pattern to increase confidence
+  
   search <query>        Semantic code search
   search index          Index repo for semantic search
   search status         Show index health
@@ -439,7 +458,7 @@ const COMMANDS = [
   'amend', 'wip', 'fixup', 'cleanup', 'blame', 'stats', 'snapshot',
   'scope', 'graph',
   'ui', 'web',
-  'ai', 'agent', 'search', 'review',
+  'ai', 'agent', 'intent', 'decision', 'patterns', 'search', 'review',
   // Issue tracking
   'issue', 'cycle', 'project',
   // Journal (Notion-like docs)
@@ -627,6 +646,10 @@ function main(): void {
         log(cmdArgs[0] || 'HEAD', {
           oneline: !!options.oneline,
           n: options.n ? parseInt(options.n as string, 10) : undefined,
+          // AI attribution flags
+          aiAuthored: !!options['ai-authored'] || !!options['ai'],
+          showAiAgent: !!options['show-ai-agent'],
+          showPrompt: !!options['show-prompt'],
         });
         break;
 
@@ -800,6 +823,42 @@ function main(): void {
       case 'agent':
         // Interactive coding agent
         handleAgent(rawArgs).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
+          }
+          process.exit(1);
+        });
+        return; // Exit main() to let async handle complete
+
+      case 'intent':
+        // Intent-driven development
+        handleIntent(rawArgs).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
+          }
+          process.exit(1);
+        });
+        return; // Exit main() to let async handle complete
+
+      case 'decision':
+        // Architectural Decision Records
+        handleDecision(rawArgs).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
+          }
+          process.exit(1);
+        });
+        return; // Exit main() to let async handle complete
+
+      case 'patterns':
+        // Learned codebase patterns
+        handlePatterns(rawArgs).catch((error: Error) => {
           if (error instanceof TsgitError) {
             console.error((error as TsgitError).format());
           } else {

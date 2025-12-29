@@ -37,6 +37,29 @@ const AUTHOR_COLORS = [
   (s: string) => `\x1b[93m${s}\x1b[0m`,  // bright yellow
 ];
 
+/**
+ * Get AI attribution for a commit
+ * Detects AI commits by author pattern (wit AI, ai@wit.dev)
+ */
+function getAiAttribution(commit: Commit): { agent: string; confidence?: number } | null {
+  // Check if commit was made by wit AI
+  const isAiCommit = 
+    commit.author.email.includes('ai@wit') ||
+    commit.author.name.toLowerCase().includes('wit ai') ||
+    commit.author.name.toLowerCase() === 'wit-bot';
+  
+  if (!isAiCommit) {
+    return null;
+  }
+  
+  // Try to extract agent type from commit message
+  // Convention: AI commits may include [agent:code] or similar
+  const agentMatch = commit.message.match(/\[agent:(\w+)\]/);
+  const agent = agentMatch ? agentMatch[1] : 'code';
+  
+  return { agent };
+}
+
 export interface BlameLine {
   lineNumber: number;
   content: string;
@@ -46,6 +69,9 @@ export interface BlameLine {
   date: Date;
   message: string;
   isOriginal: boolean;  // true if this commit created the line
+  // AI attribution (if the commit was AI-generated)
+  aiAgent?: string;     // e.g., 'code', 'pm', 'triage'
+  aiConfidence?: number; // 0.0-1.0
 }
 
 export interface BlameResult {
@@ -60,6 +86,7 @@ export interface BlameOptions {
   endLine?: number;
   showEmail?: boolean;
   porcelain?: boolean;  // Machine-readable output
+  showAiAgent?: boolean;  // Show AI agent attribution for each line
 }
 
 /**
@@ -146,6 +173,8 @@ export function blame(filePath: string, options: BlameOptions = {}): BlameResult
         date: lineInfo.date,
         message: lineInfo.message,
         isOriginal: false,
+        aiAgent: lineInfo.aiAgent,
+        aiConfidence: lineInfo.aiConfidence,
       });
       
       // Count stats
@@ -209,6 +238,15 @@ function findFileInTree(repo: Repository, treeHash: string, pathParts: string[])
   return null;
 }
 
+interface LineInfo {
+  hash: string;
+  author: string;
+  date: Date;
+  message: string;
+  aiAgent?: string;
+  aiConfidence?: number;
+}
+
 /**
  * Trace each line back through history
  * Simplified: assigns all lines to the most recent commit that touched the file
@@ -218,8 +256,8 @@ function traceLines(
   filePath: string, 
   currentLines: string[], 
   history: Commit[]
-): Array<{ hash: string; author: string; date: Date; message: string } | null> {
-  const result: Array<{ hash: string; author: string; date: Date; message: string } | null> = 
+): Array<LineInfo | null> {
+  const result: Array<LineInfo | null> = 
     new Array(currentLines.length).fill(null);
   
   if (history.length === 0) {
@@ -229,11 +267,15 @@ function traceLines(
   // Simple approach: assign to latest commit
   // A real implementation would diff between commits
   const latestCommit = history[0];
-  const info = {
+  const aiAttr = getAiAttribution(latestCommit);
+  
+  const info: LineInfo = {
     hash: latestCommit.hash(),
     author: latestCommit.author.name,
     date: new Date(latestCommit.author.timestamp * 1000),
     message: latestCommit.message.split('\n')[0],
+    aiAgent: aiAttr?.agent,
+    aiConfidence: aiAttr?.confidence,
   };
   
   for (let i = 0; i < currentLines.length; i++) {
@@ -288,6 +330,8 @@ export function handleBlame(args: string[]): void {
       options.showEmail = true;
     } else if (arg === '--porcelain') {
       options.porcelain = true;
+    } else if (arg === '--show-ai-agent' || arg === '--ai') {
+      options.showAiAgent = true;
     } else if (!arg.startsWith('-')) {
       filePath = arg;
     }
@@ -296,6 +340,7 @@ export function handleBlame(args: string[]): void {
   if (!filePath) {
     console.error(colors.red('error: ') + 'No file specified');
     console.error(colors.dim('Usage: wit blame <file>'));
+    console.error(colors.dim('       wit blame --show-ai-agent <file>  # Show AI attribution'));
     process.exit(1);
   }
   
@@ -309,12 +354,22 @@ export function handleBlame(args: string[]): void {
         console.log(`author ${line.author}`);
         console.log(`author-time ${Math.floor(line.date.getTime() / 1000)}`);
         console.log(`summary ${line.message}`);
+        if (line.aiAgent) {
+          console.log(`ai-agent ${line.aiAgent}`);
+          if (line.aiConfidence !== undefined) {
+            console.log(`ai-confidence ${line.aiConfidence}`);
+          }
+        }
         console.log(`filename ${result.file}`);
         console.log(`\t${line.content}`);
       }
     } else {
       // Human-readable output
-      console.log(colors.bold(`Blame for ${result.file}\n`));
+      console.log(colors.bold(`Blame for ${result.file}`));
+      if (options.showAiAgent) {
+        console.log(colors.dim('(showing AI agent attribution)'));
+      }
+      console.log();
       
       // Assign colors to authors
       const authorColors = new Map<string, (s: string) => string>();
@@ -331,15 +386,28 @@ export function handleBlame(args: string[]): void {
       const maxLineNum = Math.max(...result.lines.map(l => l.lineNumber));
       const lineNumWidth = maxLineNum.toString().length;
       
+      // Track AI line count for summary
+      let aiLineCount = 0;
+      const aiAgentCounts = new Map<string, number>();
+      
       for (const line of result.lines) {
         const colorFn = authorColors.get(line.author) || colors.dim;
         const lineNum = line.lineNumber.toString().padStart(lineNumWidth);
         const date = formatRelativeDate(line.date).padStart(8);
         const author = line.author.slice(0, 12).padEnd(12);
         
+        // AI badge if showing AI agent and this line was AI-generated
+        let aiBadge = '';
+        if (options.showAiAgent && line.aiAgent) {
+          aiBadge = colors.magenta(` [${line.aiAgent}]`);
+          aiLineCount++;
+          aiAgentCounts.set(line.aiAgent, (aiAgentCounts.get(line.aiAgent) || 0) + 1);
+        }
+        
         console.log(
           colors.yellow(line.shortHash) + ' ' +
-          colorFn(author) + ' ' +
+          colorFn(author) + 
+          aiBadge + ' ' +
           colors.dim(date) + ' ' +
           colors.dim(lineNum + ' │') + ' ' +
           line.content
@@ -350,6 +418,15 @@ export function handleBlame(args: string[]): void {
       console.log();
       console.log(colors.bold('Summary:'));
       console.log(colors.dim(`  ${result.commits.size} commit(s), ${result.authors.size} author(s)`));
+      
+      // AI summary if showing AI agents
+      if (options.showAiAgent && aiLineCount > 0) {
+        const aiPct = Math.round((aiLineCount / result.lines.length) * 100);
+        console.log(colors.magenta(`  AI-authored: ${aiLineCount} lines (${aiPct}%)`));
+        for (const [agent, count] of aiAgentCounts.entries()) {
+          console.log(colors.dim(`    ${agent} agent: ${count} lines`));
+        }
+      }
       
       // Top authors
       const topAuthors = Array.from(result.authors.entries())

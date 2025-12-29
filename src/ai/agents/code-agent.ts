@@ -17,6 +17,7 @@ import { spawn } from 'child_process';
 import type { AgentContext } from '../types.js';
 import { VirtualRepository } from '../../primitives/virtual-repository.js';
 import type { Author } from '../../core/types.js';
+import { trackAction, formatAiCommitMessage, getAiAuthor } from '../tracking.js';
 
 export const CODE_AGENT_INSTRUCTIONS = `You are wit AI in Code mode - a powerful coding agent that can write code, edit files, and manage the development workflow.
 
@@ -95,12 +96,7 @@ function getVirtualRepo(context: AgentContext): VirtualRepository {
  * Get default author info for commits
  */
 function getDefaultAuthor(): Author {
-  return {
-    name: 'wit AI',
-    email: 'ai@wit.dev',
-    timestamp: Math.floor(Date.now() / 1000),
-    timezone: '+0000',
-  };
+  return getAiAuthor();
 }
 
 /**
@@ -176,8 +172,16 @@ function createWriteFileTool(context: AgentContext) {
         
         // Auto-commit so changes are immediately visible in the file explorer
         const author = getDefaultAuthor();
-        const message = isNew ? `Create ${filePath}` : `Update ${filePath}`;
+        const baseMessage = isNew ? `Create ${filePath}` : `Update ${filePath}`;
+        const message = formatAiCommitMessage(baseMessage, { agentType: 'code' });
         const commitHash = vrepo.commit(message, author);
+        
+        // Track the action for attribution
+        await trackAction({
+          actionType: isNew ? 'file_create' : 'file_edit',
+          filePath,
+          commitSha: commitHash,
+        });
         
         console.log(`[writeFile] Committed: ${filePath} -> ${commitHash.slice(0, 8)}`);
         return { success: true, commitHash: commitHash.slice(0, 8) };
@@ -224,7 +228,15 @@ function createEditFileTool(context: AgentContext) {
         
         // Auto-commit so changes are immediately visible
         const author = getDefaultAuthor();
-        const commitHash = vrepo.commit(`Edit ${filePath}`, author);
+        const message = formatAiCommitMessage(`Edit ${filePath}`, { agentType: 'code' });
+        const commitHash = vrepo.commit(message, author);
+        
+        // Track the action for attribution
+        await trackAction({
+          actionType: 'file_edit',
+          filePath,
+          commitSha: commitHash,
+        });
         
         console.log(`[editFile] Committed: ${filePath} -> ${commitHash.slice(0, 8)}`);
         return { success: true, commitHash: commitHash.slice(0, 8) };
@@ -333,7 +345,15 @@ function createCommitTool(context: AgentContext) {
         }
         
         const author = getDefaultAuthor();
-        const commitHash = vrepo.commit(message, author);
+        const formattedMessage = formatAiCommitMessage(message, { agentType: 'code' });
+        const commitHash = vrepo.commit(formattedMessage, author);
+        
+        // Track the commit action
+        await trackAction({
+          actionType: 'commit',
+          commitSha: commitHash,
+          inputPrompt: message,
+        });
         
         console.log(`[commit] Created: ${commitHash.slice(0, 8)} - ${message}`);
         return { success: true, commitHash };
@@ -504,7 +524,15 @@ function createDeleteFileTool(context: AgentContext) {
         
         // Auto-commit so changes are immediately visible
         const author = getDefaultAuthor();
-        const commitHash = vrepo.commit(`Delete ${filePath}`, author);
+        const message = formatAiCommitMessage(`Delete ${filePath}`, { agentType: 'code' });
+        const commitHash = vrepo.commit(message, author);
+        
+        // Track the action
+        await trackAction({
+          actionType: 'file_delete',
+          filePath,
+          commitSha: commitHash,
+        });
         
         console.log(`[deleteFile] Committed: ${filePath} -> ${commitHash.slice(0, 8)}`);
         return { success: true, commitHash: commitHash.slice(0, 8) };

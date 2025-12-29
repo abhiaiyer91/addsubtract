@@ -177,3 +177,16 @@ export {
   type AuditLogEntry,
   type AdminContext,
 } from './admin';
+
+// AI Collaboration models (attribution, intents, patterns, decisions)
+export {
+  aiCollaborationModels,
+  aiActionModel,
+  commitAiAttributionModel,
+  codebasePatternsModel,
+  decisionsModel,
+  developmentIntentsModel,
+  intentStepsModel,
+  reviewFeedbackModel,
+  collaborativeSessionsModel,
+} from './ai-collaboration';

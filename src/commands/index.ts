@@ -18,6 +18,9 @@ export { handleScope } from './scope';
 // AI-powered commands
 export { handleAI, handleAICommit, handleReview, handleExplain, handleResolve } from './ai';
 export { handleAgent, AGENT_HELP } from './agent';
+export { handleIntent, INTENT_HELP } from './intent';
+export { handleDecision, DECISION_HELP } from './decision';
+export { handlePatterns, PATTERNS_HELP } from './patterns';
 // Quality of Life commands (new!)
 export { amend, handleAmend } from './amend';
 export { wip, handleWip } from './wip';
