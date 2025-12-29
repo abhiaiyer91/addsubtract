@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Loading } from '@/components/ui/loading';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -202,15 +203,13 @@ export function RepoSettingsPage() {
 
                 <div className="space-y-3">
                   <Label>Visibility</Label>
-                  <div className="space-y-3">
+                  <RadioGroup
+                    value={formData.isPrivate ? 'private' : 'public'}
+                    onValueChange={(value) => setFormData({ ...formData, isPrivate: value === 'private' })}
+                    className="space-y-3"
+                  >
                     <label className="flex items-start gap-3 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="visibility"
-                        checked={!formData.isPrivate}
-                        onChange={() => setFormData({ ...formData, isPrivate: false })}
-                        className="mt-1"
-                      />
+                      <RadioGroupItem value="public" className="mt-1" />
                       <div>
                         <span className="font-medium">Public</span>
                         <p className="text-sm text-muted-foreground">
@@ -219,13 +218,7 @@ export function RepoSettingsPage() {
                       </div>
                     </label>
                     <label className="flex items-start gap-3 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="visibility"
-                        checked={formData.isPrivate}
-                        onChange={() => setFormData({ ...formData, isPrivate: true })}
-                        className="mt-1"
-                      />
+                      <RadioGroupItem value="private" className="mt-1" />
                       <div>
                         <span className="font-medium">Private</span>
                         <p className="text-sm text-muted-foreground">
@@ -233,7 +226,7 @@ export function RepoSettingsPage() {
                         </p>
                       </div>
                     </label>
-                  </div>
+                  </RadioGroup>
                 </div>
 
                 {error && (

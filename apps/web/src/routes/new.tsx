@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loading } from '@/components/ui/loading';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -287,15 +288,13 @@ export function NewRepoPage() {
             {/* Visibility */}
             <div className="space-y-3">
               <Label>Visibility</Label>
-              <div className="space-y-3">
+              <RadioGroup
+                value={isPrivate ? 'private' : 'public'}
+                onValueChange={(value) => setIsPrivate(value === 'private')}
+                className="space-y-3"
+              >
                 <label className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="visibility"
-                    checked={!isPrivate}
-                    onChange={() => setIsPrivate(false)}
-                    className="mt-1"
-                  />
+                  <RadioGroupItem value="public" className="mt-1" />
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <Globe className="h-4 w-4" />
@@ -307,13 +306,7 @@ export function NewRepoPage() {
                   </div>
                 </label>
                 <label className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="visibility"
-                    checked={isPrivate}
-                    onChange={() => setIsPrivate(true)}
-                    className="mt-1"
-                  />
+                  <RadioGroupItem value="private" className="mt-1" />
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <Lock className="h-4 w-4" />
@@ -324,7 +317,7 @@ export function NewRepoPage() {
                     </p>
                   </div>
                 </label>
-              </div>
+              </RadioGroup>
             </div>
 
             {/* Error message */}
