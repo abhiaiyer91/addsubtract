@@ -99,17 +99,17 @@ function LandingView() {
         <div className="container relative z-10 max-w-5xl mx-auto px-6">
           {/* Main headline */}
           <h1 className="text-4xl md:text-6xl font-bold tracking-tight text-center mb-4 animate-fade-up" style={{ animationDelay: '100ms' }}>
-            <span className="text-zinc-100">Code hosting that</span>
+            <span className="text-zinc-100">Git, reimagined in</span>
             <br />
             <span className="bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 bg-clip-text text-transparent">
-              moves at your speed
+              TypeScript
             </span>
           </h1>
           
           {/* Subheadline */}
           <p className="text-base md:text-lg text-zinc-400 text-center mb-6 max-w-xl mx-auto leading-relaxed animate-fade-up" style={{ animationDelay: '200ms' }}>
-            The modern Git platform with AI-powered reviews, built-in CI/CD, 
-            and Linear-style project management.
+            A complete Git implementation you can self-host. With AI-native workflows, 
+            Linear-style issues, and a CLI that feels like home.
           </p>
           
           {/* CTAs */}
@@ -120,25 +120,36 @@ function LandingView() {
               className="h-11 px-6 text-sm bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 transition-all duration-300"
             >
               <Link to="/register" className="group">
-                Start building
+                Get started
                 <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
               </Link>
+            </Button>
+            <Button 
+              size="lg" 
+              variant="outline" 
+              asChild 
+              className="h-11 px-6 text-sm border-zinc-700 hover:border-zinc-600 bg-zinc-900/50 text-zinc-300 hover:text-white transition-all duration-300"
+            >
+              <a href="https://docs.wit.sh" target="_blank" rel="noopener noreferrer" className="group">
+                Read the docs
+                <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
+              </a>
             </Button>
           </div>
           
           {/* Trust indicators */}
-          <div className="flex items-center justify-center gap-4 mt-6 text-xs text-zinc-500 animate-fade-up" style={{ animationDelay: '400ms' }}>
+          <div className="flex flex-wrap items-center justify-center gap-4 mt-6 text-xs text-zinc-500 animate-fade-up" style={{ animationDelay: '400ms' }}>
             <div className="flex items-center gap-1.5">
               <Check className="h-3.5 w-3.5 text-emerald-500" />
-              Free for open source
+              Open source friendly
             </div>
             <div className="flex items-center gap-1.5">
               <Check className="h-3.5 w-3.5 text-emerald-500" />
-              No credit card
+              Self-host with Docker
             </div>
             <div className="flex items-center gap-1.5">
               <Check className="h-3.5 w-3.5 text-emerald-500" />
-              Self-host available
+              57+ Git commands
             </div>
           </div>
         </div>
@@ -253,10 +264,10 @@ function LandingView() {
         <div className="container max-w-5xl mx-auto px-6 relative">
           <div className="text-center mb-6">
             <h2 className="text-2xl md:text-3xl font-bold text-zinc-100 mb-2">
-              Everything you need to ship faster
+              Everything you need to ship
             </h2>
             <p className="text-sm text-zinc-400 max-w-xl mx-auto">
-              Git reimagined in TypeScript with AI woven into every workflow
+              Code hosting, issue tracking, CI/CD, and AI — all in one place
             </p>
           </div>
           
@@ -444,10 +455,10 @@ function LandingView() {
         <div className="container max-w-5xl mx-auto px-6">
           <div className="text-center mb-8">
             <h2 className="text-2xl md:text-3xl font-bold text-zinc-100 mb-2">
-              Why teams choose wit
+              Built different
             </h2>
             <p className="text-sm text-zinc-400">
-              Built for modern development workflows
+              Designed for modern development workflows
             </p>
           </div>
           
@@ -493,10 +504,10 @@ function LandingView() {
         
         <div className="container max-w-3xl mx-auto px-6 relative text-center">
           <h2 className="text-3xl md:text-4xl font-bold text-zinc-100 mb-4">
-            Ready to ship faster?
+            Own your code hosting
           </h2>
           <p className="text-base text-zinc-400 mb-8 max-w-lg mx-auto">
-            Join thousands of developers building better software with wit.
+            Self-host on your infrastructure or use our managed service. Either way, you're in control.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Button 
@@ -505,7 +516,7 @@ function LandingView() {
               className="h-11 px-8 text-sm bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-500/25 transition-all duration-300"
             >
               <Link to="/register" className="group">
-                Get started for free
+                Create an account
                 <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
               </Link>
             </Button>
@@ -515,7 +526,9 @@ function LandingView() {
               asChild 
               className="h-11 px-8 text-sm border-zinc-700 hover:border-zinc-600 bg-zinc-900/50 text-zinc-300 hover:text-white transition-all duration-300"
             >
-              <Link to="/login">Sign in</Link>
+              <a href="https://docs.wit.sh/platform/self-hosting" target="_blank" rel="noopener noreferrer">
+                Self-host guide
+              </a>
             </Button>
           </div>
         </div>
