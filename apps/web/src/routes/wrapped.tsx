@@ -359,7 +359,7 @@ export function WrappedPage() {
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
   
   // Fetch user info for the username
-  const { data: profileUser, isLoading: userLoading } = trpc.users.getByUsername.useQuery(
+  const { data: profileUser, isLoading: userLoading } = trpc.users.get.useQuery(
     { username: username! },
     { enabled: !!username }
   );
