@@ -1,8 +1,11 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
+import { eq, and } from 'drizzle-orm';
 import { router, publicProcedure, protectedProcedure } from '../trpc';
 import { userModel } from '../../../db/models';
 import { createAuth } from '../../../lib/auth';
+import { getDb } from '../../../db';
+import * as authSchema from '../../../db/auth-schema';
 
 export const authRouter = router({
   /**
@@ -210,4 +213,94 @@ export const authRouter = router({
       });
     }
   }),
+
+  /**
+   * Get connected social accounts
+   */
+  getConnectedAccounts: protectedProcedure.query(async ({ ctx }) => {
+    const db = getDb();
+    const accounts = await db
+      .select({
+        id: authSchema.account.id,
+        providerId: authSchema.account.providerId,
+        accountId: authSchema.account.accountId,
+        createdAt: authSchema.account.createdAt,
+      })
+      .from(authSchema.account)
+      .where(eq(authSchema.account.userId, ctx.user.id));
+    
+    return accounts.map(acc => ({
+      id: acc.id,
+      provider: acc.providerId,
+      accountId: acc.accountId,
+      connectedAt: acc.createdAt,
+    }));
+  }),
+
+  /**
+   * Check if user has GitHub connected and get their access token
+   * Used for GitHub imports
+   */
+  getGitHubToken: protectedProcedure.query(async ({ ctx }) => {
+    const db = getDb();
+    const [githubAccount] = await db
+      .select({
+        accessToken: authSchema.account.accessToken,
+        accountId: authSchema.account.accountId,
+      })
+      .from(authSchema.account)
+      .where(
+        and(
+          eq(authSchema.account.userId, ctx.user.id),
+          eq(authSchema.account.providerId, 'github')
+        )
+      )
+      .limit(1);
+    
+    if (!githubAccount) {
+      return { connected: false, token: null, username: null };
+    }
+    
+    return {
+      connected: true,
+      token: githubAccount.accessToken,
+      username: githubAccount.accountId, // GitHub username
+    };
+  }),
+
+  /**
+   * Disconnect a social account
+   */
+  disconnectAccount: protectedProcedure
+    .input(z.object({ provider: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      const db = getDb();
+      
+      // Check if this is the only auth method
+      const accounts = await db
+        .select({ id: authSchema.account.id, providerId: authSchema.account.providerId, password: authSchema.account.password })
+        .from(authSchema.account)
+        .where(eq(authSchema.account.userId, ctx.user.id));
+      
+      const hasPassword = accounts.some(acc => acc.providerId === 'credential' && acc.password);
+      const socialAccounts = accounts.filter(acc => acc.providerId !== 'credential');
+      
+      if (!hasPassword && socialAccounts.length <= 1) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Cannot disconnect your only authentication method. Set a password first.',
+        });
+      }
+      
+      await db
+        .delete(authSchema.account)
+        .where(
+          and(
+            eq(authSchema.account.userId, ctx.user.id),
+            eq(authSchema.account.providerId, input.provider)
+          )
+        );
+      
+      return { success: true };
+    }),
 });

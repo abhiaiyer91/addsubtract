@@ -5,6 +5,8 @@ import {
   ArrowRight,
   ExternalLink,
   Terminal,
+  Link2,
+  CheckCircle2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,7 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Loading } from '@/components/ui/loading';
 import { trpc } from '@/lib/trpc';
-import { useSession } from '@/lib/auth-client';
+import { useSession, authClient } from '@/lib/auth-client';
 import { toastSuccess, toastError } from '@/components/ui/use-toast';
 
 interface TerminalLine {
@@ -85,10 +87,17 @@ export function ImportPage() {
   const user = session?.user;
 
   const [repoUrl, setRepoUrl] = useState('');
+  const [githubToken, setGithubToken] = useState('');
+  const [showToken, setShowToken] = useState(false);
   const [step, setStep] = useState<'input' | 'terminal' | 'complete'>('input');
   const [terminalLines, setTerminalLines] = useState<TerminalLine[]>([]);
   const [isImporting, setIsImporting] = useState(false);
   const [importedRepoName, setImportedRepoName] = useState<string | null>(null);
+  const [isConnecting, setIsConnecting] = useState(false);
+
+  // Check if user has GitHub connected
+  // @ts-expect-error - Type generation may be stale  
+  const { data: githubConnection, refetch: refetchGithub } = trpc.auth.getGitHubToken.useQuery();
 
   // Helper to add terminal lines
   const addLine = (line: TerminalLine) => {
@@ -149,9 +158,22 @@ export function ImportPage() {
       addLine({ type: 'output', text: 'Resolving deltas...' });
       await delay(300);
 
-      // Do the actual import
-      const result = await importMutation.mutateAsync({
+      // Determine which token to use: manual input > connected account
+      const tokenToUse = githubToken || githubConnection?.token || undefined;
+      
+      if (!tokenToUse) {
+        addLine({ type: 'error', text: 'No GitHub token available' });
+        addLine({ type: 'info', text: 'Please connect your GitHub account or provide a personal access token.' });
+        setIsImporting(false);
+        return;
+      }
+      
+      // Do the actual import (with 5 minute timeout)
+      addLine({ type: 'info', text: 'Fetching repository data from GitHub...' });
+      
+      const importPromise = importMutation.mutateAsync({
         repo: repoUrl,
+        token: tokenToUse,
         import: {
           repository: true,
           issues: true,
@@ -161,6 +183,13 @@ export function ImportPage() {
           releases: true,
         },
       });
+      
+      // Add a timeout of 5 minutes
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Import timed out after 5 minutes. The repository may be too large or GitHub may be rate limiting requests. Try adding a GitHub token.')), 5 * 60 * 1000);
+      });
+      
+      const result = await Promise.race([importPromise, timeoutPromise]);
 
       addLine({ type: 'success', text: 'Repository cloned successfully' });
       await delay(200);
@@ -297,7 +326,8 @@ export function ImportPage() {
                 />
                 <Button
                   onClick={handleStartImport}
-                  disabled={!repoUrl.trim()}
+                  disabled={!repoUrl.trim() || (!githubConnection?.connected && !githubToken)}
+                  title={!githubConnection?.connected && !githubToken ? 'Connect GitHub or provide a token first' : undefined}
                 >
                   Import
                   <ArrowRight className="ml-2 h-4 w-4" />
@@ -308,21 +338,105 @@ export function ImportPage() {
               </p>
             </div>
 
-            <div className="pt-4 border-t">
-              <p className="text-sm text-muted-foreground mb-3">
-                Need to import a private repository?
-              </p>
-              <Button variant="outline" size="sm" asChild>
-                <a
-                  href="https://github.com/settings/tokens/new?scopes=repo"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <Github className="mr-2 h-4 w-4" />
-                  Generate GitHub Token
-                  <ExternalLink className="ml-2 h-3 w-3" />
-                </a>
-              </Button>
+            <div className="pt-4 border-t space-y-4">
+              {/* GitHub Connection Status */}
+              {githubConnection?.connected ? (
+                <div className="flex items-center justify-between p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-5 w-5 text-green-500" />
+                    <div>
+                      <p className="text-sm font-medium text-green-600">GitHub Connected</p>
+                      <p className="text-xs text-muted-foreground">@{githubConnection.username}</p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowToken(!showToken)}
+                  >
+                    Use different token
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border">
+                    <div className="flex items-center gap-2">
+                      <Link2 className="h-5 w-5 text-muted-foreground" />
+                      <div>
+                        <p className="text-sm font-medium">Connect GitHub</p>
+                        <p className="text-xs text-muted-foreground">Required to import repositories</p>
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      disabled={isConnecting}
+                      onClick={async () => {
+                        setIsConnecting(true);
+                        try {
+                          await authClient.signIn.social({
+                            provider: 'github',
+                            callbackURL: window.location.href,
+                          });
+                        } catch (error) {
+                          console.error('GitHub connect error:', error);
+                          toastError({
+                            title: 'Connection failed',
+                            description: 'Could not connect to GitHub. Try using a personal access token instead.',
+                          });
+                          setIsConnecting(false);
+                          setShowToken(true);
+                        }
+                      }}
+                    >
+                      {isConnecting ? 'Connecting...' : 'Connect GitHub'}
+                    </Button>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-px bg-border" />
+                    <span className="text-xs text-muted-foreground">or</span>
+                    <div className="flex-1 h-px bg-border" />
+                  </div>
+                  
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    className="w-full"
+                    onClick={() => setShowToken(!showToken)}
+                  >
+                    {showToken ? 'Hide token input' : 'Use Personal Access Token instead'}
+                  </Button>
+                </div>
+              )}
+              
+              {/* Manual token input (shown when requested or as fallback) */}
+              {showToken && (
+                <div className="space-y-2 p-3 rounded-lg border bg-muted/30">
+                  <Label htmlFor="github-token" className="text-sm">Personal Access Token</Label>
+                  <Input
+                    id="github-token"
+                    type="password"
+                    placeholder="ghp_xxxxxxxxxxxx"
+                    value={githubToken}
+                    onChange={(e) => setGithubToken(e.target.value)}
+                    className="font-mono text-sm"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Token needs <code className="px-1 py-0.5 bg-muted rounded">repo</code> scope for private repos.
+                  </p>
+                  <Button variant="outline" size="sm" asChild>
+                    <a
+                      href="https://github.com/settings/tokens/new?scopes=repo"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <Github className="mr-2 h-4 w-4" />
+                      Generate Token
+                      <ExternalLink className="ml-2 h-3 w-3" />
+                    </a>
+                  </Button>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

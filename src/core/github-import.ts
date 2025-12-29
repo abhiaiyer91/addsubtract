@@ -250,6 +250,7 @@ export class GitHubAPIClient {
         port: 443,
         path: endpoint,
         method,
+        timeout: 30000, // 30 second timeout
         headers: {
           'Accept': 'application/vnd.github.v3+json',
           'User-Agent': 'wit-vcs/2.0.0',
@@ -257,6 +258,8 @@ export class GitHubAPIClient {
           ...(body ? { 'Content-Type': 'application/json' } : {}),
         },
       };
+
+      console.log(`[GitHub API] ${method} ${endpoint}`);
 
       const req = https.request(options, (res) => {
         let data = '';
@@ -279,6 +282,10 @@ export class GitHubAPIClient {
       });
 
       req.on('error', reject);
+      req.on('timeout', () => {
+        req.destroy();
+        reject(new Error(`Request timeout after 30s: ${endpoint}`));
+      });
 
       if (body) {
         req.write(JSON.stringify(body));
@@ -424,9 +431,16 @@ export async function fetchGitHubData(
 }> {
   const { onProgress } = options;
   
+  console.log('[fetchGitHubData] Starting...');
+  
   // Get token
   onProgress?.({ phase: 'auth', current: 0, total: 1, message: 'Getting GitHub authentication...' });
   const token = options.token || await getGitHubToken();
+  console.log('[fetchGitHubData] Token obtained:', token ? 'yes (starts with ' + token.substring(0, 4) + ')' : 'NO TOKEN - will be rate limited!');
+  
+  if (!token) {
+    console.warn('[fetchGitHubData] WARNING: No GitHub token provided. Requests may be rate-limited (60/hour).');
+  }
   
   const client = new GitHubAPIClient(token);
   
@@ -439,22 +453,28 @@ export async function fetchGitHubData(
   const { owner, repo } = parsed;
   
   // Fetch repo info
+  console.log(`[fetchGitHubData] Fetching repo info for ${owner}/${repo}...`);
   onProgress?.({ phase: 'repo_info', current: 0, total: 1, message: 'Fetching repository info...' });
   const repoInfo = await client.getRepo(owner, repo);
+  console.log(`[fetchGitHubData] Repo info fetched: ${repoInfo.full_name}`);
   
   // Fetch labels
   let labels: GitHubLabel[] = [];
   if (options.import.labels) {
+    console.log('[fetchGitHubData] Fetching labels...');
     onProgress?.({ phase: 'labels', current: 0, total: 1, message: 'Fetching labels...' });
     labels = await client.getLabels(owner, repo);
+    console.log(`[fetchGitHubData] Labels fetched: ${labels.length}`);
     onProgress?.({ phase: 'labels', current: 1, total: 1, message: `Found ${labels.length} labels` });
   }
   
   // Fetch milestones
   let milestones: GitHubMilestone[] = [];
   if (options.import.milestones) {
+    console.log('[fetchGitHubData] Fetching milestones...');
     onProgress?.({ phase: 'milestones', current: 0, total: 1, message: 'Fetching milestones...' });
     milestones = await client.getMilestones(owner, repo);
+    console.log(`[fetchGitHubData] Milestones fetched: ${milestones.length}`);
     onProgress?.({ phase: 'milestones', current: 1, total: 1, message: `Found ${milestones.length} milestones` });
   }
   
@@ -462,11 +482,15 @@ export async function fetchGitHubData(
   let issues: GitHubIssue[] = [];
   const issueComments = new Map<number, GitHubIssueComment[]>();
   if (options.import.issues) {
+    console.log('[fetchGitHubData] Fetching issues...');
     onProgress?.({ phase: 'issues', current: 0, total: 1, message: 'Fetching issues...' });
     issues = await client.getIssues(owner, repo);
+    console.log(`[fetchGitHubData] Issues fetched: ${issues.length}`);
     onProgress?.({ phase: 'issues', current: 0, total: issues.length, message: `Found ${issues.length} issues, fetching comments...` });
     
-    // Fetch comments for each issue
+    // Fetch comments for each issue (only if they have comments)
+    const issuesWithComments = issues.filter(i => i.comments > 0);
+    console.log(`[fetchGitHubData] Fetching comments for ${issuesWithComments.length} issues with comments...`);
     for (let i = 0; i < issues.length; i++) {
       const issue = issues[i];
       onProgress?.({ 
@@ -482,17 +506,21 @@ export async function fetchGitHubData(
         issueComments.set(issue.number, comments);
       }
     }
+    console.log(`[fetchGitHubData] Issue comments fetched`);
   }
   
   // Fetch pull requests
   let pullRequests: GitHubPullRequest[] = [];
   const prComments = new Map<number, GitHubIssueComment[]>();
   if (options.import.pullRequests) {
+    console.log('[fetchGitHubData] Fetching pull requests...');
     onProgress?.({ phase: 'pull_requests', current: 0, total: 1, message: 'Fetching pull requests...' });
     pullRequests = await client.getPullRequests(owner, repo);
+    console.log(`[fetchGitHubData] Pull requests fetched: ${pullRequests.length}`);
     onProgress?.({ phase: 'pull_requests', current: 0, total: pullRequests.length, message: `Found ${pullRequests.length} pull requests` });
     
     // Fetch detailed PR info and comments
+    console.log(`[fetchGitHubData] Fetching details for ${pullRequests.length} PRs...`);
     for (let i = 0; i < pullRequests.length; i++) {
       const pr = pullRequests[i];
       onProgress?.({ 
@@ -516,16 +544,20 @@ export async function fetchGitHubData(
         prComments.set(pr.number, comments);
       }
     }
+    console.log(`[fetchGitHubData] PR details fetched`);
   }
   
   // Fetch releases
   let releases: GitHubRelease[] = [];
   if (options.import.releases) {
+    console.log('[fetchGitHubData] Fetching releases...');
     onProgress?.({ phase: 'releases', current: 0, total: 1, message: 'Fetching releases...' });
     releases = await client.getReleases(owner, repo);
+    console.log(`[fetchGitHubData] Releases fetched: ${releases.length}`);
     onProgress?.({ phase: 'releases', current: 1, total: 1, message: `Found ${releases.length} releases` });
   }
   
+  console.log('[fetchGitHubData] All data fetched successfully');
   return {
     repo: repoInfo,
     labels,

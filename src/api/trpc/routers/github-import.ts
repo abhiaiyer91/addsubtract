@@ -175,7 +175,16 @@ export const githubImportRouter = router({
 
       try {
         // Fetch all GitHub data
+        console.log(`[GitHub Import] Starting import for ${input.repo}`);
+        console.log(`[GitHub Import] Options:`, JSON.stringify(options.import, null, 2));
         const data = await fetchGitHubData(options);
+        console.log(`[GitHub Import] Data fetched successfully:`, {
+          labels: data.labels.length,
+          milestones: data.milestones.length,
+          issues: data.issues.length,
+          pullRequests: data.pullRequests.length,
+          releases: data.releases.length,
+        });
 
         // Determine the repo name to use
         const repoName = input.name || data.repo.name;
