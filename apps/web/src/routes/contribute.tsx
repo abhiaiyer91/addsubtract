@@ -79,6 +79,7 @@ function ContributeSkeleton() {
 }
 
 export function ContributePage() {
+  const [activeTab, setActiveTab] = useState<'wit' | 'repos'>('wit');
   const [searchQuery, setSearchQuery] = useState('');
   const [labelFilter, setLabelFilter] = useState<LabelFilter>('all');
   const [priorityFilter, setPriorityFilter] = useState<string | undefined>();
@@ -116,171 +117,40 @@ export function ContributePage() {
             <Heart className="h-8 w-8 text-pink-500" />
           </div>
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold">Contribute to Wit</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold">Contribute</h1>
             <p className="text-muted-foreground">
-              Open source is at the heart of Wit. Find issues you can help with!
+              Open source is at the heart of Wit. Find ways to contribute!
             </p>
           </div>
         </div>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card className="hover:border-primary/50 transition-colors cursor-pointer" onClick={() => setLabelFilter('all')}>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <Users className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <div className="text-2xl font-bold">{summary?.total ?? 0}</div>
-                <div className="text-sm text-muted-foreground">Total Open Tasks</div>
-              </div>
+      {/* Main Tabs */}
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'wit' | 'repos')} className="w-full">
+        <TabsList className="grid w-full grid-cols-2 max-w-md">
+          <TabsTrigger value="wit" className="gap-2">
+            <Rocket className="h-4 w-4" />
+            Contribute to Wit
+          </TabsTrigger>
+          <TabsTrigger value="repos" className="gap-2">
+            <HandHeart className="h-4 w-4" />
+            Help Repositories
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Contribute to Wit Tab */}
+        <TabsContent value="wit" className="mt-6 space-y-6">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500/20 to-cyan-500/20">
+              <Rocket className="h-6 w-6 text-blue-500" />
             </div>
-          </CardContent>
-        </Card>
-
-        <Card 
-          className={cn(
-            "hover:border-green-500/50 transition-colors cursor-pointer",
-            labelFilter === 'help-wanted' && "border-green-500/50 bg-green-500/5"
-          )}
-          onClick={() => setLabelFilter('help-wanted')}
-        >
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-green-500/10">
-                <HandHeart className="h-5 w-5 text-green-500" />
-              </div>
-              <div>
-                <div className="text-2xl font-bold">{summary?.helpWanted ?? 0}</div>
-                <div className="text-sm text-muted-foreground">Help Wanted</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card 
-          className={cn(
-            "hover:border-purple-500/50 transition-colors cursor-pointer",
-            labelFilter === 'good-first-issue' && "border-purple-500/50 bg-purple-500/5"
-          )}
-          onClick={() => setLabelFilter('good-first-issue')}
-        >
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-purple-500/10">
-                <Sparkles className="h-5 w-5 text-purple-500" />
-              </div>
-              <div>
-                <div className="text-2xl font-bold">{summary?.goodFirstIssue ?? 0}</div>
-                <div className="text-sm text-muted-foreground">Good First Issues</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-        <div className="relative flex-1 max-w-sm w-full">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search issues..."
-            className="pl-9 h-9 bg-muted/50 border-0 focus-visible:bg-background focus-visible:ring-1"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Tabs value={labelFilter} onValueChange={(v) => setLabelFilter(v as LabelFilter)}>
-            <TabsList>
-              <TabsTrigger value="all" className="text-xs sm:text-sm">All</TabsTrigger>
-              <TabsTrigger value="help-wanted" className="text-xs sm:text-sm">Help Wanted</TabsTrigger>
-              <TabsTrigger value="good-first-issue" className="text-xs sm:text-sm">Good First Issue</TabsTrigger>
-            </TabsList>
-          </Tabs>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2">
-                <Signal className="h-4 w-4" />
-                <span className="hidden sm:inline">Priority</span>
-                <ChevronDown className="h-3 w-3" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setPriorityFilter(undefined)}>
-                All Priorities
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setPriorityFilter('urgent')}>
-                <AlertCircle className="h-4 w-4 mr-2 text-red-500" />
-                Urgent
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setPriorityFilter('high')}>
-                <Signal className="h-4 w-4 mr-2 text-orange-500" />
-                High
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setPriorityFilter('medium')}>
-                <Signal className="h-4 w-4 mr-2 text-yellow-500" />
-                Medium
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setPriorityFilter('low')}>
-                <Signal className="h-4 w-4 mr-2 text-blue-500" />
-                Low
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
-
-      {/* Issues List */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <CircleDot className="h-5 w-5 text-green-500" />
-            Open Tasks
-          </CardTitle>
-          <CardDescription>
-            {filteredIssues?.length ?? 0} issue{(filteredIssues?.length ?? 0) !== 1 ? 's' : ''} available for contribution
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {!filteredIssues || filteredIssues.length === 0 ? (
-            <div className="text-center py-12">
-              <Heart className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-medium mb-2">No issues found</h3>
-              <p className="text-muted-foreground max-w-md mx-auto">
-                {searchQuery
-                  ? 'Try a different search term'
-                  : 'No contribution-worthy issues are available right now. Check back later or create issues with "help wanted" or "good first issue" labels!'}
+            <div>
+              <h2 className="text-xl sm:text-2xl font-bold">Help Build the Future of Git</h2>
+              <p className="text-muted-foreground text-sm">
+                Contribute directly to Wit. Here's what we need help with from our roadmap.
               </p>
             </div>
-          ) : (
-            <div className="divide-y">
-              {filteredIssues.map((item) => (
-                <IssueCard key={item.issue.id} item={item} />
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Contribute to Wit Section */}
-      <div className="space-y-6">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500/20 to-cyan-500/20">
-            <Rocket className="h-6 w-6 text-blue-500" />
           </div>
-          <div>
-            <h2 className="text-xl sm:text-2xl font-bold">Contribute to Wit Itself</h2>
-            <p className="text-muted-foreground text-sm">
-              Help build the future of Git. Here's what we need help with from our roadmap.
-            </p>
-          </div>
-        </div>
 
         {/* Phase Cards */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -768,46 +638,194 @@ The goal: when you ask wit a question about code, it should find the right answe
             </div>
           </CardContent>
         </Card>
-      </div>
 
-      {/* CTA */}
-      <Card className="bg-gradient-to-r from-primary/5 via-purple-500/5 to-pink-500/5 border-primary/20">
-        <CardContent className="p-6">
-          <div className="flex flex-col sm:flex-row items-center gap-4">
-            <div className="p-3 rounded-full bg-primary/10">
-              <GitFork className="h-6 w-6 text-primary" />
+          {/* CTA */}
+          <Card className="bg-gradient-to-r from-primary/5 via-purple-500/5 to-pink-500/5 border-primary/20">
+            <CardContent className="p-6">
+              <div className="flex flex-col sm:flex-row items-center gap-4">
+                <div className="p-3 rounded-full bg-primary/10">
+                  <GitFork className="h-6 w-6 text-primary" />
+                </div>
+                <div className="flex-1 text-center sm:text-left">
+                  <h3 className="text-lg font-semibold">Ready to contribute to Wit?</h3>
+                  <p className="text-muted-foreground text-sm">
+                    Fork the repository, pick an issue, and submit your first pull request!
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <a 
+                    href="https://github.com/abhiaiyer91/wit" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                  >
+                    <Button className="gap-2">
+                      <Github className="h-4 w-4" />
+                      View on GitHub
+                    </Button>
+                  </a>
+                  <a 
+                    href="https://github.com/abhiaiyer91/wit/blob/main/CONTRIBUTING.md" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                  >
+                    <Button variant="outline" className="gap-2">
+                      <FileText className="h-4 w-4" />
+                      Contributing Guide
+                    </Button>
+                  </a>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Help Repositories Tab */}
+        <TabsContent value="repos" className="mt-6 space-y-6">
+          {/* Summary Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <Card className="hover:border-primary/50 transition-colors cursor-pointer" onClick={() => setLabelFilter('all')}>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-primary/10">
+                    <Users className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold">{summary?.total ?? 0}</div>
+                    <div className="text-sm text-muted-foreground">Total Open Tasks</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card 
+              className={cn(
+                "hover:border-green-500/50 transition-colors cursor-pointer",
+                labelFilter === 'help-wanted' && "border-green-500/50 bg-green-500/5"
+              )}
+              onClick={() => setLabelFilter('help-wanted')}
+            >
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-green-500/10">
+                    <HandHeart className="h-5 w-5 text-green-500" />
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold">{summary?.helpWanted ?? 0}</div>
+                    <div className="text-sm text-muted-foreground">Help Wanted</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card 
+              className={cn(
+                "hover:border-purple-500/50 transition-colors cursor-pointer",
+                labelFilter === 'good-first-issue' && "border-purple-500/50 bg-purple-500/5"
+              )}
+              onClick={() => setLabelFilter('good-first-issue')}
+            >
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-purple-500/10">
+                    <Sparkles className="h-5 w-5 text-purple-500" />
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold">{summary?.goodFirstIssue ?? 0}</div>
+                    <div className="text-sm text-muted-foreground">Good First Issues</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Filters */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+            <div className="relative flex-1 max-w-sm w-full">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search issues..."
+                className="pl-9 h-9 bg-muted/50 border-0 focus-visible:bg-background focus-visible:ring-1"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
             </div>
-            <div className="flex-1 text-center sm:text-left">
-              <h3 className="text-lg font-semibold">Ready to contribute?</h3>
-              <p className="text-muted-foreground text-sm">
-                Fork the repository, pick an issue, and submit your first pull request!
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <a 
-                href="https://github.com/abhiaiyer91/wit" 
-                target="_blank" 
-                rel="noopener noreferrer"
-              >
-                <Button className="gap-2">
-                  <Github className="h-4 w-4" />
-                  View on GitHub
-                </Button>
-              </a>
-              <a 
-                href="https://github.com/abhiaiyer91/wit/blob/main/CONTRIBUTING.md" 
-                target="_blank" 
-                rel="noopener noreferrer"
-              >
-                <Button variant="outline" className="gap-2">
-                  <FileText className="h-4 w-4" />
-                  Contributing Guide
-                </Button>
-              </a>
+
+            <div className="flex items-center gap-2">
+              <Tabs value={labelFilter} onValueChange={(v) => setLabelFilter(v as LabelFilter)}>
+                <TabsList>
+                  <TabsTrigger value="all" className="text-xs sm:text-sm">All</TabsTrigger>
+                  <TabsTrigger value="help-wanted" className="text-xs sm:text-sm">Help Wanted</TabsTrigger>
+                  <TabsTrigger value="good-first-issue" className="text-xs sm:text-sm">Good First Issue</TabsTrigger>
+                </TabsList>
+              </Tabs>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-2">
+                    <Signal className="h-4 w-4" />
+                    <span className="hidden sm:inline">Priority</span>
+                    <ChevronDown className="h-3 w-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setPriorityFilter(undefined)}>
+                    All Priorities
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setPriorityFilter('urgent')}>
+                    <AlertCircle className="h-4 w-4 mr-2 text-red-500" />
+                    Urgent
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setPriorityFilter('high')}>
+                    <Signal className="h-4 w-4 mr-2 text-orange-500" />
+                    High
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setPriorityFilter('medium')}>
+                    <Signal className="h-4 w-4 mr-2 text-yellow-500" />
+                    Medium
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setPriorityFilter('low')}>
+                    <Signal className="h-4 w-4 mr-2 text-blue-500" />
+                    Low
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
-        </CardContent>
-      </Card>
+
+          {/* Issues List */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CircleDot className="h-5 w-5 text-green-500" />
+                Open Tasks
+              </CardTitle>
+              <CardDescription>
+                {filteredIssues?.length ?? 0} issue{(filteredIssues?.length ?? 0) !== 1 ? 's' : ''} available for contribution
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {!filteredIssues || filteredIssues.length === 0 ? (
+                <div className="text-center py-12">
+                  <Heart className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-medium mb-2">No issues found</h3>
+                  <p className="text-muted-foreground max-w-md mx-auto">
+                    {searchQuery
+                      ? 'Try a different search term'
+                      : 'No contribution-worthy issues are available right now. Check back later or create issues with "help wanted" or "good first issue" labels!'}
+                  </p>
+                </div>
+              ) : (
+                <div className="divide-y">
+                  {filteredIssues.map((item) => (
+                    <IssueCard key={item.issue.id} item={item} />
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
