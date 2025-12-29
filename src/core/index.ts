@@ -272,5 +272,27 @@ export {
   createEmailService,
 } from './email';
 
+// GitHub integration
+export {
+  GitHubAPIClient,
+  fetchGitHubData,
+  parseGitHubRepo,
+  validateImportOptions,
+  getAuthenticatedCloneUrl,
+  mapIssueState,
+  mapIssueStatus,
+  mapPRState,
+  formatImportSummary,
+  GitHubImportOptions,
+  GitHubImportResult,
+  ImportProgress,
+  GitHubRepo,
+  GitHubIssue,
+  GitHubPullRequest,
+  GitHubLabel,
+  GitHubMilestone,
+  GitHubRelease,
+} from './github-import';
+
 // Protocol exports
 export * as protocol from './protocol';
