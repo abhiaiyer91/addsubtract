@@ -536,6 +536,55 @@ export const prReviewers = pgTable(
   })
 );
 
+// ============ ISSUE STAGES (Custom Workflow Stages) ============
+
+/**
+ * Issue stages table - custom workflow stages per repository
+ * Allows users to define their own stages beyond the default Linear-style ones
+ */
+export const issueStages = pgTable('issue_stages', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  repoId: uuid('repo_id')
+    .notNull()
+    .references(() => repositories.id, { onDelete: 'cascade' }),
+  
+  /** Unique identifier for the stage (e.g., 'backlog', 'in_progress', 'custom_review') */
+  key: text('key').notNull(),
+  
+  /** Display name for the stage */
+  name: text('name').notNull(),
+  
+  /** Optional description of what this stage means */
+  description: text('description'),
+  
+  /** Icon to display (emoji or icon identifier) */
+  icon: text('icon').notNull().default('○'),
+  
+  /** Color for the stage (hex color without #) */
+  color: text('color').notNull().default('6b7280'),
+  
+  /** Position/order of the stage in the workflow (0 = first) */
+  position: integer('position').notNull().default(0),
+  
+  /** Whether moving to this stage should close the issue */
+  isClosedState: boolean('is_closed_state').notNull().default(false),
+  
+  /** Whether this is a triage/initial state for new issues */
+  isTriageState: boolean('is_triage_state').notNull().default(false),
+  
+  /** Whether this is the default stage for new issues */
+  isDefault: boolean('is_default').notNull().default(false),
+  
+  /** Whether this stage can be deleted (system stages cannot) */
+  isSystem: boolean('is_system').notNull().default(false),
+  
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  // Stage keys must be unique within a repository
+  uniqueKeyPerRepo: unique().on(table.repoId, table.key),
+}));
+
 // ============ ISSUES ============
 
 export const issues = pgTable('issues', {
@@ -552,7 +601,12 @@ export const issues = pgTable('issues', {
   state: issueStateEnum('state').notNull().default('open'),
   
   // Workflow status for Kanban board (Linear-style)
+  // This enum is kept for backward compatibility
   status: issueStatusEnum('status').notNull().default('backlog'),
+  
+  // Custom stage reference (for user-defined workflow stages)
+  // When set, this takes precedence over the status enum
+  stageId: uuid('stage_id').references(() => issueStages.id, { onDelete: 'set null' }),
   
   // Priority (Linear-style: none, low, medium, high, urgent)
   priority: issuePriorityEnum('priority').notNull().default('none'),
@@ -2108,6 +2162,9 @@ export type NewIssue = typeof issues.$inferInsert;
 
 export type IssueComment = typeof issueComments.$inferSelect;
 export type NewIssueComment = typeof issueComments.$inferInsert;
+
+export type IssueStage = typeof issueStages.$inferSelect;
+export type NewIssueStage = typeof issueStages.$inferInsert;
 
 export type Label = typeof labels.$inferSelect;
 export type NewLabel = typeof labels.$inferInsert;
