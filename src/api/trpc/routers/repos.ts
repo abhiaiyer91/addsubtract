@@ -756,15 +756,22 @@ export const reposRouter = router({
       // Get the bare repository
       const bareRepo = getRepoFromDisk(result.repo.diskPath);
       if (!bareRepo) {
-        // Return empty tree if repo doesn't exist on disk yet
-        return { entries: [] };
+        // Repository doesn't exist on disk - this can happen if import failed
+        console.warn(`[repos.getTree] Repository not found on disk: ${result.repo.diskPath}`);
+        return { entries: [], error: 'Repository data not available. The repository may not have been fully imported.' };
       }
 
       try {
         // Resolve the ref to a commit
         const commitHash = bareRepo.refs.resolve(input.ref);
         if (!commitHash) {
-          return { entries: [] };
+          // Ref not found - try to get available branches to suggest alternatives
+          const branches = bareRepo.refs.listBranches();
+          console.warn(`[repos.getTree] Ref not found: ${input.ref}, available branches: ${branches.join(', ')}`);
+          return { 
+            entries: [], 
+            error: `Branch '${input.ref}' not found.${branches.length > 0 ? ` Available branches: ${branches.join(', ')}` : ' The repository may be empty or have no branches.'}` 
+          };
         }
 
         // Read the commit to get the tree
@@ -819,7 +826,7 @@ export const reposRouter = router({
       } catch (error) {
         if (error instanceof TRPCError) throw error;
         console.error('[repos.getTree] Error:', error);
-        return { entries: [] };
+        return { entries: [], error: 'Failed to read repository tree. Please try again.' };
       }
     }),
 

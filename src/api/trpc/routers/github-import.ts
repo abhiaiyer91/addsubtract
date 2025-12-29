@@ -225,11 +225,17 @@ export const githubImportRouter = router({
             });
             cloneSuccess = true;
           } catch (cloneError) {
-            result.errors.push(`Failed to clone repository: ${cloneError instanceof Error ? cloneError.message : 'Unknown error'}`);
+            const errorMessage = cloneError instanceof Error ? cloneError.message : 'Unknown error';
+            result.errors.push(`Failed to clone repository: ${errorMessage}`);
+            // Don't create DB record if clone failed - the repo won't be visible without files
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: `Failed to clone repository from GitHub: ${errorMessage}. Please try again.`,
+            });
           }
         }
 
-        // Create the repository record
+        // Create the repository record (only if clone succeeded or we're not importing repository data)
         const newRepo = await repoModel.create({
           name: repoName,
           description: input.description ?? data.repo.description ?? undefined,

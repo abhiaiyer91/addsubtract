@@ -65,6 +65,7 @@ export function RepoPage() {
   const ownerInfo = repoData?.owner;
   const ownerUsername = (ownerInfo && 'username' in ownerInfo ? ownerInfo.username : null) || owner!;
   const tree = treeData?.entries || [];
+  const treeError = treeData?.error;
   const readme = readmeData?.encoding === 'utf-8' ? readmeData.content : null;
   const isOwner = session?.user?.id === repoInfo?.ownerId;
 
@@ -128,6 +129,7 @@ export function RepoPage() {
             owner={ownerUsername}
             repo={repoInfo?.name || repo!}
             currentRef={repoInfo?.defaultBranch || 'main'}
+            error={treeError}
           />
 
           {/* README */}
