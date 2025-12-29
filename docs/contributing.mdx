@@ -1,39 +1,459 @@
 ---
 title: "Contributing"
-description: "How to contribute to wit"
+description: "Pick a task, copy the prompt, and start contributing to wit"
 ---
 
-Thank you for your interest in contributing to wit! This guide will help you get started.
+Thank you for your interest in contributing to wit! This page contains everything you need to get started - pick a task, copy the prompt, and let AI help you build.
 
-## Getting Started
+**We only accept AI-generated contributions.** Use Claude, Cursor, or your favorite AI coding tool.
 
-### Prerequisites
-
-- Node.js >= 22.13.0
-- npm or pnpm
-- Git (for testing compatibility)
-
-### Setup
+## Quick Setup
 
 ```bash
-# Clone the repository
 git clone https://github.com/abhiaiyer91/wit.git
 cd wit
-
-# Install dependencies
 npm install
-
-# Build
 npm run build
-
-# Link for local testing
 npm link
-
-# Now 'wit' command uses your local build
 wit --version
 ```
 
-### Development Workflow
+---
+
+## Priority Tasks
+
+These are the highest-impact items we need help with right now.
+
+### Fix Integration Test Failures
+
+The test suite has failing integration tests that need to be fixed.
+
+```
+Run `npm test` and fix all failing tests. Focus on the integration tests in 
+`tests/integration/`. For each failing test:
+
+1. Understand what the test is trying to verify
+2. Determine if the test is wrong or the implementation is wrong
+3. Fix the issue and ensure the test passes
+4. Run the full test suite to make sure you didn't break anything else
+
+Start with `npm test` and work through failures one by one.
+```
+
+### Command Reference Documentation
+
+Every wit command needs documentation in the `docs/commands/` directory.
+
+```
+Create comprehensive documentation for wit commands. For each command:
+
+1. Look at the implementation in `src/commands/`
+2. Document all flags and options
+3. Add practical examples
+4. Show expected output
+
+Start by listing all commands in `src/commands/` and cross-reference with 
+existing docs in `docs/commands/`. Create missing documentation files.
+Use the existing docs as a template for format and style.
+```
+
+### ESM/CommonJS Configuration Cleanup
+
+The build configuration works but is fragile and needs cleanup.
+
+```
+Audit and fix the ESM/CommonJS configuration in this project:
+
+1. Review `package.json`, `tsconfig.json`, and any build scripts
+2. Identify inconsistencies in module resolution
+3. Ensure the build works cleanly with `npm run build`
+4. Test that `npm link` works correctly after building
+5. Document any necessary changes
+
+The goal is a clean, consistent module configuration.
+```
+
+### Error Message Audit
+
+Every user-facing error should be helpful with actionable suggestions.
+
+```
+Audit all error messages in the codebase for helpfulness:
+
+1. Search for `throw new` and `console.error` across `src/`
+2. For each error, ask: "Does this tell the user what went wrong AND how to fix it?"
+3. Add suggestions using the TsgitError pattern from `src/core/errors.ts`
+4. Prioritize errors users hit frequently (commit, push, merge conflicts)
+
+Example of a good error:
+```typescript
+throw new TsgitError(
+  'Branch not found: feature',
+  ErrorCode.REF_NOT_FOUND,
+  ['Did you mean: feature-branch?', 'Run wit branch to see all branches']
+);
+```
+```
+
+---
+
+## Documentation Tasks
+
+### Installation One-Liner
+
+Create a simple installation script for new users.
+
+```
+Create a one-liner installation script for wit:
+
+1. Create an install script that works on macOS and Linux
+2. Should download the latest release and add to PATH
+3. Consider using curl | bash pattern or npm global install
+4. Test on a fresh system
+5. Update the quickstart docs with the new install method
+
+Look at how other CLI tools (like rustup, nvm, bun) do this.
+```
+
+### "5 Minutes to Wow" Tutorial
+
+Create a tutorial that gets new users productive immediately.
+
+```
+Create a "5 minutes to wow" tutorial for wit in `docs/quickstart.mdx`:
+
+1. Start with installation
+2. Show `wit init` and basic workflow
+3. Highlight the "wit" zero-command that shows smart status
+4. Demonstrate `wit ai commit` for AI-generated messages
+5. Show `wit search` for semantic code search
+6. End with something impressive that Git can't do
+
+The goal: new user goes from install to "wow, this is better" in 5 minutes.
+```
+
+### Demo Video Script
+
+Create a script for a demo video showcasing wit's capabilities.
+
+```
+Create a demo video script for wit in a new file `docs/demo-script.md`:
+
+1. 30-60 second intro: what is wit and why it matters
+2. Show the zero command (`wit`) and smart status
+3. Demonstrate AI commit message generation
+4. Show semantic search ("where do we handle auth?")
+5. Quick look at the web UI
+6. Call to action: how to get started
+
+Include exact terminal commands and expected output.
+```
+
+---
+
+## Git Compatibility Tasks
+
+### Improve `git log` Compatibility
+
+Make `wit log` support more Git options.
+
+```
+Improve `wit log` to support more Git options:
+
+1. Read the Git documentation for `git log`
+2. Check current implementation in `src/commands/log.ts`
+3. Add missing options: --author, --since, --until, --grep, --all
+4. Ensure output format matches Git exactly
+5. Add tests comparing wit output to git output
+
+Focus on the most commonly used options first.
+```
+
+### Improve `git diff` Compatibility
+
+Enhance the diff output to match Git more closely.
+
+```
+Improve `wit diff` compatibility with Git:
+
+1. Compare `git diff` and `wit diff` output on the same repository
+2. Fix any formatting differences
+3. Add missing options: --stat, --name-only, --name-status, --cached
+4. Ensure color output matches Git conventions
+5. Add compatibility tests
+
+Use `src/core/diff.ts` and `src/commands/diff.ts`.
+```
+
+### Add Missing Command Options
+
+Many commands are missing flags that Git supports.
+
+```
+Add missing options to wit commands:
+
+1. Pick a command from `src/commands/`
+2. Compare its options to the Git equivalent
+3. Add missing flags that are commonly used
+4. Update help text
+5. Add tests for new options
+
+Start with frequently used commands: status, add, commit, branch, checkout.
+```
+
+---
+
+## AI Feature Tasks
+
+### Improve AI Commit Messages
+
+Make AI-generated commit messages better.
+
+```
+Improve the AI commit message generation in `src/commands/ai.ts`:
+
+1. Review current prompt and output quality
+2. Add context about the repository (recent commits, branch name)
+3. Follow conventional commit format when appropriate
+4. Allow user configuration for commit style
+5. Test with various types of changes
+
+The goal: commit messages that developers would actually write.
+```
+
+### Enhance Semantic Search
+
+Improve the semantic code search accuracy and speed.
+
+```
+Enhance semantic search in `src/search/`:
+
+1. Review current implementation in `semantic.ts` and `embeddings.ts`
+2. Improve chunking strategy in `chunker.ts` for better results
+3. Add support for searching by function/class name
+4. Optimize vector store performance
+5. Add relevance scoring improvements
+
+Test with queries like "where do we handle authentication" and "how does the merge queue work".
+```
+
+### Add More AI Tools
+
+Extend the AI agent with new capabilities.
+
+```
+Add new AI tools to the agent in `src/ai/tools/`:
+
+1. Review existing tools to understand the pattern
+2. Add useful new tools:
+   - `explainCode` - explain what a piece of code does
+   - `suggestRefactor` - suggest improvements to code
+   - `findSimilar` - find similar code patterns
+3. Register tools in `src/ai/agent.ts`
+4. Test with the `wit agent` command
+```
+
+---
+
+## Platform Tasks
+
+### Improve PR Review Experience
+
+Enhance the pull request review workflow.
+
+```
+Improve the PR review experience:
+
+1. Review `src/api/trpc/pull-requests.ts` and related files
+2. Add inline comment replies
+3. Improve diff rendering in `src/ui/diff-viewer.ts`
+4. Add keyboard shortcuts for review actions
+5. Test the full review workflow
+
+Focus on making code review as fast as possible.
+```
+
+### Enhance Issue Management
+
+Make issue management more powerful.
+
+```
+Enhance issue management features:
+
+1. Review `src/api/trpc/issues.ts` and `src/db/models/issues.ts`
+2. Add issue templates with custom fields
+3. Improve the Kanban board in web UI
+4. Add bulk operations (close multiple, label multiple)
+5. Add issue search/filtering improvements
+
+Look at Linear for inspiration on UX.
+```
+
+### Improve CI/CD Integration
+
+Make the CI/CD system more robust.
+
+```
+Improve CI/CD integration in `src/ci/`:
+
+1. Review current implementation in `executor.ts` and `parser.ts`
+2. Add more GitHub Actions compatibility
+3. Improve job failure reporting
+4. Add caching support for faster builds
+5. Test with real workflow files
+
+The goal: GitHub Actions workflows should work with minimal changes.
+```
+
+---
+
+## Web UI Tasks
+
+### Improve Mobile Responsiveness
+
+Make the web UI work well on mobile devices.
+
+```
+Improve mobile responsiveness in `apps/web/`:
+
+1. Audit current responsive breakpoints
+2. Fix layout issues on small screens
+3. Ensure touch interactions work well
+4. Test on various device sizes
+5. Focus on the most used pages: repo view, PR list, file browser
+```
+
+### Add Dark Mode Improvements
+
+Enhance the dark mode experience.
+
+```
+Improve dark mode in the web UI:
+
+1. Review current theme implementation in `apps/web/`
+2. Fix any contrast issues
+3. Ensure consistent colors across all components
+4. Add system preference detection
+5. Test all pages in both light and dark modes
+```
+
+### Command Palette Enhancements
+
+Make the command palette more powerful.
+
+```
+Enhance the command palette in `apps/web/src/components/CommandPalette.tsx`:
+
+1. Add more commands and actions
+2. Improve fuzzy search matching
+3. Add recent commands history
+4. Add keyboard navigation improvements
+5. Show keyboard shortcuts for each command
+```
+
+---
+
+## Testing Tasks
+
+### Add Missing Unit Tests
+
+Improve test coverage across the codebase.
+
+```
+Add missing unit tests:
+
+1. Run `npm test -- --coverage` to see current coverage
+2. Identify files in `src/core/` with low coverage
+3. Add tests for untested functions
+4. Focus on edge cases and error conditions
+5. Ensure tests are fast and reliable
+
+Start with core functionality: repository.ts, merge.ts, diff.ts.
+```
+
+### Add E2E Tests for Web UI
+
+Add end-to-end tests for the web application.
+
+```
+Add E2E tests for the web UI using Playwright or similar:
+
+1. Set up E2E testing framework in `apps/web/`
+2. Add tests for critical flows:
+   - User authentication
+   - Creating a repository
+   - Opening a pull request
+   - Reviewing and merging a PR
+3. Run tests in CI
+```
+
+### Git Compatibility Test Suite
+
+Create comprehensive tests comparing wit to Git.
+
+```
+Create a Git compatibility test suite:
+
+1. Create test file `tests/integration/git-compatibility.test.ts`
+2. For each command, compare wit and git output on the same repo
+3. Test edge cases: empty repos, large files, binary files
+4. Test network operations: clone, fetch, push
+5. Document any intentional differences
+
+The goal: verify wit is a drop-in Git replacement.
+```
+
+---
+
+## Infrastructure Tasks
+
+### Improve Build Performance
+
+Make the build faster.
+
+```
+Improve build performance:
+
+1. Profile the current build with `npm run build`
+2. Identify slow compilation steps
+3. Consider using esbuild or swc for faster builds
+4. Add incremental compilation support
+5. Document build performance improvements
+```
+
+### Docker Improvements
+
+Improve the Docker setup for self-hosting.
+
+```
+Improve Docker setup for self-hosting:
+
+1. Review `Dockerfile` and `docker-compose.yml`
+2. Reduce image size
+3. Add health checks
+4. Improve startup time
+5. Add documentation for production deployment
+
+The goal: easy one-command self-hosting with Docker.
+```
+
+### Add Telemetry (Opt-in)
+
+Add anonymous usage telemetry to understand how wit is used.
+
+```
+Add opt-in telemetry:
+
+1. Create telemetry module in `src/utils/telemetry.ts`
+2. Track command usage (not content)
+3. Make it opt-in with clear disclosure
+4. Add disable option: `wit config telemetry.enabled false`
+5. Document what is collected and why
+```
+
+---
+
+## Development Workflow
 
 ```bash
 # Watch mode - rebuilds on changes
@@ -62,336 +482,42 @@ wit/
 │   ├── core/               # Core Git functionality
 │   │   ├── repository.ts   # Repository class
 │   │   ├── object-store.ts # Object storage
-│   │   ├── index.ts        # Staging area
-│   │   ├── refs.ts         # References
 │   │   ├── merge.ts        # Merge logic
-│   │   ├── diff.ts         # Diff algorithm
-│   │   └── protocol/       # Git network protocol
-│   ├── ui/                 # Visual interfaces
+│   │   └── diff.ts         # Diff algorithm
+│   ├── ai/                 # AI features
+│   │   ├── agents/         # AI agents (PM, Code, Triage)
+│   │   ├── tools/          # Agent tools
+│   │   └── workflows/      # Multi-step workflows
+│   ├── api/                # tRPC API routers
+│   ├── server/             # HTTP/SSH server
+│   ├── ui/                 # Terminal UI components
 │   └── utils/              # Utilities
+├── apps/
+│   ├── web/                # Web frontend
+│   └── admin/              # Admin dashboard
 ├── docs/                   # Documentation (Mintlify)
-├── prompts/                # AI agent prompts
 └── tests/                  # Integration tests
 ```
 
-## Making Changes
+## Code Style
 
-### 1. Create a Branch
-
-```bash
-git checkout -b feature/my-feature
-# or
-git checkout -b fix/bug-description
-```
-
-### 2. Make Your Changes
-
-Follow the existing code style:
-
-- TypeScript with strict mode
+- TypeScript strict mode
 - Double quotes for strings
 - 2-space indentation
 - Semicolons required
 - Explicit types for function parameters and returns
+- Use the `TsgitError` pattern for user-facing errors
 
-### 3. Add Tests
+## Submitting Your Contribution
 
-Tests go in `__tests__/` directories alongside source files:
+1. Fork the repository
+2. Create a branch: `git checkout -b feature/my-feature`
+3. Make your changes using AI assistance
+4. Run tests: `npm test`
+5. Push and open a PR
 
-```typescript
-// src/core/__tests__/object.test.ts
-import { Blob, Tree } from '../object';
-
-describe('Blob', () => {
-  it('should serialize content correctly', () => {
-    const blob = new Blob(Buffer.from('hello'));
-    expect(blob.serialize().toString()).toBe('hello');
-  });
-});
-```
-
-### 4. Update Documentation
-
-If you're adding a feature:
-
-1. Add/update docs in `docs/`
-2. Update README.md if needed
-3. Add JSDoc comments to public APIs
-
-### 5. Submit a Pull Request
-
-```bash
-# Push your branch
-git push -u origin feature/my-feature
-
-# Open a PR on GitHub
-```
-
-## Code Guidelines
-
-### Adding a New Command
-
-1. Create the command file:
-
-```typescript
-// src/commands/mycommand.ts
-import { Repository } from '../core/repository';
-import { TsgitError, ErrorCode } from '../core/errors';
-import * as colors from '../utils/colors';
-
-export function handleMyCommand(args: string[]): void {
-  // Parse arguments
-  const verbose = args.includes('--verbose') || args.includes('-v');
-  
-  // Open repository
-  const repo = Repository.open('.');
-  
-  // Implement logic
-  try {
-    // Your code here
-    console.log(colors.green('✓'), 'Success!');
-  } catch (error) {
-    if (error instanceof TsgitError) {
-      console.error(colors.red('error:'), error.message);
-      if (error.suggestions.length > 0) {
-        console.log(colors.yellow('hint:'), error.suggestions.join('\n  '));
-      }
-      process.exit(1);
-    }
-    throw error;
-  }
-}
-```
-
-2. Register in CLI:
-
-```typescript
-// src/cli.ts
-import { handleMyCommand } from './commands/mycommand';
-
-// In the switch statement:
-case 'mycommand':
-  handleMyCommand(args.slice(1));
-  break;
-```
-
-3. Add help text:
-
-```typescript
-// In HELP constant
-Mycommand:
-  mycommand [options]    Description here
-```
-
-### Error Handling
-
-Use the custom error class for user-facing errors:
-
-```typescript
-import { TsgitError, ErrorCode } from '../core/errors';
-
-throw new TsgitError(
-  'Branch not found: feature',
-  ErrorCode.REF_NOT_FOUND,
-  ['Did you mean: feature-branch?', 'Run wit branch to see all branches']
-);
-```
-
-### Logging
-
-Use the colors utility for consistent output:
-
-```typescript
-import * as colors from '../utils/colors';
-
-console.log(colors.green('✓'), 'Success');
-console.log(colors.yellow('warning:'), 'Be careful');
-console.log(colors.red('error:'), 'Something went wrong');
-console.log(colors.dim('Verbose info...'));
-```
-
-### Testing Git Compatibility
-
-When implementing Git features, verify compatibility:
-
-```bash
-# Create test repos with both
-mkdir test-git test-wit
-cd test-git && git init
-cd ../test-wit && wit init
-
-# Compare behavior
-cd test-git && git add . && git commit -m "test"
-cd ../test-wit && wit add . && wit commit -m "test"
-
-# Compare objects
-git cat-file -p HEAD
-wit cat-file -p HEAD
-```
-
-## Areas to Contribute
-
-### Good First Issues
-
-- Add missing command options
-- Improve error messages
-- Add tests for edge cases
-- Fix documentation typos
-- Add examples to docs
-
-### Intermediate
-
-- Implement missing Git commands
-- Improve performance
-- Add new AI features
-- Enhance Web UI
-
-### Advanced
-
-- Protocol improvements
-- New hash algorithms
-- Distributed/P2P features
-- CI/CD system
-
-## Testing Strategy
-
-### Unit Tests
-
-Test individual functions and classes:
-
-```typescript
-describe('Tree', () => {
-  it('should sort entries correctly', () => {
-    const tree = new Tree([
-      { mode: '100644', name: 'b.txt', hash: '...' },
-      { mode: '100644', name: 'a.txt', hash: '...' },
-    ]);
-    
-    const serialized = tree.serialize();
-    // Verify a.txt comes before b.txt
-  });
-});
-```
-
-### Integration Tests
-
-Test command flows:
-
-```typescript
-describe('commit workflow', () => {
-  it('should create commit with parent', async () => {
-    // Setup
-    const dir = await createTempDir();
-    Repository.init(dir);
-    
-    // First commit
-    writeFile(path.join(dir, 'file.txt'), 'v1');
-    execSync('wit add file.txt', { cwd: dir });
-    execSync('wit commit -m "First"', { cwd: dir });
-    
-    // Second commit
-    writeFile(path.join(dir, 'file.txt'), 'v2');
-    execSync('wit add file.txt', { cwd: dir });
-    execSync('wit commit -m "Second"', { cwd: dir });
-    
-    // Verify parent chain
-    const log = execSync('wit log --oneline', { cwd: dir }).toString();
-    expect(log.split('\n').length).toBe(2);
-  });
-});
-```
-
-### Compatibility Tests
-
-Test against real Git:
-
-```typescript
-describe('git compatibility', () => {
-  it('should produce same tree hash as git', async () => {
-    const dir = await createTempDir();
-    
-    // Create with git
-    execSync('git init', { cwd: dir });
-    writeFile(path.join(dir, 'file.txt'), 'content');
-    execSync('git add file.txt', { cwd: dir });
-    const gitHash = execSync('git write-tree', { cwd: dir }).toString().trim();
-    
-    // Create with wit
-    execSync('rm -rf .git && wit init', { cwd: dir });
-    execSync('wit add file.txt', { cwd: dir });
-    const witHash = execSync('wit write-tree', { cwd: dir }).toString().trim();
-    
-    expect(witHash).toBe(gitHash);
-  });
-});
-```
-
-## Documentation
-
-### Docs Structure
-
-```
-docs/
-├── introduction.mdx        # Overview
-├── quickstart.mdx          # Getting started & install guide
-├── commands/               # Command reference
-├── features/               # Feature deep-dives
-├── architecture/           # Internals
-└── api-reference/          # Programmatic API
-```
-
-### Writing Docs
-
-Use Mintlify MDX format:
-
-```mdx
 ---
-title: "Page Title"
-description: "Brief description"
----
-
-# Heading
-
-Regular paragraph text.
-
-<Tip>
-Helpful tips go here.
-</Tip>
-
-<Warning>
-Important warnings.
-</Warning>
-
-## Code Examples
-
-\`\`\`bash
-wit command example
-\`\`\`
-
-## Tables
-
-| Column 1 | Column 2 |
-|----------|----------|
-| Value 1  | Value 2  |
-```
-
-## Community
-
-### Getting Help
-
-- Open an issue for bugs
-- Start a discussion for questions
-- Join Discord for chat
-
-### Code of Conduct
-
-Be respectful and inclusive. We welcome contributors of all backgrounds and experience levels.
 
 ## License
 
 wit is MIT licensed. By contributing, you agree that your contributions will be licensed under MIT.
-
----
-
-Thank you for contributing to wit! 🎉
-
