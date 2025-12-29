@@ -15,6 +15,7 @@ import { PostgresStore } from '@mastra/pg';
 import { witAgent, createTsgitAgent } from './agent.js';
 import { witTools } from './tools/index.js';
 import { prReviewWorkflow, issueTriageWorkflow, codeGenerationWorkflow } from './workflows/index.js';
+import { ciExecutionWorkflow } from '../ci/workflows/index.js';
 import type { AIConfig } from './types.js';
 
 let mastraInstance: Mastra | null = null;
@@ -95,6 +96,7 @@ export function createTsgitMastra(config: AIConfig = {}): Mastra {
       prReview: prReviewWorkflow,
       issueTriage: issueTriageWorkflow,
       codeGeneration: codeGenerationWorkflow,
+      ciExecution: ciExecutionWorkflow,
     },
     memory: {
       wit: memory,
@@ -292,6 +294,7 @@ export async function getAIInfoForRepo(repoId: string): Promise<{
 import type { PRReviewInput, PRReviewOutput } from './workflows/pr-review.workflow.js';
 import type { IssueTriageInput, IssueTriageOutput } from './workflows/issue-triage.workflow.js';
 import type { CodeGenerationInput, CodeGenerationOutput } from './workflows/code-generation.workflow.js';
+import type { CIExecutionInput, CIExecutionOutput } from '../ci/workflows/ci-execution.workflow.js';
 
 /**
  * Run the PR Review workflow
@@ -422,6 +425,61 @@ export async function* streamIssueTriageWorkflow(input: IssueTriageInput) {
 export async function* streamCodeGenerationWorkflow(input: CodeGenerationInput) {
   const mastra = getTsgitMastra();
   const workflow = mastra.getWorkflow('codeGeneration');
+  
+  const run = await workflow.createRun();
+  const result = await run.stream({ inputData: input });
+  
+  for await (const chunk of result.fullStream) {
+    yield chunk;
+  }
+}
+
+// =============================================================================
+// CI/CD Workflow Execution Helpers
+// =============================================================================
+
+/**
+ * Run the CI Execution workflow
+ * 
+ * This executes a parsed CI workflow definition using Mastra orchestration.
+ * The workflow provides observability, retry handling, and streaming.
+ * 
+ * @param input - CI execution input parameters including the workflow definition
+ * @returns CI execution results including job results and conclusion
+ */
+export async function runCIExecutionWorkflow(input: CIExecutionInput): Promise<CIExecutionOutput> {
+  const mastra = getTsgitMastra();
+  const workflow = mastra.getWorkflow('ciExecution');
+  
+  const run = await workflow.createRun();
+  const result = await run.start({ inputData: input });
+  
+  if (result.status === 'failed') {
+    return {
+      success: false,
+      conclusion: 'failure',
+      jobs: {},
+      totalDuration: 0,
+      summary: 'Workflow execution failed',
+      error: 'Mastra workflow execution failed',
+    };
+  }
+  
+  return (result as any).result as CIExecutionOutput;
+}
+
+/**
+ * Stream the CI Execution workflow
+ * 
+ * Streams workflow execution events for real-time updates.
+ * Useful for showing live job/step progress in the UI.
+ * 
+ * @param input - CI execution input parameters
+ * @returns AsyncIterator of workflow events
+ */
+export async function* streamCIExecutionWorkflow(input: CIExecutionInput) {
+  const mastra = getTsgitMastra();
+  const workflow = mastra.getWorkflow('ciExecution');
   
   const run = await workflow.createRun();
   const result = await run.stream({ inputData: input });
