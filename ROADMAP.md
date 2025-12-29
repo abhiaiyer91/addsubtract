@@ -32,18 +32,20 @@ This isn't about replacing developers. It's about removing the friction between 
 
 | Domain | Status | Implemented |
 |--------|--------|-------------|
-| **Git Implementation** | 98% | 66 commands, full Git compatibility |
-| **AI Tools** | 95% | 21 tools including semantic search, code review, PR generation |
-| **Server/Platform** | 90% | PRs, Issues, Forks, Webhooks, SSH, Releases, Milestones |
+| **Git Implementation** | 98% | 72+ commands, full Git compatibility |
+| **AI Features** | 95% | 28 tools, 3 agents, 4 workflows, semantic search |
+| **Server/Platform** | 95% | 35 API routers, PRs, Issues, Merge Queue, CI/CD |
+| **Database Models** | 95% | 37 models covering all platform features |
 | **CLI Experience** | 95% | Smart status, semantic search, stacked diffs |
-| **Web UI** | 75% | 76 components, 43 routes, full PR/Issue workflows |
+| **Web UI** | 80% | Full IDE, PR/Issue workflows, AI chat |
+| **Events System** | 95% | 24 event types with handlers |
 | **Documentation** | 40% | Getting started, architecture - needs command reference |
 
 ---
 
 ## What's Implemented
 
-### CLI Commands (66 total)
+### CLI Commands (72+ total)
 
 **Porcelain (User-facing)**
 | Command | Description |
@@ -69,6 +71,7 @@ This isn't about replacing developers. It's about removing the friction between 
 | `wit ai explain` | Explain commits/diffs |
 | `wit ai resolve` | AI conflict resolution |
 | `wit search` | Semantic code search |
+| `wit agent` | Interactive AI coding agent |
 
 **Quality of Life**
 | Command | Description |
@@ -111,8 +114,15 @@ This isn't about replacing developers. It's about removing the friction between 
 | `wit review` | CodeRabbit-style review |
 | `wit stack` | Stacked diffs |
 | `wit cycle` | Sprint/cycle management |
+| `wit project` | Project management |
 | `wit collaborator` | Manage collaborators |
 | `wit token` | Personal access tokens |
+| `wit merge-queue` | Merge queue management |
+| `wit ci` | CI/CD operations |
+| `wit dashboard` | View project dashboard |
+| `wit wrapped` | Spotify Wrapped-style insights |
+| `wit journal` | Notion-like documentation |
+| `wit github-import` | Import from GitHub |
 
 **Plumbing**
 | Command | Description |
@@ -143,45 +153,72 @@ This isn't about replacing developers. It's about removing the friction between 
 
 ---
 
-### AI Tools (21 total)
+### AI Tools (28 total)
 
 **Git Operations**
-- `get-status` - Repository status
-- `get-diff` - Diff output
-- `stage-files` - Stage files
-- `create-commit` - Create commits
-- `get-log` - Commit history
-- `get-branches` - List branches
-- `switch-branch` - Switch branches
-- `get-merge-conflicts` - Detect conflicts
-- `resolve-conflict` - AI conflict resolution
+- `getStatus` - Repository status
+- `getDiff` - Diff output
+- `stageFiles` - Stage files
+- `createCommit` - Create commits
+- `getLog` - Commit history
+- `getBranches` - List branches
+- `switchBranch` - Switch branches
+- `getMergeConflicts` - Detect conflicts
+- `resolveConflict` - AI conflict resolution
 - `undo` - Undo operations
 - `search` - Code search
-- `semantic-search` - Semantic code search with embeddings
+- `semanticSearch` - Semantic code search with embeddings
+- `indexRepository` - Index repository for semantic search
+- `getIndexStatus` - Get indexing status
 
 **AI Generation**
-- `generate-pr-description` - AI-generated PR descriptions
-- `review-pr` - AI code review
+- `generatePRDescription` - AI-generated PR descriptions
+- `reviewPR` - AI code review
 
-**Coding Agent Tools**
-- `read-file` - Read files
-- `write-file` - Write files
-- `edit-file` - Edit files
-- `list-directory` - List directories
-- `run-command` - Run shell commands
-- `create-branch` - Create branches
-- `open-pull-request` - Open PRs
+**Disk-Based Coding Agent Tools**
+- `readFile` - Read files
+- `writeFile` - Write files
+- `editFile` - Edit files
+- `listDirectory` - List directories
+- `runCommand` - Run shell commands
+- `createBranch` - Create branches
+- `openPullRequest` - Open PRs
+
+**Virtual Filesystem Tools (In-Memory IDE)**
+- `virtualReadFile` - Read from virtual FS
+- `virtualWriteFile` - Write to virtual FS
+- `virtualEditFile` - Edit in virtual FS
+- `virtualListDirectory` - List virtual directory
+- `virtualCommit` - Commit virtual changes
+- `virtualStatus` - Virtual FS status
+
+### AI Agents (3 total)
+
+| Agent | Description |
+|-------|-------------|
+| PM Agent | Project management - creates issues, PRs, manages projects |
+| Code Agent | Code writing - edits files, commits changes |
+| Triage Agent | Automatic issue categorization and prioritization |
+
+### AI Workflows (4 total)
+
+| Workflow | Description |
+|----------|-------------|
+| `prReviewWorkflow` | Multi-step PR review with code analysis |
+| `issueTriageWorkflow` | Automatic issue categorization |
+| `codeGenerationWorkflow` | AI-assisted code generation |
+| `ciExecutionWorkflow` | CI/CD execution workflow |
 
 ---
 
-### Platform Features (19 API Routers)
+### Platform Features (35 API Routers)
 
 **Core**
 | Feature | Status |
 |---------|--------|
 | Repositories | CRUD, fork, star, watch |
 | Pull Requests | Full lifecycle, merge (merge/squash/rebase), reviews, comments, suggestions, AI review |
-| Issues | Linear-inspired statuses, labels, assignees, comments |
+| Issues | Linear-inspired statuses, labels, assignees, comments, templates, views |
 | Organizations | Org management, teams |
 | Users | User management |
 
@@ -192,6 +229,7 @@ This isn't about replacing developers. It's about removing the friction between 
 | Activity | Activity feed |
 | Notifications | Notification system |
 | Stacks | Stacked diffs |
+| Collaborators | Team/collaborator management with roles |
 
 **Infrastructure**
 | Feature | Status |
@@ -200,24 +238,46 @@ This isn't about replacing developers. It's about removing the friction between 
 | Branch Protection | Protection rules |
 | SSH Keys | Key management |
 | Tokens | Personal access tokens |
-| Merge Queue | Merge queue |
+| Merge Queue | Merge queue with batching |
+| OAuth Apps | OAuth2 app management |
 
-**Releases**
+**Project Management**
 | Feature | Status |
 |---------|--------|
+| Projects | Project boards and tracking |
+| Cycles | Sprint/cycle management |
 | Milestones | Milestone tracking |
 | Releases | Release management |
-| Workflows | CI/CD workflows |
+| Journal | Notion-like documentation |
+
+**CI/CD**
+| Feature | Status |
+|---------|--------|
+| Workflows | GitHub Actions compatible YAML |
+| Workflow Runs | Job/step execution tracking |
+| Sandbox | E2B, Daytona, Docker providers |
 
 **AI & Search**
 | Feature | Status |
 |---------|--------|
 | AI API | AI features endpoint |
+| Agent API | AI agent sessions and messages |
+| Triage Agent | Auto-triage configuration |
 | Search | Code search API |
+| Semantic Search | Vector-based code search |
+
+**Other**
+| Feature | Status |
+|---------|--------|
+| Dashboard | Project dashboard data |
+| Wrapped | Monthly activity insights |
+| GitHub Import | Import repos from GitHub |
+| IDE | Web-based IDE integration |
+| Packages | Package registry |
 
 ---
 
-### Web UI (76 components, 43 routes)
+### Web UI (80+ components)
 
 **Implemented Pages**
 - Authentication (login, register)
@@ -239,6 +299,10 @@ This isn't about replacing developers. It's about removing the friction between 
 - Stacked diffs viewer
 - Command palette (Cmd+K)
 - Keyboard shortcuts
+- Web-based IDE with terminal
+- AI agent chat panel
+- CI job graph visualization
+- Sandbox terminal
 
 **Key Components**
 - `diff-viewer.tsx` - Side-by-side and unified diff
@@ -246,34 +310,91 @@ This isn't about replacing developers. It's about removing the friction between 
 - `suggestion-block.tsx` - Code suggestions
 - `conflict-resolver.tsx` - Conflict resolution UI
 - `ai-chat.tsx` - Chat with codebase
+- `agent-panel.tsx` - AI agent interface
 - `kanban-board.tsx` - Issue board
 - `CommandPalette.tsx` - Command palette
 - `merge-button.tsx` - Merge with options
 - `review-panel.tsx` - Code review panel
+- `ide/` - Full IDE with file tree, tabs, terminal
+- `job-graph.tsx` - CI workflow visualization
+- `sandbox-terminal.tsx` - Cloud sandbox terminal
 
 ---
 
-### Database Models (17 total)
+### Database Models (37 total)
 
-| Model | Tables |
-|-------|--------|
-| `user.ts` | Users (better-auth) |
-| `organization.ts` | Organizations, members, teams |
-| `repository.ts` | Repos, collaborators, stars, watches |
-| `pull-request.ts` | PRs, reviews, comments, labels, reviewers, inbox |
-| `issue.ts` | Issues, comments, labels, statuses |
-| `activity.ts` | Activity log |
-| `webhook.ts` | Webhooks, deliveries |
-| `milestones.ts` | Milestones |
-| `releases.ts` | Releases, assets |
-| `notification.ts` | Notifications |
-| `branch-protection.ts` | Protection rules |
-| `ssh-keys.ts` | SSH keys |
-| `tokens.ts` | Personal access tokens |
-| `stack.ts` | Stacked diffs |
-| `workflow.ts` | CI workflows |
-| `workflow-runs.ts` | Workflow runs |
-| `merge-queue.ts` | Merge queue |
+**Users & Auth**
+- `user`, `session`, `account`, `verification` (better-auth)
+- `sshKeys`, `personalAccessTokens`, `emailPreferences`
+
+**Organizations**
+- `organizations`, `orgMembers`, `teams`, `teamMembers`
+
+**Repositories**
+- `repositories`, `collaborators`, `stars`, `watches`, `branchProtectionRules`
+
+**Pull Requests**
+- `pullRequests`, `prReviews`, `prComments`, `prLabels`, `prReviewers`
+
+**Issues**
+- `issues`, `issueComments`, `labels`, `issueLabels`
+- `issueRelations`, `issueStages`, `issueActivities`
+- `issueTemplates`, `issueViews`
+
+**Project Management**
+- `projects`, `projectMembers`, `projectUpdates`
+- `cycles`, `milestones`
+
+**Stacks**
+- `stacks`, `stackBranches`
+
+**Releases & Packages**
+- `releases`, `releaseAssets`
+- `packages`, `packageVersions`, `packageDistTags`, `packageMaintainers`
+
+**CI/CD**
+- `workflowRuns`, `jobRuns`, `stepRuns`
+- `mergeQueueConfig`, `mergeQueueEntries`, `mergeQueueBatches`, `mergeQueueHistory`
+
+**Agent & AI**
+- `agentSessions`, `agentMessages`, `agentFileChanges`
+- `repoAiKeys`, `userAiKeys`
+- `triageAgentConfig`, `triageAgentRuns`
+
+**Journal**
+- `journalPages`, `journalComments`, `journalPageHistory`
+
+**OAuth Apps**
+- `oauthApps`, `oauthAuthorizations`, `oauthAuthorizationCodes`, `oauthAccessTokens`
+
+**Other**
+- `activities`, `webhooks`, `notifications`, `wrapped`
+
+---
+
+### Events System (24 event types)
+
+**Repository Events**
+- `repo.created`, `repo.pushed`, `repo.starred`, `repo.forked`
+
+**Pull Request Events**
+- `pr.created`, `pr.updated`, `pr.review_requested`, `pr.reviewed`
+- `pr.merged`, `pr.closed`, `pr.commented`
+
+**Issue Events**
+- `issue.created`, `issue.assigned`, `issue.closed`, `issue.reopened`, `issue.commented`
+
+**CI Events**
+- `ci.completed`
+
+**Merge Queue Events**
+- `merge_queue.added`, `merge_queue.process`, `merge_queue.completed`, `merge_queue.failed`
+
+**Package Events**
+- `package.published`, `package.deprecated`, `package.unpublished`
+
+**Other**
+- `mention`
 
 ---
 
@@ -403,8 +524,9 @@ Not grep. Understanding.
 | Hooks | Complete |
 | Large files | Complete |
 | Partial clone | Complete |
+| Git protocol (HTTP + SSH) | Complete |
 
-### Platform Features: 90%
+### Platform Features: 95%
 
 | Feature | Status |
 |---------|--------|
@@ -422,9 +544,12 @@ Not grep. Understanding.
 | Notifications | Complete |
 | Stacked Diffs | Complete |
 | Merge Queue | Complete |
-| CI/CD Integration | Partial |
+| CI/CD Integration | Complete (GitHub Actions compatible) |
 | Code Search | Complete |
 | Semantic Search | Complete |
+| Projects & Cycles | Complete |
+| Journal/Docs | Complete |
+| Package Registry | Complete |
 
 ### AI Features: 95%
 
@@ -437,6 +562,24 @@ Not grep. Understanding.
 | Semantic Search | Complete |
 | Chat with Codebase | Complete |
 | Coding Agent Tools | Complete |
+| PM Agent | Complete |
+| Code Agent | Complete |
+| Triage Agent | Complete |
+| Virtual Filesystem | Complete |
+
+### Server & Infrastructure: 95%
+
+| Feature | Status |
+|---------|--------|
+| HTTP Server (Hono) | Complete |
+| SSH Server | Complete |
+| tRPC API | Complete (35 routers) |
+| OAuth2 | Complete |
+| Sandbox (E2B) | Complete |
+| Sandbox (Daytona) | Complete |
+| Sandbox (Docker) | Complete |
+| Events System | Complete (24 event types) |
+| Database (Drizzle) | Complete (37 models) |
 
 ---
 
@@ -528,4 +671,4 @@ Let's find out.
 
 ---
 
-*Last updated: December 27, 2024*
+*Last updated: December 29, 2024*
