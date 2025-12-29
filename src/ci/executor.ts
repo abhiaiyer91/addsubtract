@@ -694,6 +694,98 @@ export class WorkflowExecutor {
   }
   
   /**
+   * Queue a workflow for execution on runners
+   * 
+   * Unlike execute(), this method queues jobs to be picked up by runners
+   * instead of running them locally. Use this for distributed CI execution.
+   * 
+   * @returns The workflow run ID (jobs will be executed asynchronously by runners)
+   */
+  async queue(
+    workflow: Workflow,
+    workflowPath: string,
+    options: ExecuteOptions & {
+      /** Repository info for cloning */
+      repository: {
+        id: string;
+        fullName: string;
+        cloneUrl: string;
+        defaultBranch: string;
+      };
+    }
+  ): Promise<{ runId: string }> {
+    // Import the queue service dynamically to avoid circular dependencies
+    const { getJobQueueService } = await import('./runner/queue');
+    const queueService = getJobQueueService();
+    
+    // Create workflow run record
+    const run = await workflowRunModel.create({
+      repoId: options.repoId,
+      workflowPath,
+      workflowName: workflow.name,
+      commitSha: options.commitSha,
+      branch: options.branch,
+      event: options.event,
+      eventPayload: options.eventPayload ? JSON.stringify(options.eventPayload) : undefined,
+      triggeredById: options.triggeredById,
+      state: 'queued',
+    });
+    
+    // Start workflow
+    await workflowRunModel.start(run.id);
+    
+    // Get job execution order
+    const jobOrder = this.ciEngine.getJobOrder(workflow);
+    
+    // Track job results for dependency checking
+    const jobResults: Record<string, { success: boolean; outputs: Record<string, string> }> = {};
+    
+    // Queue jobs in dependency order
+    // Jobs with dependencies will be queued after their dependencies complete
+    // (the queue service handles this, but we need to set up the initial queue)
+    for (const jobName of jobOrder) {
+      const job = workflow.jobs[jobName];
+      
+      // Create job run record
+      const jobRun = await jobRunModel.create({
+        workflowRunId: run.id,
+        jobName,
+        state: 'queued',
+      });
+      
+      // Build needs context from completed jobs
+      const needs: Record<string, { result: 'success' | 'failure' | 'cancelled' | 'skipped'; outputs: Record<string, string> }> = {};
+      const deps = Array.isArray(job.needs) ? job.needs : job.needs ? [job.needs] : [];
+      
+      for (const dep of deps) {
+        if (jobResults[dep]) {
+          needs[dep] = {
+            result: jobResults[dep].success ? 'success' : 'failure',
+            outputs: jobResults[dep].outputs,
+          };
+        }
+      }
+      
+      // Enqueue the job
+      await queueService.enqueueJob({
+        jobRunId: jobRun.id,
+        repoId: options.repoId,
+        workflowRunId: run.id,
+        workflow,
+        job,
+        jobName,
+        repository: options.repository,
+        commitSha: options.commitSha,
+        branch: options.branch,
+        needs,
+        inputs: options.inputs,
+      });
+    }
+    
+    return { runId: run.id };
+  }
+  
+  /**
    * Cancel a running workflow
    */
   async cancel(runId: string): Promise<boolean> {

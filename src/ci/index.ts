@@ -11,6 +11,14 @@
  * - Retry handling for transient failures
  * - Real-time streaming of execution events
  * - Integration with the wit AI agent ecosystem
+ * 
+ * **Runner System**
+ * 
+ * The CI/CD engine supports distributed execution via runners:
+ * - Self-hosted runners for custom environments
+ * - Cloud runners for scalability
+ * - Job queue for work distribution
+ * - Real-time log streaming
  */
 
 // Export types
@@ -73,6 +81,32 @@ export {
   StepResultSchema,
   JobResultSchema,
 } from './workflows/index';
+
+// Export runner system
+export {
+  // Queue service
+  JobQueueService,
+  getJobQueueService,
+  startJobQueueService,
+  stopJobQueueService,
+  type QueueConfig,
+  // Runner client
+  RunnerClient,
+  registerRunner,
+  type RunnerClientConfig,
+  // Types
+  type RunnerStatus,
+  type RunnerType,
+  type RunnerOS,
+  type RunnerConfig,
+  type RunnerCapabilities,
+  type QueuedJob,
+  type JobPayload,
+  type JobExecutionResult,
+  type StepExecutionResult,
+  type LogEntry,
+  type RunnerHeartbeat,
+} from './runner';
 
 import * as path from 'path';
 import * as fs from 'fs';

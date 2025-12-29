@@ -109,6 +109,9 @@ export { handleCodeReview, REVIEW_HELP } from './review';
 // CI/CD commands
 export { handleCI, CI_HELP } from './ci';
 
+// Runner commands
+export { handleRunner, RUNNER_HELP } from './runner';
+
 // Merge Queue commands
 export { handleMergeQueue, MERGE_QUEUE_HELP } from './merge-queue';
 

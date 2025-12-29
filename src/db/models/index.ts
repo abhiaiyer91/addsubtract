@@ -177,3 +177,11 @@ export {
   type AuditLogEntry,
   type AdminContext,
 } from './admin';
+
+// CI Runner models
+export {
+  runnerModel,
+  registrationTokenModel,
+  jobQueueModel,
+  runnerJobHistoryModel,
+} from './runner';

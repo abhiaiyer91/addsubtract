@@ -97,6 +97,8 @@ import {
   handleCodeReview,
   // CI/CD
   handleCI,
+  // Runner
+  handleRunner,
   // Merge Queue
   handleMergeQueue,
   // Journal (Notion-like docs)
@@ -1126,6 +1128,18 @@ function main(): void {
       // CI/CD commands
       case 'ci':
         handleCI(args.slice(args.indexOf('ci') + 1)).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
+          }
+          process.exit(1);
+        });
+        return;
+
+      // Runner commands
+      case 'runner':
+        handleRunner(args.slice(args.indexOf('runner') + 1)).catch((error: Error) => {
           if (error instanceof TsgitError) {
             console.error((error as TsgitError).format());
           } else {

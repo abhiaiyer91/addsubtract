@@ -237,6 +237,40 @@ export interface CiRunCompletedEvent extends BaseEvent {
   };
 }
 
+export interface CiJobQueuedEvent extends BaseEvent {
+  type: 'ci.job.queued';
+  payload: {
+    queueId: string;
+    jobRunId: string;
+    workflowRunId: string;
+    repoId: string;
+    jobName: string;
+  };
+}
+
+export interface CiJobCompletedEvent extends BaseEvent {
+  type: 'ci.job.completed';
+  payload: {
+    queueId: string;
+    jobRunId: string;
+    workflowRunId: string;
+    repoId: string;
+    success: boolean;
+    conclusion: string;
+  };
+}
+
+export interface CiJobFailedEvent extends BaseEvent {
+  type: 'ci.job.failed';
+  payload: {
+    queueId: string;
+    jobRunId: string;
+    workflowRunId: string;
+    repoId: string;
+    error: string;
+  };
+}
+
 // ============ MENTION EVENTS ============
 
 export interface MentionEvent extends BaseEvent {
@@ -344,6 +378,9 @@ export type AppEvent =
   | IssueReopenedEvent
   | IssueCommentedEvent
   | CiRunCompletedEvent
+  | CiJobQueuedEvent
+  | CiJobCompletedEvent
+  | CiJobFailedEvent
   | MentionEvent
   | MergeQueueAddedEvent
   | MergeQueueProcessEvent

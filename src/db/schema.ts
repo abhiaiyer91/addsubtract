@@ -1322,6 +1322,267 @@ export const stepRuns = pgTable('step_runs', {
   logs: text('logs'),
 });
 
+// ============ CI RUNNERS ============
+
+/**
+ * Runner status enum
+ */
+export const runnerStatusEnum = pgEnum('runner_status', [
+  'offline',
+  'online',
+  'busy',
+  'draining',
+]);
+
+/**
+ * Runner type enum
+ */
+export const runnerTypeEnum = pgEnum('runner_type', [
+  'self_hosted',
+  'cloud',
+  'local',
+]);
+
+/**
+ * Runner scope type enum
+ */
+export const runnerScopeTypeEnum = pgEnum('runner_scope_type', [
+  'global',
+  'organization',
+  'repository',
+]);
+
+/**
+ * Queued job status enum
+ */
+export const queuedJobStatusEnum = pgEnum('queued_job_status', [
+  'queued',
+  'assigned',
+  'in_progress',
+  'completed',
+  'failed',
+  'cancelled',
+]);
+
+/**
+ * CI Runners table
+ * Stores registered runners that can execute CI jobs
+ */
+export const ciRunners = pgTable('ci_runners', {
+  /** Unique identifier for the runner */
+  id: uuid('id').primaryKey().defaultRandom(),
+  
+  /** Display name for the runner */
+  name: text('name').notNull(),
+  
+  /** Runner type (self_hosted, cloud, local) */
+  type: runnerTypeEnum('type').notNull().default('self_hosted'),
+  
+  /** Current status */
+  status: runnerStatusEnum('status').notNull().default('offline'),
+  
+  /** Scope type (global, organization, repository) */
+  scopeType: runnerScopeTypeEnum('scope_type').notNull().default('global'),
+  
+  /** Scope ID (org ID or repo ID, null for global) */
+  scopeId: uuid('scope_id'),
+  
+  /** Authentication token hash (for runner to authenticate) */
+  tokenHash: text('token_hash').notNull(),
+  
+  /** Maximum concurrent jobs this runner can handle */
+  maxConcurrentJobs: integer('max_concurrent_jobs').notNull().default(1),
+  
+  /** Current number of active jobs */
+  activeJobCount: integer('active_job_count').notNull().default(0),
+  
+  /** Operating system (linux, macos, windows) */
+  os: text('os').notNull(),
+  
+  /** Architecture (x64, arm64) */
+  arch: text('arch').notNull(),
+  
+  /** Labels for job matching (JSON array) */
+  labels: text('labels').notNull().default('[]'),
+  
+  /** Capabilities (JSON object with cpuCores, memoryGB, etc) */
+  capabilities: text('capabilities'),
+  
+  /** Work directory on the runner */
+  workDir: text('work_dir'),
+  
+  /** Whether to accept jobs from forks */
+  acceptForkJobs: boolean('accept_fork_jobs').notNull().default(false),
+  
+  /** Runner client version */
+  version: text('version'),
+  
+  /** Last heartbeat timestamp */
+  lastHeartbeat: timestamp('last_heartbeat', { withTimezone: true }),
+  
+  /** Last online timestamp */
+  lastOnline: timestamp('last_online', { withTimezone: true }),
+  
+  /** IP address of the runner */
+  ipAddress: text('ip_address'),
+  
+  /** When the runner was registered */
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  
+  /** When the runner was last updated */
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+/**
+ * Runner registration tokens table
+ * Temporary tokens used to register new runners
+ */
+export const runnerRegistrationTokens = pgTable('runner_registration_tokens', {
+  /** Unique identifier */
+  id: uuid('id').primaryKey().defaultRandom(),
+  
+  /** The token value (hashed) */
+  tokenHash: text('token_hash').notNull(),
+  
+  /** Scope type for the runner being registered */
+  scopeType: runnerScopeTypeEnum('scope_type').notNull().default('global'),
+  
+  /** Scope ID (org ID or repo ID, null for global) */
+  scopeId: uuid('scope_id'),
+  
+  /** Who created this token */
+  createdById: text('created_by_id').notNull(),
+  
+  /** When this token expires */
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  
+  /** Whether this token has been used */
+  used: boolean('used').notNull().default(false),
+  
+  /** When the token was used */
+  usedAt: timestamp('used_at', { withTimezone: true }),
+  
+  /** Runner ID that was created with this token */
+  runnerId: uuid('runner_id').references(() => ciRunners.id, { onDelete: 'set null' }),
+  
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+/**
+ * Job queue table
+ * Queue of jobs waiting to be picked up by runners
+ */
+export const jobQueue = pgTable('job_queue', {
+  /** Unique identifier for the queue entry */
+  id: uuid('id').primaryKey().defaultRandom(),
+  
+  /** Reference to the job run */
+  jobRunId: uuid('job_run_id')
+    .notNull()
+    .references(() => jobRuns.id, { onDelete: 'cascade' }),
+  
+  /** Repository ID for scoping */
+  repoId: uuid('repo_id')
+    .notNull()
+    .references(() => repositories.id, { onDelete: 'cascade' }),
+  
+  /** Workflow run ID */
+  workflowRunId: uuid('workflow_run_id')
+    .notNull()
+    .references(() => workflowRuns.id, { onDelete: 'cascade' }),
+  
+  /** Job name */
+  jobName: text('job_name').notNull(),
+  
+  /** Required labels for runner matching (JSON array) */
+  labels: text('labels').notNull().default('[]'),
+  
+  /** Current status */
+  status: queuedJobStatusEnum('status').notNull().default('queued'),
+  
+  /** Priority (lower = higher priority) */
+  priority: integer('priority').notNull().default(100),
+  
+  /** Assigned runner ID */
+  runnerId: uuid('runner_id').references(() => ciRunners.id, { onDelete: 'set null' }),
+  
+  /** Job payload (JSON with job definition) */
+  payload: text('payload').notNull(),
+  
+  /** When the job was queued */
+  queuedAt: timestamp('queued_at', { withTimezone: true }).defaultNow().notNull(),
+  
+  /** When the job was assigned to a runner */
+  assignedAt: timestamp('assigned_at', { withTimezone: true }),
+  
+  /** When the job started running */
+  startedAt: timestamp('started_at', { withTimezone: true }),
+  
+  /** When the job completed */
+  completedAt: timestamp('completed_at', { withTimezone: true }),
+  
+  /** Timeout in minutes */
+  timeoutMinutes: integer('timeout_minutes').notNull().default(360),
+  
+  /** Number of retry attempts */
+  retryCount: integer('retry_count').notNull().default(0),
+  
+  /** Maximum retry attempts */
+  maxRetries: integer('max_retries').notNull().default(0),
+  
+  /** Error message if failed */
+  errorMessage: text('error_message'),
+});
+
+/**
+ * Runner job history table
+ * Tracks which runners executed which jobs
+ */
+export const runnerJobHistory = pgTable('runner_job_history', {
+  /** Unique identifier */
+  id: uuid('id').primaryKey().defaultRandom(),
+  
+  /** Runner that executed the job */
+  runnerId: uuid('runner_id')
+    .notNull()
+    .references(() => ciRunners.id, { onDelete: 'cascade' }),
+  
+  /** Job queue entry */
+  jobQueueId: uuid('job_queue_id')
+    .notNull()
+    .references(() => jobQueue.id, { onDelete: 'cascade' }),
+  
+  /** Job run ID */
+  jobRunId: uuid('job_run_id')
+    .notNull()
+    .references(() => jobRuns.id, { onDelete: 'cascade' }),
+  
+  /** Workflow run ID */
+  workflowRunId: uuid('workflow_run_id')
+    .notNull()
+    .references(() => workflowRuns.id, { onDelete: 'cascade' }),
+  
+  /** Repository ID */
+  repoId: uuid('repo_id')
+    .notNull()
+    .references(() => repositories.id, { onDelete: 'cascade' }),
+  
+  /** When execution started */
+  startedAt: timestamp('started_at', { withTimezone: true }).notNull(),
+  
+  /** When execution completed */
+  completedAt: timestamp('completed_at', { withTimezone: true }),
+  
+  /** Duration in milliseconds */
+  durationMs: integer('duration_ms'),
+  
+  /** Whether the job succeeded */
+  success: boolean('success'),
+  
+  /** Conclusion (success, failure, cancelled) */
+  conclusion: text('conclusion'),
+});
+
 // ============ NOTIFICATIONS ============
 
 export const notificationTypeEnum = pgEnum('notification_type', [
@@ -2258,3 +2519,21 @@ export type NewOAuthRefreshToken = typeof oauthRefreshTokens.$inferInsert;
 
 export type OAuthAppWebhook = typeof oauthAppWebhooks.$inferSelect;
 export type NewOAuthAppWebhook = typeof oauthAppWebhooks.$inferInsert;
+
+// CI Runner types
+export type RunnerStatus = (typeof runnerStatusEnum.enumValues)[number];
+export type RunnerType = (typeof runnerTypeEnum.enumValues)[number];
+export type RunnerScopeType = (typeof runnerScopeTypeEnum.enumValues)[number];
+export type QueuedJobStatus = (typeof queuedJobStatusEnum.enumValues)[number];
+
+export type CIRunner = typeof ciRunners.$inferSelect;
+export type NewCIRunner = typeof ciRunners.$inferInsert;
+
+export type RunnerRegistrationToken = typeof runnerRegistrationTokens.$inferSelect;
+export type NewRunnerRegistrationToken = typeof runnerRegistrationTokens.$inferInsert;
+
+export type JobQueueEntry = typeof jobQueue.$inferSelect;
+export type NewJobQueueEntry = typeof jobQueue.$inferInsert;
+
+export type RunnerJobHistoryEntry = typeof runnerJobHistory.$inferSelect;
+export type NewRunnerJobHistoryEntry = typeof runnerJobHistory.$inferInsert;
