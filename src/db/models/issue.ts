@@ -4,6 +4,7 @@ import {
   issues,
   issueComments,
   issueLabels,
+  issueStages,
   labels,
   repositories,
   type Issue,
@@ -14,9 +15,11 @@ import {
   type NewLabel,
   type IssueStatus,
   type IssuePriority,
+  type IssueStage,
 } from '../schema';
 import { user } from '../auth-schema';
 import { repoModel } from './repository';
+import { issueStageModel } from './issue-stage';
 
 // Issue status values for Kanban board (includes triage)
 export const ISSUE_STATUSES: IssueStatus[] = [
@@ -160,9 +163,24 @@ export const issueModel = {
 
     const number = (lastIssue?.number ?? 0) + 1;
 
+    // If no stageId is set, try to set it based on status or get the default stage
+    let stageId = data.stageId;
+    if (!stageId) {
+      // Try to find stage matching the status
+      if (data.status) {
+        const stage = await issueStageModel.findByKey(data.repoId, data.status);
+        stageId = stage?.id;
+      }
+      // If still no stage, get the default
+      if (!stageId) {
+        const defaultStage = await issueStageModel.getDefault(data.repoId);
+        stageId = defaultStage?.id;
+      }
+    }
+
     const [issue] = await db
       .insert(issues)
-      .values({ ...data, number })
+      .values({ ...data, number, stageId })
       .returning();
 
     // Increment open issues count
@@ -359,6 +377,7 @@ export const issueModel = {
 
   /**
    * List issues grouped by status (for Kanban board)
+   * @deprecated Use listByRepoGroupedByStage for custom stages support
    */
   async listByRepoGroupedByStatus(
     repoId: string,
@@ -398,6 +417,112 @@ export const issueModel = {
     }
 
     return grouped;
+  },
+
+  /**
+   * List issues grouped by custom stage (for Kanban board with custom stages)
+   */
+  async listByRepoGroupedByStage(
+    repoId: string,
+    options: {
+      state?: 'open' | 'closed';
+      authorId?: string;
+      assigneeId?: string;
+    } = {}
+  ): Promise<{ stages: IssueStage[]; issuesByStage: Map<string, Issue[]> }> {
+    const [allIssues, stages] = await Promise.all([
+      this.listByRepo(repoId, { ...options, limit: 500 }),
+      issueStageModel.listByRepo(repoId),
+    ]);
+
+    // Create a map of stage ID -> issues
+    const issuesByStage = new Map<string, Issue[]>();
+    
+    // Initialize all stages with empty arrays
+    for (const stage of stages) {
+      issuesByStage.set(stage.id, []);
+    }
+
+    // Group issues by their stage
+    for (const issue of allIssues) {
+      if (issue.stageId && issuesByStage.has(issue.stageId)) {
+        issuesByStage.get(issue.stageId)!.push(issue);
+      } else {
+        // Fall back to status-based grouping for issues without stageId
+        const stage = stages.find(s => s.key === issue.status);
+        if (stage) {
+          issuesByStage.get(stage.id)!.push(issue);
+        } else if (stages.length > 0) {
+          // Put in first stage if no match found
+          const defaultStage = stages.find(s => s.isDefault) || stages[0];
+          issuesByStage.get(defaultStage.id)!.push(issue);
+        }
+      }
+    }
+
+    return { stages, issuesByStage };
+  },
+
+  /**
+   * Get issue with its stage information
+   */
+  async findWithStage(id: string): Promise<{ issue: Issue; stage: IssueStage | null } | undefined> {
+    const db = getDb();
+    
+    const result = await db
+      .select({
+        issue: issues,
+        stage: issueStages,
+      })
+      .from(issues)
+      .leftJoin(issueStages, eq(issues.stageId, issueStages.id))
+      .where(eq(issues.id, id));
+
+    if (result.length === 0) return undefined;
+
+    return {
+      issue: result[0].issue,
+      stage: result[0].stage,
+    };
+  },
+
+  /**
+   * List issues with their stage information
+   */
+  async listByRepoWithStages(
+    repoId: string,
+    options: {
+      state?: 'open' | 'closed';
+      stageId?: string;
+      limit?: number;
+    } = {}
+  ): Promise<Array<Issue & { stage: IssueStage | null }>> {
+    const db = getDb();
+    const conditions = [eq(issues.repoId, repoId)];
+
+    if (options.state) {
+      conditions.push(eq(issues.state, options.state));
+    }
+
+    if (options.stageId) {
+      conditions.push(eq(issues.stageId, options.stageId));
+    }
+
+    const result = await db
+      .select({
+        issue: issues,
+        stage: issueStages,
+      })
+      .from(issues)
+      .leftJoin(issueStages, eq(issues.stageId, issueStages.id))
+      .where(and(...conditions))
+      .orderBy(desc(issues.createdAt))
+      .limit(options.limit || 500);
+
+    return result.map((r) => ({
+      ...r.issue,
+      stage: r.stage,
+    }));
   },
 
   /**
@@ -513,6 +638,7 @@ export const issueModel = {
 
   /**
    * Update issue status (for Kanban board)
+   * Supports both legacy status enum and custom stages
    */
   async updateStatus(id: string, status: IssueStatus): Promise<Issue | undefined> {
     const db = getDb();
@@ -525,24 +651,81 @@ export const issueModel = {
       updatedAt: new Date(),
     };
     
+    // Try to find the matching stage for this status
+    const issue = await this.findById(id);
+    if (issue) {
+      const stage = await issueStageModel.findByKey(issue.repoId, status);
+      if (stage) {
+        updates.stageId = stage.id;
+      }
+    }
+    
     if (shouldClose) {
       updates.state = 'closed';
       updates.closedAt = new Date();
     } else if (status === 'backlog' || status === 'todo' || status === 'in_progress' || status === 'in_review') {
       // Reopen if moving back to active status
-      const existing = await this.findById(id);
-      if (existing?.state === 'closed') {
+      if (issue?.state === 'closed') {
         updates.state = 'open';
         updates.closedAt = null;
       }
     }
     
-    const [issue] = await db
+    const [updated] = await db
       .update(issues)
       .set(updates)
       .where(eq(issues.id, id))
       .returning();
-    return issue;
+    return updated;
+  },
+
+  /**
+   * Update issue to a custom stage (for custom workflow)
+   */
+  async updateStage(id: string, stageId: string): Promise<Issue | undefined> {
+    const db = getDb();
+    
+    const stage = await issueStageModel.findById(stageId);
+    if (!stage) return undefined;
+    
+    const updates: Partial<Issue> = {
+      stageId,
+      status: stage.key as IssueStatus, // Try to keep status in sync for backward compatibility
+      updatedAt: new Date(),
+    };
+    
+    // Handle closed state transitions
+    if (stage.isClosedState) {
+      updates.state = 'closed';
+      updates.closedAt = new Date();
+    } else {
+      // Reopen if moving to an open stage
+      const issue = await this.findById(id);
+      if (issue?.state === 'closed') {
+        updates.state = 'open';
+        updates.closedAt = null;
+      }
+    }
+    
+    const [updated] = await db
+      .update(issues)
+      .set(updates)
+      .where(eq(issues.id, id))
+      .returning();
+    return updated;
+  },
+
+  /**
+   * Update issue to a stage by key (for custom workflow)
+   */
+  async updateStageByKey(id: string, stageKey: string): Promise<Issue | undefined> {
+    const issue = await this.findById(id);
+    if (!issue) return undefined;
+    
+    const stage = await issueStageModel.findByKey(issue.repoId, stageKey);
+    if (!stage) return undefined;
+    
+    return this.updateStage(id, stage.id);
   },
 
   /**

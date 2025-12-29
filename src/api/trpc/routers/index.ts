@@ -77,6 +77,7 @@ export const appRouter = router({
   oauthApps: oauthAppsRouter,
   admin: adminRouter,
   aiCollaboration: aiCollaborationRouter,
+  githubImport: githubImportRouter,
 });
 
 /**
@@ -121,4 +122,5 @@ export {
   oauthAppsRouter,
   adminRouter,
   aiCollaborationRouter,
+  githubImportRouter,
 };

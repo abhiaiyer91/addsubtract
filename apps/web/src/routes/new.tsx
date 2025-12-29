@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Code2, Lock, Globe, Building2, User, ChevronDown } from 'lucide-react';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { Code2, Lock, Globe, Building2, User, ChevronDown, Github } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -163,6 +163,26 @@ export function NewRepoPage() {
           A repository contains all project files, including the revision history.
         </p>
       </div>
+
+      {/* Import from GitHub CTA */}
+      <Card className="mb-6 border-dashed">
+        <CardContent className="p-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-primary/10">
+              <Github className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <p className="font-medium">Migrating from GitHub?</p>
+              <p className="text-sm text-muted-foreground">
+                Import your repository with issues, PRs, and more.
+              </p>
+            </div>
+          </div>
+          <Button variant="outline" asChild>
+            <Link to="/import">Import from GitHub</Link>
+          </Button>
+        </CardContent>
+      </Card>
 
       <form onSubmit={handleSubmit}>
         <Card>

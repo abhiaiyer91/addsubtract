@@ -38,9 +38,12 @@ export {
   withRepoPermission,
   isRepoAdmin,
   isRepoMember,
+  isRepoReader,
   withOrgRole,
   isOrgAdmin,
   isOrgOwner,
+  isOrgMember,
+  requireOAuthScope,
 } from './middleware/auth';
 
 // Export client creator

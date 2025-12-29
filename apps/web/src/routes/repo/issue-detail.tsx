@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { CircleDot, CheckCircle2, ChevronRight, FolderKanban, RefreshCw } from 'lucide-react';
+import { CircleDot, CheckCircle2, ChevronRight, FolderKanban, RefreshCw, Settings2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
@@ -13,7 +13,7 @@ import { ProjectPicker } from '@/components/issue/project-picker';
 import { PriorityPicker, type IssuePriority } from '@/components/issue/priority-picker';
 import { RepoLayout } from './components/repo-layout';
 import { Loading } from '@/components/ui/loading';
-import { formatRelativeTime, formatDate } from '@/lib/utils';
+import { formatRelativeTime, formatDate, cn } from '@/lib/utils';
 import { useSession } from '@/lib/auth-client';
 import { trpc } from '@/lib/trpc';
 import type { Label } from '@/lib/api-types';
@@ -26,6 +26,7 @@ export function IssueDetailPage() {
     number: string;
   }>();
   const [comment, setComment] = useState('');
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const { data: session } = useSession();
   const authenticated = !!session?.user;
   const currentUser = session?.user || null;
@@ -431,14 +432,14 @@ export function IssueDetailPage() {
 
       {/* Issue header */}
       <div>
-        <h1 className="text-2xl font-bold">
-          {issue.title}
-          <span className="text-muted-foreground font-normal ml-2">
+        <h1 className="text-xl lg:text-2xl font-bold flex flex-wrap items-start gap-2">
+          <span className="break-words">{issue.title}</span>
+          <span className="text-muted-foreground font-normal">
             #{issue.number}
           </span>
         </h1>
 
-        <div className="flex items-center gap-3 mt-3">
+        <div className="flex flex-wrap items-center gap-2 lg:gap-3 mt-3">
           <Badge
             variant={issue.state === 'open' ? 'success' : 'purple'}
             className="gap-1"
@@ -457,7 +458,7 @@ export function IssueDetailPage() {
               <Badge variant="outline" className="gap-1.5 hover:bg-muted transition-colors">
                 <FolderKanban className="h-3 w-3" />
                 {project.icon && <span>{project.icon}</span>}
-                {project.name}
+                <span className="hidden sm:inline">{project.name}</span>
               </Badge>
             </Link>
           )}
@@ -465,25 +466,36 @@ export function IssueDetailPage() {
             <Link to={`/${owner}/${repo}/issues?section=cycle&cycle=${cycle.id}`}>
               <Badge variant="outline" className="gap-1.5 hover:bg-muted transition-colors">
                 <RefreshCw className="h-3 w-3" />
-                {cycle.name}
+                <span className="hidden sm:inline">{cycle.name}</span>
               </Badge>
             </Link>
           )}
 
-          <span className="text-muted-foreground">
-            <Link
-              to={`/${issue.author?.username}`}
-              className="font-medium hover:text-foreground"
-            >
-              {issue.author?.username || 'Unknown'}
-            </Link>{' '}
-            opened this issue {formatRelativeTime(new Date(issue.createdAt))} ·{' '}
-            {comments.length} comments
-          </span>
+          {/* Mobile sidebar toggle */}
+          <Button
+            variant="outline"
+            size="sm"
+            className="md:hidden h-8"
+            onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+          >
+            <Settings2 className="h-3.5 w-3.5 mr-1.5" />
+            <span className="text-xs">Details</span>
+          </Button>
         </div>
+
+        {/* Author info - separate line for better mobile layout */}
+        <p className="text-sm text-muted-foreground mt-2">
+          <Link
+            to={`/${issue.author?.username}`}
+            className="font-medium hover:text-foreground"
+          >
+            {issue.author?.username || 'Unknown'}
+          </Link>{' '}
+          opened {formatRelativeTime(new Date(issue.createdAt))} · {comments.length} comments
+        </p>
       </div>
 
-      <div className="grid md:grid-cols-4 gap-6">
+      <div className="grid md:grid-cols-4 gap-4 lg:gap-6">
         {/* Main content */}
         <div className="md:col-span-3 space-y-4">
           {/* Issue body */}
@@ -579,8 +591,25 @@ export function IssueDetailPage() {
           )}
         </div>
 
-        {/* Sidebar */}
-        <div className="space-y-6">
+        {/* Sidebar - Responsive */}
+        <div className={cn(
+          "space-y-4 lg:space-y-6",
+          "md:block",
+          isMobileSidebarOpen ? "block" : "hidden"
+        )}>
+          {/* Mobile close button */}
+          <div className="flex items-center justify-between md:hidden mb-2">
+            <h3 className="font-semibold text-sm">Issue Details</h3>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setIsMobileSidebarOpen(false)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+
           {/* Labels */}
           <div>
             <LabelPicker

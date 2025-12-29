@@ -867,6 +867,111 @@ export class ApiClient {
       const query = limit ? `?limit=${limit}` : '';
       return this.request('GET', `/api/repos/${owner}/${repo}/issues/activity${query}`);
     },
+
+    // =========================================================================
+    // Stage Operations (Custom Workflow)
+    // =========================================================================
+
+    /**
+     * Update issue stage (using custom workflow)
+     */
+    updateStage: async (
+      owner: string,
+      repo: string,
+      number: number,
+      stageKey: string
+    ): Promise<Issue> => {
+      return this.request('PATCH', `/api/repos/${owner}/${repo}/issues/${number}/stage`, {
+        stageKey,
+      });
+    },
+  };
+
+  // ============================================================================
+  // Stage Operations (Custom Workflow)
+  // ============================================================================
+
+  readonly stages = {
+    /**
+     * List all stages for a repository
+     */
+    list: async (owner: string, repo: string): Promise<IssueStage[]> => {
+      return this.request('GET', `/api/repos/${owner}/${repo}/stages`);
+    },
+
+    /**
+     * Get a specific stage
+     */
+    get: async (owner: string, repo: string, key: string): Promise<IssueStage> => {
+      return this.request('GET', `/api/repos/${owner}/${repo}/stages/${key}`);
+    },
+
+    /**
+     * Create a new stage
+     */
+    create: async (
+      owner: string,
+      repo: string,
+      data: {
+        key: string;
+        name: string;
+        description?: string;
+        icon?: string;
+        color?: string;
+        position?: number;
+        isClosedState?: boolean;
+        isTriageState?: boolean;
+        isDefault?: boolean;
+      }
+    ): Promise<IssueStage> => {
+      return this.request('POST', `/api/repos/${owner}/${repo}/stages`, data);
+    },
+
+    /**
+     * Update a stage
+     */
+    update: async (
+      owner: string,
+      repo: string,
+      key: string,
+      data: {
+        name?: string;
+        description?: string;
+        icon?: string;
+        color?: string;
+        position?: number;
+        isClosedState?: boolean;
+        isTriageState?: boolean;
+        isDefault?: boolean;
+      }
+    ): Promise<IssueStage> => {
+      return this.request('PATCH', `/api/repos/${owner}/${repo}/stages/${key}`, data);
+    },
+
+    /**
+     * Delete a stage
+     */
+    delete: async (owner: string, repo: string, key: string): Promise<void> => {
+      return this.request('DELETE', `/api/repos/${owner}/${repo}/stages/${key}`);
+    },
+
+    /**
+     * Reorder stages
+     */
+    reorder: async (
+      owner: string,
+      repo: string,
+      stageIds: string[]
+    ): Promise<IssueStage[]> => {
+      return this.request('POST', `/api/repos/${owner}/${repo}/stages/reorder`, { stageIds });
+    },
+
+    /**
+     * Initialize default stages for a repository
+     */
+    init: async (owner: string, repo: string): Promise<IssueStage[]> => {
+      return this.request('POST', `/api/repos/${owner}/${repo}/stages/init`);
+    },
   };
 
   // ============================================================================
@@ -1522,6 +1627,23 @@ export interface Cycle {
   description?: string;
   startDate: string;
   endDate: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface IssueStage {
+  id: string;
+  repoId: string;
+  key: string;
+  name: string;
+  description?: string;
+  icon: string;
+  color: string;
+  position: number;
+  isClosedState: boolean;
+  isTriageState: boolean;
+  isDefault: boolean;
+  isSystem: boolean;
   createdAt: string;
   updatedAt: string;
 }

@@ -14,6 +14,7 @@ import {
   type Watch,
 } from '../schema';
 import { user } from '../auth-schema';
+import { issueStageModel } from './issue-stage';
 
 // Owner type for better-auth user table
 type Owner = {
@@ -175,10 +176,20 @@ export const repoModel = {
 
   /**
    * Create a new repository
+   * Also creates default issue stages for the repository
    */
   async create(data: NewRepository): Promise<Repository> {
     const db = getDb();
     const [repo] = await db.insert(repositories).values(data).returning();
+    
+    // Create default issue stages for the new repository
+    try {
+      await issueStageModel.createDefaultStages(repo.id);
+    } catch (error) {
+      // Log but don't fail repo creation if stages fail
+      console.error('Failed to create default stages for repo:', repo.id, error);
+    }
+    
     return repo;
   },
 
