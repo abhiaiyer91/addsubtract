@@ -267,3 +267,146 @@ html {
   content: '';
   @apply absolute -right-1 -top-1 h-2 w-2 rounded-full bg-primary;
 }
+
+/* Mobile-specific utilities */
+@layer utilities {
+  /* Improve touch targets on mobile */
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px];
+  }
+
+  /* Safe area padding for notched devices */
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+
+  .safe-top {
+    padding-top: env(safe-area-inset-top, 0);
+  }
+
+  .safe-x {
+    padding-left: env(safe-area-inset-left, 0);
+    padding-right: env(safe-area-inset-right, 0);
+  }
+
+  /* Mobile-optimized scrolling */
+  .scroll-touch {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+
+  /* Prevent text selection on mobile interactive elements */
+  .no-select {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+
+  /* Mobile tap highlight removal */
+  .no-tap-highlight {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Better mobile code display */
+  .mobile-code {
+    font-size: 12px;
+    line-height: 1.5;
+    tab-size: 2;
+  }
+}
+
+/* Mobile viewport height fix */
+@supports (height: 100dvh) {
+  .h-screen-safe {
+    height: 100dvh;
+  }
+}
+
+@supports not (height: 100dvh) {
+  .h-screen-safe {
+    height: 100vh;
+  }
+}
+
+/* Mobile-friendly horizontal scroll with visible scrollbar hints */
+.mobile-scroll-hint {
+  position: relative;
+}
+
+.mobile-scroll-hint::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 24px;
+  background: linear-gradient(to right, transparent, hsl(var(--background)));
+  pointer-events: none;
+}
+
+@media (min-width: 768px) {
+  .mobile-scroll-hint::after {
+    display: none;
+  }
+}
+
+/* Slide up animation for mobile bottom sheets */
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s ease-out;
+}
+
+/* Slide in from right animation for mobile menus */
+@keyframes slide-in-from-right {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in-right {
+  animation: slide-in-from-right 0.3s ease-out;
+}
+
+/* Mobile-specific component adjustments */
+@media (max-width: 767px) {
+  /* Smaller border radius on mobile for tighter layouts */
+  .card, [role="dialog"] {
+    border-radius: calc(var(--radius) - 2px);
+  }
+
+  /* Better button sizing on mobile */
+  button:not([class*="h-"]):not([class*="size-"]) {
+    min-height: 40px;
+  }
+
+  /* Improve form inputs for touch */
+  input, textarea, select {
+    font-size: 16px !important; /* Prevents iOS zoom on focus */
+  }
+
+  /* Code blocks horizontal scroll */
+  pre, .shiki {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Tables horizontal scroll */
+  table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}

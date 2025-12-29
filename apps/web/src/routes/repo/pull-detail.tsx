@@ -12,6 +12,8 @@ import {
   Loader2,
   Edit3,
   AlertTriangle,
+  PanelRightOpen,
+  PanelRightClose,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -49,6 +51,7 @@ export function PullDetailPage() {
   const [viewedFiles, setViewedFiles] = useState<Set<string>>(new Set());
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [editedBody, setEditedBody] = useState('');
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const { data: session } = useSession();
   const authenticated = !!session?.user;
   const utils = trpc.useUtils();
@@ -554,17 +557,17 @@ export function PullDetailPage() {
 
   return (
     <RepoLayout owner={owner!} repo={repo!}>
-      <div className="flex gap-6">
+      <div className="flex flex-col lg:flex-row gap-4 lg:gap-6">
         {/* Main content */}
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 order-2 lg:order-1">
           {/* PR Header */}
-          <div className="mb-6">
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              {pr.title}
+          <div className="mb-4 lg:mb-6">
+            <h1 className="text-xl lg:text-2xl font-bold flex flex-wrap items-center gap-2">
+              <span className="break-words">{pr.title}</span>
               <span className="text-muted-foreground font-normal">#{pr.number}</span>
             </h1>
 
-            <div className="flex items-center gap-3 mt-3">
+            <div className="flex flex-wrap items-center gap-2 lg:gap-3 mt-3 text-sm lg:text-base">
               <Badge
                 variant={pr.state === 'open' ? 'success' : pr.state === 'merged' ? 'purple' : 'secondary'}
                 className="gap-1"
@@ -578,20 +581,24 @@ export function PullDetailPage() {
                 <Link to={`/${pr.author?.username}`} className="font-medium hover:text-foreground">
                   {pr.author?.username || 'Unknown'}
                 </Link>{' '}
-                wants to merge{' '}
-                <code className="px-1.5 py-0.5 bg-muted rounded font-mono text-sm">
-                  {pr.sourceBranch}
-                </code>{' '}
-                into{' '}
-                <code className="px-1.5 py-0.5 bg-muted rounded font-mono text-sm">
-                  {pr.targetBranch}
-                </code>
+                <span className="hidden sm:inline">wants to merge</span>
               </span>
+            </div>
+
+            {/* Branch info - mobile optimized */}
+            <div className="flex flex-wrap items-center gap-2 mt-2 text-sm">
+              <code className="px-1.5 py-0.5 bg-muted rounded font-mono text-xs lg:text-sm truncate max-w-[150px] lg:max-w-none">
+                {pr.sourceBranch}
+              </code>
+              <span className="text-muted-foreground">→</span>
+              <code className="px-1.5 py-0.5 bg-muted rounded font-mono text-xs lg:text-sm truncate max-w-[150px] lg:max-w-none">
+                {pr.targetBranch}
+              </code>
             </div>
 
             {/* Labels */}
             {pr.labels && pr.labels.length > 0 && (
-              <div className="flex items-center gap-2 mt-3">
+              <div className="flex flex-wrap items-center gap-2 mt-3">
                 {pr.labels.map((label) => (
                   <Badge
                     key={label.id}
@@ -651,37 +658,58 @@ export function PullDetailPage() {
 
           {/* Tabs */}
           <Tabs defaultValue="conversation">
-            <div className="flex items-center justify-between mb-4">
-              <TabsList>
-                <TabsTrigger value="conversation" className="gap-2">
-                  <MessageSquare className="h-4 w-4" />
-                  Conversation
-                </TabsTrigger>
-                <TabsTrigger value="commits" className="gap-2">
-                  <GitCommit className="h-4 w-4" />
-                  Commits
-                  <Badge variant="secondary" className="ml-1">{commits.length}</Badge>
-                </TabsTrigger>
-                <TabsTrigger value="files" className="gap-2">
-                  <FileCode className="h-4 w-4" />
-                  Files changed
-                  <Badge variant="secondary" className="ml-1">{diff.length}</Badge>
-                </TabsTrigger>
-                {mergeabilityData?.canMerge === false && conflictCount > 0 && (
-                  <TabsTrigger value="conflicts" className="gap-2">
-                    <AlertTriangle className="h-4 w-4 text-amber-500" />
-                    Conflicts
-                    <Badge variant="warning">{conflictCount}</Badge>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+              {/* Scrollable tabs container for mobile */}
+              <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide">
+                <TabsList className="inline-flex w-max sm:w-auto">
+                  <TabsTrigger value="conversation" className="gap-1.5 text-xs sm:text-sm px-2 sm:px-3">
+                    <MessageSquare className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                    <span className="hidden xs:inline">Conversation</span>
+                    <span className="xs:hidden">Chat</span>
                   </TabsTrigger>
-                )}
-              </TabsList>
+                  <TabsTrigger value="commits" className="gap-1.5 text-xs sm:text-sm px-2 sm:px-3">
+                    <GitCommit className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                    <span className="hidden sm:inline">Commits</span>
+                    <Badge variant="secondary" className="ml-1 text-xs">{commits.length}</Badge>
+                  </TabsTrigger>
+                  <TabsTrigger value="files" className="gap-1.5 text-xs sm:text-sm px-2 sm:px-3">
+                    <FileCode className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                    <span className="hidden sm:inline">Files</span>
+                    <Badge variant="secondary" className="ml-1 text-xs">{diff.length}</Badge>
+                  </TabsTrigger>
+                  {mergeabilityData?.canMerge === false && conflictCount > 0 && (
+                    <TabsTrigger value="conflicts" className="gap-1.5 text-xs sm:text-sm px-2 sm:px-3">
+                      <AlertTriangle className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-500" />
+                      <span className="hidden sm:inline">Conflicts</span>
+                      <Badge variant="warning" className="text-xs">{conflictCount}</Badge>
+                    </TabsTrigger>
+                  )}
+                </TabsList>
+              </div>
 
-              {authenticated && pr.state === 'open' && (
-                <ReviewButton
-                  onSubmit={handleSubmitReview}
-                  isAuthor={isAuthor}
-                />
-              )}
+              <div className="flex items-center gap-2">
+                {/* Mobile sidebar toggle */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="lg:hidden h-9"
+                  onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+                >
+                  {isMobileSidebarOpen ? (
+                    <PanelRightClose className="h-4 w-4 mr-1.5" />
+                  ) : (
+                    <PanelRightOpen className="h-4 w-4 mr-1.5" />
+                  )}
+                  <span className="text-xs">Details</span>
+                </Button>
+
+                {authenticated && pr.state === 'open' && (
+                  <ReviewButton
+                    onSubmit={handleSubmitReview}
+                    isAuthor={isAuthor}
+                  />
+                )}
+              </div>
             </div>
 
             <TabsContent value="conversation" className="space-y-6">
@@ -896,8 +924,26 @@ export function PullDetailPage() {
           </Tabs>
         </div>
 
-        {/* Sidebar */}
-        <div className="w-64 shrink-0 space-y-6">
+        {/* Sidebar - Responsive */}
+        <div className={cn(
+          "lg:w-64 shrink-0 space-y-4 lg:space-y-6 order-1 lg:order-2",
+          // Mobile: collapsible with slide animation
+          "lg:block",
+          isMobileSidebarOpen ? "block" : "hidden"
+        )}>
+          {/* Mobile close button */}
+          <div className="flex items-center justify-between lg:hidden mb-2">
+            <h3 className="font-semibold text-sm">PR Details</h3>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setIsMobileSidebarOpen(false)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+          
           <PrSidebar
             reviewers={sidebarReviewers}
             onRequestReview={authenticated ? handleRequestReview : undefined}
