@@ -237,9 +237,38 @@ export class GitHubAPIClient {
   }
 
   /**
-   * Make a request to the GitHub API
+   * Make a request to the GitHub API with retry logic
    */
   async request<T>(
+    method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
+    endpoint: string,
+    body?: unknown,
+    retries = 3
+  ): Promise<T> {
+    return this.requestWithRetry<T>(method, endpoint, body, retries);
+  }
+
+  private async requestWithRetry<T>(
+    method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
+    endpoint: string,
+    body: unknown,
+    retriesLeft: number
+  ): Promise<T> {
+    try {
+      return await this.doRequest<T>(method, endpoint, body);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      // Retry on transient errors
+      if (retriesLeft > 0 && (message.includes('temporarily unavailable') || message.includes('timeout'))) {
+        console.log(`[GitHub API] Retrying ${endpoint} (${retriesLeft} retries left)...`);
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+        return this.requestWithRetry<T>(method, endpoint, body, retriesLeft - 1);
+      }
+      throw error;
+    }
+  }
+
+  private doRequest<T>(
     method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
     endpoint: string,
     body?: unknown
@@ -272,11 +301,24 @@ export class GitHubAPIClient {
               resolve(data as unknown as T);
             }
           } else if (res.statusCode === 404) {
-            reject(new Error(`Not found: ${endpoint}`));
-          } else if (res.statusCode === 401 || res.statusCode === 403) {
-            reject(new Error(`Authentication failed or rate limited: ${data}`));
+            reject(new Error(`Repository or resource not found: ${endpoint}`));
+          } else if (res.statusCode === 401) {
+            reject(new Error('GitHub authentication failed. Please reconnect your GitHub account or use a valid token.'));
+          } else if (res.statusCode === 403) {
+            // Check if it's rate limiting
+            if (data.includes('rate limit')) {
+              reject(new Error('GitHub API rate limit exceeded. Please wait a few minutes and try again.'));
+            } else {
+              reject(new Error('GitHub access denied. Your token may not have the required permissions (repo scope).'));
+            }
+          } else if (res.statusCode === 502 || res.statusCode === 503 || res.statusCode === 504) {
+            reject(new Error('GitHub is temporarily unavailable. Please try again in a few minutes.'));
           } else {
-            reject(new Error(`GitHub API error ${res.statusCode}: ${data}`));
+            // Clean up HTML error pages from GitHub
+            const cleanError = data.includes('<!DOCTYPE') || data.includes('<html') 
+              ? `GitHub returned an error (HTTP ${res.statusCode})` 
+              : data.substring(0, 200);
+            reject(new Error(`GitHub API error: ${cleanError}`));
           }
         });
       });
