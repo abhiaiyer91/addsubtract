@@ -1,13 +1,26 @@
 ---
-title: "Contributing"
-description: "Pick a task, copy the prompt, and start contributing to wit"
+title: "Lend Me Your Tokens"
+description: "Help build wit - pick a task, copy the prompt, contribute with AI"
 ---
 
-Thank you for your interest in contributing to wit! This page contains everything you need to get started - pick a task, copy the prompt, and let AI help you build.
+# Lend Me Your Tokens
 
-**We only accept AI-generated contributions.** Use Claude, Cursor, or your favorite AI coding tool.
+Like Goku's Spirit Bomb, wit is powered by collective energy. Every contribution - every token spent by contributors around the world - adds to something bigger than any of us could build alone.
 
-## Quick Setup
+**This is an open call:** We need your AI tokens to build the future of version control.
+
+You have Claude, Cursor, Copilot, or another AI coding tool. You have tokens. We have tasks. Pick one, copy the prompt, and let's build wit together.
+
+---
+
+## How It Works
+
+1. **Clone wit** and set up your environment
+2. **Pick a task** from the list below
+3. **Copy the prompt** into your AI coding tool
+4. **Submit a PR** with your AI-generated contribution
+
+Every contribution counts. Every token helps.
 
 ```bash
 git clone https://github.com/abhiaiyer91/wit.git
@@ -22,7 +35,7 @@ wit --version
 
 ## Priority Tasks
 
-These are the highest-impact items we need help with right now.
+The highest-impact items we need help with right now.
 
 ### Fix Integration Test Failures
 
@@ -86,13 +99,11 @@ Audit all error messages in the codebase for helpfulness:
 4. Prioritize errors users hit frequently (commit, push, merge conflicts)
 
 Example of a good error:
-```typescript
 throw new TsgitError(
   'Branch not found: feature',
   ErrorCode.REF_NOT_FOUND,
   ['Did you mean: feature-branch?', 'Run wit branch to see all branches']
 );
-```
 ```
 
 ---
@@ -100,8 +111,6 @@ throw new TsgitError(
 ## Documentation Tasks
 
 ### Installation One-Liner
-
-Create a simple installation script for new users.
 
 ```
 Create a one-liner installation script for wit:
@@ -117,8 +126,6 @@ Look at how other CLI tools (like rustup, nvm, bun) do this.
 
 ### "5 Minutes to Wow" Tutorial
 
-Create a tutorial that gets new users productive immediately.
-
 ```
 Create a "5 minutes to wow" tutorial for wit in `docs/quickstart.mdx`:
 
@@ -133,8 +140,6 @@ The goal: new user goes from install to "wow, this is better" in 5 minutes.
 ```
 
 ### Demo Video Script
-
-Create a script for a demo video showcasing wit's capabilities.
 
 ```
 Create a demo video script for wit in a new file `docs/demo-script.md`:
@@ -155,8 +160,6 @@ Include exact terminal commands and expected output.
 
 ### Improve `git log` Compatibility
 
-Make `wit log` support more Git options.
-
 ```
 Improve `wit log` to support more Git options:
 
@@ -171,8 +174,6 @@ Focus on the most commonly used options first.
 
 ### Improve `git diff` Compatibility
 
-Enhance the diff output to match Git more closely.
-
 ```
 Improve `wit diff` compatibility with Git:
 
@@ -186,8 +187,6 @@ Use `src/core/diff.ts` and `src/commands/diff.ts`.
 ```
 
 ### Add Missing Command Options
-
-Many commands are missing flags that Git supports.
 
 ```
 Add missing options to wit commands:
@@ -207,8 +206,6 @@ Start with frequently used commands: status, add, commit, branch, checkout.
 
 ### Improve AI Commit Messages
 
-Make AI-generated commit messages better.
-
 ```
 Improve the AI commit message generation in `src/commands/ai.ts`:
 
@@ -223,8 +220,6 @@ The goal: commit messages that developers would actually write.
 
 ### Enhance Semantic Search
 
-Improve the semantic code search accuracy and speed.
-
 ```
 Enhance semantic search in `src/search/`:
 
@@ -238,8 +233,6 @@ Test with queries like "where do we handle authentication" and "how does the mer
 ```
 
 ### Add More AI Tools
-
-Extend the AI agent with new capabilities.
 
 ```
 Add new AI tools to the agent in `src/ai/tools/`:
@@ -259,8 +252,6 @@ Add new AI tools to the agent in `src/ai/tools/`:
 
 ### Improve PR Review Experience
 
-Enhance the pull request review workflow.
-
 ```
 Improve the PR review experience:
 
@@ -275,8 +266,6 @@ Focus on making code review as fast as possible.
 
 ### Enhance Issue Management
 
-Make issue management more powerful.
-
 ```
 Enhance issue management features:
 
@@ -290,8 +279,6 @@ Look at Linear for inspiration on UX.
 ```
 
 ### Improve CI/CD Integration
-
-Make the CI/CD system more robust.
 
 ```
 Improve CI/CD integration in `src/ci/`:
@@ -311,8 +298,6 @@ The goal: GitHub Actions workflows should work with minimal changes.
 
 ### Improve Mobile Responsiveness
 
-Make the web UI work well on mobile devices.
-
 ```
 Improve mobile responsiveness in `apps/web/`:
 
@@ -325,8 +310,6 @@ Improve mobile responsiveness in `apps/web/`:
 
 ### Add Dark Mode Improvements
 
-Enhance the dark mode experience.
-
 ```
 Improve dark mode in the web UI:
 
@@ -338,8 +321,6 @@ Improve dark mode in the web UI:
 ```
 
 ### Command Palette Enhancements
-
-Make the command palette more powerful.
 
 ```
 Enhance the command palette in `apps/web/src/components/CommandPalette.tsx`:
@@ -357,8 +338,6 @@ Enhance the command palette in `apps/web/src/components/CommandPalette.tsx`:
 
 ### Add Missing Unit Tests
 
-Improve test coverage across the codebase.
-
 ```
 Add missing unit tests:
 
@@ -373,8 +352,6 @@ Start with core functionality: repository.ts, merge.ts, diff.ts.
 
 ### Add E2E Tests for Web UI
 
-Add end-to-end tests for the web application.
-
 ```
 Add E2E tests for the web UI using Playwright or similar:
 
@@ -388,8 +365,6 @@ Add E2E tests for the web UI using Playwright or similar:
 ```
 
 ### Git Compatibility Test Suite
-
-Create comprehensive tests comparing wit to Git.
 
 ```
 Create a Git compatibility test suite:
@@ -409,8 +384,6 @@ The goal: verify wit is a drop-in Git replacement.
 
 ### Improve Build Performance
 
-Make the build faster.
-
 ```
 Improve build performance:
 
@@ -422,8 +395,6 @@ Improve build performance:
 ```
 
 ### Docker Improvements
-
-Improve the Docker setup for self-hosting.
 
 ```
 Improve Docker setup for self-hosting:
@@ -439,8 +410,6 @@ The goal: easy one-command self-hosting with Docker.
 
 ### Add Telemetry (Opt-in)
 
-Add anonymous usage telemetry to understand how wit is used.
-
 ```
 Add opt-in telemetry:
 
@@ -453,26 +422,18 @@ Add opt-in telemetry:
 
 ---
 
-## Development Workflow
+## Development Reference
+
+### Workflow
 
 ```bash
-# Watch mode - rebuilds on changes
-npm run dev
-
-# Run tests
-npm test
-
-# Run a specific test
-npm test -- --grep "commit"
-
-# Type check
-npm run typecheck
-
-# Lint
-npm run lint
+npm run dev      # Watch mode
+npm test         # Run tests
+npm run typecheck # Type check
+npm run lint     # Lint
 ```
 
-## Project Structure
+### Project Structure
 
 ```
 wit/
@@ -480,35 +441,27 @@ wit/
 │   ├── cli.ts              # Entry point
 │   ├── commands/           # Command implementations
 │   ├── core/               # Core Git functionality
-│   │   ├── repository.ts   # Repository class
-│   │   ├── object-store.ts # Object storage
-│   │   ├── merge.ts        # Merge logic
-│   │   └── diff.ts         # Diff algorithm
 │   ├── ai/                 # AI features
-│   │   ├── agents/         # AI agents (PM, Code, Triage)
-│   │   ├── tools/          # Agent tools
-│   │   └── workflows/      # Multi-step workflows
 │   ├── api/                # tRPC API routers
 │   ├── server/             # HTTP/SSH server
-│   ├── ui/                 # Terminal UI components
-│   └── utils/              # Utilities
+│   └── ui/                 # Terminal UI components
 ├── apps/
 │   ├── web/                # Web frontend
 │   └── admin/              # Admin dashboard
-├── docs/                   # Documentation (Mintlify)
+├── docs/                   # Documentation
 └── tests/                  # Integration tests
 ```
 
-## Code Style
+### Code Style
 
 - TypeScript strict mode
-- Double quotes for strings
-- 2-space indentation
-- Semicolons required
+- Double quotes, 2-space indent, semicolons
 - Explicit types for function parameters and returns
-- Use the `TsgitError` pattern for user-facing errors
+- Use `TsgitError` for user-facing errors with helpful suggestions
 
-## Submitting Your Contribution
+---
+
+## Submit Your Contribution
 
 1. Fork the repository
 2. Create a branch: `git checkout -b feature/my-feature`
@@ -516,8 +469,8 @@ wit/
 4. Run tests: `npm test`
 5. Push and open a PR
 
+**Every token you spend building wit makes it stronger for everyone.**
+
 ---
 
-## License
-
-wit is MIT licensed. By contributing, you agree that your contributions will be licensed under MIT.
+MIT Licensed. By contributing, you agree to the MIT license.

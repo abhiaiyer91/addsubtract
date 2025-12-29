@@ -17,163 +17,157 @@
   },
   "topbarLinks": [
     {
-      "name": "Website",
-      "url": "https://wit.sh"
-    },
-    {
       "name": "GitHub",
       "url": "https://github.com/abhiaiyer91/wit"
     }
   ],
   "topbarCtaButton": {
-    "name": "Get Started",
-    "url": "/quickstart"
+    "name": "Contribute",
+    "url": "/contributing"
   },
   "tabs": [
     {
-      "name": "Documentation",
+      "name": "Contribute",
       "url": "/"
+    },
+    {
+      "name": "Documentation",
+      "url": "/docs"
     },
     {
       "name": "API Reference",
       "url": "/api-reference"
-    },
-    {
-      "name": "Architecture",
-      "url": "/architecture"
     }
   ],
   "anchors": [
     {
-      "name": "Website",
-      "icon": "globe",
-      "url": "https://wit.sh"
-    },
-    {
       "name": "GitHub",
       "icon": "github",
       "url": "https://github.com/abhiaiyer91/wit"
-    },
-    {
-      "name": "Roadmap",
-      "icon": "map",
-      "url": "https://github.com/abhiaiyer91/wit/blob/main/ROADMAP.md"
     }
   ],
   "navigation": [
     {
-      "group": "Getting Started",
+      "group": "Contribute to wit",
       "pages": [
-        "introduction",
-        "quickstart"
+        "contributing",
+        "why-wit"
       ]
     },
     {
-      "group": "About",
+      "group": "Documentation",
       "pages": [
-        "why-wit",
-        "contributing"
+        "docs/introduction",
+        "docs/quickstart"
       ]
     },
     {
       "group": "Commands",
       "pages": [
-        "commands/overview",
-        "commands/basic-workflow",
-        "commands/branches",
-        "commands/remotes",
-        "commands/merge",
-        "commands/stash",
-        "commands/history-rewriting",
-        "commands/tags",
-        "commands/undo-history",
-        "commands/quality-of-life",
-        "commands/debugging",
-        "commands/advanced",
-        "commands/pr",
-        "commands/issue",
-        "commands/ci",
-        "commands/stack",
-        "commands/search",
-        "commands/review",
-        "commands/agent",
-        "commands/dashboard",
-        "commands/wrapped",
-        "commands/journal",
-        "commands/project",
-        "commands/cycle",
-        "commands/fsck"
+        "docs/commands/overview",
+        "docs/commands/basic-workflow",
+        "docs/commands/branches",
+        "docs/commands/remotes",
+        "docs/commands/merge",
+        "docs/commands/stash",
+        "docs/commands/history-rewriting",
+        "docs/commands/tags",
+        "docs/commands/undo-history",
+        "docs/commands/quality-of-life",
+        "docs/commands/debugging",
+        "docs/commands/advanced",
+        "docs/commands/pr",
+        "docs/commands/issue",
+        "docs/commands/ci",
+        "docs/commands/stack",
+        "docs/commands/search",
+        "docs/commands/review",
+        "docs/commands/agent",
+        "docs/commands/dashboard",
+        "docs/commands/wrapped",
+        "docs/commands/journal",
+        "docs/commands/project",
+        "docs/commands/cycle",
+        "docs/commands/fsck"
       ]
     },
     {
       "group": "Visual Interfaces",
       "pages": [
-        "visual/overview",
-        "visual/web-ui",
-        "visual/terminal-ui",
-        "visual/graph",
-        "visual/themes"
+        "docs/visual/overview",
+        "docs/visual/web-ui",
+        "docs/visual/terminal-ui",
+        "docs/visual/graph",
+        "docs/visual/themes"
       ]
     },
     {
       "group": "AI & Intelligence",
       "pages": [
-        "features/smart-status",
-        "features/ai-powered",
-        "features/ai-agents",
-        "features/search",
-        "features/review"
+        "docs/features/smart-status",
+        "docs/features/ai-powered",
+        "docs/features/ai-agents",
+        "docs/features/search",
+        "docs/features/review"
       ]
     },
     {
       "group": "Workflows",
       "pages": [
-        "features/stacked-diffs",
-        "features/hooks",
-        "features/ci-cd",
-        "features/merge-queue",
-        "features/monorepo-scopes",
-        "features/worktrees",
-        "features/cycles-projects"
+        "docs/features/stacked-diffs",
+        "docs/features/hooks",
+        "docs/features/ci-cd",
+        "docs/features/merge-queue",
+        "docs/features/monorepo-scopes",
+        "docs/features/worktrees",
+        "docs/features/cycles-projects"
       ]
     },
     {
       "group": "GitHub & Team",
       "pages": [
-        "features/github",
-        "features/collaborators",
-        "features/tokens",
-        "features/branch-protection"
+        "docs/features/github",
+        "docs/features/collaborators",
+        "docs/features/tokens",
+        "docs/features/branch-protection"
       ]
     },
     {
       "group": "Advanced",
       "pages": [
-        "features/large-files",
-        "features/submodules",
-        "features/partial-clone",
-        "features/git-migration"
+        "docs/features/large-files",
+        "docs/features/submodules",
+        "docs/features/partial-clone",
+        "docs/features/git-migration"
       ]
     },
     {
       "group": "Configuration",
       "pages": [
-        "configuration/overview",
-        "configuration/repository",
-        "configuration/directory-structure",
-        "configuration/shell-integration",
-        "configuration/environment-variables"
+        "docs/configuration/overview",
+        "docs/configuration/repository",
+        "docs/configuration/directory-structure",
+        "docs/configuration/shell-integration",
+        "docs/configuration/environment-variables"
       ]
     },
     {
       "group": "Platform",
       "pages": [
-        "platform/overview",
-        "platform/server",
-        "platform/ssh-server",
-        "platform/self-hosting",
-        "platform/pull-requests",
-        "platform/issues"
+        "docs/platform/overview",
+        "docs/platform/server",
+        "docs/platform/ssh-server",
+        "docs/platform/self-hosting",
+        "docs/platform/pull-requests",
+        "docs/platform/issues"
+      ]
+    },
+    {
+      "group": "Architecture",
+      "pages": [
+        "docs/architecture/overview",
+        "docs/architecture/events",
+        "docs/architecture/primitives"
       ]
     },
     {
@@ -201,18 +195,9 @@
         "api-reference/activity",
         "api-reference/releases"
       ]
-    },
-    {
-      "group": "Architecture",
-      "pages": [
-        "architecture/overview",
-        "architecture/events",
-        "architecture/primitives"
-      ]
     }
   ],
   "footerSocials": {
-    "website": "https://wit.sh",
     "github": "https://github.com/abhiaiyer91/wit"
   }
 }
