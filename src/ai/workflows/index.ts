@@ -27,7 +27,21 @@ export {
   type CodeGenerationOutput,
 } from './code-generation.workflow.js';
 
-// Planning Workflow (Multi-Agent Parallel Execution)
+// Planning Workflow (Mastra-based Multi-Agent Parallel Execution)
+export {
+  planningWorkflow,
+  planningIterationWorkflow,
+  PlanningWorkflowInputSchema,
+  PlanningIterationInputSchema,
+  PlanningWorkflowOutputSchema,
+  PlanningIterationOutputSchema,
+  type PlanningWorkflowInput,
+  type PlanningWorkflowOutput,
+  type PlanningIterationInput,
+  type PlanningIterationOutput,
+} from './planning.workflow.js';
+
+// Legacy helpers (for backwards compatibility)
 export {
   startPlanningSession,
   iteratePlan,
@@ -37,7 +51,7 @@ export {
   cancelSession,
   getSessionDetails,
   type StartPlanningInput,
-  type PlanningIterationInput,
+  type PlanningIterationInput as LegacyPlanningIterationInput,
   type FinalizeTasksInput,
   type ExecuteTasksInput,
   type TaskExecutionResult,

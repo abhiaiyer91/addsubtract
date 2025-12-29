@@ -2,10 +2,12 @@
  * Planning Workflow Router
  * 
  * tRPC router for the agent planning workflow system.
+ * Uses Mastra workflows for AI-powered planning and execution.
+ * 
  * Provides endpoints for:
  * - Creating and managing planning sessions
- * - Iterating on plans with AI
- * - Managing and executing tasks
+ * - Iterating on plans with AI (Mastra workflow)
+ * - Managing and executing tasks (Mastra workflow)
  * - Monitoring execution progress
  */
 
@@ -21,8 +23,11 @@ import {
   getPlanningSessionFull,
 } from '../../../db/models/index.js';
 import {
+  runPlanningWorkflow,
+  runPlanningIterationWorkflow,
+} from '../../../ai/mastra.js';
+import {
   startPlanningSession,
-  iteratePlan,
   generateTasks,
   finalizeTasks,
   executeTasks,
@@ -185,7 +190,7 @@ export const planningWorkflowRouter = router({
     }),
 
   /**
-   * Send a message to iterate on the plan
+   * Send a message to iterate on the plan (uses Mastra workflow)
    */
   iterate: protectedProcedure
     .input(
@@ -215,12 +220,21 @@ export const planningWorkflowRouter = router({
         });
       }
 
-      const result = await iteratePlan({
+      // Use Mastra workflow for iteration
+      const result = await runPlanningIterationWorkflow({
         sessionId: input.sessionId,
         userMessage: input.message,
       });
 
-      return result;
+      // Get updated session
+      const updatedSession = await planningSessionModel.findById(input.sessionId);
+
+      return {
+        session: updatedSession!,
+        response: result.response,
+        iteration: result.iteration,
+        hasTasks: result.hasTasks,
+      };
     }),
 
   /**
@@ -360,7 +374,7 @@ export const planningWorkflowRouter = router({
     }),
 
   /**
-   * Start task execution
+   * Start task execution (uses legacy executor)
    */
   execute: protectedProcedure
     .input(z.object({ sessionId: z.string().uuid() }))
@@ -385,11 +399,46 @@ export const planningWorkflowRouter = router({
         });
       }
 
-      // Start execution in background
-      // Note: This is a long-running operation, so we return immediately
-      // and the client can poll for status
+      // Start execution
       const result = await executeTasks({ sessionId: input.sessionId });
       
+      return result;
+    }),
+
+  /**
+   * Run complete Mastra planning workflow (plan + execute)
+   * This creates a session, generates plan, creates tasks, and executes them
+   */
+  runFullWorkflow: protectedProcedure
+    .input(
+      z.object({
+        repoId: z.string().uuid(),
+        planningPrompt: z.string().min(1).max(50000),
+        title: z.string().optional(),
+        baseBranch: z.string().optional().default('main'),
+        maxConcurrency: z.number().min(1).max(10).optional().default(3),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      // Verify repo access
+      const repo = await repoModel.findById(input.repoId);
+      if (!repo) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Repository not found',
+        });
+      }
+
+      // Run the full Mastra planning workflow
+      const result = await runPlanningWorkflow({
+        userId: ctx.user.id,
+        repoId: input.repoId,
+        planningPrompt: input.planningPrompt,
+        title: input.title,
+        baseBranch: input.baseBranch,
+        maxConcurrency: input.maxConcurrency,
+      });
+
       return result;
     }),
 

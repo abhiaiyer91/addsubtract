@@ -1,11 +1,20 @@
 ---
 title: "Planning Workflows"
-description: "Plan complex tasks with AI and execute them with parallel coding agents"
+description: "Plan complex tasks with AI and execute them with parallel coding agents using Mastra"
 ---
 
 # Planning Workflows
 
-Planning Workflows is a powerful feature that helps you break down complex development tasks into discrete, parallelizable units of work, and then execute them with multiple AI coding agents running simultaneously.
+Planning Workflows is a powerful feature built on [Mastra](https://mastra.ai) that helps you break down complex development tasks into discrete, parallelizable units of work, and then execute them with multiple AI coding agents running simultaneously.
+
+## Architecture
+
+The system is built on Mastra's workflow primitives:
+
+- **Mastra Workflows**: Multi-step orchestration with proper data flow
+- **Mastra Agents**: Specialized AI agents for planning and coding
+- **Mastra Tools**: Repository exploration and code manipulation
+- **Mastra Memory**: Conversation history and context
 
 ## Overview
 
@@ -57,6 +66,35 @@ When you're ready, start execution. The system:
 - Creates separate branches for each task
 - Tracks progress in real-time
 
+## Mastra Workflow Steps
+
+The planning workflow uses Mastra's step-based execution:
+
+| Step | Description |
+|------|-------------|
+| `initialize-planning` | Creates session and saves initial prompt |
+| `generate-initial-plan` | AI analyzes codebase and proposes plan |
+| `parse-tasks` | Converts plan to structured JSON tasks |
+| `create-task-records` | Persists tasks to database |
+| `execute-tasks` | Runs parallel coding agents |
+| `finalize-session` | Completes session with summary |
+
+### Streaming
+
+Use `streamPlanningWorkflow()` for real-time updates:
+
+```typescript
+import { streamPlanningWorkflow } from 'wit/ai/mastra';
+
+for await (const event of streamPlanningWorkflow(input)) {
+  if (event.type === 'step-start') {
+    console.log(`Starting: ${event.payload.stepId}`);
+  } else if (event.type === 'step-complete') {
+    console.log(`Completed: ${event.payload.stepId}`);
+  }
+}
+```
+
 ## Usage
 
 ### Web Interface
@@ -69,44 +107,78 @@ When you're ready, start execution. The system:
 6. Review and customize tasks
 7. Click **Start Execution**
 
-### API
+### API (Mastra Workflows)
 
 ```typescript
 import { 
-  startPlanningSession,
-  iteratePlan,
-  finalizeTasks,
-  executeTasks 
-} from 'wit/ai/workflows';
+  runPlanningWorkflow,
+  runPlanningIterationWorkflow,
+  getTsgitMastra,
+} from 'wit/ai/mastra';
 
-// Start a planning session
-const session = await startPlanningSession({
+// Option 1: Run the full workflow (plan + generate + execute)
+const result = await runPlanningWorkflow({
   userId: 'user-123',
   repoId: 'repo-456',
   planningPrompt: 'Add user authentication with email/password and OAuth support',
   maxConcurrency: 3,
 });
 
-// Iterate on the plan
-const result = await iteratePlan({
+console.log(result.sessionId);
+console.log(result.tasks);
+console.log(result.taskCounts);
+
+// Option 2: Interactive planning with iterations
+import { startPlanningSession, finalizeTasks, executeTasks } from 'wit/ai/workflows';
+
+// Start planning session
+const session = await startPlanningSession({
+  userId: 'user-123',
+  repoId: 'repo-456',
+  planningPrompt: 'Add user authentication',
+  maxConcurrency: 3,
+});
+
+// Iterate using Mastra workflow
+const iteration = await runPlanningIterationWorkflow({
   sessionId: session.id,
   userMessage: 'Focus on security best practices',
 });
 
-// Finalize tasks
-const tasks = await finalizeTasks({
-  sessionId: session.id,
-  tasks: [
-    { title: 'Create auth types', description: '...', priority: 'high' },
-    { title: 'Implement password hashing', description: '...', priority: 'high' },
-    // ...
-  ],
+console.log(iteration.response);
+console.log(iteration.hasTasks); // true when AI generated task list
+
+// Finalize and execute
+const tasks = await finalizeTasks({ sessionId: session.id, tasks: [...] });
+const results = await executeTasks({ sessionId: session.id });
+```
+
+### Using Mastra Directly
+
+```typescript
+const mastra = getTsgitMastra();
+
+// Get the planning workflow
+const planningWorkflow = mastra.getWorkflow('planning');
+
+// Create a run
+const run = await planningWorkflow.createRun();
+
+// Start with input
+const result = await run.start({
+  inputData: {
+    userId: 'user-123',
+    repoId: 'repo-456',
+    planningPrompt: 'Add user authentication',
+    maxConcurrency: 3,
+  },
 });
 
-// Execute
-const results = await executeTasks({
-  sessionId: session.id,
-});
+// Or stream for real-time updates
+const stream = await run.stream({ inputData: {...} });
+for await (const event of stream.fullStream) {
+  console.log(event.type, event.payload);
+}
 ```
 
 ## Task Structure

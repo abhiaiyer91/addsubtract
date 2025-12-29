@@ -14,7 +14,7 @@ import { LibSQLStore } from '@mastra/libsql';
 import { PostgresStore } from '@mastra/pg';
 import { witAgent, createTsgitAgent } from './agent.js';
 import { witTools } from './tools/index.js';
-import { prReviewWorkflow, issueTriageWorkflow, codeGenerationWorkflow } from './workflows/index.js';
+import { prReviewWorkflow, issueTriageWorkflow, codeGenerationWorkflow, planningWorkflow, planningIterationWorkflow } from './workflows/index.js';
 import type { AIConfig } from './types.js';
 
 let mastraInstance: Mastra | null = null;
@@ -95,6 +95,8 @@ export function createTsgitMastra(config: AIConfig = {}): Mastra {
       prReview: prReviewWorkflow,
       issueTriage: issueTriageWorkflow,
       codeGeneration: codeGenerationWorkflow,
+      planning: planningWorkflow,
+      planningIteration: planningIterationWorkflow,
     },
     memory: {
       wit: memory,
@@ -292,6 +294,12 @@ export async function getAIInfoForRepo(repoId: string): Promise<{
 import type { PRReviewInput, PRReviewOutput } from './workflows/pr-review.workflow.js';
 import type { IssueTriageInput, IssueTriageOutput } from './workflows/issue-triage.workflow.js';
 import type { CodeGenerationInput, CodeGenerationOutput } from './workflows/code-generation.workflow.js';
+import type { 
+  PlanningWorkflowInput, 
+  PlanningWorkflowOutput,
+  PlanningIterationInput,
+  PlanningIterationOutput,
+} from './workflows/planning.workflow.js';
 
 /**
  * Run the PR Review workflow
@@ -422,6 +430,100 @@ export async function* streamIssueTriageWorkflow(input: IssueTriageInput) {
 export async function* streamCodeGenerationWorkflow(input: CodeGenerationInput) {
   const mastra = getTsgitMastra();
   const workflow = mastra.getWorkflow('codeGeneration');
+  
+  const run = await workflow.createRun();
+  const result = await run.stream({ inputData: input });
+  
+  for await (const chunk of result.fullStream) {
+    yield chunk;
+  }
+}
+
+// =============================================================================
+// Planning Workflow Execution Helpers
+// =============================================================================
+
+/**
+ * Run the Planning workflow (full execution)
+ * 
+ * This runs the complete workflow: planning -> task generation -> execution
+ * 
+ * @param input - Planning workflow input parameters
+ * @returns Planning results including session, tasks, and execution summary
+ */
+export async function runPlanningWorkflow(input: PlanningWorkflowInput): Promise<PlanningWorkflowOutput> {
+  const mastra = getTsgitMastra();
+  const workflow = mastra.getWorkflow('planning');
+  
+  const run = await workflow.createRun();
+  const result = await run.start({ inputData: input });
+  
+  if (result.status === 'failed') {
+    return {
+      success: false,
+      sessionId: '',
+      status: 'failed',
+      error: 'Workflow execution failed',
+    };
+  }
+  
+  return (result as any).result as PlanningWorkflowOutput;
+}
+
+/**
+ * Run the Planning Iteration workflow
+ * 
+ * Used to refine a plan with user feedback during the planning phase.
+ * 
+ * @param input - Session ID and user message
+ * @returns Updated plan and iteration info
+ */
+export async function runPlanningIterationWorkflow(input: PlanningIterationInput): Promise<PlanningIterationOutput> {
+  const mastra = getTsgitMastra();
+  const workflow = mastra.getWorkflow('planningIteration');
+  
+  const run = await workflow.createRun();
+  const result = await run.start({ inputData: input });
+  
+  if (result.status === 'failed') {
+    return {
+      sessionId: input.sessionId,
+      response: 'Workflow failed',
+      iteration: 0,
+      hasTasks: false,
+    };
+  }
+  
+  return (result as any).result as PlanningIterationOutput;
+}
+
+/**
+ * Stream the Planning workflow execution
+ * 
+ * @param input - Planning workflow input parameters
+ * @returns AsyncIterator of workflow events
+ */
+export async function* streamPlanningWorkflow(input: PlanningWorkflowInput) {
+  const mastra = getTsgitMastra();
+  const workflow = mastra.getWorkflow('planning');
+  
+  const run = await workflow.createRun();
+  const result = await run.stream({ inputData: input });
+  
+  for await (const chunk of result.fullStream) {
+    yield chunk;
+  }
+}
+
+/**
+ * Stream the Planning Iteration workflow
+ * 
+ * @param input - Session ID and user message
+ * @returns AsyncIterator of workflow events
+ */
+export async function* streamPlanningIterationWorkflow(input: PlanningIterationInput) {
+  const mastra = getTsgitMastra();
+  const workflow = mastra.getWorkflow('planningIteration');
   
   const run = await workflow.createRun();
   const result = await run.stream({ inputData: input });

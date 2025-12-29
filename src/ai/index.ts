@@ -18,10 +18,14 @@ export {
   runPRReviewWorkflow,
   runIssueTriageWorkflow,
   runCodeGenerationWorkflow,
+  runPlanningWorkflow,
+  runPlanningIterationWorkflow,
   // Workflow streamers
   streamPRReviewWorkflow,
   streamIssueTriageWorkflow,
   streamCodeGenerationWorkflow,
+  streamPlanningWorkflow,
+  streamPlanningIterationWorkflow,
 } from './mastra.js';
 
 // Tools
@@ -35,12 +39,18 @@ export {
   prReviewWorkflow,
   issueTriageWorkflow,
   codeGenerationWorkflow,
+  planningWorkflow,
+  planningIterationWorkflow,
   type PRReviewInput,
   type PRReviewOutput,
   type IssueTriageInput,
   type IssueTriageOutput,
   type CodeGenerationInput,
   type CodeGenerationOutput,
+  type PlanningWorkflowInput,
+  type PlanningWorkflowOutput,
+  type PlanningIterationInput,
+  type PlanningIterationOutput,
 } from './workflows/index.js';
 
 // Types
