@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { router, publicProcedure, protectedProcedure } from '../trpc';
 import { releaseModel, releaseAssetModel } from '../../../db/models/releases';
+import { generateReleaseNotesTool } from '../../../ai/tools/generate-release-notes.js';
 
 /**
  * Input validation schemas
@@ -179,6 +180,61 @@ export const releasesRouter = router({
         });
       }
       return { success: true };
+    }),
+
+  /**
+   * Generate AI release notes from commits
+   * 
+   * This endpoint generates release notes using AI based on commit history.
+   * It categorizes changes into features, fixes, improvements, etc.
+   */
+  generateNotes: protectedProcedure
+    .input(z.object({
+      version: z.string().min(1).max(255).describe('The version/tag being released'),
+      previousVersion: z.string().optional().describe('Previous version for comparison'),
+      commits: z.array(z.object({
+        sha: z.string(),
+        shortSha: z.string(),
+        message: z.string(),
+        author: z.string(),
+        email: z.string(),
+        date: z.string(),
+      })).describe('Array of commits to generate notes from'),
+      filesSummary: z.object({
+        totalFiles: z.number(),
+        additions: z.number(),
+        deletions: z.number(),
+        files: z.array(z.object({
+          path: z.string(),
+          additions: z.number(),
+          deletions: z.number(),
+        })).optional(),
+      }).optional().describe('File change statistics'),
+      repoUrl: z.string().optional().describe('Repository URL for generating links'),
+      style: z.enum(['standard', 'detailed', 'minimal', 'changelog']).default('standard'),
+      includeStats: z.boolean().default(true),
+      includeContributors: z.boolean().default(true),
+    }))
+    .mutation(async ({ input }) => {
+      try {
+        const result = await generateReleaseNotesTool.execute({
+          version: input.version,
+          previousVersion: input.previousVersion,
+          commits: input.commits,
+          filesSummary: input.filesSummary,
+          repoUrl: input.repoUrl,
+          style: input.style,
+          includeStats: input.includeStats,
+          includeContributors: input.includeContributors,
+        });
+
+        return result;
+      } catch (error) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: error instanceof Error ? error.message : 'Failed to generate release notes',
+        });
+      }
     }),
 
   /**

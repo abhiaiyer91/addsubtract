@@ -50,6 +50,7 @@ export { fsck, handleFsck } from './fsck';
 // New commands (bridging the gap with Git)
 export { handleStash, StashManager } from './stash';
 export { handleTag, createLightweightTag, createAnnotatedTag, listTags, deleteTag } from './tag';
+export { handleRelease, RELEASE_HELP } from './release';
 export { handleReset, reset, resetFile, parseRevision } from './reset';
 export { handleBisect, BisectManager } from './bisect';
 export { handleClean, clean, getUntrackedItems } from './clean';

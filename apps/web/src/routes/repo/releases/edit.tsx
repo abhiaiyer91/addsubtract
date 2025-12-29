@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Loader2, Tag, ChevronLeft, Trash2 } from 'lucide-react';
+import { Loader2, Tag, ChevronLeft, Trash2, Sparkles, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Loading } from '@/components/ui/loading';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RepoLayout } from '../components/repo-layout';
 import { useSession } from '@/lib/auth-client';
 import { trpc } from '@/lib/trpc';
@@ -24,6 +25,8 @@ export function EditReleasePage() {
   const [isPrerelease, setIsPrerelease] = useState(false);
   const [isDraft, setIsDraft] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [previousTag, setPreviousTag] = useState<string>('');
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const utils = trpc.useUtils();
 
@@ -36,6 +39,27 @@ export function EditReleasePage() {
     { id: id! },
     { enabled: !!id }
   );
+
+  // Fetch existing tags for comparison dropdown
+  const { data: tagsData } = trpc.repos.getTags.useQuery(
+    { owner: owner!, repo: repo! },
+    { enabled: !!owner && !!repo }
+  );
+
+  // Check if AI is available
+  const { data: aiStatus } = trpc.ai.status.useQuery();
+  const aiAvailable = aiStatus?.available ?? false;
+
+  // Find the previous tag (the one before the current release tag)
+  const defaultPreviousTag = useMemo(() => {
+    if (!tagsData || tagsData.length === 0 || !release) return '';
+    const currentIndex = tagsData.findIndex(t => t.name === release.tagName);
+    if (currentIndex === -1 || currentIndex === tagsData.length - 1) {
+      // Current tag not found or is the oldest tag
+      return tagsData.length > 1 ? tagsData[1].name : '';
+    }
+    return tagsData[currentIndex + 1]?.name || '';
+  }, [tagsData, release]);
 
   const updateRelease = trpc.releases.update.useMutation({
     onSuccess: (data) => {
@@ -56,6 +80,8 @@ export function EditReleasePage() {
     },
   });
 
+  const generateNotesMutation = trpc.releases.generateNotes.useMutation();
+
   // Populate form when release loads
   useEffect(() => {
     if (release) {
@@ -66,6 +92,54 @@ export function EditReleasePage() {
       setIsDraft(release.isDraft);
     }
   }, [release]);
+
+  const handleGenerateNotes = async () => {
+    if (!tagName.trim()) {
+      setError('Please enter a tag name first');
+      return;
+    }
+
+    setIsGenerating(true);
+    setError(null);
+
+    try {
+      // Determine what ref to compare from
+      const fromRef = previousTag || defaultPreviousTag || undefined;
+      
+      // First, get the commits between the refs
+      const commitsResult = await trpc.repos.getCommitsBetween.query({
+        owner: owner!,
+        repo: repo!,
+        fromRef,
+        toRef: tagName.trim(),
+        limit: 200,
+      });
+
+      if (commitsResult.commits.length === 0) {
+        setError('No commits found for the specified range. Try selecting a different comparison tag.');
+        setIsGenerating(false);
+        return;
+      }
+
+      // Now generate the release notes
+      const result = await generateNotesMutation.mutateAsync({
+        version: tagName.trim(),
+        previousVersion: fromRef,
+        commits: commitsResult.commits,
+        style: 'standard',
+        includeStats: true,
+        includeContributors: true,
+      });
+
+      // Update the form with generated content
+      setName(result.title);
+      setBody(result.body);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to generate release notes');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -133,6 +207,8 @@ export function EditReleasePage() {
     );
   }
 
+  const canGenerate = aiAvailable && tagName.trim().length > 0;
+
   return (
     <RepoLayout owner={owner!} repo={repo!}>
       <div className="max-w-3xl mx-auto space-y-6">
@@ -175,14 +251,42 @@ export function EditReleasePage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="tagName">Tag version *</Label>
-                <Input
-                  id="tagName"
-                  placeholder="v1.0.0"
-                  value={tagName}
-                  onChange={(e) => setTagName(e.target.value)}
-                />
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="tagName">Tag version *</Label>
+                  <Input
+                    id="tagName"
+                    placeholder="v1.0.0"
+                    value={tagName}
+                    onChange={(e) => setTagName(e.target.value)}
+                  />
+                </div>
+
+                {tagsData && tagsData.length > 0 && (
+                  <div className="space-y-2">
+                    <Label htmlFor="previousTag">Compare with previous tag</Label>
+                    <Select value={previousTag} onValueChange={setPreviousTag}>
+                      <SelectTrigger>
+                        <SelectValue placeholder={defaultPreviousTag || 'Select a tag'} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {defaultPreviousTag && (
+                          <SelectItem value="">Default ({defaultPreviousTag})</SelectItem>
+                        )}
+                        {tagsData
+                          .filter(tag => tag.name !== tagName)
+                          .map((tag) => (
+                            <SelectItem key={tag.name} value={tag.name}>
+                              {tag.name}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      For regenerating release notes.
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -196,7 +300,31 @@ export function EditReleasePage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="body">Describe this release</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="body">Describe this release</Label>
+                  {aiAvailable && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleGenerateNotes}
+                      disabled={!canGenerate || isGenerating}
+                      className="gap-1.5"
+                    >
+                      {isGenerating ? (
+                        <>
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          Generating...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-3.5 w-3.5" />
+                          Regenerate with AI
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
                 <Textarea
                   id="body"
                   placeholder="## What's New&#10;- Feature A&#10;- Feature B&#10;&#10;## Bug Fixes&#10;- Fix #123"
@@ -205,9 +333,24 @@ export function EditReleasePage() {
                   rows={12}
                   className="font-mono text-sm"
                 />
-                <p className="text-xs text-muted-foreground">
-                  Supports Markdown formatting.
-                </p>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-muted-foreground">
+                    Supports Markdown formatting.
+                  </p>
+                  {body && aiAvailable && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleGenerateNotes}
+                      disabled={!canGenerate || isGenerating}
+                      className="gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      <RefreshCw className="h-3 w-3" />
+                      Regenerate
+                    </Button>
+                  )}
+                </div>
               </div>
 
               <div className="space-y-4 pt-4 border-t">

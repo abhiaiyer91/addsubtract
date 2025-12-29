@@ -1929,4 +1929,318 @@ export const reposRouter = router({
       // Return top N
       return reposWithCommits.slice(0, limit);
     }),
+
+  /**
+   * Get tags for a repository
+   * Returns list of tags with commit info for release notes generation
+   */
+  getTags: publicProcedure
+    .input(
+      z.object({
+        owner: z.string(),
+        repo: z.string(),
+      })
+    )
+    .query(async ({ input, ctx }) => {
+      const result = await repoModel.findByPath(input.owner, input.repo);
+
+      if (!result) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Repository not found',
+        });
+      }
+
+      // Check access for private repos
+      if (result.repo.isPrivate) {
+        if (!ctx.user) {
+          throw new TRPCError({
+            code: 'UNAUTHORIZED',
+            message: 'Authentication required',
+          });
+        }
+
+        const isOwner = result.repo.ownerId === ctx.user.id;
+        const hasAccess = isOwner || (await collaboratorModel.hasPermission(result.repo.id, ctx.user.id, 'read'));
+
+        if (!hasAccess) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'You do not have access to this repository',
+          });
+        }
+      }
+
+      // Get the bare repository
+      const bareRepo = getRepoFromDisk(result.repo.diskPath);
+      if (!bareRepo) {
+        return [];
+      }
+
+      try {
+        const tagNames = bareRepo.refs.listTags();
+        const tags: Array<{
+          name: string;
+          sha: string;
+          targetSha: string;
+          isAnnotated: boolean;
+          message?: string;
+          tagger?: { name: string; email: string };
+          date?: Date;
+        }> = [];
+
+        for (const name of tagNames) {
+          try {
+            const sha = bareRepo.refs.resolve(name);
+            if (!sha) continue;
+
+            // Try to read as tag object (annotated) or fall back to commit (lightweight)
+            let targetSha = sha;
+            let isAnnotated = false;
+            let message: string | undefined;
+            let tagger: { name: string; email: string } | undefined;
+            let date: Date | undefined;
+
+            try {
+              const obj = bareRepo.objects.readObject(sha);
+              if (obj.type === 'tag') {
+                // Annotated tag
+                isAnnotated = true;
+                const content = obj.serialize().toString('utf-8');
+                
+                // Parse tag object
+                const objectMatch = content.match(/^object ([a-f0-9]+)/m);
+                if (objectMatch) {
+                  targetSha = objectMatch[1];
+                }
+                
+                const taggerMatch = content.match(/^tagger (.+) <(.+)> (\d+)/m);
+                if (taggerMatch) {
+                  tagger = { name: taggerMatch[1], email: taggerMatch[2] };
+                  date = new Date(parseInt(taggerMatch[3], 10) * 1000);
+                }
+                
+                // Message is after the blank line
+                const blankIndex = content.indexOf('\n\n');
+                if (blankIndex !== -1) {
+                  message = content.slice(blankIndex + 2).trim();
+                }
+              }
+            } catch {
+              // Lightweight tag - targetSha is the same as sha
+            }
+
+            tags.push({
+              name,
+              sha,
+              targetSha,
+              isAnnotated,
+              message,
+              tagger,
+              date,
+            });
+          } catch {
+            // Skip invalid tags
+          }
+        }
+
+        // Sort by semver if possible, then by date
+        tags.sort((a, b) => {
+          // Try semver comparison
+          const aMatch = a.name.match(/v?(\d+)\.(\d+)\.(\d+)(?:-(.+))?/);
+          const bMatch = b.name.match(/v?(\d+)\.(\d+)\.(\d+)(?:-(.+))?/);
+          
+          if (aMatch && bMatch) {
+            const aMajor = parseInt(aMatch[1], 10);
+            const bMajor = parseInt(bMatch[1], 10);
+            if (aMajor !== bMajor) return bMajor - aMajor;
+            
+            const aMinor = parseInt(aMatch[2], 10);
+            const bMinor = parseInt(bMatch[2], 10);
+            if (aMinor !== bMinor) return bMinor - aMinor;
+            
+            const aPatch = parseInt(aMatch[3], 10);
+            const bPatch = parseInt(bMatch[3], 10);
+            if (aPatch !== bPatch) return bPatch - aPatch;
+            
+            // Pre-release versions come after release
+            if (aMatch[4] && !bMatch[4]) return 1;
+            if (!aMatch[4] && bMatch[4]) return -1;
+          }
+          
+          // Fall back to date comparison
+          if (a.date && b.date) {
+            return b.date.getTime() - a.date.getTime();
+          }
+          
+          return b.name.localeCompare(a.name);
+        });
+
+        return tags;
+      } catch (error) {
+        console.error('[repos.getTags] Error:', error);
+        return [];
+      }
+    }),
+
+  /**
+   * Get commits between two refs (for release notes generation)
+   * Returns commits from 'toRef' back to (but not including) 'fromRef'
+   */
+  getCommitsBetween: publicProcedure
+    .input(
+      z.object({
+        owner: z.string(),
+        repo: z.string(),
+        fromRef: z.string().optional().describe('Starting ref (exclusive) - e.g., previous tag'),
+        toRef: z.string().default('HEAD').describe('Ending ref (inclusive) - e.g., new tag or HEAD'),
+        limit: z.number().min(1).max(500).default(200),
+      })
+    )
+    .query(async ({ input, ctx }) => {
+      const result = await repoModel.findByPath(input.owner, input.repo);
+
+      if (!result) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Repository not found',
+        });
+      }
+
+      // Check access for private repos
+      if (result.repo.isPrivate) {
+        if (!ctx.user) {
+          throw new TRPCError({
+            code: 'UNAUTHORIZED',
+            message: 'Authentication required',
+          });
+        }
+
+        const isOwner = result.repo.ownerId === ctx.user.id;
+        const hasAccess = isOwner || (await collaboratorModel.hasPermission(result.repo.id, ctx.user.id, 'read'));
+
+        if (!hasAccess) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'You do not have access to this repository',
+          });
+        }
+      }
+
+      // Get the bare repository
+      const bareRepo = getRepoFromDisk(result.repo.diskPath);
+      if (!bareRepo) {
+        return { commits: [], stats: { totalCommits: 0 } };
+      }
+
+      try {
+        // Resolve the refs
+        let toHash = bareRepo.refs.resolve(input.toRef);
+        if (!toHash) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: `Cannot resolve ref '${input.toRef}'`,
+          });
+        }
+
+        // Handle tag objects (dereference to commit)
+        try {
+          const toObj = bareRepo.objects.readObject(toHash);
+          if (toObj.type === 'tag') {
+            const content = toObj.serialize().toString('utf-8');
+            const objectMatch = content.match(/^object ([a-f0-9]+)/m);
+            if (objectMatch) {
+              toHash = objectMatch[1];
+            }
+          }
+        } catch {
+          // Not a tag object, use as-is
+        }
+
+        let fromHash: string | null = null;
+        if (input.fromRef) {
+          fromHash = bareRepo.refs.resolve(input.fromRef);
+          if (fromHash) {
+            // Handle tag objects
+            try {
+              const fromObj = bareRepo.objects.readObject(fromHash);
+              if (fromObj.type === 'tag') {
+                const content = fromObj.serialize().toString('utf-8');
+                const objectMatch = content.match(/^object ([a-f0-9]+)/m);
+                if (objectMatch) {
+                  fromHash = objectMatch[1];
+                }
+              }
+            } catch {
+              // Not a tag object, use as-is
+            }
+          }
+        }
+
+        const commits: Array<{
+          sha: string;
+          shortSha: string;
+          message: string;
+          author: string;
+          email: string;
+          date: string;
+        }> = [];
+
+        const visited = new Set<string>();
+        const queue: string[] = [toHash];
+
+        // Walk commit history from toRef back to fromRef
+        while (queue.length > 0 && commits.length < input.limit) {
+          const hash = queue.shift()!;
+
+          // Stop if we reached the from commit
+          if (fromHash && hash === fromHash) {
+            continue;
+          }
+
+          if (visited.has(hash)) {
+            continue;
+          }
+          visited.add(hash);
+
+          try {
+            const commit = bareRepo.objects.readCommit(hash);
+            
+            commits.push({
+              sha: hash,
+              shortSha: hash.slice(0, 7),
+              message: commit.message,
+              author: commit.author.name,
+              email: commit.author.email,
+              date: new Date(commit.author.timestamp * 1000).toISOString(),
+            });
+
+            // Add parents to queue
+            for (const parent of commit.parentHashes) {
+              if (!visited.has(parent) && parent !== fromHash) {
+                queue.push(parent);
+              }
+            }
+          } catch {
+            // Skip invalid commits
+          }
+        }
+
+        // Sort by date (newest first)
+        commits.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+        return {
+          commits,
+          stats: {
+            totalCommits: commits.length,
+          },
+        };
+      } catch (error) {
+        if (error instanceof TRPCError) {
+          throw error;
+        }
+        console.error('[repos.getCommitsBetween] Error:', error);
+        return { commits: [], stats: { totalCommits: 0 } };
+      }
+    }),
 });

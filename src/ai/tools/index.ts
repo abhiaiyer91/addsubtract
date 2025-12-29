@@ -20,6 +20,8 @@ export { semanticSearchTool, indexRepositoryTool, getIndexStatusTool } from './s
 export { generatePRDescriptionTool, PR_DESCRIPTION_PROMPT } from './generate-pr-description.js';
 export { reviewPRTool, CODE_REVIEW_PROMPT, formatReviewComment } from './review-pr.js';
 export type { ReviewCategory } from './review-pr.js';
+export { generateReleaseNotesTool, RELEASE_NOTES_PROMPT } from './generate-release-notes.js';
+export type { GeneratedReleaseNotes, ChangeEntry } from './generate-release-notes.js';
 
 // Coding agent tools (disk-based)
 export { readFileTool } from './read-file.js';
@@ -52,6 +54,7 @@ import { searchTool } from './search.js';
 import { semanticSearchTool, indexRepositoryTool, getIndexStatusTool } from './semantic-search.js';
 import { generatePRDescriptionTool } from './generate-pr-description.js';
 import { reviewPRTool } from './review-pr.js';
+import { generateReleaseNotesTool } from './generate-release-notes.js';
 
 // Coding agent tools imports (disk-based)
 import { readFileTool } from './read-file.js';
@@ -91,6 +94,7 @@ export const witTools = {
   getIndexStatus: getIndexStatusTool,
   generatePRDescription: generatePRDescriptionTool,
   reviewPR: reviewPRTool,
+  generateReleaseNotes: generateReleaseNotesTool,
   
   // Coding agent tools (disk-based)
   readFile: readFileTool,

@@ -40,6 +40,7 @@ import {
   // New Git-compatible commands
   handleStash,
   handleTag,
+  handleRelease,
   handleReset,
   handleBisect,
   handleClean,
@@ -178,6 +179,15 @@ Tags:
   tag <name>            Create a lightweight tag
   tag -a <name> -m ""   Create an annotated tag
   tag -d <name>         Delete a tag
+
+Releases:
+  release               List all releases
+  release create <tag>  Create a new release
+  release create <tag> --generate  AI-generated release notes
+  release view <tag>    View release details
+  release notes <tag>   Generate release notes from commits
+  release latest        Show the latest release
+  release delete <tag>  Delete a release
 
 History Rewriting:
   cherry-pick <commit>  Apply changes from specific commits
@@ -448,7 +458,7 @@ const COMMANDS = [
   // Plumbing commands
   'rev-parse', 'update-ref', 'symbolic-ref', 'for-each-ref', 'show-ref', 'fsck',
   // New Git-compatible commands
-  'stash', 'tag', 'reset', 'bisect', 'clean', 'show',
+  'stash', 'tag', 'release', 'reset', 'bisect', 'clean', 'show',
   // History rewriting commands
   'cherry-pick', 'rebase', 'revert',
   // Remote commands
@@ -889,6 +899,17 @@ function main(): void {
       case 'tag':
         handleTag(rawArgs);
         break;
+
+      case 'release':
+        handleRelease(rawArgs).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
+          }
+          process.exit(1);
+        });
+        return; // Exit main() to let async handle complete
 
       case 'reset':
         handleReset(rawArgs);
