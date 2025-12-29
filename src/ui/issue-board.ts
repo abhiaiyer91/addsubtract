@@ -3,7 +3,7 @@
  * Linear-inspired kanban board for the web UI
  */
 
-import { Issue, IssueStatus, IssuePriority, IssueManager, STATUS_CONFIG, PRIORITY_CONFIG, Cycle } from '../core/issues';
+import { Issue, IssueStatus, IssuePriority, IssueManager, STATUS_CONFIG, PRIORITY_CONFIG, Cycle, CustomStage } from '../core/issues';
 
 /**
  * Extended issue with Linear-style fields
@@ -31,19 +31,50 @@ export interface BoardColumn {
   title: string;
   icon: string;
   color: string;
+  /** Stage key for custom stages */
+  stageKey?: string;
+  /** Stage ID for custom stages */
+  stageId?: string;
+  /** Whether this column represents a closed state */
+  isClosedState?: boolean;
 }
 
 /**
  * Default board columns - includes triage for Linear-style workflow
  */
 export const DEFAULT_COLUMNS: BoardColumn[] = [
-  { status: 'triage' as IssueStatus, title: 'Triage', icon: '◇', color: '#9ca3af' },
-  { status: 'backlog', title: 'Backlog', icon: '○', color: '#6b7280' },
-  { status: 'todo', title: 'Todo', icon: '◔', color: '#f59e0b' },
-  { status: 'in_progress', title: 'In Progress', icon: '◑', color: '#3b82f6' },
-  { status: 'in_review', title: 'In Review', icon: '◕', color: '#8b5cf6' },
-  { status: 'done', title: 'Done', icon: '●', color: '#22c55e' },
+  { status: 'triage' as IssueStatus, title: 'Triage', icon: '◇', color: '#9ca3af', stageKey: 'triage' },
+  { status: 'backlog', title: 'Backlog', icon: '○', color: '#6b7280', stageKey: 'backlog' },
+  { status: 'todo', title: 'Todo', icon: '◔', color: '#f59e0b', stageKey: 'todo' },
+  { status: 'in_progress', title: 'In Progress', icon: '◑', color: '#3b82f6', stageKey: 'in_progress' },
+  { status: 'in_review', title: 'In Review', icon: '◕', color: '#8b5cf6', stageKey: 'in_review' },
+  { status: 'done', title: 'Done', icon: '●', color: '#22c55e', stageKey: 'done', isClosedState: true },
 ];
+
+/**
+ * Convert custom stages to board columns
+ */
+export function stagesToColumns(stages: CustomStage[]): BoardColumn[] {
+  return stages.map(stage => ({
+    status: stage.key as IssueStatus,
+    title: stage.name,
+    icon: stage.icon,
+    color: `#${stage.color}`,
+    stageKey: stage.key,
+    isClosedState: stage.isClosedState,
+  }));
+}
+
+/**
+ * Get board columns from IssueManager (supports custom stages)
+ */
+export function getBoardColumns(manager: IssueManager): BoardColumn[] {
+  const stages = manager.getStages();
+  if (stages && stages.length > 0) {
+    return stagesToColumns(stages);
+  }
+  return DEFAULT_COLUMNS;
+}
 
 /**
  * Relations data type
@@ -184,23 +215,32 @@ export function renderBoardColumn(
   issues: Issue[], 
   manager: IssueManager
 ): string {
-  const issueCards = issues
-    .filter(i => i.status === column.status)
+  // Filter by stage key (for custom stages) or status (for legacy)
+  const columnIssues = issues.filter(i => {
+    if (column.stageKey) {
+      return i.status === column.stageKey;
+    }
+    return i.status === column.status;
+  });
+  
+  const issueCards = columnIssues
     .map(i => renderIssueCard(i, manager))
     .join('');
   
-  const count = issues.filter(i => i.status === column.status).length;
+  const count = columnIssues.length;
+  const stageIdentifier = column.stageKey || column.status;
   
   return `
-    <div class="board-column" data-status="${column.status}">
+    <div class="board-column" data-status="${stageIdentifier}" data-stage-key="${column.stageKey || ''}" data-stage-id="${column.stageId || ''}">
       <div class="board-column-header">
         <span class="board-column-icon" style="color: ${column.color}">${column.icon}</span>
         <span class="board-column-title">${column.title}</span>
         <span class="board-column-count">${count}</span>
+        ${column.isClosedState ? '<span class="board-column-closed-badge" title="Closed state">✓</span>' : ''}
       </div>
       <div class="board-column-content" 
            ondragover="handleDragOver(event)" 
-           ondrop="handleDrop(event, '${column.status}')">
+           ondrop="handleDrop(event, '${stageIdentifier}')">
         ${issueCards || '<div class="board-column-empty">No issues</div>'}
       </div>
     </div>
@@ -213,9 +253,12 @@ export function renderBoardColumn(
 export function renderBoard(
   issues: Issue[], 
   manager: IssueManager,
-  columns: BoardColumn[] = DEFAULT_COLUMNS
+  columns?: BoardColumn[]
 ): string {
-  const columnsHtml = columns
+  // Get columns from manager if not provided (supports custom stages)
+  const boardColumns = columns || getBoardColumns(manager);
+  
+  const columnsHtml = boardColumns
     .map(col => renderBoardColumn(col, issues, manager))
     .join('');
   
@@ -227,6 +270,12 @@ export function renderBoard(
           <span class="board-count">${issues.length} issues</span>
         </div>
         <div class="board-actions">
+          <button class="btn btn-secondary btn-sm" onclick="manageStages()" title="Manage workflow stages">
+            <svg viewBox="0 0 16 16" fill="currentColor" width="14" height="14">
+              <path d="M8 4.5a.5.5 0 1 1-1 0 .5.5 0 0 1 1 0zm0 4a.5.5 0 1 1-1 0 .5.5 0 0 1 1 0zm0 4a.5.5 0 1 1-1 0 .5.5 0 0 1 1 0zM4.5 4.5a.5.5 0 1 1-1 0 .5.5 0 0 1 1 0zm0 4a.5.5 0 1 1-1 0 .5.5 0 0 1 1 0zm0 4a.5.5 0 1 1-1 0 .5.5 0 0 1 1 0zm7-8a.5.5 0 1 1-1 0 .5.5 0 0 1 1 0zm0 4a.5.5 0 1 1-1 0 .5.5 0 0 1 1 0zm0 4a.5.5 0 1 1-1 0 .5.5 0 0 1 1 0z"/>
+            </svg>
+            Stages
+          </button>
           <button class="btn btn-primary" onclick="createIssue()">
             <svg viewBox="0 0 16 16" fill="currentColor" width="14" height="14">
               <path d="M8 2a.75.75 0 01.75.75v4.5h4.5a.75.75 0 010 1.5h-4.5v4.5a.75.75 0 01-1.5 0v-4.5h-4.5a.75.75 0 010-1.5h4.5v-4.5A.75.75 0 018 2z"/>
@@ -1560,6 +1609,220 @@ export function getIssueBoardStyles(): string {
       background: rgba(var(--accent-primary-rgb), 0.1);
     }
     
+    /* ================================================================
+       Stage Management Modal Styles
+       ================================================================ */
+    
+    .stage-modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    
+    .stage-modal {
+      background: var(--bg-elevated);
+      border-radius: var(--radius-lg);
+      width: 90%;
+      max-width: 700px;
+      max-height: 80vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: var(--shadow-xl);
+    }
+    
+    .stage-modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: var(--spacing-lg);
+      border-bottom: 1px solid var(--border-default);
+    }
+    
+    .stage-modal-header h2 {
+      margin: 0;
+      font-size: var(--font-size-lg);
+    }
+    
+    .stage-modal-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: var(--spacing-lg);
+    }
+    
+    .stage-modal-description {
+      color: var(--text-secondary);
+      font-size: var(--font-size-sm);
+      margin-bottom: var(--spacing-lg);
+    }
+    
+    .stage-list {
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing-sm);
+      margin-bottom: var(--spacing-xl);
+    }
+    
+    .stage-row {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-sm);
+      padding: var(--spacing-sm) var(--spacing-md);
+      background: var(--bg-surface);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-md);
+      transition: all var(--transition-fast);
+    }
+    
+    .stage-row:hover {
+      border-color: var(--border-focus);
+    }
+    
+    .stage-row.dragging {
+      opacity: 0.5;
+      border-color: var(--accent-primary);
+    }
+    
+    .stage-drag-handle {
+      cursor: grab;
+      color: var(--text-tertiary);
+      padding: var(--spacing-xs);
+      user-select: none;
+    }
+    
+    .stage-drag-handle:active {
+      cursor: grabbing;
+    }
+    
+    .stage-icon {
+      font-size: 16px;
+      width: 24px;
+      text-align: center;
+    }
+    
+    .stage-name-input {
+      flex: 1;
+      padding: var(--spacing-xs) var(--spacing-sm);
+      background: var(--bg-overlay);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-sm);
+      color: var(--text-primary);
+      font-size: var(--font-size-sm);
+    }
+    
+    .stage-name-input:read-only {
+      background: transparent;
+      border-color: transparent;
+    }
+    
+    .stage-name-input:focus {
+      outline: none;
+      border-color: var(--border-focus);
+    }
+    
+    .stage-color-input {
+      width: 80px;
+      padding: var(--spacing-xs) var(--spacing-sm);
+      background: var(--bg-overlay);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-sm);
+      color: var(--text-primary);
+      font-size: var(--font-size-sm);
+      font-family: var(--font-mono);
+    }
+    
+    .stage-checkbox {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-xs);
+      font-size: var(--font-size-xs);
+      color: var(--text-secondary);
+      white-space: nowrap;
+    }
+    
+    .stage-checkbox input {
+      margin: 0;
+    }
+    
+    .stage-delete {
+      color: var(--accent-danger);
+      font-size: 18px;
+      line-height: 1;
+    }
+    
+    .stage-delete:hover {
+      color: var(--accent-danger);
+      opacity: 0.8;
+    }
+    
+    .stage-system-badge {
+      font-size: var(--font-size-xs);
+      color: var(--text-tertiary);
+      background: var(--bg-overlay);
+      padding: 2px 6px;
+      border-radius: var(--radius-sm);
+    }
+    
+    .stage-add-section {
+      border-top: 1px solid var(--border-default);
+      padding-top: var(--spacing-lg);
+    }
+    
+    .stage-add-section h3 {
+      font-size: var(--font-size-sm);
+      font-weight: 600;
+      margin-bottom: var(--spacing-md);
+    }
+    
+    .stage-add-form {
+      display: flex;
+      gap: var(--spacing-sm);
+      flex-wrap: wrap;
+    }
+    
+    .stage-add-form input {
+      padding: var(--spacing-sm);
+      background: var(--bg-overlay);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-md);
+      color: var(--text-primary);
+      font-size: var(--font-size-sm);
+    }
+    
+    .stage-add-form input:focus {
+      outline: none;
+      border-color: var(--border-focus);
+    }
+    
+    .stage-add-form input:nth-child(1) { flex: 1; min-width: 100px; }
+    .stage-add-form input:nth-child(2) { flex: 2; min-width: 150px; }
+    .stage-add-form input:nth-child(3) { width: 60px; }
+    .stage-add-form input:nth-child(4) { width: 80px; font-family: var(--font-mono); }
+    
+    .stage-modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: var(--spacing-sm);
+      padding: var(--spacing-lg);
+      border-top: 1px solid var(--border-default);
+    }
+    
+    /* Board column closed state badge */
+    .board-column-closed-badge {
+      font-size: 10px;
+      background: var(--accent-success);
+      color: white;
+      padding: 1px 4px;
+      border-radius: var(--radius-sm);
+      margin-left: auto;
+    }
+    
     /* Overdue issues highlight in list view */
     .issue-row.overdue {
       background: rgba(239, 68, 68, 0.05);
@@ -1917,6 +2180,232 @@ export function getIssueBoardScript(): string {
         params.delete(filterType);
       }
       window.location.search = params.toString();
+    }
+    
+    // ================================================================
+    // Stage Management Functions
+    // ================================================================
+    
+    async function manageStages() {
+      // Open stage management modal
+      const modal = document.createElement('div');
+      modal.className = 'stage-modal-overlay';
+      modal.innerHTML = await renderStageManagementModal();
+      document.body.appendChild(modal);
+      
+      // Close on overlay click
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+          modal.remove();
+        }
+      });
+      
+      // Enable drag and drop for reordering
+      enableStageDragAndDrop();
+    }
+    
+    async function renderStageManagementModal() {
+      const stages = await fetchStages();
+      
+      const stageRows = stages.map((stage, index) => 
+        '<div class="stage-row" data-stage-id="' + stage.id + '" data-stage-key="' + stage.key + '">' +
+          '<div class="stage-drag-handle" draggable="true">⋮⋮</div>' +
+          '<div class="stage-icon" style="color: #' + stage.color + '">' + stage.icon + '</div>' +
+          '<input type="text" class="stage-name-input" value="' + escapeHtmlAttr(stage.name) + '" ' + (stage.isSystem ? 'readonly' : '') + ' />' +
+          '<input type="text" class="stage-color-input" value="' + stage.color + '" placeholder="Color (hex)" />' +
+          '<label class="stage-checkbox">' +
+            '<input type="checkbox" ' + (stage.isClosedState ? 'checked' : '') + ' onchange="updateStageProperty(\\''+stage.id+'\\', \\'isClosedState\\', this.checked)" />' +
+            ' Closes' +
+          '</label>' +
+          '<label class="stage-checkbox">' +
+            '<input type="checkbox" ' + (stage.isDefault ? 'checked' : '') + ' onchange="updateStageProperty(\\''+stage.id+'\\', \\'isDefault\\', this.checked)" />' +
+            ' Default' +
+          '</label>' +
+          (!stage.isSystem ? '<button class="btn-icon stage-delete" onclick="deleteStage(\\''+stage.id+'\\')">×</button>' : '<span class="stage-system-badge">System</span>') +
+        '</div>'
+      ).join('');
+      
+      return '<div class="stage-modal">' +
+        '<div class="stage-modal-header">' +
+          '<h2>Manage Workflow Stages</h2>' +
+          '<button class="close-btn" onclick="this.closest(\\'.stage-modal-overlay\\').remove()">×</button>' +
+        '</div>' +
+        '<div class="stage-modal-content">' +
+          '<p class="stage-modal-description">Customize your workflow by adding, editing, or reordering stages. Drag stages to reorder them.</p>' +
+          '<div class="stage-list" id="stage-list">' + stageRows + '</div>' +
+          '<div class="stage-add-section">' +
+            '<h3>Add New Stage</h3>' +
+            '<div class="stage-add-form">' +
+              '<input type="text" id="new-stage-key" placeholder="Key (e.g., review)" />' +
+              '<input type="text" id="new-stage-name" placeholder="Name (e.g., Code Review)" />' +
+              '<input type="text" id="new-stage-icon" placeholder="Icon" value="○" />' +
+              '<input type="text" id="new-stage-color" placeholder="Color" value="6b7280" />' +
+              '<button class="btn btn-primary" onclick="addNewStage()">Add</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="stage-modal-footer">' +
+          '<button class="btn btn-secondary" onclick="this.closest(\\'.stage-modal-overlay\\').remove()">Close</button>' +
+          '<button class="btn btn-primary" onclick="saveStageOrder()">Save Order</button>' +
+        '</div>' +
+      '</div>';
+    }
+    
+    function enableStageDragAndDrop() {
+      const list = document.getElementById('stage-list');
+      if (!list) return;
+      
+      let draggedRow = null;
+      
+      list.querySelectorAll('.stage-row').forEach(row => {
+        row.addEventListener('dragstart', (e) => {
+          draggedRow = row;
+          row.classList.add('dragging');
+        });
+        
+        row.addEventListener('dragend', (e) => {
+          row.classList.remove('dragging');
+          draggedRow = null;
+        });
+        
+        row.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          if (draggedRow && draggedRow !== row) {
+            const rect = row.getBoundingClientRect();
+            const midY = rect.top + rect.height / 2;
+            if (e.clientY < midY) {
+              list.insertBefore(draggedRow, row);
+            } else {
+              list.insertBefore(draggedRow, row.nextSibling);
+            }
+          }
+        });
+      });
+    }
+    
+    async function fetchStages() {
+      const pathParts = window.location.pathname.split('/');
+      const owner = pathParts[1];
+      const repo = pathParts[2];
+      const res = await fetch('/api/repos/' + owner + '/' + repo + '/stages');
+      return res.json();
+    }
+    
+    async function addNewStage() {
+      const key = document.getElementById('new-stage-key').value.trim();
+      const name = document.getElementById('new-stage-name').value.trim();
+      const icon = document.getElementById('new-stage-icon').value.trim() || '○';
+      const color = document.getElementById('new-stage-color').value.trim() || '6b7280';
+      
+      if (!key || !name) {
+        showToast('Key and name are required', 'error');
+        return;
+      }
+      
+      const pathParts = window.location.pathname.split('/');
+      const owner = pathParts[1];
+      const repo = pathParts[2];
+      
+      try {
+        const res = await fetch('/api/repos/' + owner + '/' + repo + '/stages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key, name, icon, color })
+        });
+        
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || 'Failed to create stage');
+        }
+        
+        showToast('Stage created successfully', 'success');
+        document.querySelector('.stage-modal-overlay').remove();
+        loadIssues();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+    
+    async function deleteStage(stageId) {
+      if (!confirm('Are you sure you want to delete this stage?')) {
+        return;
+      }
+      
+      const pathParts = window.location.pathname.split('/');
+      const owner = pathParts[1];
+      const repo = pathParts[2];
+      
+      try {
+        const res = await fetch('/api/repos/' + owner + '/' + repo + '/stages/' + stageId, {
+          method: 'DELETE'
+        });
+        
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || 'Failed to delete stage');
+        }
+        
+        showToast('Stage deleted', 'success');
+        document.querySelector('.stage-modal-overlay').remove();
+        loadIssues();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+    
+    async function updateStageProperty(stageId, property, value) {
+      const pathParts = window.location.pathname.split('/');
+      const owner = pathParts[1];
+      const repo = pathParts[2];
+      
+      try {
+        const res = await fetch('/api/repos/' + owner + '/' + repo + '/stages/' + stageId, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ [property]: value })
+        });
+        
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || 'Failed to update stage');
+        }
+        
+        showToast('Stage updated', 'success');
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+    
+    async function saveStageOrder() {
+      const stageRows = document.querySelectorAll('#stage-list .stage-row');
+      const stageIds = Array.from(stageRows).map(row => row.dataset.stageId);
+      
+      const pathParts = window.location.pathname.split('/');
+      const owner = pathParts[1];
+      const repo = pathParts[2];
+      
+      try {
+        const res = await fetch('/api/repos/' + owner + '/' + repo + '/stages/reorder', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ stageIds })
+        });
+        
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || 'Failed to reorder stages');
+        }
+        
+        showToast('Stage order saved', 'success');
+        document.querySelector('.stage-modal-overlay').remove();
+        loadIssues();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+    
+    function escapeHtmlAttr(str) {
+      return str.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
   `;
 }

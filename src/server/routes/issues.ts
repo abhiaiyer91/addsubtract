@@ -5,6 +5,7 @@
 
 import { Hono } from 'hono';
 import { issueModel, issueRelationModel, issueActivityModel, repoModel } from '../../db/models';
+import { issueStageModel } from '../../db/models/issue-stage';
 import { authMiddleware } from '../middleware/auth';
 
 type IssueStatus = 'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done' | 'canceled' | 'triage';
@@ -419,6 +420,222 @@ export function createIssueRoutes(): Hono {
     await issueActivityModel.logCommented(issue.id, user?.id || 'anonymous', body.body);
 
     return c.json({ id: 'comment-id', body: body.body });
+  });
+
+  // ============ STAGE ROUTES ============
+
+  /**
+   * GET /api/repos/:owner/:repo/stages
+   * List all custom stages for a repository
+   */
+  app.get('/:owner/:repo/stages', async (c) => {
+    const { owner, repo } = c.req.param();
+
+    const dbRepo = await getRepo(owner, repo);
+    const stages = await issueStageModel.listByRepo(dbRepo.id);
+
+    return c.json(stages);
+  });
+
+  /**
+   * POST /api/repos/:owner/:repo/stages
+   * Create a new custom stage
+   */
+  app.post('/:owner/:repo/stages', async (c) => {
+    const { owner, repo } = c.req.param();
+    const body = await c.req.json();
+
+    const dbRepo = await getRepo(owner, repo);
+
+    // Check if key already exists
+    const existing = await issueStageModel.findByKey(dbRepo.id, body.key);
+    if (existing) {
+      return c.json({ error: 'Stage with this key already exists' }, 400);
+    }
+
+    const stage = await issueStageModel.create({
+      repoId: dbRepo.id,
+      key: body.key,
+      name: body.name,
+      description: body.description,
+      icon: body.icon || '○',
+      color: body.color || '6b7280',
+      position: body.position,
+      isClosedState: body.isClosedState || false,
+      isTriageState: body.isTriageState || false,
+      isDefault: body.isDefault || false,
+      isSystem: false, // User-created stages are never system stages
+    });
+
+    return c.json(stage, 201);
+  });
+
+  /**
+   * GET /api/repos/:owner/:repo/stages/:stageKey
+   * Get a specific stage
+   */
+  app.get('/:owner/:repo/stages/:stageKey', async (c) => {
+    const { owner, repo, stageKey } = c.req.param();
+
+    const dbRepo = await getRepo(owner, repo);
+    const stage = await issueStageModel.findByKey(dbRepo.id, stageKey);
+
+    if (!stage) {
+      return c.json({ error: 'Stage not found' }, 404);
+    }
+
+    return c.json(stage);
+  });
+
+  /**
+   * PATCH /api/repos/:owner/:repo/stages/:stageKey
+   * Update a stage
+   */
+  app.patch('/:owner/:repo/stages/:stageKey', async (c) => {
+    const { owner, repo, stageKey } = c.req.param();
+    const body = await c.req.json();
+
+    const dbRepo = await getRepo(owner, repo);
+    const stage = await issueStageModel.findByKey(dbRepo.id, stageKey);
+
+    if (!stage) {
+      return c.json({ error: 'Stage not found' }, 404);
+    }
+
+    const updates: Parameters<typeof issueStageModel.update>[1] = {};
+    if (body.name !== undefined) updates.name = body.name;
+    if (body.description !== undefined) updates.description = body.description;
+    if (body.icon !== undefined) updates.icon = body.icon;
+    if (body.color !== undefined) updates.color = body.color;
+    if (body.position !== undefined) updates.position = body.position;
+    if (body.isClosedState !== undefined) updates.isClosedState = body.isClosedState;
+    if (body.isTriageState !== undefined) updates.isTriageState = body.isTriageState;
+    if (body.isDefault !== undefined) updates.isDefault = body.isDefault;
+
+    const updated = await issueStageModel.update(stage.id, updates);
+    return c.json(updated);
+  });
+
+  /**
+   * DELETE /api/repos/:owner/:repo/stages/:stageKey
+   * Delete a stage (non-system stages only)
+   */
+  app.delete('/:owner/:repo/stages/:stageKey', async (c) => {
+    const { owner, repo, stageKey } = c.req.param();
+
+    const dbRepo = await getRepo(owner, repo);
+    const stage = await issueStageModel.findByKey(dbRepo.id, stageKey);
+
+    if (!stage) {
+      return c.json({ error: 'Stage not found' }, 404);
+    }
+
+    if (stage.isSystem) {
+      return c.json({ error: 'Cannot delete system stages' }, 400);
+    }
+
+    const deleted = await issueStageModel.delete(stage.id);
+    if (!deleted) {
+      return c.json({ error: 'Failed to delete stage' }, 500);
+    }
+
+    return c.json({ success: true });
+  });
+
+  /**
+   * POST /api/repos/:owner/:repo/stages/reorder
+   * Reorder stages
+   */
+  app.post('/:owner/:repo/stages/reorder', async (c) => {
+    const { owner, repo } = c.req.param();
+    const body = await c.req.json();
+
+    const dbRepo = await getRepo(owner, repo);
+
+    if (!Array.isArray(body.stageIds)) {
+      return c.json({ error: 'stageIds must be an array' }, 400);
+    }
+
+    const stages = await issueStageModel.reorder(dbRepo.id, body.stageIds);
+    return c.json(stages);
+  });
+
+  /**
+   * POST /api/repos/:owner/:repo/stages/init
+   * Initialize default stages for a repository
+   */
+  app.post('/:owner/:repo/stages/init', async (c) => {
+    const { owner, repo } = c.req.param();
+
+    const dbRepo = await getRepo(owner, repo);
+
+    // Check if stages already exist
+    const hasStages = await issueStageModel.hasStages(dbRepo.id);
+    if (hasStages) {
+      return c.json({ error: 'Repository already has stages configured' }, 400);
+    }
+
+    const stages = await issueStageModel.createDefaultStages(dbRepo.id);
+    return c.json(stages, 201);
+  });
+
+  /**
+   * PATCH /api/repos/:owner/:repo/issues/:number/stage
+   * Update issue stage (using custom stage system)
+   */
+  app.patch('/:owner/:repo/issues/:number/stage', async (c) => {
+    const { owner, repo, number } = c.req.param();
+    const body = await c.req.json();
+
+    const dbRepo = await getRepo(owner, repo);
+    const issue = await issueModel.findByRepoAndNumber(dbRepo.id, parseInt(number, 10));
+
+    if (!issue) {
+      return c.json({ error: 'Issue not found' }, 404);
+    }
+
+    let updated;
+    if (body.stageId) {
+      updated = await issueModel.updateStage(issue.id, body.stageId);
+    } else if (body.stageKey) {
+      updated = await issueModel.updateStageByKey(issue.id, body.stageKey);
+    } else {
+      return c.json({ error: 'Either stageId or stageKey is required' }, 400);
+    }
+
+    if (!updated) {
+      return c.json({ error: 'Failed to update stage' }, 500);
+    }
+
+    return c.json(updated);
+  });
+
+  /**
+   * GET /api/repos/:owner/:repo/issues/board
+   * Get issues grouped by stage (for Kanban board with custom stages)
+   */
+  app.get('/:owner/:repo/issues/board', async (c) => {
+    const { owner, repo } = c.req.param();
+    const query = c.req.query();
+
+    const dbRepo = await getRepo(owner, repo);
+
+    const result = await issueModel.listByRepoGroupedByStage(dbRepo.id, {
+      state: query.state as 'open' | 'closed' | undefined,
+      authorId: query.author,
+      assigneeId: query.assignee,
+    });
+
+    // Convert Map to object for JSON serialization
+    const issuesByStage: Record<string, unknown[]> = {};
+    for (const [stageId, issues] of result.issuesByStage) {
+      issuesByStage[stageId] = issues;
+    }
+
+    return c.json({
+      stages: result.stages,
+      issuesByStage,
+    });
   });
 
   return app;
