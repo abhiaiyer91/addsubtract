@@ -7,6 +7,7 @@ import { Hono } from 'hono';
 import { issueModel, issueRelationModel, issueActivityModel, repoModel } from '../../db/models';
 import { issueStageModel } from '../../db/models/issue-stage';
 import { authMiddleware } from '../middleware/auth';
+import { eventBus } from '../../events/bus';
 
 type IssueStatus = 'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done' | 'canceled' | 'triage';
 type IssuePriority = 'none' | 'urgent' | 'high' | 'medium' | 'low';
@@ -132,6 +133,16 @@ export function createIssueRoutes(): Hono {
         await issueModel.setParent(issue.id, parent.id);
       }
     }
+
+    // Emit issue.created event for triage agent and other handlers
+    const repoFullName = `${owner}/${repo}`;
+    await eventBus.emit('issue.created', user?.id || 'anonymous', {
+      issueId: issue.id,
+      issueNumber: issue.number,
+      issueTitle: issue.title,
+      repoId: dbRepo.id,
+      repoFullName,
+    });
 
     return c.json(issue, 201);
   });
