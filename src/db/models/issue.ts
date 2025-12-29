@@ -1569,7 +1569,7 @@ export const contributionIssuesModel = {
     const conditions = [
       inArray(issues.id, issueIds),
       eq(issues.state, 'open'),
-      eq(repositories.isPublic, true), // Only public repos
+      eq(repositories.isPrivate, false), // Only public repos
     ];
 
     if (priority) {
@@ -1674,7 +1674,7 @@ export const contributionIssuesModel = {
     const conditions = [
       inArray(issues.id, issueIds),
       eq(issues.state, 'open'),
-      eq(repositories.isPublic, true),
+      eq(repositories.isPrivate, false), // Only public repos
     ];
 
     if (priority) {
