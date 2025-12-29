@@ -195,15 +195,41 @@ export function DiffViewer({
   onToggleViewed,
   showViewedToggle = false,
 }: DiffViewerProps) {
+  // Check if mobile device
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth < 768;
+    }
+    return false;
+  });
+
+  // Listen for resize to update mobile status
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   // Initialize view mode from localStorage or default
   const [viewMode, setViewMode] = useState<DiffViewMode>(() => {
     if (defaultViewMode) return defaultViewMode;
     if (typeof window !== 'undefined') {
+      // Force unified on mobile
+      if (window.innerWidth < 768) return 'unified';
       const saved = localStorage.getItem(DIFF_VIEW_PREFERENCE_KEY);
       if (saved === 'split' || saved === 'unified') return saved;
     }
     return 'unified';
   });
+
+  // Force unified mode on mobile
+  useEffect(() => {
+    if (isMobile && viewMode === 'split') {
+      setViewMode('unified');
+    }
+  }, [isMobile, viewMode]);
 
   // Save preference to localStorage
   useEffect(() => {
@@ -229,11 +255,11 @@ export function DiffViewer({
 
   return (
     <TooltipProvider>
-    <div className="space-y-4">
+    <div className="space-y-3 md:space-y-4">
       {/* Header with summary and view toggle */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-          <span>{displayFiles.length} file{displayFiles.length !== 1 ? 's' : ''} changed</span>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2 md:gap-4 text-xs md:text-sm text-muted-foreground">
+          <span>{displayFiles.length} file{displayFiles.length !== 1 ? 's' : ''}</span>
           <span className="text-green-500">
             +{displayFiles.reduce((acc, f) => acc + f.additions, 0)}
           </span>
@@ -242,36 +268,38 @@ export function DiffViewer({
           </span>
         </div>
 
-        {/* View mode toggle */}
-        <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant={viewMode === 'unified' ? 'secondary' : 'ghost'}
-                size="icon-sm"
-                onClick={() => setViewMode('unified')}
-                className="h-7 w-7"
-              >
-                <AlignJustify className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Unified view</TooltipContent>
-          </Tooltip>
-          
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant={viewMode === 'split' ? 'secondary' : 'ghost'}
-                size="icon-sm"
-                onClick={() => setViewMode('split')}
-                className="h-7 w-7"
-              >
-                <Columns className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Split view</TooltipContent>
-          </Tooltip>
-        </div>
+        {/* View mode toggle - hidden on mobile */}
+        {!isMobile && (
+          <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={viewMode === 'unified' ? 'secondary' : 'ghost'}
+                  size="icon-sm"
+                  onClick={() => setViewMode('unified')}
+                  className="h-7 w-7"
+                >
+                  <AlignJustify className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Unified view</TooltipContent>
+            </Tooltip>
+            
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={viewMode === 'split' ? 'secondary' : 'ghost'}
+                  size="icon-sm"
+                  onClick={() => setViewMode('split')}
+                  className="h-7 w-7"
+                >
+                  <Columns className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Split view</TooltipContent>
+            </Tooltip>
+          </div>
+        )}
       </div>
 
       {/* File list */}
@@ -282,6 +310,7 @@ export function DiffViewer({
           file={file}
           prId={prId}
           aiAvailable={aiAvailable}
+          isMobile={isMobile}
           comments={comments[file.path] || []}
           currentUserId={currentUserId}
           onAddComment={onAddComment}
@@ -308,6 +337,7 @@ interface DiffFileViewProps {
   file: DiffFile;
   prId?: string;
   aiAvailable?: boolean;
+  isMobile?: boolean;
   comments: InlineCommentData[];
   currentUserId?: string;
   viewMode: DiffViewMode;
@@ -330,6 +360,7 @@ function DiffFileView({
   file,
   prId,
   aiAvailable,
+  isMobile = false,
   comments,
   currentUserId,
   viewMode,
@@ -410,83 +441,100 @@ function DiffFileView({
 
   return (
     <div className={cn('border rounded-lg overflow-hidden', isViewed && 'opacity-60')}>
-      {/* File header */}
+      {/* File header - mobile optimized */}
       <div
-        className="flex items-center gap-3 px-4 py-2 bg-muted/50 border-b cursor-pointer hover:bg-muted/70"
+        className="flex flex-wrap items-center gap-2 md:gap-3 px-2 md:px-4 py-2 bg-muted/50 border-b cursor-pointer hover:bg-muted/70"
         onClick={() => setIsExpanded(!isExpanded)}
       >
-        <Button variant="ghost" size="icon" className="h-6 w-6 p-0">
+        <Button variant="ghost" size="icon" className="h-6 w-6 p-0 shrink-0">
           {isExpanded ? (
             <ChevronDown className="h-4 w-4" />
           ) : (
             <ChevronRight className="h-4 w-4" />
           )}
         </Button>
-        <File className="h-4 w-4 text-muted-foreground" />
-        <span className="font-mono text-sm flex-1">
+        <File className="h-4 w-4 text-muted-foreground shrink-0 hidden sm:block" />
+        
+        {/* File path - truncate on mobile */}
+        <span className="font-mono text-xs md:text-sm flex-1 min-w-0 truncate">
           {file.oldPath && file.oldPath !== file.path ? (
-            <>
-              <span className="text-muted-foreground">{file.oldPath}</span>
-              <span className="mx-2">-&gt;</span>
-              <span>{file.path}</span>
-            </>
+            isMobile ? (
+              <span title={`${file.oldPath} → ${file.path}`}>{file.path.split('/').pop()}</span>
+            ) : (
+              <>
+                <span className="text-muted-foreground">{file.oldPath}</span>
+                <span className="mx-2">→</span>
+                <span>{file.path}</span>
+              </>
+            )
           ) : (
-            file.path
+            isMobile ? (
+              <span title={file.path}>{file.path.split('/').pop()}</span>
+            ) : (
+              file.path
+            )
           )}
         </span>
 
-        {commentCount > 0 && (
-          <Badge variant="outline" className="gap-1">
-            <MessageSquare className="h-3 w-3" />
-            {commentCount}
+        {/* Stats and actions row */}
+        <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
+          {commentCount > 0 && (
+            <Badge variant="outline" className="gap-1 text-xs px-1.5 py-0.5">
+              <MessageSquare className="h-3 w-3" />
+              {commentCount}
+            </Badge>
+          )}
+          
+          {/* AI Explain button - icon only on mobile */}
+          {aiAvailable && prId && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                "h-7 px-1.5 md:px-2 gap-1 text-xs",
+                showExplanation && explanation && "bg-primary/10 text-primary"
+              )}
+              onClick={handleExplainClick}
+              disabled={explainMutation.isPending}
+            >
+              {explainMutation.isPending ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <Sparkles className="h-3 w-3" />
+              )}
+              <span className="hidden sm:inline">
+                {explanation ? (showExplanation ? 'Hide' : 'Show') : 'Explain'}
+              </span>
+            </Button>
+          )}
+
+          <Badge variant="outline" className={cn('text-xs px-1.5 py-0.5', statusColors[file.status])}>
+            <span className="hidden sm:inline">{file.status}</span>
+            <span className="sm:hidden">{file.status.charAt(0).toUpperCase()}</span>
           </Badge>
-        )}
-        
-        {/* AI Explain button */}
-        {aiAvailable && prId && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className={cn(
-              "h-7 px-2 gap-1 text-xs",
-              showExplanation && explanation && "bg-primary/10 text-primary"
-            )}
-            onClick={handleExplainClick}
-            disabled={explainMutation.isPending}
-          >
-            {explainMutation.isPending ? (
-              <Loader2 className="h-3 w-3 animate-spin" />
-            ) : (
-              <Sparkles className="h-3 w-3" />
-            )}
-            {explanation ? (showExplanation ? 'Hide' : 'Show') : 'Explain'}
-          </Button>
-        )}
-
-        <Badge variant="outline" className={cn('text-xs', statusColors[file.status])}>
-          {file.status}
-        </Badge>
-        <div className="flex items-center gap-2 text-xs">
-          <span className="text-green-500">+{file.additions}</span>
-          <span className="text-red-500">-{file.deletions}</span>
-        </div>
-
-        {/* Viewed toggle */}
-        {showViewedToggle && onToggleViewed && (
-          <div
-            className="flex items-center gap-1.5"
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleViewed(file.path);
-            }}
-          >
-            <Checkbox
-              checked={isViewed}
-              className="h-4 w-4"
-            />
-            <span className="text-xs text-muted-foreground">Viewed</span>
+          
+          <div className="flex items-center gap-1 text-xs">
+            <span className="text-green-500">+{file.additions}</span>
+            <span className="text-red-500">-{file.deletions}</span>
           </div>
-        )}
+
+          {/* Viewed toggle - hidden on mobile */}
+          {showViewedToggle && onToggleViewed && !isMobile && (
+            <div
+              className="flex items-center gap-1.5"
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleViewed(file.path);
+              }}
+            >
+              <Checkbox
+                checked={isViewed}
+                className="h-4 w-4"
+              />
+              <span className="text-xs text-muted-foreground">Viewed</span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* AI Explanation panel */}
@@ -528,8 +576,8 @@ function DiffFileView({
 
       {/* File content */}
       {isExpanded && (
-        <div className="overflow-x-auto">
-          <table className="w-full font-mono text-sm">
+        <div className="overflow-x-auto scroll-touch">
+          <table className="w-full font-mono text-xs md:text-sm mobile-code">
             <tbody>
               {file.hunks.map((hunk, hunkIndex) => (
                 viewMode === 'split' ? (

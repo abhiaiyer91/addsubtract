@@ -20,12 +20,14 @@ export {
   runCodeGenerationWorkflow,
   runPlanningWorkflow,
   runPlanningIterationWorkflow,
+  runCIExecutionWorkflow,
   // Workflow streamers
   streamPRReviewWorkflow,
   streamIssueTriageWorkflow,
   streamCodeGenerationWorkflow,
   streamPlanningWorkflow,
   streamPlanningIterationWorkflow,
+  streamCIExecutionWorkflow,
 } from './mastra.js';
 
 // Tools
@@ -52,6 +54,16 @@ export {
   type PlanningIterationInput,
   type PlanningIterationOutput,
 } from './workflows/index.js';
+
+// CI/CD Workflow (built on Mastra)
+export {
+  ciExecutionWorkflow,
+  type CIExecutionInput,
+  type CIExecutionOutput,
+  type StepResult as CIStepResult,
+  type JobResult as CIJobResult,
+  type ExecutionContext as CIExecutionContext,
+} from '../ci/workflows/index.js';
 
 // Types
 export type { 

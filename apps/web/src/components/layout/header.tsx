@@ -15,6 +15,7 @@ import {
   Building2,
   Flame,
   Trophy,
+  Github,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -120,6 +121,10 @@ export function Header() {
                     <DropdownMenuItem onClick={() => navigate('/new')}>
                       <BookOpen className="mr-2 h-4 w-4" />
                       New repository
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate('/import')}>
+                      <Github className="mr-2 h-4 w-4" />
+                      Import from GitHub
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={() => navigate('/orgs/new')}>
@@ -255,6 +260,14 @@ export function Header() {
                   >
                     <Plus className="h-4 w-4" />
                     New repository
+                  </Link>
+                  <Link
+                    to="/import"
+                    className="flex items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-lg transition-all"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <Github className="h-4 w-4" />
+                    Import from GitHub
                   </Link>
 <Link
                                     to="/orgs/new"

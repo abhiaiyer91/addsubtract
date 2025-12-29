@@ -47,6 +47,9 @@ export {
 // Issue relations model
 export { issueRelationModel } from './issue-relations';
 
+// Issue stages model (custom workflow stages)
+export { issueStageModel, DEFAULT_STAGES } from './issue-stage';
+
 // Issue activity model
 export { issueActivityModel, type ActivityAction } from './issue-activity';
 

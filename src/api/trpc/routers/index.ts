@@ -35,6 +35,7 @@ import { packagesRouter } from './packages';
 import { oauthAppsRouter } from './oauth-apps';
 import { adminRouter } from './admin';
 import { planningWorkflowRouter } from './planning-workflow';
+import { githubImportRouter } from './github-import';
 
 /**
  * Main application router
@@ -77,6 +78,7 @@ export const appRouter = router({
   oauthApps: oauthAppsRouter,
   admin: adminRouter,
   planningWorkflow: planningWorkflowRouter,
+  githubImport: githubImportRouter,
 });
 
 /**
@@ -121,4 +123,5 @@ export {
   oauthAppsRouter,
   adminRouter,
   planningWorkflowRouter,
+  githubImportRouter,
 };

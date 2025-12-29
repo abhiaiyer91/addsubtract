@@ -1,87 +1,92 @@
 # Contributing to wit
 
-Welcome! We're excited that you want to contribute to wit - a modern, AI-native version control system. This guide will help you get started.
+Welcome! We're excited that you want to contribute to wit - a modern, AI-native version control system.
 
-## Important: AI-Generated Code Only
-
-**We only accept contributions that are generated using coding agents** (such as Claude, Cursor, Copilot, or similar AI coding assistants).
-
-Why? Because wit is built for the AI-first era of software development. We believe:
-
-1. **Consistency** - AI agents produce code that follows established patterns more reliably
-2. **Documentation** - AI-generated code tends to be well-documented and self-explanatory
-3. **Quality** - Modern coding agents write comprehensive tests and handle edge cases
-4. **Dogfooding** - We're building tools for AI-assisted development, so we use them ourselves
-
-When submitting a PR, please mention which coding agent you used to generate your contribution.
-
----
-
-## Getting Started
-
-### Prerequisites
-
-- **Node.js** >= 22.13.0
-- **Docker** (for PostgreSQL)
-- A coding agent (Claude, Cursor, Copilot, etc.)
-
-### Quick Setup
+## TL;DR (Quick Start)
 
 ```bash
-# Clone the repository
-git clone https://github.com/abhiaiyer91/wit.git
-cd wit
-
-# Install dependencies
+# 1. Clone and setup
+git clone https://github.com/abhiaiyer91/wit.git && cd wit
 npm install
-
-# Start PostgreSQL
-npm run docker:db
-
-# Setup environment
 cp .env.example .env
 
-# Build and test
-npm run build
-npm test
+# 2. Start database
+npm run docker:db
 
-# Link for local CLI testing
+# 3. Setup database schema
+npm run db:push
+
+# 4. Build and test
+npm run build && npm test
+
+# 5. Link CLI for local testing
 npm link
 wit --help
 ```
 
-### Environment Variables
+That's it! You're ready to contribute.
 
-Copy `.env.example` to `.env` and configure:
+---
 
-```bash
-# Required for platform features
-DATABASE_URL=postgresql://wit:wit@localhost:5432/wit
+## Important: AI-Generated Contributions
 
-# Optional: AI features
-OPENAI_API_KEY=sk-...
-# or
-ANTHROPIC_API_KEY=sk-ant-...
+**We only accept contributions generated using coding agents** (Claude, Cursor, Copilot, or similar).
 
-# Optional: GitHub OAuth
-GITHUB_TOKEN=ghp_...
-```
+Why? Because wit is built for the AI-first era:
 
-### Database Setup
+- **Consistency** - AI agents follow established patterns reliably
+- **Documentation** - AI-generated code is well-documented
+- **Quality** - Modern agents write tests and handle edge cases
+- **Dogfooding** - We build tools for AI-assisted development, so we use them
 
-```bash
-# Start PostgreSQL
-npm run docker:db
+When submitting a PR, mention which coding agent you used.
 
-# Run migrations
-npm run db:push
+---
 
-# (Optional) Seed sample data
-npm run db:seed
+## Good First Issues
 
-# (Optional) Open Drizzle Studio
-npm run db:studio
-```
+New to wit? Here are some beginner-friendly ways to contribute:
+
+### Easy Wins (< 1 hour)
+
+| Task | Files | Description |
+|------|-------|-------------|
+| Improve error messages | `src/commands/*.ts` | Add helpful suggestions to error messages |
+| Add JSDoc comments | `src/core/*.ts` | Document public functions |
+| Fix typos in docs | `docs/**/*.mdx` | Fix typos or improve clarity |
+| Add test cases | `src/__tests__/*.test.ts` | Add edge case tests to existing commands |
+
+### Medium Tasks (1-4 hours)
+
+| Task | Files | Description |
+|------|-------|-------------|
+| Add new flag to command | `src/commands/*.ts` | Add useful flags (check Git docs for ideas) |
+| Improve CLI output | `src/ui/*.ts` | Better formatting, colors, or progress indicators |
+| Add integration test | `tests/integration/*.test.ts` | Test a workflow end-to-end |
+
+### Starter Prompts for Your AI
+
+Copy-paste these prompts to get started:
+
+**Improve error message:**
+> "In `src/commands/checkout.ts`, improve the error message when a branch doesn't exist. Add helpful suggestions like `wit branch` to list branches. Follow the TsgitError pattern used in other commands."
+
+**Add a test:**
+> "Add a test case to `src/__tests__/stash.test.ts` that tests stashing when there are no changes. Look at existing tests for the pattern."
+
+**Add documentation:**
+> "Add JSDoc comments to all public functions in `src/core/refs.ts`. Follow the documentation style used in `src/core/repository.ts`."
+
+---
+
+## Prerequisites
+
+| Requirement | Version | Check |
+|-------------|---------|-------|
+| Node.js | >= 22.13.0 | `node --version` |
+| Docker | Any recent | `docker --version` |
+| npm | Any recent | `npm --version` |
+| Coding Agent | Claude, Cursor, Copilot, etc. | - |
 
 ---
 
@@ -89,91 +94,51 @@ npm run db:studio
 
 ```
 wit/
-├── apps/
-│   └── web/                 # Web UI (React + Vite)
 ├── src/
-│   ├── cli.ts               # CLI entry point
-│   ├── commands/            # Command implementations (57 commands)
-│   ├── core/                # Core Git functionality
-│   │   ├── repository.ts    # Main repository class
-│   │   ├── object-store.ts  # Object storage (SHA-1/SHA-256)
-│   │   ├── refs.ts          # References (branches, tags)
-│   │   ├── merge.ts         # Merge logic
-│   │   ├── hooks.ts         # Git hooks system
-│   │   └── protocol/        # Git protocol implementation
-│   ├── ai/                  # AI-powered features
-│   │   ├── agent.ts         # Mastra AI agent
-│   │   └── tools/           # AI tools (commit, review, etc.)
-│   ├── api/                 # tRPC API layer
-│   ├── db/                  # Database (Drizzle ORM)
-│   ├── server/              # HTTP server (Hono)
-│   ├── primitives/          # Filesystem & knowledge primitives
-│   ├── ui/                  # Terminal UI components
-│   └── utils/               # Utilities (hash, compression, fs)
+│   ├── cli.ts              # CLI entry point
+│   ├── commands/           # 66 CLI commands (add.ts, commit.ts, etc.)
+│   ├── core/               # Git internals
+│   │   ├── repository.ts   # Main repo class - start here!
+│   │   ├── object-store.ts # Blob/tree/commit storage
+│   │   ├── refs.ts         # Branches and tags
+│   │   ├── merge.ts        # Merge algorithms
+│   │   └── protocol/       # Git wire protocol
+│   ├── ai/                 # AI features (Mastra)
+│   │   ├── agent.ts        # AI agent definition
+│   │   └── tools/          # 21 AI tools
+│   ├── server/             # HTTP server (Hono)
+│   ├── api/                # tRPC API
+│   ├── db/                 # Database (Drizzle ORM)
+│   └── ui/                 # Terminal UI components
+├── apps/
+│   └── web/                # Web UI (React + Vite)
 ├── tests/
-│   └── integration/         # Integration tests
-├── docs/                    # Documentation (Mintlify)
-└── docker-compose.yml       # Development services
+│   └── integration/        # End-to-end tests
+└── docs/                   # Documentation (Mintlify)
 ```
 
----
+### Key Files to Know
 
-## Ways to Contribute
-
-### 1. CLI Commands (`src/commands/`)
-
-The core wit experience. All 57 commands are implemented, but improvements are welcome:
-
-- Bug fixes and edge cases
-- Performance optimizations
-- Better error messages
-- New flags/options
-
-### 2. AI Features (`src/ai/`)
-
-AI-powered Git assistance using Mastra:
-
-- `wit ai commit` - Generate commit messages
-- `wit ai review` - Code review
-- `wit ai explain` - Explain commits
-- New AI tools and capabilities
-
-### 3. Platform Features (`src/server/`, `src/api/`, `src/db/`)
-
-Building a GitHub-like platform:
-
-- Git server (`wit serve`)
-- Pull requests and issues
-- User authentication
-- REST/GraphQL API
-
-### 4. Web UI (`apps/web/`)
-
-React-based dashboard:
-
-- Commit graph visualization
-- File browser and diffs
-- Search and navigation
-
-### 5. Documentation (`docs/`)
-
-Mintlify-powered docs:
-
-- Command reference
-- Tutorials and guides
-- Architecture docs
+| If you want to... | Look at... |
+|-------------------|------------|
+| Add a new command | `src/commands/wip.ts` (simple example) |
+| Understand Git internals | `src/core/repository.ts` |
+| Add an AI feature | `src/ai/tools/commit.ts` |
+| Add an API endpoint | `src/api/trpc/` |
+| Add a UI component | `src/ui/` or `apps/web/src/` |
 
 ---
 
-## Contribution Workflow
+## Development Workflow
 
-### Step 1: Find Something to Work On
+### 1. Find Something to Work On
 
 - Check [ROADMAP.md](./ROADMAP.md) for planned features
 - Look for issues labeled `good first issue`
+- Check the "Good First Issues" section above
 - Propose new features via GitHub issues
 
-### Step 2: Create a Branch
+### 2. Create a Branch
 
 ```bash
 git checkout -b feature/your-feature
@@ -181,49 +146,62 @@ git checkout -b feature/your-feature
 git checkout -b fix/your-fix
 ```
 
-### Step 3: Implement with Your Coding Agent
+### 3. Implement with Your Coding Agent
 
-Use your preferred coding agent to implement the changes. Here's an example prompt you might give your agent:
+Example prompt for your agent:
 
-> "I want to add a new command to wit called `wit stats` that shows repository statistics. Follow the patterns in `src/commands/wip.ts` for structure and `src/commands/log.ts` for output formatting. Add tests in `src/__tests__/stats.test.ts`."
+> "Add a `--verbose` flag to the `wit status` command that shows additional details like file sizes. Follow the patterns in `src/commands/status.ts` and add tests in `src/__tests__/status.test.ts`."
 
-### Step 4: Run Tests
+### 4. Run Tests
 
 ```bash
 # Run all tests
 npm test
 
-# Run specific test file
+# Run specific test
 npm test -- src/__tests__/your-command.test.ts
 
-# Run with coverage
-npm run test:coverage
-
-# Watch mode during development
+# Watch mode (re-runs on changes)
 npm run test:watch
+
+# Run only unit tests
+npm run test:unit
+
+# Run only integration tests
+npm run test:e2e
 ```
 
-### Step 5: Submit a Pull Request
+### 5. Verify Build
 
 ```bash
-# Ensure tests pass
-npm test
-
-# Ensure build succeeds
 npm run build
+```
 
-# Push and create PR
+### 6. Test Your Changes Locally
+
+```bash
+# Use the dev CLI
+npm run wit -- <command>
+
+# Or link globally
+npm link
+wit <command>
+```
+
+### 7. Submit a Pull Request
+
+```bash
 git push -u origin feature/your-feature
 ```
 
-In your PR description, please include:
-- What coding agent you used
-- A brief description of what the agent was asked to do
-- Any manual adjustments you made (if any)
+In your PR description, include:
+- Which coding agent you used
+- What you asked the agent to do
+- Any manual adjustments made
 
 ---
 
-## Code Style Guidelines
+## Code Style
 
 ### Error Handling
 
@@ -231,22 +209,19 @@ Always use `TsgitError` with helpful suggestions:
 
 ```typescript
 throw new TsgitError(
-  'Clear error message explaining what went wrong',
-  ErrorCode.APPROPRIATE_CODE,
+  'Branch "feature" does not exist',
+  ErrorCode.BRANCH_NOT_FOUND,
   [
-    'wit command --option    # Suggestion 1',
-    'wit other-command       # Suggestion 2',
+    'wit branch              # List all branches',
+    'wit branch feature      # Create the branch',
+    'wit checkout -b feature # Create and switch',
   ]
 );
 ```
 
-### Output Formatting
+### Console Output
 
 Use colors consistently:
-- Green (`✓`) for success
-- Yellow for warnings
-- Red for errors
-- Dim for supplementary info
 
 ```typescript
 console.log(colors.green('✓') + ' Operation successful');
@@ -255,21 +230,20 @@ console.log(colors.yellow('warning:') + ' Something to note');
 console.error(colors.red('error:') + ' Something went wrong');
 ```
 
-### Function Documentation
+### Documentation
 
 Use JSDoc for public functions:
 
 ```typescript
 /**
- * Brief description of what the function does
- * 
- * @param param1 - Description of first parameter
- * @param param2 - Description of second parameter
- * @returns Description of return value
- * @throws TsgitError if something specific goes wrong
+ * Resolves a ref to its target commit SHA.
+ *
+ * @param ref - The ref name (branch, tag, or SHA)
+ * @returns The resolved commit SHA
+ * @throws TsgitError if ref cannot be resolved
  */
-export function myFunction(param1: string, param2: number): Result {
-  // Implementation
+export function resolveRef(ref: string): string {
+  // ...
 }
 ```
 
@@ -277,78 +251,136 @@ export function myFunction(param1: string, param2: number): Result {
 
 ## Testing
 
-The project uses Vitest for testing. Current test count: **397+ tests**.
+| Type | Location | Run |
+|------|----------|-----|
+| Unit tests | `src/__tests__/` | `npm run test:unit` |
+| Integration tests | `tests/integration/` | `npm run test:e2e` |
+| All tests | - | `npm test` |
+| With coverage | - | `npm run test:coverage` |
 
-### Test Categories
+### Writing Tests
 
-| Category | Location | Description |
-|----------|----------|-------------|
-| Unit tests | `src/__tests__/` | Individual command tests |
-| Integration | `tests/integration/` | Full flow tests |
-| API tests | `src/api/__tests__/` | tRPC router tests |
+Follow existing patterns in test files. Example:
 
-### Running Tests
+```typescript
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
-```bash
-# Run all tests
-npm test
+describe('wit stash', () => {
+  let testDir: string;
 
-# Run unit tests only
-npm run test:unit
+  beforeEach(async () => {
+    testDir = await createTestRepo();
+  });
 
-# Run integration tests
-npm run test:e2e
+  afterEach(async () => {
+    await cleanup(testDir);
+  });
 
-# Run with coverage report
-npm run test:coverage
-
-# Watch mode
-npm run test:watch
+  it('should stash uncommitted changes', async () => {
+    // Test implementation
+  });
+});
 ```
 
 ---
 
-## Reference Implementations
+## Troubleshooting
 
-When implementing new features, reference these well-structured examples:
+### Database Connection Failed
 
-| Type | File | Description |
-|------|------|-------------|
-| Simple command | `src/commands/wip.ts` | Minimal command structure |
-| Complex command | `src/commands/merge.ts` | Multi-step with conflicts |
-| Stateful command | `src/commands/stash.ts` | Saves/restores state |
+```
+Error: Connection refused to localhost:5432
+```
+
+**Fix:** Start the database container:
+```bash
+npm run docker:db
+```
+
+### Tests Fail with Database Errors
+
+**Fix:** Reset and re-push the schema:
+```bash
+npm run docker:down
+npm run docker:db
+npm run db:push
+```
+
+### Build Fails
+
+**Fix:** Clean and rebuild:
+```bash
+npm run clean
+npm install
+npm run build
+```
+
+### `wit` Command Not Found
+
+**Fix:** Link the CLI:
+```bash
+npm link
+```
+
+### AI Features Not Working
+
+**Fix:** Set up API keys in `.env`:
+```bash
+# Option 1: OpenAI
+OPENAI_API_KEY=sk-...
+
+# Option 2: Anthropic
+ANTHROPIC_API_KEY=sk-ant-...
+```
+
+---
+
+## Reference Examples
+
+Use these as templates when implementing new features:
+
+| Type | File | Why It's Good |
+|------|------|---------------|
+| Simple command | `src/commands/wip.ts` | Minimal, clean structure |
+| Complex command | `src/commands/merge.ts` | Multi-step with conflict handling |
+| Stateful command | `src/commands/stash.ts` | Saves and restores state |
 | Plumbing command | `src/commands/reset.ts` | Low-level operations |
 | Remote command | `src/commands/push.ts` | Network operations |
 | AI tool | `src/ai/tools/commit.ts` | AI-powered feature |
+| Test file | `src/__tests__/stash.test.ts` | Comprehensive test coverage |
 
 ---
 
 ## CI/CD
 
-GitHub Actions runs on every push and PR:
+GitHub Actions runs automatically on every push and PR:
 
-1. Checkout code
-2. Setup Node.js 22
-3. Install dependencies (`npm ci`)
-4. Build (`npm run build`)
-5. Setup PostgreSQL service
-6. Run migrations (`npm run db:push`)
-7. Run tests (`npm test`)
+1. Build the project
+2. Start PostgreSQL service
+3. Run database migrations
+4. Run all tests
 
-Ensure your PR passes CI before requesting review.
+**Your PR must pass CI before review.** If CI fails, check the logs and fix the issues.
 
 ---
 
 ## Getting Help
 
-- Check existing command implementations for patterns
-- Look at `src/core/` for low-level operations
-- See [docs/architecture/overview.mdx](./docs/architecture/overview.mdx) for design philosophy
-- Open an issue for discussion
-- Reference the [README](./README.md) for user-facing documentation
+- **Stuck?** Check existing command implementations for patterns
+- **Architecture question?** See [docs/architecture/overview.mdx](./docs/architecture/overview.mdx)
+- **Bug or feature idea?** Open a GitHub issue
+- **General question?** Open a discussion on GitHub
 
 ---
 
 ## License
 
 By contributing, you agree that your contributions will be licensed under the MIT License.
+
+---
+
+## Thank You!
+
+Every contribution makes wit better. Whether it's a typo fix, a new feature, or better docs - we appreciate your help building the future of version control.
+
+Now go make something awesome!

@@ -290,7 +290,7 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
     }`;
 
   const tabClass = (tab: string) =>
-    `flex items-center gap-1.5 md:gap-2 px-2 md:px-4 py-2 border-b-2 text-sm transition-colors whitespace-nowrap ${
+    `flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-2.5 md:py-2 border-b-2 text-sm transition-colors whitespace-nowrap touch-target no-tap-highlight ${
       activeTab === tab
         ? 'border-primary text-foreground'
         : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/50'
@@ -474,38 +474,85 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
         </div>
       </div>
 
-      {/* Navigation tabs - horizontally scrollable on mobile */}
-      <div className="border-b -mx-4 md:mx-0">
-        <nav className="flex gap-0 -mb-px overflow-x-auto px-4 md:px-0 scrollbar-hide">
+      {/* Navigation tabs - horizontally scrollable on mobile with better touch targets */}
+      <div className="border-b -mx-4 md:mx-0 relative">
+        <div className="mobile-scroll-hint md:hidden">
+          <nav className="flex gap-0 -mb-px overflow-x-auto px-4 md:px-0 scrollbar-hide scroll-touch">
+            <Link to={`/${owner}/${repo}`} className={tabClass('code')}>
+              <Code className="h-4 w-4" />
+              <span className="sr-only sm:not-sr-only sm:inline">Code</span>
+            </Link>
+            <Link to={`/${owner}/${repo}/commits`} className={tabClass('commits')}>
+              <History className="h-4 w-4" />
+              <span className="sr-only sm:not-sr-only sm:inline">Commits</span>
+            </Link>
+            <Link to={`/${owner}/${repo}/issues`} className={tabClass('issues')}>
+              <CircleDot className="h-4 w-4" />
+              <span className="sr-only sm:not-sr-only sm:inline">Issues</span>
+              <Badge variant="secondary" className="ml-1 text-xs">
+                {repoInfo.openIssuesCount}
+              </Badge>
+            </Link>
+            <Link to={`/${owner}/${repo}/pulls`} className={tabClass('pulls')}>
+              <GitPullRequest className="h-4 w-4" />
+              <span className="sr-only sm:not-sr-only sm:inline">PRs</span>
+              <Badge variant="secondary" className="ml-1 text-xs">
+                {repoInfo.openPrsCount}
+              </Badge>
+            </Link>
+            <Link to={`/${owner}/${repo}/stacks`} className={tabClass('stacks')}>
+              <Layers className="h-4 w-4" />
+              <span className="sr-only sm:not-sr-only sm:inline">Stacks</span>
+            </Link>
+            <Link to={`/${owner}/${repo}/journal`} className={tabClass('journal')}>
+              <BookOpen className="h-4 w-4" />
+              <span className="sr-only sm:not-sr-only sm:inline">Journal</span>
+            </Link>
+            {packageData && (
+              <Link to={`/${owner}/${repo}/package`} className={tabClass('package')}>
+                <Package className="h-4 w-4" />
+                <span className="sr-only sm:not-sr-only sm:inline">Package</span>
+              </Link>
+            )}
+            {authenticated && (
+              <Link to={`/${owner}/${repo}/settings`} className={tabClass('settings')}>
+                <Settings className="h-4 w-4" />
+                <span className="sr-only sm:not-sr-only sm:inline">Settings</span>
+              </Link>
+            )}
+          </nav>
+        </div>
+        {/* Desktop nav without the scroll hint */}
+        <nav className="hidden md:flex gap-0 -mb-px">
           <Link to={`/${owner}/${repo}`} className={tabClass('code')}>
             <Code className="h-4 w-4" />
-            <span className="hidden sm:inline">Code</span>
+            <span>Code</span>
           </Link>
           <Link to={`/${owner}/${repo}/commits`} className={tabClass('commits')}>
             <History className="h-4 w-4" />
-            <span className="hidden sm:inline">Commits</span>
+            <span>Commits</span>
           </Link>
           <Link to={`/${owner}/${repo}/issues`} className={tabClass('issues')}>
             <CircleDot className="h-4 w-4" />
-            <span className="hidden sm:inline">Issues</span>
+            <span>Issues</span>
             <Badge variant="secondary" className="ml-1 text-xs">
               {repoInfo.openIssuesCount}
             </Badge>
           </Link>
           <Link to={`/${owner}/${repo}/pulls`} className={tabClass('pulls')}>
             <GitPullRequest className="h-4 w-4" />
-            <span className="hidden sm:inline">PRs</span>
+            <span>PRs</span>
             <Badge variant="secondary" className="ml-1 text-xs">
               {repoInfo.openPrsCount}
             </Badge>
           </Link>
           <Link to={`/${owner}/${repo}/stacks`} className={tabClass('stacks')}>
             <Layers className="h-4 w-4" />
-            <span className="hidden sm:inline">Stacks</span>
+            <span>Stacks</span>
           </Link>
           <Link to={`/${owner}/${repo}/journal`} className={tabClass('journal')}>
             <BookOpen className="h-4 w-4" />
-            <span className="hidden sm:inline">Journal</span>
+            <span>Journal</span>
           </Link>
           {authenticated && (
             <Link to={`/${owner}/${repo}/planning`} className={tabClass('planning')}>
@@ -516,13 +563,13 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
           {packageData && (
             <Link to={`/${owner}/${repo}/package`} className={tabClass('package')}>
               <Package className="h-4 w-4" />
-              <span className="hidden sm:inline">Package</span>
+              <span>Package</span>
             </Link>
           )}
           {authenticated && (
             <Link to={`/${owner}/${repo}/settings`} className={tabClass('settings')}>
               <Settings className="h-4 w-4" />
-              <span className="hidden sm:inline">Settings</span>
+              <span>Settings</span>
             </Link>
           )}
         </nav>

@@ -33,22 +33,22 @@ export function CodeViewer({ content, filename, className }: CodeViewerProps) {
 
   return (
     <div className={cn('border rounded-lg overflow-hidden', className)}>
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2 bg-muted/50 border-b">
-        <div className="flex items-center gap-2 text-sm">
-          <FileCode className="h-4 w-4 text-muted-foreground" />
-          <span className="font-medium">{filename}</span>
-          <span className="text-muted-foreground">·</span>
-          <span className="text-muted-foreground">{lines.length} lines</span>
-          <span className="text-muted-foreground">·</span>
-          <span className="text-muted-foreground">{formatBytes(content.length)}</span>
+      {/* Header - mobile optimized */}
+      <div className="flex items-center justify-between px-2 sm:px-4 py-2 bg-muted/50 border-b">
+        <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm min-w-0">
+          <FileCode className="h-4 w-4 text-muted-foreground shrink-0" />
+          <span className="font-medium truncate">{filename}</span>
+          <span className="text-muted-foreground hidden sm:inline">·</span>
+          <span className="text-muted-foreground hidden sm:inline">{lines.length} lines</span>
+          <span className="text-muted-foreground hidden sm:inline">·</span>
+          <span className="text-muted-foreground hidden sm:inline">{formatBytes(content.length)}</span>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
           <Button
             variant="ghost"
             size="sm"
             onClick={handleCopy}
-            className="h-8"
+            className="h-8 w-8 sm:w-auto p-0 sm:px-2"
           >
             {copied ? (
               <Check className="h-4 w-4 text-green-500" />
@@ -60,20 +60,20 @@ export function CodeViewer({ content, filename, className }: CodeViewerProps) {
             variant="ghost"
             size="sm"
             onClick={handleDownload}
-            className="h-8"
+            className="h-8 w-8 sm:w-auto p-0 sm:px-2"
           >
             <Download className="h-4 w-4" />
           </Button>
         </div>
       </div>
 
-      {/* Code content */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm font-mono">
+      {/* Code content - mobile optimized */}
+      <div className="overflow-x-auto scroll-touch">
+        <table className="w-full text-xs sm:text-sm font-mono mobile-code">
           <tbody>
             {lines.map((line, index) => (
               <tr key={index} className="hover:bg-muted/30 group">
-                <td className="w-12 px-4 py-0.5 text-right text-muted-foreground select-none border-r border-border sticky left-0 bg-background">
+                <td className="w-8 sm:w-12 px-2 sm:px-4 py-0.5 text-right text-muted-foreground select-none border-r border-border sticky left-0 bg-background">
                   <a
                     href={`#L${index + 1}`}
                     id={`L${index + 1}`}
@@ -82,7 +82,7 @@ export function CodeViewer({ content, filename, className }: CodeViewerProps) {
                     {index + 1}
                   </a>
                 </td>
-                <td className="px-4 py-0.5 whitespace-pre">
+                <td className="px-2 sm:px-4 py-0.5 whitespace-pre">
                   {line || '\u00A0'}
                 </td>
               </tr>

@@ -22,6 +22,7 @@ export type IssuePriority = 'urgent' | 'high' | 'medium' | 'low' | 'none';
 
 /**
  * Issue status (Linear-style workflow)
+ * These are the built-in statuses; users can define custom stages via the database
  */
 export type IssueStatus = 
   | 'backlog'
@@ -30,6 +31,21 @@ export type IssueStatus =
   | 'in_review'
   | 'done'
   | 'cancelled';
+
+/**
+ * Custom stage definition (for user-defined workflow stages)
+ */
+export interface CustomStage {
+  key: string;           // Unique identifier (e.g., 'backlog', 'custom_review')
+  name: string;          // Display name
+  description?: string;  // Optional description
+  icon: string;          // Icon to display (emoji or identifier)
+  color: string;         // Hex color without #
+  position: number;      // Order in the workflow
+  isClosedState: boolean; // Whether this stage closes the issue
+  isTriageState: boolean; // Whether this is the initial triage stage
+  isDefault: boolean;    // Whether this is the default stage for new issues
+}
 
 /**
  * Issue type
@@ -138,7 +154,21 @@ interface IssueStorage {
   labels: Label[];
   comments: Comment[];
   activities: Activity[];
+  customStages?: CustomStage[]; // User-defined workflow stages
 }
+
+/**
+ * Default stages matching the built-in status workflow
+ */
+const DEFAULT_CUSTOM_STAGES: CustomStage[] = [
+  { key: 'triage', name: 'Triage', icon: '◇', color: '9ca3af', position: 0, isClosedState: false, isTriageState: true, isDefault: false },
+  { key: 'backlog', name: 'Backlog', icon: '○', color: '6b7280', position: 1, isClosedState: false, isTriageState: false, isDefault: true },
+  { key: 'todo', name: 'Todo', icon: '◔', color: 'f59e0b', position: 2, isClosedState: false, isTriageState: false, isDefault: false },
+  { key: 'in_progress', name: 'In Progress', icon: '◑', color: '3b82f6', position: 3, isClosedState: false, isTriageState: false, isDefault: false },
+  { key: 'in_review', name: 'In Review', icon: '◕', color: '8b5cf6', position: 4, isClosedState: false, isTriageState: false, isDefault: false },
+  { key: 'done', name: 'Done', icon: '●', color: '22c55e', position: 5, isClosedState: true, isTriageState: false, isDefault: false },
+  { key: 'cancelled', name: 'Cancelled', icon: '⊘', color: 'ef4444', position: 6, isClosedState: true, isTriageState: false, isDefault: false },
+];
 
 const DEFAULT_STORAGE: IssueStorage = {
   version: 2,
@@ -151,6 +181,7 @@ const DEFAULT_STORAGE: IssueStorage = {
   labels: [],
   comments: [],
   activities: [],
+  customStages: DEFAULT_CUSTOM_STAGES,
 };
 
 /**
@@ -919,5 +950,240 @@ export class IssueManager {
         completed,
       };
     });
+  }
+
+  // ========================================
+  // CUSTOM STAGE OPERATIONS
+  // ========================================
+
+  /**
+   * Get all custom stages
+   */
+  getStages(): CustomStage[] {
+    return this.storage.customStages || DEFAULT_CUSTOM_STAGES;
+  }
+
+  /**
+   * Get a stage by key
+   */
+  getStage(key: string): CustomStage | null {
+    const stages = this.getStages();
+    return stages.find(s => s.key === key) || null;
+  }
+
+  /**
+   * Get stage config for display (with order, color, icon)
+   */
+  getStageConfig(): Record<string, { order: number; color: string; icon: string; name: string }> {
+    const stages = this.getStages();
+    const config: Record<string, { order: number; color: string; icon: string; name: string }> = {};
+    
+    for (const stage of stages) {
+      config[stage.key] = {
+        order: stage.position,
+        color: `#${stage.color}`,
+        icon: stage.icon,
+        name: stage.name,
+      };
+    }
+    
+    return config;
+  }
+
+  /**
+   * Create a new custom stage
+   */
+  createStage(options: {
+    key: string;
+    name: string;
+    description?: string;
+    icon?: string;
+    color?: string;
+    position?: number;
+    isClosedState?: boolean;
+    isTriageState?: boolean;
+    isDefault?: boolean;
+  }): CustomStage {
+    const stages = this.getStages();
+    
+    // Check if key already exists
+    if (stages.find(s => s.key === options.key)) {
+      throw new Error(`Stage with key "${options.key}" already exists`);
+    }
+    
+    const stage: CustomStage = {
+      key: options.key,
+      name: options.name,
+      description: options.description,
+      icon: options.icon || '○',
+      color: options.color || '6b7280',
+      position: options.position ?? stages.length,
+      isClosedState: options.isClosedState || false,
+      isTriageState: options.isTriageState || false,
+      isDefault: options.isDefault || false,
+    };
+    
+    // If this is the new default, unset other defaults
+    if (stage.isDefault) {
+      for (const s of stages) {
+        s.isDefault = false;
+      }
+    }
+    
+    stages.push(stage);
+    stages.sort((a, b) => a.position - b.position);
+    
+    this.storage.customStages = stages;
+    this.save();
+    
+    return stage;
+  }
+
+  /**
+   * Update a custom stage
+   */
+  updateStage(key: string, updates: Partial<Omit<CustomStage, 'key'>>): CustomStage | null {
+    const stages = this.getStages();
+    const stage = stages.find(s => s.key === key);
+    
+    if (!stage) return null;
+    
+    // If setting as new default, unset other defaults
+    if (updates.isDefault) {
+      for (const s of stages) {
+        s.isDefault = false;
+      }
+    }
+    
+    Object.assign(stage, updates);
+    
+    // Re-sort if position changed
+    if (updates.position !== undefined) {
+      stages.sort((a, b) => a.position - b.position);
+    }
+    
+    this.storage.customStages = stages;
+    this.save();
+    
+    return stage;
+  }
+
+  /**
+   * Delete a custom stage
+   * Cannot delete if there are issues in this stage
+   */
+  deleteStage(key: string): boolean {
+    const stages = this.getStages();
+    const stageIndex = stages.findIndex(s => s.key === key);
+    
+    if (stageIndex === -1) return false;
+    
+    // Check if any issues use this stage
+    const issuesInStage = this.list({ status: key as IssueStatus });
+    if (issuesInStage.length > 0) {
+      throw new Error(`Cannot delete stage "${key}" - ${issuesInStage.length} issues are using it`);
+    }
+    
+    stages.splice(stageIndex, 1);
+    
+    // Re-calculate positions
+    for (let i = 0; i < stages.length; i++) {
+      stages[i].position = i;
+    }
+    
+    this.storage.customStages = stages;
+    this.save();
+    
+    return true;
+  }
+
+  /**
+   * Reorder stages
+   */
+  reorderStages(orderedKeys: string[]): CustomStage[] {
+    const stages = this.getStages();
+    const stageMap = new Map(stages.map(s => [s.key, s]));
+    
+    const reordered: CustomStage[] = [];
+    
+    for (let i = 0; i < orderedKeys.length; i++) {
+      const stage = stageMap.get(orderedKeys[i]);
+      if (stage) {
+        stage.position = i;
+        reordered.push(stage);
+        stageMap.delete(orderedKeys[i]);
+      }
+    }
+    
+    // Append any stages not in the ordered list
+    let position = reordered.length;
+    for (const stage of stageMap.values()) {
+      stage.position = position++;
+      reordered.push(stage);
+    }
+    
+    this.storage.customStages = reordered;
+    this.save();
+    
+    return reordered;
+  }
+
+  /**
+   * Get the default stage
+   */
+  getDefaultStage(): CustomStage | null {
+    const stages = this.getStages();
+    return stages.find(s => s.isDefault) || stages[0] || null;
+  }
+
+  /**
+   * Get the triage stage
+   */
+  getTriageStage(): CustomStage | null {
+    const stages = this.getStages();
+    return stages.find(s => s.isTriageState) || null;
+  }
+
+  /**
+   * Get closed stages
+   */
+  getClosedStages(): CustomStage[] {
+    return this.getStages().filter(s => s.isClosedState);
+  }
+
+  /**
+   * Get open (active) stages
+   */
+  getOpenStages(): CustomStage[] {
+    return this.getStages().filter(s => !s.isClosedState);
+  }
+
+  /**
+   * List issues grouped by custom stage
+   */
+  listByStage(): Record<string, Issue[]> {
+    const stages = this.getStages();
+    const grouped: Record<string, Issue[]> = {};
+    
+    // Initialize all stages with empty arrays
+    for (const stage of stages) {
+      grouped[stage.key] = [];
+    }
+    
+    // Group issues
+    for (const issue of this.storage.issues) {
+      const status = issue.status || 'backlog';
+      if (grouped[status]) {
+        grouped[status].push(issue);
+      } else {
+        // Put in default stage if status doesn't match any stage
+        const defaultStage = this.getDefaultStage();
+        if (defaultStage && grouped[defaultStage.key]) {
+          grouped[defaultStage.key].push(issue);
+        }
+      }
+    }
+    
+    return grouped;
   }
 }
