@@ -10,6 +10,7 @@ import {
   collaboratorModel,
   activityHelpers,
   issueInboxModel,
+  contributionIssuesModel,
   ISSUE_STATUSES,
   ISSUE_PRIORITIES,
 } from '../../../db/models';
@@ -2425,5 +2426,51 @@ export const issuesRouter = router({
     .query(async ({ input, ctx }) => {
       const { limit = 20, offset = 0, repoId, state = 'open' } = input ?? {};
       return issueInboxModel.getParticipated(ctx.user.id, { limit, offset, repoId, state });
+    }),
+
+  // ============ CONTRIBUTION ENDPOINTS (PUBLIC) ============
+
+  /**
+   * List open issues from public repos that are good for contributions
+   * These are issues with labels like "help wanted" or "good first issue"
+   */
+  listContributionIssues: publicProcedure
+    .input(
+      z.object({
+        labelFilter: z.enum(['all', 'help-wanted', 'good-first-issue']).default('all'),
+        priority: issuePrioritySchema.optional(),
+        limit: z.number().min(1).max(100).default(50),
+        offset: z.number().min(0).default(0),
+      }).optional()
+    )
+    .query(async ({ input }) => {
+      const { labelFilter = 'all', priority, limit = 50, offset = 0 } = input ?? {};
+      
+      let labelNames: string[];
+      switch (labelFilter) {
+        case 'help-wanted':
+          labelNames = ['help wanted'];
+          break;
+        case 'good-first-issue':
+          labelNames = ['good first issue'];
+          break;
+        default:
+          labelNames = ['help wanted', 'good first issue'];
+      }
+      
+      return contributionIssuesModel.listContributionIssues({
+        labelNames,
+        priority,
+        limit,
+        offset,
+      });
+    }),
+
+  /**
+   * Get contribution issues summary for the contribute page
+   */
+  contributionSummary: publicProcedure
+    .query(async () => {
+      return contributionIssuesModel.getContributionSummary();
     }),
 });

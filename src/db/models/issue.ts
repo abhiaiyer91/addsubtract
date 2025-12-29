@@ -1506,6 +1506,227 @@ type InboxIssue = Issue & {
   repoName?: string;
 };
 
+// ============ CONTRIBUTION-WORTHY ISSUES MODEL ============
+
+/**
+ * Issues that are good for contributors - those with labels like
+ * "help wanted", "good first issue", etc. from public repositories
+ */
+export const contributionIssuesModel = {
+  /**
+   * List issues across all public repositories that are marked as good for contributions
+   * These are open issues with labels like "help wanted", "good first issue", etc.
+   */
+  async listContributionIssues(options: {
+    labelNames?: string[];
+    priority?: IssuePriority;
+    limit?: number;
+    offset?: number;
+  } = {}): Promise<Array<{
+    issue: Issue;
+    repo: { id: string; name: string; ownerId: string; ownerUsername: string | null };
+    author: { id: string; name: string; username: string | null; avatarUrl: string | null } | null;
+    labels: Array<{ id: string; name: string; color: string }>;
+  }>> {
+    const db = getDb();
+    const { 
+      labelNames = ['help wanted', 'good first issue'], 
+      priority,
+      limit = 50, 
+      offset = 0 
+    } = options;
+
+    // First, find all labels matching the contribution label names across all repos
+    const contributionLabelsResult = await db
+      .select({
+        id: labels.id,
+        name: labels.name,
+        color: labels.color,
+        repoId: labels.repoId,
+      })
+      .from(labels)
+      .where(inArray(labels.name, labelNames));
+
+    if (contributionLabelsResult.length === 0) {
+      return [];
+    }
+
+    const contributionLabelIds = contributionLabelsResult.map(l => l.id);
+
+    // Get issue IDs that have at least one contribution label
+    const issueIdsWithLabels = await db
+      .selectDistinct({ issueId: issueLabels.issueId })
+      .from(issueLabels)
+      .where(inArray(issueLabels.labelId, contributionLabelIds));
+
+    if (issueIdsWithLabels.length === 0) {
+      return [];
+    }
+
+    const issueIds = issueIdsWithLabels.map(i => i.issueId);
+
+    // Build conditions for the main query
+    const conditions = [
+      inArray(issues.id, issueIds),
+      eq(issues.state, 'open'),
+      eq(repositories.isPrivate, false), // Only public repos
+    ];
+
+    if (priority) {
+      conditions.push(eq(issues.priority, priority));
+    }
+
+    // Get the issues with repo and author info
+    const result = await db
+      .select({
+        issue: issues,
+        repo: {
+          id: repositories.id,
+          name: repositories.name,
+          ownerId: repositories.ownerId,
+        },
+        author: {
+          id: user.id,
+          name: user.name,
+          username: user.username,
+          avatarUrl: user.avatarUrl,
+        },
+      })
+      .from(issues)
+      .innerJoin(repositories, eq(issues.repoId, repositories.id))
+      .leftJoin(user, eq(issues.authorId, user.id))
+      .where(and(...conditions))
+      .orderBy(desc(issues.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    // Get repo owner usernames and labels for each issue
+    const enriched = await Promise.all(
+      result.map(async (r) => {
+        // Get repo owner username
+        const ownerResult = await db
+          .select({ username: user.username })
+          .from(user)
+          .where(eq(user.id, r.repo.ownerId))
+          .limit(1);
+
+        // Get labels for this issue
+        const issueLabelsResult = await db
+          .select({ 
+            id: labels.id, 
+            name: labels.name, 
+            color: labels.color 
+          })
+          .from(issueLabels)
+          .innerJoin(labels, eq(issueLabels.labelId, labels.id))
+          .where(eq(issueLabels.issueId, r.issue.id));
+
+        return {
+          issue: r.issue,
+          repo: {
+            ...r.repo,
+            ownerUsername: ownerResult[0]?.username || null,
+          },
+          author: r.author,
+          labels: issueLabelsResult,
+        };
+      })
+    );
+
+    return enriched;
+  },
+
+  /**
+   * Count contribution-worthy issues
+   */
+  async countContributionIssues(options: {
+    labelNames?: string[];
+    priority?: IssuePriority;
+  } = {}): Promise<number> {
+    const db = getDb();
+    const { labelNames = ['help wanted', 'good first issue'], priority } = options;
+
+    // Find labels matching the contribution label names
+    const contributionLabelsResult = await db
+      .select({ id: labels.id })
+      .from(labels)
+      .where(inArray(labels.name, labelNames));
+
+    if (contributionLabelsResult.length === 0) {
+      return 0;
+    }
+
+    const contributionLabelIds = contributionLabelsResult.map(l => l.id);
+
+    // Get issue IDs that have at least one contribution label
+    const issueIdsWithLabels = await db
+      .selectDistinct({ issueId: issueLabels.issueId })
+      .from(issueLabels)
+      .where(inArray(issueLabels.labelId, contributionLabelIds));
+
+    if (issueIdsWithLabels.length === 0) {
+      return 0;
+    }
+
+    const issueIds = issueIdsWithLabels.map(i => i.issueId);
+
+    // Build conditions
+    const conditions = [
+      inArray(issues.id, issueIds),
+      eq(issues.state, 'open'),
+      eq(repositories.isPrivate, false), // Only public repos
+    ];
+
+    if (priority) {
+      conditions.push(eq(issues.priority, priority));
+    }
+
+    const countResult = await db
+      .select({ count: count() })
+      .from(issues)
+      .innerJoin(repositories, eq(issues.repoId, repositories.id))
+      .where(and(...conditions));
+
+    return Number(countResult[0]?.count ?? 0);
+  },
+
+  /**
+   * Get summary of contribution issues by label type
+   */
+  async getContributionSummary(): Promise<{
+    total: number;
+    helpWanted: number;
+    goodFirstIssue: number;
+    byPriority: Record<IssuePriority, number>;
+  }> {
+    const [total, helpWanted, goodFirstIssue] = await Promise.all([
+      this.countContributionIssues(),
+      this.countContributionIssues({ labelNames: ['help wanted'] }),
+      this.countContributionIssues({ labelNames: ['good first issue'] }),
+    ]);
+
+    const byPriority: Record<IssuePriority, number> = {
+      none: 0,
+      low: 0,
+      medium: 0,
+      high: 0,
+      urgent: 0,
+    };
+
+    // Count by priority
+    for (const priority of ISSUE_PRIORITIES) {
+      byPriority[priority] = await this.countContributionIssues({ priority });
+    }
+
+    return {
+      total,
+      helpWanted,
+      goodFirstIssue,
+      byPriority,
+    };
+  },
+};
+
 export const issueInboxModel = {
   /**
    * Get issues assigned to the user
