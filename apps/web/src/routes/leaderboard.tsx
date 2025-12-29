@@ -7,10 +7,10 @@ import { trpc } from '@/lib/trpc';
 
 function LeaderboardSkeleton() {
   return (
-    <div className="container max-w-[900px] mx-auto py-8 space-y-6">
+    <div className="container max-w-[900px] mx-auto px-4 py-6 sm:py-8 space-y-6">
       <div className="space-y-2">
-        <Skeleton className="h-10 w-64" />
-        <Skeleton className="h-5 w-96" />
+        <Skeleton className="h-10 w-48 sm:w-64" />
+        <Skeleton className="h-5 w-full max-w-[24rem]" />
       </div>
       <div className="space-y-4">
         {[1, 2, 3, 4, 5].map((i) => (
@@ -58,14 +58,14 @@ export function LeaderboardPage() {
   }
 
   return (
-    <div className="container max-w-[900px] mx-auto py-8 space-y-6">
+    <div className="container max-w-[900px] mx-auto px-4 py-6 sm:py-8 space-y-6">
       {/* Header */}
       <div className="space-y-2">
-        <h1 className="text-3xl font-bold flex items-center gap-3">
-          <Trophy className="h-8 w-8 text-yellow-500" />
+        <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2 sm:gap-3">
+          <Trophy className="h-6 w-6 sm:h-8 sm:w-8 text-yellow-500" />
           Leaderboard
         </h1>
-        <p className="text-muted-foreground">
+        <p className="text-sm sm:text-base text-muted-foreground">
           Most active repositories by commits in the last 7 days
         </p>
       </div>
@@ -91,43 +91,63 @@ export function LeaderboardPage() {
               </p>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               {leaderboard.map((repo, index) => (
                 <Link
                   key={repo.id}
                   to={`/${repo.ownerName}/${repo.name}`}
-                  className="flex items-center gap-4 p-4 rounded-lg border border-border hover:bg-muted/50 transition-colors"
+                  className="block p-3 sm:p-4 rounded-lg border border-border hover:bg-muted/50 transition-colors"
                 >
-                  {/* Rank */}
-                  {getRankBadge(index + 1)}
+                  {/* Mobile: Stacked layout, Desktop: Horizontal layout */}
+                  <div className="flex items-start sm:items-center gap-3 sm:gap-4">
+                    {/* Rank */}
+                    <div className="flex-shrink-0">
+                      {getRankBadge(index + 1)}
+                    </div>
 
-                  {/* Repo Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      {repo.ownerType === 'organization' && (
-                        <Building2 className="h-4 w-4 text-muted-foreground" />
+                    {/* Repo Info + Stats */}
+                    <div className="flex-1 min-w-0">
+                      {/* Repo name */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {repo.ownerType === 'organization' && (
+                          <Building2 className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        )}
+                        <span className="font-medium text-primary hover:underline break-all">
+                          {repo.ownerName}/{repo.name}
+                        </span>
+                      </div>
+                      
+                      {/* Description */}
+                      {repo.description && (
+                        <p className="text-sm text-muted-foreground line-clamp-2 sm:truncate mt-1">
+                          {repo.description}
+                        </p>
                       )}
-                      <span className="font-medium text-primary hover:underline">
-                        {repo.ownerName}/{repo.name}
-                      </span>
+                      
+                      {/* Stats - Shown below on mobile, inline on desktop */}
+                      <div className="flex items-center gap-3 mt-2 sm:hidden">
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <Star className="h-3.5 w-3.5" />
+                          <span>{repo.starsCount}</span>
+                        </div>
+                        <Badge variant="secondary" className="font-mono text-xs">
+                          <GitCommit className="h-3 w-3 mr-1" />
+                          {repo.commitCount}
+                        </Badge>
+                      </div>
                     </div>
-                    {repo.description && (
-                      <p className="text-sm text-muted-foreground truncate mt-1">
-                        {repo.description}
-                      </p>
-                    )}
-                  </div>
 
-                  {/* Stats */}
-                  <div className="flex items-center gap-4 text-sm">
-                    <div className="flex items-center gap-1 text-muted-foreground">
-                      <Star className="h-4 w-4" />
-                      <span>{repo.starsCount}</span>
+                    {/* Stats - Desktop only */}
+                    <div className="hidden sm:flex items-center gap-4 text-sm flex-shrink-0">
+                      <div className="flex items-center gap-1 text-muted-foreground">
+                        <Star className="h-4 w-4" />
+                        <span>{repo.starsCount}</span>
+                      </div>
+                      <Badge variant="secondary" className="font-mono">
+                        <GitCommit className="h-3 w-3 mr-1" />
+                        {repo.commitCount} commits
+                      </Badge>
                     </div>
-                    <Badge variant="secondary" className="font-mono">
-                      <GitCommit className="h-3 w-3 mr-1" />
-                      {repo.commitCount} commits
-                    </Badge>
                   </div>
                 </Link>
               ))}
