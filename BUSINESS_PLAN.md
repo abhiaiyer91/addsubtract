@@ -216,15 +216,32 @@ Self-hosted enterprise license:
 
 ### Path to Profitability
 
+With the AI-first model, our cost structure is radically different:
+
 | Milestone | Users | MRR | Costs | Profit |
 |-----------|-------|-----|-------|--------|
-| Launch | 100 | $1,500 | $5,000 | -$3,500 |
-| Month 6 | 500 | $7,500 | $8,000 | -$500 |
+| Launch | 100 | $1,500 | $8,000 | -$6,500 |
+| Month 3 | 250 | $3,750 | $8,500 | -$4,750 |
+| Month 6 | 500 | $7,500 | $10,000 | -$2,500 |
+| Month 9 | 750 | $11,250 | $11,000 | $250 |
 | Month 12 | 1,000 | $15,000 | $12,000 | $3,000 |
-| Month 18 | 2,500 | $37,500 | $25,000 | $12,500 |
-| Month 24 | 5,000 | $75,000 | $45,000 | $30,000 |
+| Month 18 | 2,500 | $37,500 | $15,000 | $22,500 |
+| Month 24 | 5,000 | $75,000 | $20,000 | $55,000 |
 
-**Break-even:** ~500 paying users
+**Break-even:** ~400 paying users (Month 8-9)
+**Key insight:** Costs scale sub-linearly because AI agents don't need raises.
+
+### Cost Breakdown (at 1,000 users)
+
+| Category | Monthly Cost | Notes |
+|----------|--------------|-------|
+| AI APIs (OpenAI, Anthropic) | $5,000 | Scales with usage |
+| Infrastructure (hosting, DB) | $3,000 | Railway/Render |
+| Third-party services | $1,000 | Stripe, email, monitoring |
+| Founder compensation | $3,000 | Modest until scale |
+| **Total** | **$12,000** | |
+
+Compare to traditional startup: $70K+/month with employees.
 
 ---
 
@@ -315,25 +332,86 @@ Self-hosted enterprise license:
 
 ## Team
 
-### Current
+### The AI-First Operating Model
 
-- **Human Co-founder** - Vision, business, fundraising
-- **Claude (AI)** - Technical architecture, implementation, documentation
+wit is an experiment in a new kind of company: **one human + an army of AI agents**.
 
-### Needed (with funding)
+Traditional startups hire engineers, designers, and marketers. We deploy agents. This isn't a cost-cutting measure—it's a fundamental bet that AI can now do 90% of what a software company needs.
 
-| Role | Priority | Timeline |
-|------|----------|----------|
-| Full-stack Engineer | P0 | Immediate |
-| DevRel / Community | P1 | Month 3 |
-| Designer | P1 | Month 3 |
-| Infrastructure Engineer | P2 | Month 6 |
+### Current Team
+
+| Role | Who | Responsibilities |
+|------|-----|------------------|
+| **Founder** | Human | Vision, strategy, customer relationships, final decisions |
+| **Technical Lead** | Claude | Architecture, implementation, code review, documentation |
+| **DevRel Agent** | AI | Content writing, community responses, social media |
+| **Support Agent** | AI | User support, bug triage, issue responses |
+| **QA Agent** | AI | Test writing, bug detection, code quality |
+| **Design Agent** | AI | UI/UX improvements, component design |
+
+### Why This Works
+
+1. **AI can code.** Claude wrote 95%+ of wit's codebase. Not scaffolding—real features, real tests, real documentation.
+
+2. **AI can support.** Triage issues, answer questions, write docs. 24/7, no burnout.
+
+3. **AI can create content.** Blog posts, tweets, documentation. Consistent voice, unlimited output.
+
+4. **One human for judgment.** Strategy, customer relationships, legal, the things that need a human in the loop.
+
+### What We Still Need Humans For
+
+| Task | Why Human |
+|------|-----------|
+| Customer sales calls | Trust, relationship building |
+| Legal/contracts | Liability, signatures |
+| Strategic partnerships | Human-to-human negotiation |
+| Final product decisions | Taste, vision, accountability |
+| Public speaking/podcasts | Authenticity, presence |
+
+### The Math
+
+**Traditional startup (Year 1):**
+- 4 engineers × $150K = $600K
+- 1 designer × $120K = $120K
+- 1 DevRel × $100K = $100K
+- Total: **$820K/year** in salaries alone
+
+**wit (Year 1):**
+- 1 founder × $0-80K = $0-80K (can bootstrap)
+- AI API costs = $50K/year
+- Infrastructure = $30K/year
+- Total: **$80-160K/year**
+
+**Result:** 5-10x lower burn rate, same or better output.
+
+### Scaling the AI Team
+
+As wit grows, we don't hire—we deploy more agents:
+
+| Growth Stage | AI Agents Added |
+|--------------|-----------------|
+| Launch | Triage agent for issues |
+| 1K users | Support agent for Discord |
+| 5K users | Sales agent for lead qualification |
+| 10K users | Success agent for onboarding |
+| Enterprise | Custom agents per customer |
+
+### When We Would Hire Humans
+
+Only when absolutely necessary:
+
+1. **Legal counsel** - When contracts get complex (contractor, not FTE)
+2. **Enterprise sales** - If enterprise becomes >30% of revenue
+3. **Compliance** - If SOC2/HIPAA becomes required
+
+Even then: contractors > FTEs, part-time > full-time.
 
 ### Advisors (Target)
 
 - Former GitHub/GitLab engineering leader
 - Developer tools founder (successful exit)
-- Open source community builder
+- AI-native company operator (someone who's done this)
 
 ---
 
@@ -361,25 +439,44 @@ Self-hosted enterprise license:
 
 - **Target:** 100,000 users, 15,000 paying
 - **ARR:** $2.7M
-- **Team:** 15 people
-- **Status:** Series A ready or profitable
+- **Team:** 1 human + 20 AI agents
+- **Status:** Profitable, optionally raise Series A for acceleration
 
 ### Funding Requirements
 
-**Seed Round: $500K**
+**Option A: Bootstrap (Recommended)**
+
+No external funding. The AI-first model makes this viable:
+
+| Monthly Costs | Amount |
+|---------------|--------|
+| Founder salary | $0-5K (until profitable) |
+| AI API costs | $3-5K |
+| Infrastructure | $2-3K |
+| Tools/services | $500 |
+| **Total burn** | **$5-13K/month** |
+
+**Break-even:** ~400 paying users at $15/month
+**Timeline to break-even:** 6-9 months
+
+**Option B: Small Seed ($150K)**
+
+If faster growth is desired:
 
 | Use | Amount | % |
 |-----|--------|---|
-| Engineering (2 FTEs, 18 months) | $300K | 60% |
-| Infrastructure (hosting, AI APIs) | $100K | 20% |
-| Marketing/Community | $50K | 10% |
-| Legal/Operations | $50K | 10% |
+| AI API costs (18 months) | $60K | 40% |
+| Infrastructure scaling | $40K | 27% |
+| Marketing/launch | $30K | 20% |
+| Legal/operations | $20K | 13% |
 
-**Milestones for seed:**
+Note: No engineering salaries. The AI does the engineering.
+
+**Milestones (either path):**
 - 1,000 paying users
 - $15K MRR
 - 10,000 GitHub stars
-- Enterprise pilot customers
+- Profitable or break-even
 
 ---
 
@@ -407,7 +504,17 @@ Self-hosted enterprise license:
 |------|------------|--------|------------|
 | Slow user growth | Medium | High | Aggressive content marketing, free tier optimization |
 | High churn | Medium | High | Onboarding optimization, feature gating |
-| Funding gap | Medium | Critical | Bootstrap-friendly model, revenue early |
+| Funding gap | Low | Medium | AI-first model = low burn, bootstrap-viable |
+
+### AI-First Operating Risks
+
+| Risk | Likelihood | Impact | Mitigation |
+|------|------------|--------|------------|
+| AI API price increases | Medium | High | Multi-provider strategy, local model fallbacks |
+| AI capability plateau | Low | Medium | Current capabilities already sufficient for v1 |
+| AI makes critical errors | Medium | Medium | Human review for customer-facing decisions, good testing |
+| Customers distrust AI-built product | Medium | Low | Transparency about process, quality speaks for itself |
+| Key person risk (1 human) | Medium | High | Document everything, AI agents can maintain continuity |
 
 ---
 
@@ -476,17 +583,17 @@ wit understands every codebase it touches. Ask it anything. It knows.
 
 ## The Ask
 
-**We're raising $500K seed funding** to:
-- Hire 2 engineers
+**We're bootstrapping** (or raising a small $150K seed) to:
 - Launch hosted platform
 - Reach 1,000 paying users
-- Prove product-market fit
+- Prove the AI-first company model
 
-**What we offer:**
-- Ground floor in AI-native developer tools
-- Open source with sustainable business model
-- Experienced technical execution (the product works today)
-- Clear path to $1M+ ARR
+**What makes this different:**
+- **No employees** - AI agents do the work
+- **Low burn** - $8-12K/month, not $80K+
+- **Fast break-even** - ~400 users, achievable in 6-9 months
+- **The product already works** - 66 commands, full Git compatibility
+- **Proof of concept** - This entire codebase was built by AI
 
 ---
 
