@@ -3,6 +3,14 @@
  * 
  * A GitHub Actions-compatible CI/CD engine for wit repositories.
  * Workflows are defined in .wit/workflows/*.yml
+ * 
+ * **Built on Mastra Workflows**
+ * 
+ * The CI/CD engine is built on top of Mastra workflows, providing:
+ * - Observability and tracing for each step
+ * - Retry handling for transient failures
+ * - Real-time streaming of execution events
+ * - Integration with the wit AI agent ecosystem
  */
 
 // Export types
@@ -52,6 +60,20 @@ export {
   WorkflowLoadError,
 } from './parser';
 
+// Export Mastra-based CI workflow
+export {
+  ciExecutionWorkflow,
+  type CIExecutionInput,
+  type CIExecutionOutput,
+  type StepResult,
+  type JobResult,
+  type ExecutionContext,
+  CIExecutionInputSchema,
+  CIExecutionOutputSchema,
+  StepResultSchema,
+  JobResultSchema,
+} from './workflows/index';
+
 import * as path from 'path';
 import * as fs from 'fs';
 import {
@@ -62,7 +84,7 @@ import {
   PushTrigger,
   PullRequestTrigger,
 } from './types';
-import { loadWorkflows, validateWorkflowFile, WorkflowLoadError } from './parser';
+import { loadWorkflows, loadWorkflowFile, validateWorkflowFile, WorkflowLoadError } from './parser';
 
 /**
  * CI Engine configuration
@@ -461,4 +483,135 @@ jobs:
  */
 export function createCIEngine(repoPath: string): CIEngine {
   return new CIEngine({ repoPath });
+}
+
+// =============================================================================
+// Mastra-based Workflow Execution
+// =============================================================================
+
+/**
+ * Options for running a CI workflow using Mastra
+ */
+export interface RunCIWorkflowOptions {
+  /** Repository ID */
+  repoId: string;
+  /** Repository disk path */
+  repoDiskPath: string;
+  /** Commit SHA */
+  commitSha: string;
+  /** Branch name (optional) */
+  branch?: string;
+  /** Event that triggered the workflow */
+  event: string;
+  /** Event payload */
+  eventPayload?: Record<string, unknown>;
+  /** User who triggered the workflow */
+  triggeredById?: string;
+  /** Workflow file path */
+  workflowPath: string;
+  /** Input values for workflow_dispatch */
+  inputs?: Record<string, string>;
+  /** Environment variables */
+  env?: Record<string, string>;
+  /** Secrets (not logged) */
+  secrets?: Record<string, string>;
+}
+
+/**
+ * Run a CI workflow using the Mastra-based execution engine
+ * 
+ * This is the recommended way to execute CI workflows. It provides:
+ * - Observability and tracing
+ * - Retry handling for transient failures  
+ * - Real-time streaming support
+ * - Integration with the Mastra ecosystem
+ * 
+ * @param workflow - The parsed workflow definition
+ * @param options - Execution options
+ * @returns CI execution results
+ * 
+ * @example
+ * ```typescript
+ * import { runCIWorkflow, loadWorkflowFile } from './ci';
+ * 
+ * const parsed = loadWorkflowFile('/path/to/.wit/workflows/ci.yml');
+ * const result = await runCIWorkflow(parsed.workflow, {
+ *   repoId: 'repo-123',
+ *   repoDiskPath: '/path/to/repo',
+ *   commitSha: 'abc123',
+ *   event: 'push',
+ *   workflowPath: '.wit/workflows/ci.yml',
+ * });
+ * 
+ * console.log(`Workflow ${result.success ? 'passed' : 'failed'}: ${result.summary}`);
+ * ```
+ */
+export async function runCIWorkflow(
+  workflow: Workflow,
+  options: RunCIWorkflowOptions
+): Promise<import('./workflows/index').CIExecutionOutput> {
+  const { runCIExecutionWorkflow } = await import('../ai/mastra.js');
+  
+  return runCIExecutionWorkflow({
+    ...options,
+    workflow,
+  });
+}
+
+/**
+ * Stream a CI workflow execution using Mastra
+ * 
+ * Provides real-time streaming of workflow execution events.
+ * Useful for showing live progress in the UI.
+ * 
+ * @param workflow - The parsed workflow definition
+ * @param options - Execution options
+ * @returns AsyncIterator of workflow events
+ * 
+ * @example
+ * ```typescript
+ * import { streamCIWorkflow, loadWorkflowFile } from './ci';
+ * 
+ * const parsed = loadWorkflowFile('/path/to/.wit/workflows/ci.yml');
+ * 
+ * for await (const event of streamCIWorkflow(parsed.workflow, options)) {
+ *   if (event.type === 'step-start') {
+ *     console.log(`Starting step: ${event.stepName}`);
+ *   } else if (event.type === 'step-complete') {
+ *     console.log(`Step completed: ${event.success ? '✅' : '❌'}`);
+ *   }
+ * }
+ * ```
+ */
+export async function* streamCIWorkflow(
+  workflow: Workflow,
+  options: RunCIWorkflowOptions
+) {
+  const { streamCIExecutionWorkflow } = await import('../ai/mastra.js');
+  
+  yield* streamCIExecutionWorkflow({
+    ...options,
+    workflow,
+  });
+}
+
+/**
+ * Run a CI workflow from a file path
+ * 
+ * Convenience function that loads and executes a workflow in one call.
+ * 
+ * @param workflowFilePath - Path to the workflow YAML file
+ * @param options - Execution options (workflowPath will be auto-filled)
+ * @returns CI execution results
+ */
+export async function runCIWorkflowFromFile(
+  workflowFilePath: string,
+  options: Omit<RunCIWorkflowOptions, 'workflowPath'>
+): Promise<import('./workflows/index').CIExecutionOutput> {
+  const parsed = loadWorkflowFile(workflowFilePath);
+  
+  return runCIWorkflow(parsed.workflow, {
+    ...options,
+    workflowPath: parsed.filePath,
+  });
 }

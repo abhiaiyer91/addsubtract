@@ -17,6 +17,7 @@ import {
 } from '../../db/models';
 import { runIssueTriageWorkflow, type IssueTriageInput } from '../../ai/index.js';
 import { repoAiKeyModel } from '../../db/models/repo-ai-keys';
+import { resolveDiskPath } from '../../server/storage/repos.js';
 
 // Label name that indicates an issue has already been triaged
 const AI_TRIAGE_LABEL = 'ai-triage';
@@ -113,12 +114,16 @@ async function handleIssueTriage(
     // Get the owner info for the repo path
     const [ownerName] = repoFullName.split('/');
 
+    // Resolve the actual filesystem path from the stored diskPath
+    const resolvedRepoPath = resolveDiskPath(repo.diskPath);
+    console.log(`[TriageHandler] Resolved repo path: ${repo.diskPath} -> ${resolvedRepoPath}`);
+    
     // Build the workflow input
     const workflowInput: IssueTriageInput = {
       issueId,
       issueNumber,
       repoId,
-      repoPath: repo.diskPath,
+      repoPath: resolvedRepoPath,
       title: issueTitle,
       body: issue.body || undefined,
       authorId: issue.authorId,

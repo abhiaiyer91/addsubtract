@@ -90,6 +90,13 @@ Commands:
   ${colors.bold('Activity:')}
   activity [number]   View activity log (repo-wide or for specific issue)
 
+  ${colors.bold('Workflow Stages:')}
+  stages              List custom workflow stages
+  stages add <key>    Add a new custom stage
+  stages remove <key> Remove a custom stage (non-system only)
+  stages reorder      Reorder stages interactively
+  stage <num> <key>   Move issue to a specific stage
+
 Options:
   -h, --help          Show this help message
 
@@ -126,6 +133,9 @@ Examples:
   wit issue triage
   wit issue accept 45
   wit issue activity 42
+  wit issue stages                # List all workflow stages
+  wit issue stages add qa_review "QA Review" --icon "🔍" --color "f59e0b"
+  wit issue stage 42 qa_review    # Move issue #42 to QA Review stage
 `;
 
 /**
@@ -256,6 +266,13 @@ export async function handleIssue(args: string[]): Promise<void> {
       // Activity
       case 'activity':
         await handleIssueActivity(args.slice(1));
+        break;
+      // Stages (custom workflow)
+      case 'stages':
+        await handleIssueStages(args.slice(1));
+        break;
+      case 'stage':
+        await handleIssueStage(args.slice(1));
         break;
       default:
         console.error(colors.red('error: ') + `Unknown subcommand: '${subcommand}'`);
@@ -1293,4 +1310,157 @@ interface ActivityEntry {
   newValue?: string;
   actor?: string;
   createdAt: string;
+}
+
+// ============================================================================
+// Stage Commands (Custom Workflow)
+// ============================================================================
+
+interface IssueStage {
+  id: string;
+  key: string;
+  name: string;
+  description?: string;
+  icon: string;
+  color: string;
+  position: number;
+  isClosedState: boolean;
+  isTriageState: boolean;
+  isDefault: boolean;
+  isSystem: boolean;
+}
+
+/**
+ * List and manage workflow stages
+ */
+async function handleIssueStages(args: string[]): Promise<void> {
+  const { positional, flags } = parseArgs(args);
+  const subcommand = positional[0];
+
+  const repo = Repository.find();
+  const api = getApiClient();
+  const remoteUrl = getRemoteUrl(repo);
+  const { owner, repo: repoName } = parseOwnerRepo(remoteUrl);
+
+  // No subcommand - list stages
+  if (!subcommand || subcommand === 'list') {
+    const stages = await api.stages.list(owner, repoName) as IssueStage[];
+
+    console.log(`\n${colors.bold('Workflow Stages:')}\n`);
+
+    for (const stage of stages) {
+      const badges: string[] = [];
+      if (stage.isDefault) badges.push(colors.green('default'));
+      if (stage.isClosedState) badges.push(colors.red('closes'));
+      if (stage.isTriageState) badges.push(colors.yellow('triage'));
+      if (stage.isSystem) badges.push(colors.dim('system'));
+
+      const badgeStr = badges.length > 0 ? ` [${badges.join(', ')}]` : '';
+      const colorHex = `#${stage.color}`;
+      
+      console.log(`  ${stage.icon} ${colors.bold(stage.name)} ${colors.dim(`(${stage.key})`)}${badgeStr}`);
+      if (stage.description) {
+        console.log(`    ${colors.dim(stage.description)}`);
+      }
+    }
+
+    console.log();
+    console.log(colors.dim('Use `wit issue stages add <key> <name>` to add a custom stage'));
+    console.log(colors.dim('Use `wit issue stage <num> <key>` to move an issue to a stage'));
+    return;
+  }
+
+  // Add a new stage
+  if (subcommand === 'add') {
+    const key = positional[1];
+    const name = positional[2] || positional[1]; // Use key as name if not provided
+
+    if (!key) {
+      console.error(colors.red('error: ') + 'Stage key required');
+      console.error('usage: wit issue stages add <key> [name] [--icon <emoji>] [--color <hex>] [--closes]');
+      process.exit(1);
+    }
+
+    const icon = (flags.icon as string) || '○';
+    const color = (flags.color as string) || '6b7280';
+    const isClosedState = !!flags.closes;
+    const isDefault = !!flags.default;
+
+    const stage = await api.stages.create(owner, repoName, {
+      key,
+      name,
+      icon,
+      color,
+      isClosedState,
+      isDefault,
+    }) as IssueStage;
+
+    console.log(colors.green('✓') + ` Created stage "${stage.name}" (${stage.key})`);
+    return;
+  }
+
+  // Remove a stage
+  if (subcommand === 'remove' || subcommand === 'rm' || subcommand === 'delete') {
+    const key = positional[1];
+
+    if (!key) {
+      console.error(colors.red('error: ') + 'Stage key required');
+      console.error('usage: wit issue stages remove <key>');
+      process.exit(1);
+    }
+
+    await api.stages.delete(owner, repoName, key);
+    console.log(colors.green('✓') + ` Removed stage "${key}"`);
+    return;
+  }
+
+  // Update a stage
+  if (subcommand === 'update') {
+    const key = positional[1];
+
+    if (!key) {
+      console.error(colors.red('error: ') + 'Stage key required');
+      console.error('usage: wit issue stages update <key> [--name <name>] [--icon <emoji>] [--color <hex>] [--closes] [--default]');
+      process.exit(1);
+    }
+
+    const updates: Record<string, string | boolean> = {};
+    if (flags.name) updates.name = flags.name as string;
+    if (flags.icon) updates.icon = flags.icon as string;
+    if (flags.color) updates.color = flags.color as string;
+    if (flags.closes !== undefined) updates.isClosedState = !!flags.closes;
+    if (flags.default !== undefined) updates.isDefault = !!flags.default;
+
+    const stage = await api.stages.update(owner, repoName, key, updates) as IssueStage;
+    console.log(colors.green('✓') + ` Updated stage "${stage.name}"`);
+    return;
+  }
+
+  console.error(colors.red('error: ') + `Unknown stages subcommand: ${subcommand}`);
+  console.error('usage: wit issue stages [list|add|remove|update]');
+  process.exit(1);
+}
+
+/**
+ * Move an issue to a specific stage
+ */
+async function handleIssueStage(args: string[]): Promise<void> {
+  const { positional } = parseArgs(args);
+  const issueNumber = parseInt(positional[0], 10);
+  const stageKey = positional[1];
+
+  if (isNaN(issueNumber) || !stageKey) {
+    console.error(colors.red('error: ') + 'Issue number and stage key required');
+    console.error('usage: wit issue stage <number> <stage-key>');
+    console.error('  Use `wit issue stages` to see available stages');
+    process.exit(1);
+  }
+
+  const repo = Repository.find();
+  const api = getApiClient();
+  const remoteUrl = getRemoteUrl(repo);
+  const { owner, repo: repoName } = parseOwnerRepo(remoteUrl);
+
+  const issue = await api.issues.updateStage(owner, repoName, issueNumber, stageKey);
+  console.log(colors.green('✓') + ` Moved issue #${issueNumber} to stage "${stageKey}"`);
 }

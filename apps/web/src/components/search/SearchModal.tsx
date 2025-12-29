@@ -394,21 +394,21 @@ export function SearchModal() {
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && close()}>
       <DialogContent 
-        className="p-0 gap-0 max-w-2xl overflow-hidden bg-background/95 backdrop-blur-xl border-border/50 shadow-2xl"
+        className="p-0 gap-0 max-w-2xl w-[95vw] sm:w-full overflow-hidden bg-background/95 backdrop-blur-xl border-border/50 shadow-2xl max-h-[85vh] sm:max-h-[80vh] flex flex-col"
         onKeyDown={handleKeyDown}
       >
         <DialogTitle className="sr-only">Search</DialogTitle>
         
         {/* Search Input */}
-        <div className="flex items-center border-b border-border/40 px-4">
-          <Search className="h-5 w-5 text-muted-foreground shrink-0" />
+        <div className="flex items-center border-b border-border/40 px-3 sm:px-4 shrink-0">
+          <Search className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground shrink-0" />
           <input
             ref={inputRef}
             type="text"
-            placeholder="Search repositories, issues, pull requests..."
+            placeholder="Search..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="flex-1 h-14 px-3 bg-transparent border-0 outline-none text-base placeholder:text-muted-foreground/50"
+            className="flex-1 h-12 sm:h-14 px-2 sm:px-3 bg-transparent border-0 outline-none text-base placeholder:text-muted-foreground/50"
           />
           {isLoading && (
             <Loader2 className="h-4 w-4 animate-spin text-muted-foreground shrink-0" />
@@ -416,15 +416,15 @@ export function SearchModal() {
           {query && (
             <button
               onClick={() => setQuery('')}
-              className="p-1 hover:bg-muted/40 rounded transition-colors"
+              className="p-1.5 hover:bg-muted/40 rounded transition-colors touch-target"
             >
               <X className="h-4 w-4 text-muted-foreground" />
             </button>
           )}
         </div>
 
-        {/* Type Filters */}
-        <div className="flex items-center gap-1 px-4 py-2 border-b border-border/40 bg-muted/20">
+        {/* Type Filters - scrollable on mobile */}
+        <div className="flex items-center gap-1 px-3 sm:px-4 py-2 border-b border-border/40 bg-muted/20 overflow-x-auto scrollbar-hide shrink-0">
           {[
             { type: 'all' as SearchType, label: 'All', icon: Search },
             { type: 'repos' as SearchType, label: 'Repos', icon: BookOpen },
@@ -436,13 +436,13 @@ export function SearchModal() {
               key={type}
               onClick={() => setActiveType(type)}
               className={cn(
-                'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all',
+                'flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all whitespace-nowrap',
                 activeType === type
                   ? 'bg-primary text-primary-foreground shadow-sm'
                   : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'
               )}
             >
-              <Icon className="h-3.5 w-3.5" />
+              <Icon className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
               {label}
             </button>
           ))}
@@ -451,7 +451,7 @@ export function SearchModal() {
         {/* Results */}
         <div 
           ref={listRef}
-          className="max-h-[400px] overflow-y-auto overscroll-contain"
+          className="flex-1 overflow-y-auto overscroll-contain scroll-touch"
         >
           {/* Empty State / Recent Searches */}
           {!query && recentSearches.length > 0 && (
@@ -563,18 +563,19 @@ export function SearchModal() {
           )}
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-between px-4 py-2.5 border-t border-border/40 bg-muted/30 text-xs text-muted-foreground">
-          <div className="flex items-center gap-4">
+        {/* Footer - simplified on mobile */}
+        <div className="flex items-center justify-between px-3 sm:px-4 py-2 sm:py-2.5 border-t border-border/40 bg-muted/30 text-xs text-muted-foreground shrink-0">
+          {/* Keyboard hints - hidden on mobile */}
+          <div className="hidden sm:flex items-center gap-4">
             <span className="flex items-center gap-1">
               <kbd className="kbd">
-                <span className="text-[10px]">&#8593;&#8595;</span>
+                <span className="text-[10px]">↑↓</span>
               </kbd>
               <span>Navigate</span>
             </span>
             <span className="flex items-center gap-1">
               <kbd className="kbd">
-                <span className="text-[10px]">&#8629;</span>
+                <span className="text-[10px]">↵</span>
               </kbd>
               <span>Select</span>
             </span>
@@ -587,6 +588,10 @@ export function SearchModal() {
               <span>Close</span>
             </span>
           </div>
+          {/* Mobile hint */}
+          <span className="sm:hidden text-muted-foreground">
+            Tap to select
+          </span>
           {query && (
             <button
               onClick={handleGoToSearchPage}

@@ -46,6 +46,7 @@ export * from './core/merge';
 export * from './core/branch-state';
 export * from './core/partial-clone';
 export * from './core/scope';
+export * from './core/acl';
 
 // Utilities
 export * from './utils/hash';
@@ -80,9 +81,12 @@ export {
   withRepoPermission,
   isRepoAdmin,
   isRepoMember,
+  isRepoReader,
   withOrgRole,
   isOrgAdmin,
   isOrgOwner,
+  isOrgMember,
+  requireOAuthScope,
   // Client
   createClient,
   createClientWithTokenGetter,

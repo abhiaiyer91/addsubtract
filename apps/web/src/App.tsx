@@ -64,6 +64,7 @@ import { OAuthAppDetailPage } from './routes/settings/oauth-app-detail';
 import { AuthorizedAppsPage } from './routes/settings/authorized-apps';
 import { OAuthAuthorizePage } from './routes/oauth/authorize';
 import { NewRepoPage } from './routes/new';
+import { ImportPage } from './routes/import';
 import { NewOrgPage } from './routes/org/new';
 import { OrgPage } from './routes/org';
 import { OrgSettingsPage } from './routes/org/settings';
@@ -118,6 +119,7 @@ export function App() {
             <Route path="/settings/authorized-apps" element={<AuthorizedAppsPage />} />
             <Route path="/oauth/authorize" element={<OAuthAuthorizePage />} />
             <Route path="/new" element={<NewRepoPage />} />
+            <Route path="/import" element={<ImportPage />} />
             <Route path="/orgs/new" element={<NewOrgPage />} />
             <Route path="/search" element={<SearchPage />} />
             <Route path="/inbox" element={<InboxPage />} />

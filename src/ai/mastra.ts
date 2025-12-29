@@ -2,7 +2,7 @@
  * Mastra Configuration for wit
  * 
  * Sets up the Mastra instance with the wit agent, tools, memory, and workflows.
- * Uses LibSQL for persistent storage of conversation history.
+ * Uses PostgreSQL for server-side storage, LibSQL for CLI storage.
  */
 
 import * as path from 'path';
@@ -11,17 +11,26 @@ import { Mastra } from '@mastra/core';
 import { Agent } from '@mastra/core/agent';
 import { Memory } from '@mastra/memory';
 import { LibSQLStore } from '@mastra/libsql';
+import { PostgresStore } from '@mastra/pg';
 import { witAgent, createTsgitAgent } from './agent.js';
 import { witTools } from './tools/index.js';
 import { prReviewWorkflow, issueTriageWorkflow, codeGenerationWorkflow } from './workflows/index.js';
+import { ciExecutionWorkflow } from '../ci/workflows/index.js';
 import type { AIConfig } from './types.js';
 
 let mastraInstance: Mastra | null = null;
 let memoryInstance: Memory | null = null;
-let storageInstance: LibSQLStore | null = null;
+let storageInstance: LibSQLStore | PostgresStore | null = null;
 
 /**
- * Get the path to the wit data directory
+ * Check if we're running in server mode (have DATABASE_URL)
+ */
+function isServerMode(): boolean {
+  return !!process.env.DATABASE_URL;
+}
+
+/**
+ * Get the path to the wit data directory (for CLI mode)
  */
 function getWitDataDir(): string {
   const witDir = process.env.WIT_DATA_DIR || path.join(os.homedir(), '.wit');
@@ -29,15 +38,27 @@ function getWitDataDir(): string {
 }
 
 /**
- * Get or create the LibSQL storage instance
+ * Get or create the storage instance.
+ * Uses PostgresStore in server mode, LibSQLStore in CLI mode.
  */
-export function getStorage(): LibSQLStore {
+export function getStorage(): LibSQLStore | PostgresStore {
   if (!storageInstance) {
-    const dbPath = path.join(getWitDataDir(), 'agent.db');
-    storageInstance = new LibSQLStore({
-      id: 'wit-agent-storage',
-      url: `file:${dbPath}`,
-    });
+    if (isServerMode()) {
+      // Server mode: use PostgreSQL
+      storageInstance = new PostgresStore({
+        id: 'wit-mastra-storage',
+        connectionString: process.env.DATABASE_URL!,
+      });
+      console.log('[Mastra] Using PostgresStore for storage');
+    } else {
+      // CLI mode: use local LibSQL
+      const dbPath = path.join(getWitDataDir(), 'agent.db');
+      storageInstance = new LibSQLStore({
+        id: 'wit-agent-storage',
+        url: `file:${dbPath}`,
+      });
+      console.log('[Mastra] Using LibSQLStore for storage');
+    }
   }
   return storageInstance;
 }
@@ -75,6 +96,7 @@ export function createTsgitMastra(config: AIConfig = {}): Mastra {
       prReview: prReviewWorkflow,
       issueTriage: issueTriageWorkflow,
       codeGeneration: codeGenerationWorkflow,
+      ciExecution: ciExecutionWorkflow,
     },
     memory: {
       wit: memory,
@@ -272,6 +294,7 @@ export async function getAIInfoForRepo(repoId: string): Promise<{
 import type { PRReviewInput, PRReviewOutput } from './workflows/pr-review.workflow.js';
 import type { IssueTriageInput, IssueTriageOutput } from './workflows/issue-triage.workflow.js';
 import type { CodeGenerationInput, CodeGenerationOutput } from './workflows/code-generation.workflow.js';
+import type { CIExecutionInput, CIExecutionOutput } from '../ci/workflows/ci-execution.workflow.js';
 
 /**
  * Run the PR Review workflow
@@ -402,6 +425,61 @@ export async function* streamIssueTriageWorkflow(input: IssueTriageInput) {
 export async function* streamCodeGenerationWorkflow(input: CodeGenerationInput) {
   const mastra = getTsgitMastra();
   const workflow = mastra.getWorkflow('codeGeneration');
+  
+  const run = await workflow.createRun();
+  const result = await run.stream({ inputData: input });
+  
+  for await (const chunk of result.fullStream) {
+    yield chunk;
+  }
+}
+
+// =============================================================================
+// CI/CD Workflow Execution Helpers
+// =============================================================================
+
+/**
+ * Run the CI Execution workflow
+ * 
+ * This executes a parsed CI workflow definition using Mastra orchestration.
+ * The workflow provides observability, retry handling, and streaming.
+ * 
+ * @param input - CI execution input parameters including the workflow definition
+ * @returns CI execution results including job results and conclusion
+ */
+export async function runCIExecutionWorkflow(input: CIExecutionInput): Promise<CIExecutionOutput> {
+  const mastra = getTsgitMastra();
+  const workflow = mastra.getWorkflow('ciExecution');
+  
+  const run = await workflow.createRun();
+  const result = await run.start({ inputData: input });
+  
+  if (result.status === 'failed') {
+    return {
+      success: false,
+      conclusion: 'failure',
+      jobs: {},
+      totalDuration: 0,
+      summary: 'Workflow execution failed',
+      error: 'Mastra workflow execution failed',
+    };
+  }
+  
+  return (result as any).result as CIExecutionOutput;
+}
+
+/**
+ * Stream the CI Execution workflow
+ * 
+ * Streams workflow execution events for real-time updates.
+ * Useful for showing live job/step progress in the UI.
+ * 
+ * @param input - CI execution input parameters
+ * @returns AsyncIterator of workflow events
+ */
+export async function* streamCIExecutionWorkflow(input: CIExecutionInput) {
+  const mastra = getTsgitMastra();
+  const workflow = mastra.getWorkflow('ciExecution');
   
   const run = await workflow.createRun();
   const result = await run.stream({ inputData: input });

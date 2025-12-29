@@ -18,10 +18,12 @@ export {
   runPRReviewWorkflow,
   runIssueTriageWorkflow,
   runCodeGenerationWorkflow,
+  runCIExecutionWorkflow,
   // Workflow streamers
   streamPRReviewWorkflow,
   streamIssueTriageWorkflow,
   streamCodeGenerationWorkflow,
+  streamCIExecutionWorkflow,
 } from './mastra.js';
 
 // Tools
@@ -42,6 +44,16 @@ export {
   type CodeGenerationInput,
   type CodeGenerationOutput,
 } from './workflows/index.js';
+
+// CI/CD Workflow (built on Mastra)
+export {
+  ciExecutionWorkflow,
+  type CIExecutionInput,
+  type CIExecutionOutput,
+  type StepResult as CIStepResult,
+  type JobResult as CIJobResult,
+  type ExecutionContext as CIExecutionContext,
+} from '../ci/workflows/index.js';
 
 // Types
 export type { 

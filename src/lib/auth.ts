@@ -12,6 +12,39 @@ import { getDb } from '../db';
 import * as authSchema from '../db/auth-schema';
 import { getGlobalEmailService } from '../core/email';
 
+/**
+ * GitHub OAuth configuration
+ * 
+ * To enable GitHub OAuth:
+ * 1. Create an OAuth App at https://github.com/settings/developers
+ * 2. Set callback URL to: {YOUR_API_URL}/api/auth/callback/github
+ * 3. Set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET env vars
+ * 
+ * Scopes requested: repo (for private repo access), user:email
+ */
+function getGitHubOAuthConfig() {
+  const clientId = process.env.GITHUB_CLIENT_ID;
+  const clientSecret = process.env.GITHUB_CLIENT_SECRET;
+  
+  if (!clientId || !clientSecret) {
+    return undefined;
+  }
+  
+  return {
+    clientId,
+    clientSecret,
+    // Request repo scope for importing private repos
+    scope: ['repo', 'user:email'],
+    // Map GitHub profile to wit user
+    mapProfileToUser: (profile: { login?: string; name?: string; avatar_url?: string; bio?: string }) => ({
+      username: profile.login,
+      name: profile.name || profile.login,
+      avatarUrl: profile.avatar_url,
+      bio: profile.bio,
+    }),
+  };
+}
+
 // Singleton auth instance
 let authInstance: ReturnType<typeof betterAuth> | null = null;
 
@@ -46,6 +79,8 @@ export function createAuth() {
   const appUrl = process.env.APP_URL || 'http://localhost:5173';
   const emailService = getGlobalEmailService();
   
+  const githubConfig = getGitHubOAuthConfig();
+  
   authInstance = betterAuth({
     database: drizzleAdapter(db, {
       provider: 'pg',
@@ -57,6 +92,13 @@ export function createAuth() {
     
     // Secret for signing tokens - required in production
     secret: process.env.BETTER_AUTH_SECRET,
+    
+    // Social providers (GitHub for repo imports)
+    ...(githubConfig && {
+      socialProviders: {
+        github: githubConfig,
+      },
+    }),
     
     // Email and password authentication with password reset
     emailAndPassword: {

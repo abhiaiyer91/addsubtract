@@ -174,22 +174,22 @@ const analyzeTaskStep = createStep({
     const relevantPatterns: string[] = [];
     try {
       // Look for common patterns using wit's file listing
-      const allFiles = findFilesInRepo(inputData.repoPath, /\.(ts|tsx)$/);
-      const srcFiles = allFiles.filter(f => f.startsWith('src/')).slice(0, 20);
+      const allFiles = await findFilesInRepo(inputData.repoPath, /\.(ts|tsx)$/);
+      const srcFiles = allFiles.filter((f: string) => f.startsWith('src/')).slice(0, 20);
       
-      if (srcFiles.some(f => f.includes('/components/'))) {
+      if (srcFiles.some((f: string) => f.includes('/components/'))) {
         relevantPatterns.push('component-based');
       }
-      if (srcFiles.some(f => f.includes('/hooks/'))) {
+      if (srcFiles.some((f: string) => f.includes('/hooks/'))) {
         relevantPatterns.push('custom-hooks');
       }
-      if (srcFiles.some(f => f.includes('/api/') || f.includes('/routes/'))) {
+      if (srcFiles.some((f: string) => f.includes('/api/') || f.includes('/routes/'))) {
         relevantPatterns.push('api-routes');
       }
-      if (srcFiles.some(f => f.includes('/models/') || f.includes('/db/'))) {
+      if (srcFiles.some((f: string) => f.includes('/models/') || f.includes('/db/'))) {
         relevantPatterns.push('data-models');
       }
-      if (srcFiles.some(f => f.includes('/utils/') || f.includes('/lib/'))) {
+      if (srcFiles.some((f: string) => f.includes('/utils/') || f.includes('/lib/'))) {
         relevantPatterns.push('utilities');
       }
     } catch {
@@ -252,12 +252,12 @@ const searchConventionsStep = createStep({
     
     try {
       // Analyze file naming conventions using wit APIs
-      const allFiles = findFilesInRepo(inputData.repoPath, /\.(ts|tsx)$/);
+      const allFiles = await findFilesInRepo(inputData.repoPath, /\.(ts|tsx)$/);
       const files = allFiles.slice(0, 30);
       
-      const kebabCase = files.filter(f => /[a-z]+-[a-z]+/.test(path.basename(f)));
-      const camelCase = files.filter(f => /[a-z]+[A-Z][a-z]+/.test(path.basename(f)));
-      const pascalCase = files.filter(f => /^[A-Z][a-z]+[A-Z]/.test(path.basename(f)));
+      const kebabCase = files.filter((f: string) => /[a-z]+-[a-z]+/.test(path.basename(f)));
+      const camelCase = files.filter((f: string) => /[a-z]+[A-Z][a-z]+/.test(path.basename(f)));
+      const pascalCase = files.filter((f: string) => /^[A-Z][a-z]+[A-Z]/.test(path.basename(f)));
       
       if (kebabCase.length > camelCase.length && kebabCase.length > pascalCase.length) {
         conventions.fileNaming = 'kebab-case';
@@ -305,16 +305,16 @@ const searchConventionsStep = createStep({
       }
       
       // Check for test patterns using wit file listing
-      const testFiles = allFiles.filter(f => 
+      const testFiles = allFiles.filter((f: string) => 
         f.includes('test') || f.includes('spec')
       ).slice(0, 5);
       
       if (testFiles.length > 0) {
-        if (testFiles.some(f => f.includes('.test.'))) {
+        if (testFiles.some((f: string) => f.includes('.test.'))) {
           conventions.testPattern = '.test.ts';
-        } else if (testFiles.some(f => f.includes('.spec.'))) {
+        } else if (testFiles.some((f: string) => f.includes('.spec.'))) {
           conventions.testPattern = '.spec.ts';
-        } else if (testFiles.some(f => f.includes('__tests__'))) {
+        } else if (testFiles.some((f: string) => f.includes('__tests__'))) {
           conventions.testPattern = '__tests__/';
         }
       }
@@ -322,7 +322,7 @@ const searchConventionsStep = createStep({
       // Find example files for the task using wit file listing
       for (const keyword of inputData.keywords.slice(0, 3)) {
         const matches = allFiles
-          .filter(f => f.toLowerCase().includes(keyword.toLowerCase()))
+          .filter((f: string) => f.toLowerCase().includes(keyword.toLowerCase()))
           .slice(0, 2);
         
         for (const match of matches) {
