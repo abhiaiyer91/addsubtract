@@ -381,7 +381,7 @@ export function UserHomePage() {
               <CardContent>
                 <div className="flex flex-wrap gap-3">
                   {orgsData.map((org: any) => (
-                    <Link key={org.id} to={`/${org.name}`} className="group">
+                    <Link key={org.id} to={`/org/${org.name}`} className="group">
                       <div className="flex items-center gap-2 p-2 rounded-lg hover:bg-accent/50 transition-colors">
                         <Avatar className="h-8 w-8">
                           <AvatarImage src={org.avatarUrl || undefined} />

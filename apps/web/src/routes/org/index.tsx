@@ -1,5 +1,5 @@
 import { useParams, Link } from 'react-router-dom';
-import { Building2, Users, MapPin, LinkIcon, Settings, BookOpen } from 'lucide-react';
+import { Building2, Users, MapPin, LinkIcon, Settings, BookOpen, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -121,6 +121,16 @@ export function OrgPage() {
         </TabsList>
 
         <TabsContent value="repos" className="space-y-4">
+          {isAdmin && (
+            <div className="flex justify-end">
+              <Button asChild>
+                <Link to={`/new?org=${slug}`}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  New repository
+                </Link>
+              </Button>
+            </div>
+          )}
           {reposLoading ? (
             <Loading text="Loading repositories..." />
           ) : !repos || repos.length === 0 ? (
@@ -129,7 +139,18 @@ export function OrgPage() {
                 <EmptyState
                   icon={BookOpen}
                   title="No repositories"
-                  description="This organization doesn't have any repositories yet."
+                  description={isAdmin 
+                    ? "This organization doesn't have any repositories yet. Create one to get started!"
+                    : "This organization doesn't have any repositories yet."
+                  }
+                  action={isAdmin ? (
+                    <Button asChild>
+                      <Link to={`/new?org=${slug}`}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Create repository
+                      </Link>
+                    </Button>
+                  ) : undefined}
                 />
               </CardContent>
             </Card>
