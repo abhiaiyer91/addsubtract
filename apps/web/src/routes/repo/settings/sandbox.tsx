@@ -860,7 +860,7 @@ export function SandboxSettingsPage() {
           <div className="flex justify-end">
             <Button 
               onClick={handleSave} 
-              disabled={!isEnabled || updateSettingsMutation.isPending}
+              disabled={updateSettingsMutation.isPending}
             >
               {updateSettingsMutation.isPending ? (
                 <>
