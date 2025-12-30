@@ -47,7 +47,6 @@ import { WebhooksPage } from './routes/repo/settings/webhooks';
 import { AgentsSettingsPage } from './routes/repo/settings/agents';
 import { SandboxSettingsPage } from './routes/repo/settings/sandbox';
 import { PackageSettingsPage } from './routes/repo/settings/package';
-import { SentinelSettingsPage } from './routes/repo/settings/sentinel';
 import { PackagePage } from './routes/repo/package';
 import { SentinelPage } from './routes/repo/sentinel';
 import { ReleasesPage } from './routes/repo/releases';
@@ -216,7 +215,6 @@ export function App() {
             <Route path="/:owner/:repo/settings/webhooks" element={<WebhooksPage />} />
             <Route path="/:owner/:repo/settings/agents" element={<AgentsSettingsPage />} />
             <Route path="/:owner/:repo/settings/sandbox" element={<SandboxSettingsPage />} />
-            <Route path="/:owner/:repo/settings/sentinel" element={<SentinelSettingsPage />} />
             <Route path="/:owner/:repo/settings/package" element={<PackageSettingsPage />} />
           </Route>
         </Routes>
