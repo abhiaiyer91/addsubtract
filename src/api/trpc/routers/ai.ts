@@ -2,6 +2,7 @@
  * AI Router
  * 
  * tRPC router for AI-powered features in the web UI.
+ * Includes usage-based billing via Autumn.
  */
 
 import { z } from 'zod';
@@ -11,8 +12,9 @@ import { repoModel, prModel, collaboratorModel } from '../../../db/models';
 import { resolveDiskPath, BareRepository } from '../../../server/storage/repos';
 import { exists } from '../../../utils/fs';
 import { generatePRDescriptionTool } from '../../../ai/tools/generate-pr-description';
-import { getTsgitAgent, isAIAvailable, isAIAvailableForRepo } from '../../../ai/mastra';
+import { getTsgitAgent, isAIAvailableForRepo } from '../../../ai/mastra';
 import { diff, createHunks, formatUnifiedDiff, FileDiff } from '../../../core/diff';
+import { withUsageLimit } from '../../../server/middleware/usage';
 
 /**
  * Flatten a tree into a map of path -> blob hash
@@ -301,13 +303,16 @@ export const aiRouter = router({
       }
 
       // Use the generate PR description tool directly
+      // Wrapped with usage limit enforcement
       try {
-        const result = await generatePRDescriptionTool.execute({
-          diff: diff || '',
-          commits,
-          title: input.existingTitle,
-          existingDescription: input.existingDescription,
-        }) as any;
+        const result = await withUsageLimit(ctx.user.id, 'review', async () => {
+          return await generatePRDescriptionTool.execute({
+            diff: diff || '',
+            commits,
+            title: input.existingTitle,
+            existingDescription: input.existingDescription,
+          }) as { title: string; description: string; labels: string[]; summary: string; changes: string[] };
+        });
 
         return {
           title: result.title,
@@ -685,23 +690,35 @@ Respond with ONLY the commit message, no additional commentary.`;
       }
 
       // Use the AI agent to respond
+      // Wrapped with usage limit enforcement (counts as agent message)
       try {
-        const agent = getTsgitAgent();
-        const prompt = `You are helping a developer understand and work with the repository "${repo.name}". ${repo.description ? `Repository description: ${repo.description}` : ''} You have access to tools that can search the codebase and analyze code. Be helpful, concise, and provide code references when possible.
+        const result = await withUsageLimit(ctx.user.id, 'agent', async () => {
+          const agent = getTsgitAgent();
+          const prompt = `You are helping a developer understand and work with the repository "${repo.name}". ${repo.description ? `Repository description: ${repo.description}` : ''} You have access to tools that can search the codebase and analyze code. Be helpful, concise, and provide code references when possible.
 
 User question: ${input.message}`;
 
-        const response = await agent.generate(prompt);
+          const response = await agent.generate(prompt);
 
-        // Extract any file references from the response
-        const fileRefs = extractFileReferences(response.text || '');
+          // Extract any file references from the response
+          const fileRefs = extractFileReferences(response.text || '');
 
-        return {
-          message: response.text || 'I could not generate a response.',
-          fileReferences: fileRefs,
-          conversationId: input.conversationId || crypto.randomUUID(),
-        };
+          return {
+            message: response.text || 'I could not generate a response.',
+            fileReferences: fileRefs,
+            conversationId: input.conversationId || crypto.randomUUID(),
+          };
+        });
+
+        return result;
       } catch (error) {
+        // Handle usage limit errors specially
+        if ((error as Error & { code?: string }).code === 'USAGE_LIMIT_EXCEEDED') {
+          throw new TRPCError({
+            code: 'TOO_MANY_REQUESTS',
+            message: (error as Error).message,
+          });
+        }
         console.error('[ai.chat] Error:', error);
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',

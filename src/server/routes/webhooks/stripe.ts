@@ -1,17 +1,16 @@
 /**
- * Stripe Webhook Handler
+ * Stripe Webhook Handler (Optional)
  * 
- * Handles Stripe webhook events for subscription management.
- * This keeps user subscription status in sync with Stripe.
+ * Handles direct Stripe webhook events if you're using Stripe directly.
+ * Note: If using Autumn, Autumn handles webhooks automatically.
  */
 
 import { Hono } from 'hono';
-import Stripe from 'stripe';
+import type Stripe from 'stripe';
 import {
   verifyWebhookEvent,
   getTierFromSubscription,
   getUserIdFromSubscription,
-  mapStripeStatus,
   isStripeConfigured,
 } from '../../../lib/stripe';
 import { subscriptionModel } from '../../../db/models';
@@ -66,20 +65,13 @@ stripeWebhookRouter.post('/', async (c) => {
         await handleSubscriptionDeleted(event.data.object as Stripe.Subscription);
         break;
 
-      case 'invoice.payment_succeeded':
-        await handlePaymentSucceeded(event.data.object as Stripe.Invoice);
-        break;
-
       case 'invoice.payment_failed':
-        await handlePaymentFailed(event.data.object as Stripe.Invoice);
+        await handlePaymentFailed(event);
         break;
 
       default:
         console.log(`[Stripe Webhook] Unhandled event type: ${event.type}`);
     }
-
-    // Log the event for auditing
-    await logWebhookEvent(event);
 
     return c.json({ received: true });
   } catch (error) {
@@ -94,13 +86,12 @@ stripeWebhookRouter.post('/', async (c) => {
 
 /**
  * Handle checkout.session.completed
- * User completed payment checkout
  */
 async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
   const userId = session.metadata?.userId;
   const tier = session.metadata?.tier as 'pro' | 'team' | undefined;
-  const subscriptionId = session.subscription as string | undefined;
-  const customerId = session.customer as string | undefined;
+  const subscriptionId = typeof session.subscription === 'string' ? session.subscription : undefined;
+  const customerId = typeof session.customer === 'string' ? session.customer : undefined;
 
   if (!userId || !tier) {
     console.error('[Stripe] Checkout completed but missing metadata');
@@ -141,10 +132,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   console.log(`[Stripe] Subscription ${subscription.id} updated for user ${userId}`);
 
   const db = getDb();
-  
-  // Map Stripe status to our status
-  const status = mapStripeStatus(subscription.status);
-  const periodEnd = new Date(subscription.current_period_end * 1000);
+  const customerId = typeof subscription.customer === 'string' ? subscription.customer : undefined;
 
   // Update user record
   await db
@@ -152,9 +140,8 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
     .set({
       tier: tier || 'free',
       stripeSubscriptionId: subscription.id,
-      stripeCustomerId: subscription.customer as string,
-      subscriptionStatus: status,
-      subscriptionPeriodEnd: periodEnd,
+      stripeCustomerId: customerId,
+      subscriptionStatus: subscription.status === 'active' ? 'active' : 'inactive',
       updatedAt: new Date(),
     })
     .where(eq(user.id, userId));
@@ -188,75 +175,11 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
 }
 
 /**
- * Handle successful payment
- */
-async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
-  const subscriptionId = invoice.subscription as string | undefined;
-  
-  if (!subscriptionId) return;
-
-  console.log(`[Stripe] Payment succeeded for subscription ${subscriptionId}`);
-
-  // Find user by subscription ID and ensure status is active
-  const db = getDb();
-  await db
-    .update(user)
-    .set({
-      subscriptionStatus: 'active',
-      updatedAt: new Date(),
-    })
-    .where(eq(user.stripeSubscriptionId, subscriptionId));
-}
-
-/**
  * Handle failed payment
  */
-async function handlePaymentFailed(invoice: Stripe.Invoice) {
-  const subscriptionId = invoice.subscription as string | undefined;
-  
-  if (!subscriptionId) return;
-
-  console.log(`[Stripe] Payment failed for subscription ${subscriptionId}`);
-
-  // Mark subscription as past_due
-  const db = getDb();
-  await db
-    .update(user)
-    .set({
-      subscriptionStatus: 'past_due',
-      updatedAt: new Date(),
-    })
-    .where(eq(user.stripeSubscriptionId, subscriptionId));
-
+async function handlePaymentFailed(event: Stripe.Event) {
+  console.log(`[Stripe] Payment failed for event ${event.id}`);
   // TODO: Send email notification about failed payment
-}
-
-// ============================================================================
-// Logging
-// ============================================================================
-
-/**
- * Log webhook event for auditing
- */
-async function logWebhookEvent(event: Stripe.Event) {
-  try {
-    const db = getDb();
-    
-    // Import the subscription_events table if it exists
-    // For now, just log to console
-    console.log(`[Stripe Webhook] Logged event: ${event.id} (${event.type})`);
-    
-    // In production, you'd insert into subscription_events table:
-    // await db.insert(subscriptionEvents).values({
-    //   id: crypto.randomUUID(),
-    //   stripeEventId: event.id,
-    //   eventType: event.type,
-    //   data: event.data.object,
-    //   processedAt: new Date(),
-    // });
-  } catch (error) {
-    console.error('[Stripe Webhook] Failed to log event:', error);
-  }
 }
 
 // ============================================================================

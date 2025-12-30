@@ -94,51 +94,42 @@ Ship a "Pro" tier quickly using an honor-based system before building full billi
 
 ---
 
-### Option 3: 💳 Full Stripe Integration (2-3 weeks)
-**Time to revenue: 2-3 weeks**
+### Option 3: 💳 Autumn Billing (1 week) ✅ IMPLEMENTED
+**Time to revenue: 1 week**
 
-Complete billing infrastructure with self-serve subscriptions.
+We've implemented Autumn for simplified billing infrastructure.
 
-**Implementation:**
-1. User subscription model (tier, stripe_customer_id, stripe_subscription_id)
-2. Usage tracking tables (ai_usage with daily/monthly aggregates)
-3. Stripe Checkout for subscriptions
-4. Stripe Webhooks for subscription events
-5. Billing settings page
-6. Usage dashboard
+**What's Built:**
+1. `src/lib/autumn.ts` - Autumn SDK integration
+2. `src/server/middleware/usage.ts` - Usage enforcement middleware
+3. `src/api/trpc/routers/billing.ts` - Billing API with Autumn
+4. `src/commands/billing.ts` - CLI billing command
+5. `apps/web/src/routes/settings/billing.tsx` - Billing settings page
 
-**Database Schema:**
-```sql
--- User subscriptions
-ALTER TABLE user ADD COLUMN tier TEXT DEFAULT 'free';
-ALTER TABLE user ADD COLUMN stripe_customer_id TEXT;
-ALTER TABLE user ADD COLUMN stripe_subscription_id TEXT;
-ALTER TABLE user ADD COLUMN subscription_status TEXT DEFAULT 'inactive';
-ALTER TABLE user ADD COLUMN current_period_end TIMESTAMP;
+**Why Autumn over raw Stripe:**
+- Handles subscriptions + usage-based billing in one API
+- Built-in entitlements/feature flags
+- Much simpler than raw Stripe (1 API call vs 10+)
+- Customer portal included
+- Stripe under the hood (all the reliability)
 
--- Usage tracking
-CREATE TABLE ai_usage (
-  id TEXT PRIMARY KEY,
-  user_id TEXT REFERENCES user(id),
-  feature TEXT NOT NULL, -- 'commit', 'review', 'search'
-  count INTEGER DEFAULT 1,
-  period_start TIMESTAMP NOT NULL,
-  period_end TIMESTAMP NOT NULL,
-  created_at TIMESTAMP DEFAULT NOW()
-);
-
-CREATE INDEX ai_usage_user_period ON ai_usage(user_id, period_start);
-```
+**Setup Steps:**
+1. Sign up at https://getautumn.com
+2. Create products: `free`, `pro`, `team`, `enterprise`
+3. Create features: `ai-commits`, `ai-reviews`, `ai-searches`, `ai-agent-messages`
+4. Set limits for each product/feature combo
+5. Add `AUTUMN_SECRET_KEY` to your environment
+6. Run database migration: `npm run db:migrate`
 
 **Pros:**
 - Self-serve (scales)
-- Professional experience
-- Automatic billing
+- Usage-based billing built-in
+- Minimal code needed
+- Stripe reliability
 
 **Cons:**
-- More development time
-- Need to handle billing edge cases
-- Stripe fees (2.9% + $0.30)
+- Autumn fees (on top of Stripe)
+- Less customization than raw Stripe
 
 ---
 
