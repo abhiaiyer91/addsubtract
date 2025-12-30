@@ -2354,4 +2354,178 @@ export const reposRouter = router({
         ...counts,
       };
     }),
+
+  /**
+   * Transfer a repository to another user or organization
+   * Only the current owner can transfer a repository.
+   * For transfers to organizations, the user must be an admin/owner of the target org.
+   */
+  transfer: protectedProcedure
+    .input(
+      z.object({
+        owner: z.string(),
+        repo: z.string(),
+        newOwner: z.string().min(1, 'New owner is required'),
+        newOwnerType: z.enum(['user', 'organization']),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const result = await repoModel.findByPath(input.owner, input.repo);
+
+      if (!result) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Repository not found',
+        });
+      }
+
+      const repo = result.repo;
+
+      // Only the current owner can transfer
+      // For user-owned repos, check if current user is the owner
+      // For org-owned repos, check if current user is an org owner
+      let isOwner = false;
+      let previousOwnerName = '';
+
+      if (repo.ownerType === 'user') {
+        isOwner = repo.ownerId === ctx.user.id;
+        const ownerUser = await userModel.findById(repo.ownerId);
+        previousOwnerName = ownerUser?.username || ownerUser?.name || 'unknown';
+      } else {
+        // Organization - check if user is an owner of the org
+        isOwner = await orgMemberModel.hasRole(repo.ownerId, ctx.user.id, 'owner');
+        const org = await orgModel.findById(repo.ownerId);
+        previousOwnerName = org?.name || 'unknown';
+      }
+
+      if (!isOwner) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only the repository owner can transfer it',
+        });
+      }
+
+      // Resolve the new owner
+      let newOwnerId: string;
+      let newOwnerName: string;
+
+      if (input.newOwnerType === 'user') {
+        const newOwnerUser = await userModel.findByUsername(input.newOwner);
+        if (!newOwnerUser) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: `User '${input.newOwner}' not found`,
+          });
+        }
+        newOwnerId = newOwnerUser.id;
+        newOwnerName = newOwnerUser.username || newOwnerUser.name;
+      } else {
+        const newOwnerOrg = await orgModel.findByName(input.newOwner);
+        if (!newOwnerOrg) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: `Organization '${input.newOwner}' not found`,
+          });
+        }
+
+        // Check if the current user is an admin/owner of the target org
+        const hasPermission = await orgMemberModel.hasRole(newOwnerOrg.id, ctx.user.id, 'admin');
+        if (!hasPermission) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'You must be an admin or owner of the target organization',
+          });
+        }
+
+        newOwnerId = newOwnerOrg.id;
+        newOwnerName = newOwnerOrg.name;
+      }
+
+      // Check if a repo with the same name already exists for the new owner
+      const existingRepo = await repoModel.findByOwnerAndName(newOwnerId, repo.name);
+      if (existingRepo) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: `A repository named '${repo.name}' already exists for ${input.newOwner}`,
+        });
+      }
+
+      // Calculate the new disk path
+      const newDiskPath = `/repos/${newOwnerName}/${repo.name}.git`;
+
+      // Move the repository on disk
+      const reposDir = process.env.REPOS_DIR || './repos';
+      const oldAbsolutePath = resolveDiskPath(repo.diskPath);
+      const newAbsolutePath = resolveDiskPath(newDiskPath);
+
+      // Ensure the target directory exists
+      const newOwnerDir = path.dirname(newAbsolutePath);
+      if (!exists(newOwnerDir)) {
+        mkdirp(newOwnerDir);
+      }
+
+      // Check if old path exists before attempting to move
+      if (exists(oldAbsolutePath)) {
+        try {
+          // Move the repository directory
+          const fs = await import('fs');
+          fs.renameSync(oldAbsolutePath, newAbsolutePath);
+        } catch (moveError) {
+          // If rename fails (cross-device), try copy + delete
+          try {
+            const fs = await import('fs');
+            fs.cpSync(oldAbsolutePath, newAbsolutePath, { recursive: true });
+            fs.rmSync(oldAbsolutePath, { recursive: true, force: true });
+          } catch (copyError) {
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: `Failed to move repository on disk: ${copyError instanceof Error ? copyError.message : 'Unknown error'}`,
+            });
+          }
+        }
+      }
+
+      // Update the database
+      const updatedRepo = await repoModel.transfer(
+        repo.id,
+        newOwnerId,
+        input.newOwnerType,
+        newDiskPath
+      );
+
+      if (!updatedRepo) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to update repository record',
+        });
+      }
+
+      // Log activity
+      await activityHelpers.logRepoTransferred(
+        ctx.user.id,
+        repo.id,
+        repo.ownerId,
+        previousOwnerName,
+        newOwnerId,
+        newOwnerName
+      );
+
+      // Emit event for repo transfer
+      await eventBus.emit('repo.transferred', ctx.user.id, {
+        repoId: repo.id,
+        repoName: repo.name,
+        previousOwnerId: repo.ownerId,
+        previousOwnerName,
+        newOwnerId,
+        newOwnerName,
+        newOwnerType: input.newOwnerType,
+      });
+
+      return {
+        success: true,
+        repo: updatedRepo,
+        previousOwner: previousOwnerName,
+        newOwner: newOwnerName,
+      };
+    }),
 });

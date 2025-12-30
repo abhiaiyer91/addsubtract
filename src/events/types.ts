@@ -65,6 +65,19 @@ export interface RepoForkedEvent extends BaseEvent {
   };
 }
 
+export interface RepoTransferredEvent extends BaseEvent {
+  type: 'repo.transferred';
+  payload: {
+    repoId: string;
+    repoName: string;
+    previousOwnerId: string;
+    previousOwnerName: string;
+    newOwnerId: string;
+    newOwnerName: string;
+    newOwnerType: 'user' | 'organization';
+  };
+}
+
 // ============ PULL REQUEST EVENTS ============
 
 export interface PrCreatedEvent extends BaseEvent {
@@ -331,6 +344,7 @@ export type AppEvent =
   | RepoPushedEvent
   | RepoStarredEvent
   | RepoForkedEvent
+  | RepoTransferredEvent
   | PrCreatedEvent
   | PrUpdatedEvent
   | PrReviewRequestedEvent

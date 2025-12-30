@@ -33,6 +33,7 @@ export type ActivityType =
   | 'repo_created'
   | 'repo_forked'
   | 'repo_starred'
+  | 'repo_transferred'
   | 'user_followed';
 
 export interface ActivityPayload {
@@ -61,6 +62,12 @@ export interface ActivityPayload {
   // Follow events
   followedUserId?: string;
   followedUsername?: string;
+  
+  // Transfer events
+  previousOwnerId?: string;
+  previousOwnerName?: string;
+  newOwnerId?: string;
+  newOwnerName?: string;
 }
 
 export const activityModel = {
@@ -379,6 +386,22 @@ export const activityHelpers = {
       repoId,
       type: 'repo_starred',
       payload: { repoName },
+    });
+  },
+
+  async logRepoTransferred(
+    actorId: string,
+    repoId: string,
+    previousOwnerId: string,
+    previousOwnerName: string,
+    newOwnerId: string,
+    newOwnerName: string
+  ): Promise<Activity> {
+    return activityModel.create({
+      actorId,
+      repoId,
+      type: 'repo_transferred',
+      payload: { previousOwnerId, previousOwnerName, newOwnerId, newOwnerName },
     });
   },
 };
