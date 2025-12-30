@@ -901,6 +901,9 @@ export type InboxPr = PullRequest & {
   reviewState?: 'pending' | 'approved' | 'changes_requested' | 'commented' | null;
   ciStatus?: 'success' | 'failure' | 'pending' | null;
   reviewRequestedAt?: Date | null;
+  // Flattened properties for easier frontend consumption
+  repoOwner?: string;
+  repoName?: string;
 };
 
 export const inboxModel = {
@@ -943,12 +946,19 @@ export const inboxModel = {
       .limit(limit)
       .offset(offset);
 
-    // Enrich with author, labels, and CI status
+    // Enrich with author, labels, CI status, and owner username
     return Promise.all(
       result.map(async (r) => {
         const authorResult = await prModel.findWithAuthor(r.pr.id);
         const labels = await prLabelModel.listByPr(r.pr.id);
         const ciStatus = await getCiStatus(r.pr.repoId, r.pr.headSha);
+
+        // Get repo owner username
+        const ownerResult = await db
+          .select({ username: user.username })
+          .from(user)
+          .where(eq(user.id, r.repo.ownerId))
+          .limit(1);
 
         return {
           ...r.pr,
@@ -957,6 +967,8 @@ export const inboxModel = {
           labels,
           reviewRequestedAt: r.reviewer.requestedAt,
           ciStatus,
+          repoOwner: ownerResult[0]?.username || '',
+          repoName: r.repo.name,
         };
       })
     );
@@ -998,13 +1010,20 @@ export const inboxModel = {
       .limit(limit)
       .offset(offset);
 
-    // Enrich with review status, labels, and CI status
+    // Enrich with review status, labels, CI status, and owner username
     return Promise.all(
       result.map(async (r) => {
         const authorResult = await prModel.findWithAuthor(r.pr.id);
         const labels = await prLabelModel.listByPr(r.pr.id);
         const reviewState = await getLatestReviewState(r.pr.id);
         const ciStatus = await getCiStatus(r.pr.repoId, r.pr.headSha);
+
+        // Get repo owner username
+        const ownerResult = await db
+          .select({ username: user.username })
+          .from(user)
+          .where(eq(user.id, r.repo.ownerId))
+          .limit(1);
 
         return {
           ...r.pr,
@@ -1013,6 +1032,8 @@ export const inboxModel = {
           labels,
           reviewState,
           ciStatus,
+          repoOwner: ownerResult[0]?.username || '',
+          repoName: r.repo.name,
         };
       })
     );
@@ -1072,13 +1093,20 @@ export const inboxModel = {
       .limit(limit)
       .offset(offset);
 
-    // Enrich with author, labels, and status
+    // Enrich with author, labels, status, and owner username
     return Promise.all(
       result.map(async (r) => {
         const authorResult = await prModel.findWithAuthor(r.pr.id);
         const labels = await prLabelModel.listByPr(r.pr.id);
         const reviewState = await getLatestReviewState(r.pr.id, userId);
         const ciStatus = await getCiStatus(r.pr.repoId, r.pr.headSha);
+
+        // Get repo owner username
+        const ownerResult = await db
+          .select({ username: user.username })
+          .from(user)
+          .where(eq(user.id, r.repo.ownerId))
+          .limit(1);
 
         return {
           ...r.pr,
@@ -1087,6 +1115,8 @@ export const inboxModel = {
           labels,
           reviewState,
           ciStatus,
+          repoOwner: ownerResult[0]?.username || '',
+          repoName: r.repo.name,
         };
       })
     );
