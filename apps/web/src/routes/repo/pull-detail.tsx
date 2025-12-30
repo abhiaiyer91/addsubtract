@@ -117,6 +117,18 @@ export function PullDetailPage() {
     { enabled: !!prData?.id }
   );
 
+  // Fetch available labels for the sidebar
+  const { data: availableLabels } = trpc.issues.listLabels.useQuery(
+    { repoId: repoData?.repo.id! },
+    { enabled: !!repoData?.repo.id }
+  );
+
+  // Fetch collaborators for available reviewers
+  const { data: collaborators } = trpc.repos.collaborators.useQuery(
+    { repoId: repoData?.repo.id! },
+    { enabled: !!repoData?.repo.id }
+  );
+
   // Check mergeability
   const { data: mergeabilityData } = trpc.pulls.checkMergeability.useQuery(
     { prId: prData?.id! },
@@ -458,6 +470,36 @@ export function PullDetailPage() {
     };
   });
 
+  // Process available reviewers from collaborators (includes owner)
+  const availableReviewers = useMemo(() => {
+    const reviewersList: Array<{ id: string; username: string; avatarUrl?: string | null }> = [];
+    
+    // Add repo owner
+    if (repoData?.repo.owner) {
+      reviewersList.push({
+        id: repoData.repo.ownerId,
+        username: repoData.repo.owner.username,
+        avatarUrl: repoData.repo.owner.avatarUrl || null,
+      });
+    }
+    
+    // Add collaborators
+    if (collaborators) {
+      collaborators.forEach((collab: any) => {
+        // Don't add duplicates (owner might already be added)
+        if (!reviewersList.some((r) => r.id === collab.userId)) {
+          reviewersList.push({
+            id: collab.userId,
+            username: collab.user?.username || 'Unknown',
+            avatarUrl: collab.user?.avatarUrl || null,
+          });
+        }
+      });
+    }
+    
+    return reviewersList;
+  }, [repoData, collaborators]);
+
   // Review counts
   const approvedCount = reviews.filter((r) => r.state === 'approved').length;
   const changesRequestedCount = reviews.filter((r) => r.state === 'changes_requested').length;
@@ -719,11 +761,13 @@ export function PullDetailPage() {
                       <div className="space-y-4 pb-20">
                         <PrSidebar
                           reviewers={sidebarReviewers}
+                          availableReviewers={availableReviewers}
                           onRequestReview={authenticated ? handleRequestReview : undefined}
                           onRemoveReviewer={authenticated && isAuthor ? handleRemoveReviewer : undefined}
                           canManageReviewers={authenticated && (isAuthor || false)}
                           checks={[]}
                           labels={pr.labels || []}
+                          availableLabels={availableLabels || []}
                           onAddLabel={authenticated ? handleAddLabel : undefined}
                           onRemoveLabel={authenticated ? handleRemoveLabel : undefined}
                           canManageLabels={authenticated}
@@ -987,11 +1031,13 @@ export function PullDetailPage() {
         <div className="hidden lg:block lg:w-64 shrink-0 space-y-6 order-2">
           <PrSidebar
             reviewers={sidebarReviewers}
+            availableReviewers={availableReviewers}
             onRequestReview={authenticated ? handleRequestReview : undefined}
             onRemoveReviewer={authenticated && isAuthor ? handleRemoveReviewer : undefined}
             canManageReviewers={authenticated && (isAuthor || false)}
             checks={[]}
             labels={pr.labels || []}
+            availableLabels={availableLabels || []}
             onAddLabel={authenticated ? handleAddLabel : undefined}
             onRemoveLabel={authenticated ? handleRemoveLabel : undefined}
             canManageLabels={authenticated}
