@@ -12,14 +12,17 @@ import {
   activityHelpers,
   orgModel,
   orgMemberModel,
+  prModel,
+  workflowRunModel,
 } from '../../../db/models';
+import { pullRequests, prComments, workflowRuns } from '../../../db/schema';
+import { and, eq, or, sql, desc, count } from 'drizzle-orm';
 import { BareRepository, forkRepository, getRepoDiskPath, RepoManager, resolveDiskPath, initBareRepository } from '../../../server/storage/repos';
 import { exists, mkdirp } from '../../../utils/fs';
 import { eventBus } from '../../../events';
 import { getGlobalEmailService } from '../../../core/email';
 import { getDb } from '../../../db';
 import { user } from '../../../db/auth-schema';
-import { eq } from 'drizzle-orm';
 import { 
   calculateLanguageStats, 
   shouldIgnorePath, 
@@ -1387,7 +1390,7 @@ export const reposRouter = router({
     }),
 
   /**
-   * Get commit history for a repository
+   * Get commit history for a repository with PR associations and CI status
    */
   getCommits: publicProcedure
     .input(
@@ -1431,14 +1434,30 @@ export const reposRouter = router({
       // Get the bare repository
       const bareRepo = getRepoFromDisk(result.repo.diskPath);
       if (!bareRepo) {
-        return [];
+        return { commits: [], totalCount: 0 };
       }
 
       try {
         // Resolve the ref to a commit
         let commitHash = bareRepo.refs.resolve(input.ref);
         if (!commitHash) {
-          return [];
+          return { commits: [], totalCount: 0 };
+        }
+
+        const db = getDb();
+        const repoId = result.repo.id;
+
+        // Count total commits (walk the entire history)
+        let totalCount = 0;
+        let countHash: string | null = commitHash;
+        while (countHash) {
+          try {
+            const commit = bareRepo.objects.readCommit(countHash);
+            totalCount++;
+            countHash = commit.parentHashes[0] || null;
+          } catch {
+            break;
+          }
         }
 
         const commits: Array<{
@@ -1446,19 +1465,87 @@ export const reposRouter = router({
           message: string;
           author: string;
           authorEmail: string;
+          authorUsername: string | null;
+          authorAvatarUrl: string | null;
           date: Date;
+          pr: { number: number; title: string } | null;
+          commentCount: number;
+          ciStatus: 'success' | 'failure' | 'pending' | null;
         }> = [];
 
         // Walk the commit history
         while (commitHash && commits.length < input.limit) {
           try {
             const commit = bareRepo.objects.readCommit(commitHash);
+            
+            // Look up author by email to get username and avatar
+            const [authorUser] = await db
+              .select({ username: user.username, avatarUrl: user.avatarUrl })
+              .from(user)
+              .where(eq(user.email, commit.author.email))
+              .limit(1);
+
+            // Look up associated PR (by mergeSha or headSha)
+            const [associatedPr] = await db
+              .select({ number: pullRequests.number, title: pullRequests.title })
+              .from(pullRequests)
+              .where(
+                and(
+                  eq(pullRequests.repoId, repoId),
+                  or(
+                    eq(pullRequests.mergeSha, commitHash),
+                    eq(pullRequests.headSha, commitHash)
+                  )
+                )
+              )
+              .limit(1);
+
+            // Get comment count for commits that are part of a PR
+            let commentCount = 0;
+            if (associatedPr) {
+              const [countResult] = await db
+                .select({ count: count() })
+                .from(prComments)
+                .innerJoin(pullRequests, eq(prComments.prId, pullRequests.id))
+                .where(
+                  and(
+                    eq(pullRequests.repoId, repoId),
+                    eq(pullRequests.number, associatedPr.number)
+                  )
+                );
+              commentCount = Number(countResult?.count ?? 0);
+            }
+
+            // Get CI status for this commit
+            const ciRuns = await db
+              .select({ state: workflowRuns.state, conclusion: workflowRuns.conclusion })
+              .from(workflowRuns)
+              .where(and(eq(workflowRuns.repoId, repoId), eq(workflowRuns.commitSha, commitHash)))
+              .orderBy(desc(workflowRuns.createdAt))
+              .limit(5);
+
+            let ciStatus: 'success' | 'failure' | 'pending' | null = null;
+            if (ciRuns.length > 0) {
+              const hasPending = ciRuns.some((r) => r.state === 'queued' || r.state === 'in_progress');
+              if (hasPending) {
+                ciStatus = 'pending';
+              } else {
+                const hasFailed = ciRuns.some((r) => r.conclusion === 'failure');
+                ciStatus = hasFailed ? 'failure' : 'success';
+              }
+            }
+
             commits.push({
               sha: commitHash,
               message: commit.message,
               author: commit.author.name,
               authorEmail: commit.author.email,
+              authorUsername: authorUser?.username ?? null,
+              authorAvatarUrl: authorUser?.avatarUrl ?? null,
               date: new Date(commit.author.timestamp * 1000),
+              pr: associatedPr ? { number: associatedPr.number, title: associatedPr.title } : null,
+              commentCount,
+              ciStatus,
             });
 
             // Move to the first parent
@@ -1468,10 +1555,10 @@ export const reposRouter = router({
           }
         }
 
-        return commits;
+        return { commits, totalCount };
       } catch (error) {
         console.error('[repos.getCommits] Error:', error);
-        return [];
+        return { commits: [], totalCount: 0 };
       }
     }),
 
