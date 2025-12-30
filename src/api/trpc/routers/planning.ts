@@ -3,6 +3,7 @@
  * 
  * API endpoints for the multi-agent planning workflow.
  * Enables complex task planning with parallel subtask execution.
+ * Streams Mastra workflow events directly to the frontend.
  */
 
 import { z } from 'zod';
@@ -20,6 +21,33 @@ import type {
   GroupResult,
   ReviewResult,
 } from '../../../ai/workflows/multi-agent-planning.workflow';
+
+// =============================================================================
+// Streaming Event Types
+// =============================================================================
+
+/**
+ * Streaming event types - matches Mastra workflow events plus our custom events
+ */
+export type PlanningStreamEventType = 
+  | 'started'       // Workflow started
+  | 'step-start'    // Mastra step starting
+  | 'step-complete' // Mastra step completed with result
+  | 'step-error'    // Mastra step failed
+  | 'complete'      // Workflow completed
+  | 'error';        // Workflow error
+
+/**
+ * Streaming event structure
+ */
+export interface PlanningStreamEvent {
+  type: PlanningStreamEventType;
+  timestamp: string;
+  runId: string;
+  stepId?: string;
+  result?: unknown;
+  error?: string;
+}
 
 /**
  * Generate disk path for a repository
@@ -283,7 +311,8 @@ export const planningRouter = router({
     }),
 
   /**
-   * Stream planning workflow execution (real-time updates)
+   * Stream planning workflow execution
+   * Passes through Mastra workflow events directly to the frontend
    */
   stream: protectedProcedure
     .input(z.object({
@@ -298,17 +327,27 @@ export const planningRouter = router({
       autoCommit: z.boolean().default(true),
     }))
     .subscription(({ input, ctx }) => {
-      return observable<{
-        type: 'status' | 'plan' | 'group_start' | 'task_complete' | 'review' | 'done' | 'error';
-        data: unknown;
-      }>((emit) => {
+      return observable<PlanningStreamEvent>((emit) => {
+        const runId = crypto.randomUUID();
+        const startTime = Date.now();
+        let aborted = false;
+
+        const emitEvent = (event: Omit<PlanningStreamEvent, 'timestamp' | 'runId'>): void => {
+          if (aborted) return;
+          emit.next({
+            ...event,
+            timestamp: new Date().toISOString(),
+            runId,
+          });
+        };
+
         (async () => {
           try {
             // Check AI availability
             if (!isAIAvailable()) {
               const repoKey = await repoAiKeyModel.getAnyKey(input.repoId);
               if (!repoKey) {
-                emit.next({ type: 'error', data: { message: 'AI is not configured' } });
+                emitEvent({ type: 'error', error: 'AI is not configured. Add an API key in repository settings.' });
                 emit.complete();
                 return;
               }
@@ -323,7 +362,7 @@ export const planningRouter = router({
             // Get repository
             const repo = await repoModel.findByIdWithOwner(input.repoId);
             if (!repo) {
-              emit.next({ type: 'error', data: { message: 'Repository not found' } });
+              emitEvent({ type: 'error', error: 'Repository not found' });
               emit.complete();
               return;
             }
@@ -349,59 +388,48 @@ export const planningRouter = router({
               autoCommit: input.autoCommit,
             };
 
-            emit.next({ type: 'status', data: { status: 'starting', message: 'Starting planning workflow...' } });
+            // Emit started event with context
+            emitEvent({ 
+              type: 'started', 
+              result: { 
+                task: input.task, 
+                repoName: repo.repo.name, 
+                dryRun: input.dryRun 
+              } 
+            });
 
-            // Stream workflow events
+            // Stream Mastra workflow events directly
             for await (const event of streamMultiAgentPlanningWorkflow(workflowInput)) {
-              const eventData = event as any;
+              if (aborted) break;
               
-              if (eventData.type === 'step-start') {
-                emit.next({ 
-                  type: 'status', 
-                  data: { 
-                    status: eventData.stepId,
-                    message: `Starting step: ${eventData.stepId}`,
-                  } 
-                });
-              } else if (eventData.type === 'step-complete') {
-                if (eventData.stepId === 'create-plan' && eventData.result?.plan) {
-                  emit.next({ type: 'plan', data: eventData.result.plan });
-                } else if (eventData.stepId === 'execute-plan' && eventData.result?.groupResults) {
-                  for (const group of eventData.result.groupResults) {
-                    emit.next({ type: 'group_start', data: { groupId: group.groupId } });
-                    for (const task of group.subtaskResults) {
-                      emit.next({ type: 'task_complete', data: task });
-                    }
-                  }
-                } else if (eventData.stepId === 'review-results' && eventData.result?.review) {
-                  emit.next({ type: 'review', data: eventData.result.review });
-                }
-              } else if (eventData.type === 'step-error') {
-                emit.next({ 
-                  type: 'error', 
-                  data: { 
-                    step: eventData.stepId,
-                    message: eventData.error,
-                  } 
-                });
-              }
+              const eventData = event as { type: string; stepId?: string; result?: unknown; error?: string };
+              
+              // Pass through Mastra events with our wrapper
+              emitEvent({
+                type: eventData.type as PlanningStreamEventType,
+                stepId: eventData.stepId,
+                result: eventData.result,
+                error: eventData.error,
+              });
             }
 
-            emit.next({ type: 'done', data: { message: 'Workflow completed' } });
+            // Emit complete event
+            emitEvent({ 
+              type: 'complete', 
+              result: { totalDuration: Date.now() - startTime } 
+            });
             emit.complete();
           } catch (error) {
-            emit.next({ 
+            emitEvent({ 
               type: 'error', 
-              data: { 
-                message: error instanceof Error ? error.message : 'Unknown error',
-              } 
+              error: error instanceof Error ? error.message : 'Unknown error' 
             });
             emit.complete();
           }
         })();
 
         return () => {
-          // Cleanup if needed
+          aborted = true;
         };
       });
     }),
