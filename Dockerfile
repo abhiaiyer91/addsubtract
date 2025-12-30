@@ -2,8 +2,13 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Install git for any git operations and docker CLI for sandbox
-RUN apk add --no-cache git docker-cli
+# Install git for any git operations, docker CLI for sandbox, and curl for CodeRabbit CLI
+RUN apk add --no-cache git docker-cli curl bash
+
+# Install CodeRabbit CLI for AI code reviews
+RUN curl -fsSL https://cli.coderabbit.ai/install.sh | sh && \
+    ln -sf /root/.local/bin/coderabbit /usr/local/bin/coderabbit && \
+    ln -sf /root/.local/bin/coderabbit /usr/local/bin/cr
 
 # Install dependencies
 COPY package*.json ./

@@ -10,7 +10,7 @@ import { resolveDiskPath, BareRepository } from '../../server/storage/repos';
 import { exists } from '../../utils/fs';
 import { diff, createHunks, formatUnifiedDiff, FileDiff } from '../../core/diff';
 import {
-  reviewDiff as codeRabbitReviewDiff,
+  reviewRepo as codeRabbitReviewRepo,
   getCodeRabbitStatus,
   type CodeRabbitReviewResult,
 } from '../../utils/coderabbit';
@@ -435,9 +435,9 @@ export async function runAIReview(prId: string): Promise<AIReviewResult | null> 
     // Try CodeRabbit if we have an API key
     if (codeRabbitKey && crStatus.installed) {
       console.log('[AI Review] Using CodeRabbit for review');
-      const crResult = await codeRabbitReviewDiff(diffContent, { 
-        format: 'json',
+      const crResult = await codeRabbitReviewRepo(diskPath, { 
         apiKey: codeRabbitKey,
+        baseCommit: pr.baseSha,
       });
       
       if (crResult.success) {

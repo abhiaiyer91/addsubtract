@@ -22,7 +22,7 @@ import {
   getCodeRabbitStatus,
   getCodeRabbitApiKey,
   saveCodeRabbitApiKey,
-  reviewDiff,
+  reviewRepo,
   formatReviewResult,
   CodeRabbitConfig,
 } from '../utils/coderabbit';
@@ -217,13 +217,17 @@ export async function handleCodeReview(args: string[]): Promise<void> {
   console.log(colors.dim(`   Reviewing: ${description}`));
   console.log('');
 
-  // Run the review
+  // Run the review using CodeRabbit CLI
   const config: CodeRabbitConfig = {
-    verbose: options.verbose,
-    format: options.json ? 'json' : 'text',
+    cwd: repo.workDir,
   };
 
-  const result = await reviewDiff(diffContent, config);
+  // Set base branch for comparison if reviewing branch changes
+  if (options.branch) {
+    config.baseBranch = options.base || detectBaseBranch(repo);
+  }
+
+  const result = await reviewRepo(repo.workDir, config);
 
   // Output results
   if (options.json) {
