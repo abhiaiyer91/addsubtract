@@ -9,6 +9,8 @@ import { TerminalPanel } from './terminal-panel';
 import { PendingChangesPanel } from './pending-changes-panel';
 import { QuickOpen } from './quick-open';
 import { Breadcrumb } from './breadcrumb';
+import { KeyboardShortcutsPanel } from './keyboard-shortcuts-panel';
+import { AgentChangesHistory, useAgentChangesHistory } from './agent-changes-history';
 import { AgentPanel } from '@/components/agent/agent-panel';
 import { trpc } from '@/lib/trpc';
 import {
@@ -28,6 +30,8 @@ import {
   Check,
   Plus,
   Loader2,
+  HelpCircle,
+  Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -87,6 +91,10 @@ export function IDELayout({ owner, repo, repoId, defaultRef }: IDELayoutProps) {
   const [quickOpenVisible, setQuickOpenVisible] = useState(false);
   const [showCreateBranchDialog, setShowCreateBranchDialog] = useState(false);
   const [newBranchName, setNewBranchName] = useState('');
+  const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
+  
+  // Agent changes history for undo/redo
+  const agentChanges = useAgentChangesHistory();
   const sidebarRef = useRef<HTMLDivElement>(null);
   const chatRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<HTMLDivElement>(null);
@@ -305,6 +313,17 @@ export function IDELayout({ owner, repo, repoId, defaultRef }: IDELayoutProps) {
     [setIDEMode]
   );
 
+  // ? - Show keyboard shortcuts
+  useHotkeys(
+    '?',
+    (e) => {
+      e.preventDefault();
+      setShowKeyboardShortcuts(true);
+    },
+    {},
+    [setShowKeyboardShortcuts]
+  );
+
   // Resizer handlers
   const handleMouseDown = useCallback(
     (type: 'sidebar' | 'chat' | 'terminal') => () => {
@@ -483,11 +502,24 @@ export function IDELayout({ owner, repo, repoId, defaultRef }: IDELayoutProps) {
                 <Keyboard className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
-                Keyboard Shortcuts
+            <DropdownMenuContent align="end" className="w-64">
+              <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground flex items-center gap-2">
+                <Sparkles className="h-3 w-3 text-purple-400" />
+                AI Shortcuts
               </div>
               <DropdownMenuSeparator />
+              <DropdownMenuItem className="justify-between">
+                <span>AI inline edit</span>
+                <kbd className="text-xs text-muted-foreground">⌘K</kbd>
+              </DropdownMenuItem>
+              <DropdownMenuItem className="justify-between">
+                <span>Focus chat</span>
+                <kbd className="text-xs text-muted-foreground">⌘L</kbd>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                Editor
+              </div>
               <DropdownMenuItem className="justify-between">
                 <span>Quick open</span>
                 <kbd className="text-xs text-muted-foreground">⌘P</kbd>
@@ -504,13 +536,16 @@ export function IDELayout({ owner, repo, repoId, defaultRef }: IDELayoutProps) {
                 <span>Toggle terminal</span>
                 <kbd className="text-xs text-muted-foreground">⌘`</kbd>
               </DropdownMenuItem>
-              <DropdownMenuItem className="justify-between">
-                <span>Close tab</span>
-                <kbd className="text-xs text-muted-foreground">⌘W</kbd>
-              </DropdownMenuItem>
-              <DropdownMenuItem className="justify-between">
-                <span>Next tab</span>
-                <kbd className="text-xs text-muted-foreground">⌘Tab</kbd>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem 
+                className="justify-between text-purple-400"
+                onClick={() => setShowKeyboardShortcuts(true)}
+              >
+                <span className="flex items-center gap-2">
+                  <HelpCircle className="h-3 w-3" />
+                  Show all shortcuts
+                </span>
+                <kbd className="text-xs text-muted-foreground">?</kbd>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -573,6 +608,7 @@ export function IDELayout({ owner, repo, repoId, defaultRef }: IDELayoutProps) {
                         path={activeFile.path}
                         onChange={(content) => updateFileContent(activeFile.path, content)}
                         onSave={handleSave}
+                        repoId={repoId}
                       />
                     )
                   )}
@@ -706,6 +742,12 @@ export function IDELayout({ owner, repo, repoId, defaultRef }: IDELayoutProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Keyboard Shortcuts Panel */}
+      <KeyboardShortcutsPanel
+        isOpen={showKeyboardShortcuts}
+        onClose={() => setShowKeyboardShortcuts(false)}
+      />
     </div>
   );
 }

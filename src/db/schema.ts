@@ -1684,6 +1684,8 @@ export const notificationTypeEnum = pgEnum('notification_type', [
   'repo_forked',
   'ci_failed',
   'ci_passed',
+  'achievement_unlocked',
+  'level_up',
 ]);
 
 export const notifications = pgTable('notifications', {
@@ -2832,3 +2834,175 @@ export type MarketingContentStatus = (typeof marketingContentStatusEnum.enumValu
 export type MarketingContentSource = (typeof marketingContentSourceEnum.enumValues)[number];
 export type MarketingContent = typeof marketingContent.$inferSelect;
 export type NewMarketingContent = typeof marketingContent.$inferInsert;
+
+// ============ GAMIFICATION ============
+
+export const achievementCategoryEnum = pgEnum('achievement_category', [
+  'commits',
+  'pull_requests',
+  'reviews',
+  'issues',
+  'collaboration',
+  'streaks',
+  'milestones',
+  'special',
+]);
+
+export const achievementRarityEnum = pgEnum('achievement_rarity', [
+  'common',
+  'uncommon',
+  'rare',
+  'epic',
+  'legendary',
+]);
+
+/**
+ * Achievement definitions - all available achievements
+ */
+export const achievements = pgTable('achievements', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  key: text('key').notNull().unique(),
+  name: text('name').notNull(),
+  description: text('description').notNull(),
+  category: achievementCategoryEnum('category').notNull(),
+  rarity: achievementRarityEnum('rarity').notNull(),
+  xpReward: integer('xp_reward').notNull().default(100),
+  icon: text('icon').notNull(),
+  isSecret: boolean('is_secret').notNull().default(false),
+  displayOrder: integer('display_order').notNull().default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+/**
+ * User achievements - tracks which users have unlocked which achievements
+ */
+export const userAchievements = pgTable('user_achievements', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: text('user_id')
+    .notNull()
+    .references(() => authUser.id, { onDelete: 'cascade' }),
+  achievementId: uuid('achievement_id')
+    .notNull()
+    .references(() => achievements.id, { onDelete: 'cascade' }),
+  unlockedAt: timestamp('unlocked_at', { withTimezone: true }).defaultNow().notNull(),
+  context: text('context'),
+}, (table) => ({
+  uniqueUserAchievement: unique().on(table.userId, table.achievementId),
+  userIdIdx: index('idx_user_achievements_user_id').on(table.userId),
+  unlockedAtIdx: index('idx_user_achievements_unlocked_at').on(table.unlockedAt),
+}));
+
+/**
+ * User gamification stats - XP, level, and overall progress
+ */
+export const userGamification = pgTable('user_gamification', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: text('user_id')
+    .notNull()
+    .references(() => authUser.id, { onDelete: 'cascade' })
+    .unique(),
+  totalXp: integer('total_xp').notNull().default(0),
+  level: integer('level').notNull().default(1),
+  xpToNextLevel: integer('xp_to_next_level').notNull().default(100),
+  currentStreak: integer('current_streak').notNull().default(0),
+  longestStreak: integer('longest_streak').notNull().default(0),
+  lastActivityDate: timestamp('last_activity_date', { withTimezone: true }),
+  totalCommits: integer('total_commits').notNull().default(0),
+  totalPrsOpened: integer('total_prs_opened').notNull().default(0),
+  totalPrsMerged: integer('total_prs_merged').notNull().default(0),
+  totalReviews: integer('total_reviews').notNull().default(0),
+  totalIssuesOpened: integer('total_issues_opened').notNull().default(0),
+  totalIssuesClosed: integer('total_issues_closed').notNull().default(0),
+  totalComments: integer('total_comments').notNull().default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  levelIdx: index('idx_user_gamification_level').on(table.level),
+  totalXpIdx: index('idx_user_gamification_total_xp').on(table.totalXp),
+}));
+
+/**
+ * XP events - log of all XP earned
+ */
+export const xpEvents = pgTable('xp_events', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: text('user_id')
+    .notNull()
+    .references(() => authUser.id, { onDelete: 'cascade' }),
+  activityType: text('activity_type').notNull(),
+  xpAmount: integer('xp_amount').notNull(),
+  description: text('description'),
+  relatedId: text('related_id'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  userIdIdx: index('idx_xp_events_user_id').on(table.userId),
+  createdAtIdx: index('idx_xp_events_created_at').on(table.createdAt),
+}));
+
+// Gamification types
+export type AchievementCategory = (typeof achievementCategoryEnum.enumValues)[number];
+export type AchievementRarity = (typeof achievementRarityEnum.enumValues)[number];
+
+export type Achievement = typeof achievements.$inferSelect;
+export type NewAchievement = typeof achievements.$inferInsert;
+
+export type UserAchievementRecord = typeof userAchievements.$inferSelect;
+export type NewUserAchievementRecord = typeof userAchievements.$inferInsert;
+
+export type UserGamificationRecord = typeof userGamification.$inferSelect;
+export type NewUserGamificationRecord = typeof userGamification.$inferInsert;
+
+export type XpEvent = typeof xpEvents.$inferSelect;
+export type NewXpEvent = typeof xpEvents.$inferInsert;
+
+// ============ MCP SERVERS (Model Context Protocol) ============
+
+/**
+ * MCP Server configurations enabled for a repository's agent.
+ * Stores enabled MCP servers from Composio that the agent can use.
+ */
+export const repoMcpServers = pgTable('repo_mcp_servers', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  
+  /** Repository this MCP server is enabled for */
+  repoId: uuid('repo_id')
+    .notNull()
+    .references(() => repositories.id, { onDelete: 'cascade' }),
+  
+  /** Composio MCP server slug/identifier */
+  mcpSlug: text('mcp_slug').notNull(),
+  
+  /** Display name of the MCP server */
+  name: text('name').notNull(),
+  
+  /** Description of what the MCP server does */
+  description: text('description'),
+  
+  /** Icon URL for the MCP server */
+  iconUrl: text('icon_url'),
+  
+  /** Category/type of the MCP (e.g., 'productivity', 'development', 'data') */
+  category: text('category'),
+  
+  /** Whether this MCP is currently enabled */
+  enabled: boolean('enabled').notNull().default(true),
+  
+  /** Configuration JSON for the MCP (API keys, settings, etc.) - encrypted */
+  configEncrypted: text('config_encrypted'),
+  
+  /** User who enabled this MCP */
+  enabledById: text('enabled_by_id')
+    .notNull()
+    .references(() => authUser.id, { onDelete: 'cascade' }),
+  
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  repoIdx: index('idx_repo_mcp_servers_repo_id').on(table.repoId),
+  slugIdx: index('idx_repo_mcp_servers_slug').on(table.mcpSlug),
+  uniqueRepoMcp: unique('unique_repo_mcp').on(table.repoId, table.mcpSlug),
+}));
+
+// MCP Server types
+export type RepoMcpServer = typeof repoMcpServers.$inferSelect;
+export type NewRepoMcpServer = typeof repoMcpServers.$inferInsert;

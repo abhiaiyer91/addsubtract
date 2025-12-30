@@ -5,7 +5,10 @@ description: "Isolated development environments for AI agents"
 
 # Sandbox Providers
 
-Wit supports multiple sandbox providers for running AI agents in isolated environments. Sandboxes provide secure, ephemeral compute environments where AI can safely execute code, run commands, and interact with repositories.
+Wit supports two sandbox provider modes for running AI agents in isolated environments:
+
+- **Docker**: Self-hosted container-based sandboxes for local development and air-gapped environments
+- **ComputeSDK**: Cloud sandboxes via [ComputeSDK](https://computesdk.com) - unified access to E2B, Daytona, Modal, CodeSandbox, Vercel, and more
 
 ## Overview
 
@@ -21,9 +24,22 @@ Sandbox providers enable:
 | Provider | Startup Time | Use Case | Self-hosted |
 |----------|-------------|----------|-------------|
 | Docker | ~2-5s | Local development, self-hosted | Yes |
-| E2B | ~150ms | Production, fast iteration | No |
-| Vercel | ~1s | Node.js/Python workloads | No |
-| Daytona | ~2s | Full dev environments | No |
+| ComputeSDK | Varies | Cloud sandboxes, GPU workloads | No |
+
+### ComputeSDK Underlying Providers
+
+ComputeSDK provides unified access to multiple cloud providers:
+
+| Provider | Via ComputeSDK | Startup | Best For |
+|----------|----------------|---------|----------|
+| E2B | ✅ | ~150ms | AI code execution, secure sandboxing |
+| Daytona | ✅ | ~2s | Full dev environments, PTY, git |
+| Modal | ✅ | ~2s | **GPU/ML workloads** |
+| CodeSandbox | ✅ | ~2s | **Collaborative coding** |
+| Vercel | ✅ | ~1s | Node.js/Python ephemeral compute |
+| Blaxel | ✅ | Varies | AI-powered code execution |
+
+---
 
 ## Docker Provider
 
@@ -43,9 +59,10 @@ Local container-based sandboxes using Docker. Best for self-hosted deployments.
 import { DockerProvider } from 'wit/server/sandbox/providers/docker';
 
 const docker = new DockerProvider({
+  type: 'docker',
   options: {
     image: 'wit-sandbox:latest',
-    host: 'unix:///var/run/docker.sock', // Optional: custom Docker host
+    socketPath: '/var/run/docker.sock',
     security: {
       dropCapabilities: true,
       runAsNonRoot: true,
@@ -53,16 +70,19 @@ const docker = new DockerProvider({
       noNetwork: false,
     },
   },
-  defaults: {
-    resources: {
-      memoryMB: 512,
-      cpuCores: 1,
-      maxProcesses: 100,
-    },
-  },
 });
 
 await docker.initialize();
+```
+
+### Environment Variables
+
+```bash
+SANDBOX_PROVIDER=docker
+DOCKER_SOCKET_PATH=/var/run/docker.sock
+DOCKER_HOST=unix:///var/run/docker.sock
+SANDBOX_IMAGE=wit-sandbox:latest
+DOCKER_NETWORK=bridge
 ```
 
 ### Creating a Session
@@ -79,7 +99,7 @@ const session = await docker.createSession({
 });
 
 // Execute commands
-const result = await session.exec('npm install');
+const result = await session.exec('npm', ['install']);
 console.log(result.stdout);
 
 // Interactive PTY
@@ -117,235 +137,162 @@ docker build -t wit-sandbox:latest .
 
 ---
 
-## E2B Provider
+## ComputeSDK Provider
 
-Cloud-based Firecracker microVMs via [E2B](https://e2b.dev). Best for production with fast startup times.
+Unified multi-provider access via [ComputeSDK](https://computesdk.com). Provides access to E2B, Daytona, Modal (GPU!), CodeSandbox, Vercel, and more through a single API.
 
 ### Features
 
-- ~150ms sandbox startup
-- Full filesystem access
-- Command execution with streaming
-- Code interpreter support (Python, JavaScript)
-- Persistence via pause/resume (via dashboard)
+- **Unified API** across all cloud providers
+- **Zero-config auto-detection** from environment variables
+- **GPU access** via Modal for ML workloads
+- **Collaborative sandboxes** via CodeSandbox
+- **Seamless provider switching** without code changes
 
 ### Configuration
 
 ```typescript
-import { E2BProvider } from 'wit/server/sandbox/providers/e2b';
+import { ComputeSDKProvider } from 'wit/server/sandbox/providers/computesdk';
 
-const e2b = new E2BProvider({
+const computesdk = new ComputeSDKProvider({
+  type: 'computesdk',
   options: {
-    apiKey: process.env.E2B_API_KEY,
-    templateId: 'base', // or custom template ID
-  },
-  defaults: {
-    resources: {
-      timeoutSeconds: 300,
-    },
+    // Explicit provider selection (or auto-detect from env)
+    provider: 'modal', // 'e2b' | 'daytona' | 'modal' | 'codesandbox' | 'vercel' | 'blaxel'
+    timeoutMs: 300000,
+    autoDetect: true, // Auto-detect provider from environment
   },
 });
 
-await e2b.initialize();
+await computesdk.initialize();
 ```
 
 ### Environment Variables
 
 ```bash
-E2B_API_KEY=your_api_key_here
+# Select ComputeSDK as the provider
+SANDBOX_PROVIDER=computesdk
+
+# Optional: explicitly select underlying provider
+COMPUTESDK_PROVIDER=modal
+
+# Provider credentials (auto-detected):
+
+# For Modal (GPU workloads)
+MODAL_TOKEN_ID=your_modal_token_id
+MODAL_TOKEN_SECRET=your_modal_token_secret
+
+# For E2B (fast microVMs)
+E2B_API_KEY=your_e2b_key
+
+# For Daytona (full dev environments)
+DAYTONA_API_KEY=your_daytona_key
+
+# For CodeSandbox (collaboration)
+CODESANDBOX_TOKEN=your_codesandbox_token
+
+# For Vercel (ephemeral Node.js/Python)
+VERCEL_TOKEN=your_vercel_token
 ```
+
+### Auto-Detection Order
+
+ComputeSDK auto-detects the provider based on which credentials are present:
+
+1. **Modal** - `MODAL_TOKEN_ID` + `MODAL_TOKEN_SECRET`
+2. **E2B** - `E2B_API_KEY`
+3. **Daytona** - `DAYTONA_API_KEY`
+4. **CodeSandbox** - `CODESANDBOX_TOKEN`
 
 ### Creating a Session
 
 ```typescript
-const session = await e2b.createSession({
+const session = await computesdk.createSession({
   sessionId: 'session-123',
   userId: 'user-456',
-  env: {
-    GITHUB_TOKEN: process.env.GITHUB_TOKEN,
-  },
-});
-
-// Execute commands
-const result = await session.exec('pip install requests && python script.py');
-
-// Run code directly (requires code interpreter template)
-const codeResult = await session.runCode(`
-import json
-data = {"hello": "world"}
-print(json.dumps(data))
-`, 'python');
-
-// Set timeout
-await session.setTimeout(600000); // 10 minutes
-
-// Cleanup
-await session.stop();
-```
-
----
-
-## Vercel Sandbox Provider
-
-Ephemeral compute via [Vercel Sandbox](https://vercel.com/docs/vercel-sandbox). Optimized for Node.js and Python.
-
-### Features
-
-- ~1s sandbox startup
-- Full filesystem access
-- Command execution with streaming
-- File read/write operations
-- Public URL for exposed ports
-- Node.js 22 and Python 3.13 runtimes
-
-### Configuration
-
-```typescript
-import { VercelProvider } from 'wit/server/sandbox/providers/vercel';
-
-const vercel = new VercelProvider({
-  options: {
-    accessToken: process.env.VERCEL_TOKEN,
-    teamId: process.env.VERCEL_TEAM_ID,
-    projectId: process.env.VERCEL_PROJECT_ID,
-    runtime: 'node22', // or 'python3.13'
-    ports: [3000, 8080],
-    vcpus: 2,
-    timeoutMs: 300000, // 5 minutes (max: 45 minutes)
-  },
-});
-
-await vercel.initialize();
-```
-
-### Environment Variables
-
-```bash
-VERCEL_TOKEN=your_access_token
-VERCEL_TEAM_ID=your_team_id
-VERCEL_PROJECT_ID=your_project_id
-```
-
-### Creating a Session
-
-```typescript
-const session = await vercel.createSession({
-  sessionId: 'session-123',
-  userId: 'user-456',
-});
-
-// Execute commands
-const result = await session.exec('node --version');
-
-// Run code
-const codeResult = await session.runCode(`
-console.log("Hello from Vercel Sandbox!");
-`, 'javascript');
-
-// Write and read files
-await session.writeFiles([
-  { path: '/app/index.js', content: 'console.log("test")' },
-]);
-const content = await session.readFile('/app/index.js');
-
-// Get public URL for a port
-const url = session.getDomain(3000);
-console.log(`App available at: https://${url}`);
-
-// Extend timeout
-await session.setTimeout(600000); // Extend to 10 minutes
-
-// Cleanup
-await session.stop();
-```
-
----
-
-## Daytona Provider
-
-Cloud development environments via [Daytona](https://www.daytona.io). Best for full-featured dev environments.
-
-### Features
-
-- Full PTY support with interactive terminals
-- Git operations built-in
-- Language Server Protocol support
-- Snapshots for fast startup
-- Auto-stop/auto-archive lifecycle management
-
-### Configuration
-
-```typescript
-import { DaytonaProvider } from 'wit/server/sandbox/providers/daytona';
-
-const daytona = new DaytonaProvider({
-  options: {
-    apiKey: process.env.DAYTONA_API_KEY,
-    language: 'typescript', // default language
-    snapshot: 'my-snapshot', // optional: use a pre-configured snapshot
-    autoStopInterval: 15, // minutes
-    labels: {
-      environment: 'development',
-    },
-  },
-  defaults: {
-    resources: {
-      cpuCores: 2,
-      memoryMB: 4096,
-      diskMB: 10240,
-    },
-  },
-});
-
-await daytona.initialize();
-```
-
-### Environment Variables
-
-```bash
-DAYTONA_API_KEY=your_api_key_here
-```
-
-### Creating a Session
-
-```typescript
-const session = await daytona.createSession({
-  sessionId: 'session-123',
-  userId: 'user-456',
-  language: 'typescript',
-  pty: { cols: 120, rows: 30 },
   env: {
     NODE_ENV: 'development',
   },
 });
 
-// Initialize PTY for interactive use
-await session.initPty(120, 30);
-
-// Interactive PTY events
-session.on('data', (data) => process.stdout.write(data));
-session.sendInput('npm run dev\n');
-
-// Resize terminal
-await session.resize(200, 50);
-
-// Execute commands non-interactively
-const result = await session.exec('npm test');
+// Execute commands (works across all providers)
+const result = await session.exec('python', ['--version']);
+console.log(result.stdout);
 
 // Run code directly
 const codeResult = await session.runCode(`
-const x = 1 + 1;
-console.log(x);
-`);
-
-// Archive for later (stops and saves state)
-await session.archive();
-
-// Resume from archive
-await session.resume();
+import numpy as np
+print(np.array([1, 2, 3]) * 2)
+`, 'python');
 
 // Cleanup
 await session.stop();
+```
+
+### GPU Workloads with Modal
+
+```bash
+# Set up Modal credentials
+export SANDBOX_PROVIDER=computesdk
+export MODAL_TOKEN_ID=your_token_id
+export MODAL_TOKEN_SECRET=your_token_secret
+```
+
+```typescript
+// GPU-accelerated Python via Modal
+const session = await manager.createSession({ userId: 'user-123' });
+
+const result = await session.runCode(`
+import torch
+print(f"CUDA available: {torch.cuda.is_available()}")
+print(f"GPU: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'N/A'}")
+`, 'python');
+
+console.log(result.stdout);
+// CUDA available: True
+// GPU: NVIDIA A100-SXM4-40GB
+```
+
+---
+
+## Quick Start
+
+### Using the Manager
+
+The recommended way to use sandboxes is through the `SandboxManager`:
+
+```typescript
+import { createSandboxManagerFromEnv } from 'wit/server/sandbox';
+
+// Creates manager based on SANDBOX_PROVIDER env var
+const manager = createSandboxManagerFromEnv('/var/lib/repos');
+await manager.initialize();
+
+// Create a session
+const session = await manager.createSession({
+  userId: 'user-123',
+  repository: 'my-repo',
+});
+
+// Execute code
+const result = await session.exec('npm', ['run', 'build']);
+console.log(result.stdout);
+
+// Cleanup
+await session.stop();
+await manager.shutdown();
+```
+
+### Environment-Based Configuration
+
+```bash
+# For self-hosted Docker
+SANDBOX_PROVIDER=docker
+
+# For cloud providers via ComputeSDK
+SANDBOX_PROVIDER=computesdk
+MODAL_TOKEN_ID=xxx  # or E2B_API_KEY, DAYTONA_API_KEY, etc.
+MODAL_TOKEN_SECRET=xxx
 ```
 
 ---
@@ -354,27 +301,27 @@ await session.stop();
 
 ### When to Use Each Provider
 
-| Scenario | Recommended Provider |
-|----------|---------------------|
+| Scenario | Recommended |
+|----------|-------------|
 | Local development | Docker |
-| Self-hosted deployment | Docker |
-| Fast iteration (CI/CD) | E2B |
-| Production AI agents | E2B or Vercel |
-| Full dev environment | Daytona |
-| Node.js/Python workloads | Vercel |
-| Cost-sensitive | Docker (self-hosted) |
+| Self-hosted / air-gapped | Docker |
+| Fast iteration (CI/CD) | ComputeSDK (E2B) |
+| Production AI agents | ComputeSDK (E2B or Vercel) |
+| Full dev environment | ComputeSDK (Daytona) |
+| GPU/ML workloads | ComputeSDK (Modal) |
+| Collaborative coding | ComputeSDK (CodeSandbox) |
 
 ### Feature Comparison
 
-| Feature | Docker | E2B | Vercel | Daytona |
-|---------|--------|-----|--------|---------|
-| PTY Support | Yes | Limited | No | Yes |
-| File Operations | Yes | Yes | Yes | Yes |
-| Code Interpreter | No | Yes | Yes | Yes |
-| Network Isolation | Yes | Yes | Yes | Yes |
-| Resource Limits | Yes | Yes | Limited | Yes |
-| Persistence | Manual | Dashboard | No | Yes |
-| Git Built-in | No | No | No | Yes |
+| Feature | Docker | ComputeSDK |
+|---------|--------|------------|
+| PTY Support | Yes | Yes (varies) |
+| File Operations | Yes | Yes |
+| Code Interpreter | No | Yes |
+| Network Isolation | Yes | Yes |
+| GPU Support | No | Yes (Modal) |
+| Self-hosted | Yes | No |
+| Multi-provider | No | Yes |
 
 ---
 
@@ -388,10 +335,10 @@ const health = await provider.healthCheck();
 console.log(health);
 // {
 //   healthy: true,
-//   message: 'Provider is ready',
+//   message: 'ComputeSDK provider is ready (using modal)',
 //   details: {
-//     activeSessions: 3,
-//     ...providerSpecificInfo
+//     underlyingProvider: 'modal',
+//     activeSessions: 3
 //   }
 // }
 ```
@@ -434,11 +381,10 @@ const info = await session.getInfo();
 console.log(info);
 // {
 //   id: 'session-123',
-//   providerId: 'container-abc',
+//   providerId: 'sandbox-abc',
 //   state: 'running',
 //   createdAt: Date,
-//   expiresAt: Date, // if applicable
-//   metadata: { ... }
+//   metadata: { underlyingProvider: 'modal' }
 // }
 ```
 
@@ -455,8 +401,9 @@ try {
   } else if (error.message.includes('not initialized')) {
     // Provider needs initialization
     await provider.initialize();
+  } else if (error.message.includes('credentials')) {
+    // Missing API keys
   } else {
-    // Other error
     console.error('Failed to create session:', error);
   }
 }
@@ -472,3 +419,4 @@ try {
 4. **Handle errors gracefully** - Sessions can fail unexpectedly
 5. **Monitor session stats** - Track resource usage
 6. **Use environment variables** - Never hardcode API keys
+7. **Choose the right provider** - Docker for self-hosted, ComputeSDK for cloud

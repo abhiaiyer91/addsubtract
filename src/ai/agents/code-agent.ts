@@ -539,3 +539,43 @@ export function createCodeAgent(context: AgentContext, model: string = 'anthropi
     },
   });
 }
+
+/**
+ * Create a Code mode agent with additional MCP tools
+ * MCP tools are loaded dynamically from enabled MCP servers
+ */
+export function createCodeAgentWithMcpTools(
+  context: AgentContext,
+  model: string = 'anthropic/claude-sonnet-4-20250514',
+  mcpTools: Record<string, ReturnType<typeof createTool>>,
+  mcpInstructions: string = ''
+): Agent {
+  // Combine base tools with MCP tools
+  const baseTools = {
+    readFile: createReadFileTool(context),
+    writeFile: createWriteFileTool(context),
+    editFile: createEditFileTool(context),
+    deleteFile: createDeleteFileTool(context),
+    listDirectory: createListDirectoryTool(context),
+    getStatus: createStatusTool(context),
+    commit: createCommitTool(context),
+    createBranch: createBranchTool(context),
+    getHistory: createHistoryTool(context),
+    runCommand: createRunCommandTool(context),
+  };
+
+  // Merge base tools with MCP tools
+  const allTools = { ...baseTools, ...mcpTools };
+
+  // Append MCP instructions to the base instructions
+  const instructions = CODE_AGENT_INSTRUCTIONS + mcpInstructions;
+
+  return new Agent({
+    id: `wit-code-mcp-${context.repoId}`,
+    name: 'wit Code Agent with MCP',
+    description: 'A full-featured coding agent with MCP integrations',
+    instructions,
+    model,
+    tools: allTools,
+  });
+}

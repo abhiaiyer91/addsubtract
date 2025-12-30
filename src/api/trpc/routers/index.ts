@@ -38,6 +38,8 @@ import { sandboxRouter } from './sandbox';
 import { githubImportRouter } from './github-import';
 import { marketingRouter } from './marketing';
 import { planningRouter } from './planning';
+import { gamificationRouter } from './gamification';
+import { mcpRouter } from './mcp';
 
 /**
  * Main application router
@@ -83,6 +85,8 @@ export const appRouter = router({
   githubImport: githubImportRouter,
   marketing: marketingRouter,
   planning: planningRouter,
+  gamification: gamificationRouter,
+  mcp: mcpRouter,
 });
 
 /**
@@ -130,4 +134,6 @@ export {
   githubImportRouter,
   marketingRouter,
   planningRouter,
+  gamificationRouter,
+  mcpRouter,
 };

@@ -782,4 +782,122 @@ export const agentRouter = router({
       const count = await agentFileChangeModel.approveAllForSession(input.sessionId);
       return { approved: count };
     }),
+
+  /**
+   * Inline AI edit - quick code transformations from the editor
+   * This is the ⌘K feature for instant AI edits
+   */
+  inlineEdit: protectedProcedure
+    .input(
+      z.object({
+        repoId: z.string().uuid(),
+        filePath: z.string(),
+        selectedText: z.string().optional(),
+        fileContent: z.string(),
+        cursorLine: z.number(),
+        prompt: z.string().min(1).max(4000),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      // Verify repo access
+      const repo = await repoModel.findById(input.repoId);
+      if (!repo) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Repository not found',
+        });
+      }
+
+      // Get API key
+      let apiKey = await repoAiKeyModel.getDecryptedKey(input.repoId, 'anthropic');
+      let provider = 'anthropic';
+      
+      if (!apiKey) {
+        apiKey = await repoAiKeyModel.getDecryptedKey(input.repoId, 'openai');
+        provider = 'openai';
+      }
+      
+      if (!apiKey) {
+        apiKey = process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY || null;
+        provider = process.env.ANTHROPIC_API_KEY ? 'anthropic' : 'openai';
+      }
+
+      if (!apiKey) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'AI is not configured. Add an API key in repository settings.',
+        });
+      }
+
+      // Set the API key for this request
+      const originalAnthropicKey = process.env.ANTHROPIC_API_KEY;
+      const originalOpenAIKey = process.env.OPENAI_API_KEY;
+      
+      if (provider === 'anthropic') {
+        process.env.ANTHROPIC_API_KEY = apiKey;
+      } else {
+        process.env.OPENAI_API_KEY = apiKey;
+      }
+
+      const restoreKeys = () => {
+        if (originalAnthropicKey !== undefined) {
+          process.env.ANTHROPIC_API_KEY = originalAnthropicKey;
+        } else {
+          delete process.env.ANTHROPIC_API_KEY;
+        }
+        if (originalOpenAIKey !== undefined) {
+          process.env.OPENAI_API_KEY = originalOpenAIKey;
+        } else {
+          delete process.env.OPENAI_API_KEY;
+        }
+      };
+
+      try {
+        // Import generateText dynamically for inline edit
+        const { generateText } = await import('ai');
+        const { anthropic } = await import('@ai-sdk/anthropic');
+        const { openai } = await import('@ai-sdk/openai');
+        
+        const model = provider === 'anthropic' 
+          ? anthropic('claude-sonnet-4-20250514')
+          : openai('gpt-4o');
+
+        // Build the system prompt for inline editing
+        const systemPrompt = `You are an expert code editor. Your task is to transform or generate code based on the user's instructions.
+
+IMPORTANT RULES:
+1. Output ONLY the code - no explanations, no markdown code blocks, no commentary
+2. Preserve the original indentation and style of the file
+3. If given selected text, output the replacement for that selection only
+4. If no text is selected, output code to insert at the cursor position
+5. Be precise and minimal - only make the requested changes
+
+File: ${input.filePath}
+${input.selectedText ? `Selected code:\n${input.selectedText}` : `Cursor is at line ${input.cursorLine}`}`;
+
+        const userMessage = input.selectedText
+          ? `Transform this code: "${input.prompt}"\n\nCode:\n${input.selectedText}`
+          : `Generate code: "${input.prompt}"\n\nContext (surrounding code):\n${input.fileContent.split('\n').slice(Math.max(0, input.cursorLine - 10), input.cursorLine + 10).join('\n')}`;
+
+        const result = await generateText({
+          model,
+          system: systemPrompt,
+          prompt: userMessage,
+          temperature: 0.2,
+        });
+
+        restoreKeys();
+
+        return {
+          result: result.text.trim(),
+          provider,
+        };
+      } catch (error) {
+        restoreKeys();
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: error instanceof Error ? error.message : 'Failed to generate code',
+        });
+      }
+    }),
 });

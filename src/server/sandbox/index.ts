@@ -63,6 +63,7 @@
 // Types
 export type {
   SandboxProviderType,
+  ComputeSDKUnderlyingProvider,
   NetworkMode,
   SandboxResourceLimits,
   PTYConfig,
@@ -73,10 +74,8 @@ export type {
   SandboxInfo,
   SandboxStats,
   SandboxProviderConfig,
-  E2BProviderConfig,
-  DaytonaProviderConfig,
   DockerProviderConfig,
-  VercelProviderConfig,
+  ComputeSDKProviderConfig,
   ProviderConfig,
   SandboxProvider,
   SandboxManagerConfig,
@@ -101,11 +100,9 @@ export {
   registerProvider,
 } from './manager';
 
-// Providers (lazy loaded, but exported for direct use)
-export { E2BProvider } from './providers/e2b';
-export { DaytonaProvider } from './providers/daytona';
+// Providers
 export { DockerProvider } from './providers/docker';
-export { VercelProvider } from './providers/vercel';
+export { ComputeSDKProvider } from './providers/computesdk';
 
 // Sandbox Pool (for reusing sandboxes across requests)
 export {

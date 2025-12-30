@@ -204,6 +204,10 @@ export function Header() {
                       <Flame className="mr-2 h-4 w-4" />
                       Your Wrapped
                     </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate(`/${user?.username}/achievements`)}>
+                      <Trophy className="mr-2 h-4 w-4" />
+                      Achievements
+                    </DropdownMenuItem>
                     {/* Mobile-only: New repository option */}
                     <DropdownMenuItem onClick={() => navigate('/new')} className="md:hidden">
                       <Plus className="mr-2 h-4 w-4" />

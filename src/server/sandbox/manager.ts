@@ -112,25 +112,15 @@ export class SandboxManager extends EventEmitter {
     try {
       const config = this.config.provider;
       switch (type) {
-        case 'e2b': {
-          if (config.type !== 'e2b') return null;
-          const { E2BProvider } = await import('./providers/e2b');
-          return new E2BProvider(config);
-        }
-        case 'daytona': {
-          if (config.type !== 'daytona') return null;
-          const { DaytonaProvider } = await import('./providers/daytona');
-          return new DaytonaProvider(config);
-        }
         case 'docker': {
           if (config.type !== 'docker') return null;
           const { DockerProvider } = await import('./providers/docker');
           return new DockerProvider(config);
         }
-        case 'vercel': {
-          if (config.type !== 'vercel') return null;
-          const { VercelProvider } = await import('./providers/vercel');
-          return new VercelProvider(config);
+        case 'computesdk': {
+          if (config.type !== 'computesdk') return null;
+          const { ComputeSDKProvider } = await import('./providers/computesdk');
+          return new ComputeSDKProvider(config);
         }
         default:
           return null;
@@ -441,6 +431,13 @@ export function createSandboxManager(
 
 /**
  * Create a sandbox manager from environment variables
+ *
+ * Supported providers:
+ * - docker: Self-hosted container-based sandboxes (default)
+ * - computesdk: Cloud sandboxes via ComputeSDK (E2B, Daytona, Modal, CodeSandbox, Vercel)
+ *
+ * For cloud providers, use SANDBOX_PROVIDER=computesdk and set the underlying
+ * provider via COMPUTESDK_PROVIDER or let it auto-detect from environment.
  */
 export function createSandboxManagerFromEnv(
   repoRoot: string
@@ -450,58 +447,24 @@ export function createSandboxManagerFromEnv(
   let config: SandboxManagerConfig;
 
   switch (providerType) {
-    case 'e2b':
-      if (!process.env.E2B_API_KEY) {
-        throw new Error('E2B_API_KEY environment variable is required');
-      }
+    case 'computesdk':
       config = {
         repoRoot,
         provider: {
-          type: 'e2b',
+          type: 'computesdk',
           options: {
-            apiKey: process.env.E2B_API_KEY,
-            templateId: process.env.E2B_TEMPLATE_ID,
-            timeoutMs: parseInt(process.env.E2B_TIMEOUT_MS || '300000', 10),
-          },
-        },
-        enableAuditLog: process.env.SANDBOX_AUDIT_LOG === 'true',
-      };
-      break;
-
-    case 'daytona':
-      if (!process.env.DAYTONA_API_KEY) {
-        throw new Error('DAYTONA_API_KEY environment variable is required');
-      }
-      config = {
-        repoRoot,
-        provider: {
-          type: 'daytona',
-          options: {
-            apiKey: process.env.DAYTONA_API_KEY,
-            snapshot: process.env.DAYTONA_SNAPSHOT,
-            language: (process.env.DAYTONA_LANGUAGE as 'python' | 'typescript' | 'javascript') || 'typescript',
-            autoStopInterval: parseInt(process.env.DAYTONA_AUTO_STOP_INTERVAL || '15', 10),
-          },
-        },
-        enableAuditLog: process.env.SANDBOX_AUDIT_LOG === 'true',
-      };
-      break;
-
-    case 'vercel':
-      if (!process.env.VERCEL_PROJECT_ID) {
-        throw new Error('VERCEL_PROJECT_ID environment variable is required');
-      }
-      config = {
-        repoRoot,
-        provider: {
-          type: 'vercel',
-          options: {
-            accessToken: process.env.VERCEL_TOKEN,
-            teamId: process.env.VERCEL_TEAM_ID,
-            projectId: process.env.VERCEL_PROJECT_ID,
-            timeoutMs: parseInt(process.env.VERCEL_SANDBOX_TIMEOUT_MS || '300000', 10),
-            runtime: (process.env.VERCEL_SANDBOX_RUNTIME as 'node22' | 'python3.13') || 'node22',
-            vcpus: parseInt(process.env.VERCEL_SANDBOX_VCPUS || '1', 10),
+            apiKey: process.env.COMPUTESDK_API_KEY,
+            provider: process.env.COMPUTESDK_PROVIDER as
+              | 'e2b'
+              | 'daytona'
+              | 'modal'
+              | 'codesandbox'
+              | 'blaxel'
+              | 'vercel'
+              | undefined,
+            providerApiKey: process.env.COMPUTESDK_PROVIDER_API_KEY,
+            timeoutMs: parseInt(process.env.COMPUTESDK_TIMEOUT_MS || '300000', 10),
+            autoDetect: process.env.COMPUTESDK_AUTO_DETECT !== 'false',
           },
         },
         enableAuditLog: process.env.SANDBOX_AUDIT_LOG === 'true',

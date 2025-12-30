@@ -10,8 +10,12 @@ import {
 // Type for notification type to preference field mapping
 type NotificationType = Notification['type'];
 
+// Preference field type (excludes gamification notifications which are always on)
+type PreferenceField = keyof Omit<EmailNotificationPreferences, 'id' | 'userId' | 'emailEnabled' | 'digestEnabled' | 'digestFrequency' | 'digestDay' | 'digestHour' | 'createdAt' | 'updatedAt'>;
+
 // Map notification types to preference field names
-const NOTIFICATION_TYPE_TO_PREFERENCE: Record<NotificationType, keyof Omit<EmailNotificationPreferences, 'id' | 'userId' | 'emailEnabled' | 'digestEnabled' | 'digestFrequency' | 'digestDay' | 'digestHour' | 'createdAt' | 'updatedAt'>> = {
+// Note: achievement_unlocked and level_up are always sent (no email preference)
+const NOTIFICATION_TYPE_TO_PREFERENCE: Partial<Record<NotificationType, PreferenceField>> = {
   pr_review_requested: 'prReviewRequested',
   pr_reviewed: 'prReviewed',
   pr_merged: 'prMerged',
@@ -24,6 +28,9 @@ const NOTIFICATION_TYPE_TO_PREFERENCE: Record<NotificationType, keyof Omit<Email
   repo_forked: 'repoForked',
   ci_failed: 'ciFailed',
   ci_passed: 'ciPassed',
+  // Gamification notifications are always enabled (no email sent, just in-app)
+  // achievement_unlocked: not configurable
+  // level_up: not configurable
 };
 
 // Default preferences for new users
@@ -115,6 +122,11 @@ export const emailPreferencesModel = {
    * Check if a user should receive email for a notification type
    */
   async shouldSendEmail(userId: string, notificationType: NotificationType): Promise<boolean> {
+    // Gamification notifications are in-app only, never emailed
+    if (notificationType === 'achievement_unlocked' || notificationType === 'level_up') {
+      return false;
+    }
+    
     const prefs = await this.get(userId);
     
     // Default to true for high-priority notifications if no preferences set
@@ -130,6 +142,9 @@ export const emailPreferencesModel = {
     
     // Check specific notification type preference
     const prefField = NOTIFICATION_TYPE_TO_PREFERENCE[notificationType];
+    if (!prefField) {
+      return false;
+    }
     return Boolean(prefs[prefField]);
   },
 
