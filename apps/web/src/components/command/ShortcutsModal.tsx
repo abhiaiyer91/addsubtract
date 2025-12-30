@@ -1,124 +1,153 @@
+/**
+ * Shortcuts Modal Component
+ *
+ * Displays all available keyboard shortcuts grouped by category.
+ * Reads from the centralized keyboard shortcuts store to show
+ * current (possibly customized) bindings.
+ */
+
+import { useMemo } from 'react';
+import { Link } from 'react-router-dom';
+import { Settings } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 import { useShortcutsModalStore } from '@/hooks/useCommandPalette';
-import { isMac } from '@/lib/commands';
+import {
+  useShortcutStore,
+  formatShortcutDisplay,
+  SHORTCUT_CATEGORIES,
+} from '@/lib/keyboard-shortcuts';
 
-interface ShortcutItem {
-  keys: string[];
-  description: string;
-}
-
-interface ShortcutSection {
-  title: string;
-  shortcuts: ShortcutItem[];
-}
-
-const shortcutSections: ShortcutSection[] = [
-  {
-    title: 'Global',
-    shortcuts: [
-      { keys: ['mod', 'K'], description: 'Command palette' },
-      { keys: ['/'], description: 'Focus search' },
-      { keys: ['?'], description: 'This help' },
-    ],
-  },
-  {
-    title: 'Navigation',
-    shortcuts: [
-      { keys: ['g', 'h'], description: 'Go home' },
-      { keys: ['g', 'n'], description: 'Notifications' },
-      { keys: ['g', 's'], description: 'Settings' },
-    ],
-  },
-  {
-    title: 'Repository',
-    shortcuts: [
-      { keys: ['g', 'c'], description: 'Go to code' },
-      { keys: ['g', 'i'], description: 'Go to issues' },
-      { keys: ['g', 'p'], description: 'Go to pull requests' },
-    ],
-  },
-  {
-    title: 'Lists',
-    shortcuts: [
-      { keys: ['j'], description: 'Next item' },
-      { keys: ['k'], description: 'Previous item' },
-      { keys: ['o'], description: 'Open selected' },
-      { keys: ['c'], description: 'Create new' },
-    ],
-  },
-];
-
-function formatKey(key: string): string {
-  const mac = isMac();
-  switch (key.toLowerCase()) {
-    case 'mod':
-      return mac ? '\u2318' : 'Ctrl';
-    case 'shift':
-      return mac ? '\u21E7' : 'Shift';
-    case 'alt':
-      return mac ? '\u2325' : 'Alt';
-    case 'enter':
-      return '\u23CE';
-    case 'escape':
-      return 'Esc';
-    default:
-      return key.toUpperCase();
+function ShortcutKeys({ keys }: { keys: string }) {
+  if (!keys) {
+    return <span className="text-xs text-muted-foreground italic">None</span>;
   }
-}
 
-function ShortcutKeys({ keys }: { keys: string[] }) {
   return (
-    <div className="flex items-center gap-0.5">
-      {keys.map((key, i) => (
-        <kbd key={i} className="kbd">
-          {formatKey(key)}
-        </kbd>
-      ))}
-    </div>
+    <kbd className="px-1.5 py-0.5 text-xs font-mono bg-muted rounded border">
+      {formatShortcutDisplay(keys)}
+    </kbd>
   );
 }
 
 export function ShortcutsModal() {
   const { isOpen, close } = useShortcutsModalStore();
+  const { shortcuts, getEffectiveKeys, isShortcutDisabled } = useShortcutStore();
+
+  // Group shortcuts by category, excluding disabled ones
+  const groupedShortcuts = useMemo(() => {
+    const groups = new Map<string, typeof shortcuts>();
+
+    // Use predefined category order
+    for (const category of SHORTCUT_CATEGORIES) {
+      const categoryShortcuts = shortcuts.filter(
+        (s) => s.category === category && !isShortcutDisabled(s.id)
+      );
+      if (categoryShortcuts.length > 0) {
+        groups.set(category, categoryShortcuts);
+      }
+    }
+
+    return groups;
+  }, [shortcuts, isShortcutDisabled]);
+
+  // Calculate columns for better layout
+  const categories = Array.from(groupedShortcuts.entries());
+  const midpoint = Math.ceil(categories.length / 2);
+  const leftColumn = categories.slice(0, midpoint);
+  const rightColumn = categories.slice(midpoint);
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && close()}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Keyboard Shortcuts</DialogTitle>
+      <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
+        <DialogHeader className="flex-shrink-0">
+          <DialogTitle className="flex items-center justify-between">
+            <span>Keyboard Shortcuts</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              asChild
+              onClick={() => close()}
+            >
+              <Link to="/settings/keyboard" className="gap-2">
+                <Settings className="h-4 w-4" />
+                Customize
+              </Link>
+            </Button>
+          </DialogTitle>
         </DialogHeader>
 
-        <div className="grid grid-cols-2 gap-6 py-4">
-          {shortcutSections.map((section) => (
-            <div key={section.title}>
-              <h3 className="text-sm font-semibold text-foreground mb-3">
-                {section.title}
-              </h3>
-              <div className="space-y-2">
-                {section.shortcuts.map((shortcut, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center justify-between text-sm"
-                  >
-                    <span className="text-muted-foreground">
-                      {shortcut.description}
-                    </span>
-                    <ShortcutKeys keys={shortcut.keys} />
+        <div className="overflow-y-auto flex-1 py-4">
+          <div className="grid grid-cols-2 gap-6">
+            {/* Left Column */}
+            <div className="space-y-6">
+              {leftColumn.map(([category, categoryShortcuts]) => (
+                <div key={category}>
+                  <h3 className="text-sm font-semibold text-foreground mb-3">
+                    {category}
+                  </h3>
+                  <div className="space-y-2">
+                    {categoryShortcuts.map((shortcut) => (
+                      <div
+                        key={shortcut.id}
+                        className="flex items-center justify-between text-sm"
+                      >
+                        <span className="text-muted-foreground">
+                          {shortcut.description}
+                        </span>
+                        <ShortcutKeys keys={getEffectiveKeys(shortcut.id)} />
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
-          ))}
+
+            {/* Right Column */}
+            <div className="space-y-6">
+              {rightColumn.map(([category, categoryShortcuts]) => (
+                <div key={category}>
+                  <h3 className="text-sm font-semibold text-foreground mb-3">
+                    {category}
+                  </h3>
+                  <div className="space-y-2">
+                    {categoryShortcuts.map((shortcut) => (
+                      <div
+                        key={shortcut.id}
+                        className="flex items-center justify-between text-sm"
+                      >
+                        <span className="text-muted-foreground">
+                          {shortcut.description}
+                        </span>
+                        <ShortcutKeys keys={getEffectiveKeys(shortcut.id)} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
-        <div className="border-t border-border/40 pt-4">
+        <div className="border-t border-border/40 pt-4 flex-shrink-0">
           <p className="text-xs text-muted-foreground text-center">
-            Press <kbd className="kbd">?</kbd> anytime to see this help
+            Press{' '}
+            <kbd className="px-1.5 py-0.5 text-xs font-mono bg-muted rounded border">
+              ?
+            </kbd>{' '}
+            anytime to see this help ·{' '}
+            <Link
+              to="/settings/keyboard"
+              className="text-primary hover:underline"
+              onClick={() => close()}
+            >
+              Customize shortcuts
+            </Link>
           </p>
         </div>
       </DialogContent>
