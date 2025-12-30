@@ -163,6 +163,12 @@
       ]
     },
     {
+      "group": "Database",
+      "pages": [
+        "database/schema"
+      ]
+    },
+    {
       "group": "API Reference",
       "pages": [
         "api-reference/overview",
