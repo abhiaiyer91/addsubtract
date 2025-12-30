@@ -298,7 +298,7 @@ This isn't about replacing developers. It's about removing the friction between 
 - Collaborator management
 - Stacked diffs viewer
 - Command palette (Cmd+K)
-- Keyboard shortcuts
+- Comprehensive keyboard shortcuts system with customization
 - Web-based IDE with terminal
 - AI agent chat panel
 - CI job graph visualization
