@@ -1002,6 +1002,8 @@ The goal: a compelling video that shows why wit is special in under 3 minutes.`,
     category: 'Documentation',
     priority: 'P1',
     tags: ['docs', 'architecture', 'onboarding'],
+    completed: true,
+    completedPr: 257,
     prompt: `I'm contributing to wit, an AI-native Git platform. Please help me write architecture documentation.
 
 1. Check existing docs:
