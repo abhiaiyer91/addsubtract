@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
   CircleDot,
@@ -10,11 +10,15 @@ import {
   GripVertical,
   User,
   AlertCircle,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { trpc } from '@/lib/trpc';
 import { useSession } from '@/lib/auth-client';
+import { useMobile } from '@/hooks/use-mobile';
 
 // Issue status type
 type IssueStatus = 'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done' | 'canceled';
@@ -96,9 +100,33 @@ export function KanbanBoard({
   const [draggedIssue, setDraggedIssue] = useState<KanbanIssue | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<IssueStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [currentMobileColumn, setCurrentMobileColumn] = useState<number>(1); // Start at "todo"
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const isMobile = useMobile();
   
   const { data: session } = useSession();
   const isAuthenticated = !!session?.user;
+
+  // Mobile navigation handlers
+  const scrollToColumn = useCallback((index: number) => {
+    if (scrollContainerRef.current) {
+      const columnWidth = 288 + 16; // w-72 (288px) + gap-4 (16px)
+      scrollContainerRef.current.scrollTo({
+        left: index * columnWidth,
+        behavior: 'smooth',
+      });
+      setCurrentMobileColumn(index);
+    }
+  }, []);
+
+  const handleScrollEnd = useCallback(() => {
+    if (scrollContainerRef.current && isMobile) {
+      const scrollLeft = scrollContainerRef.current.scrollLeft;
+      const columnWidth = 288 + 16;
+      const newIndex = Math.round(scrollLeft / columnWidth);
+      setCurrentMobileColumn(Math.min(Math.max(newIndex, 0), STATUSES.length - 1));
+    }
+  }, [isMobile]);
 
   const utils = trpc.useUtils();
   const updateStatus = trpc.issues.updateStatus.useMutation({
@@ -225,12 +253,79 @@ export function KanbanBoard({
       {!isAuthenticated && (
         <div className="flex items-center gap-2 p-3 text-sm text-yellow-600 bg-yellow-50 dark:bg-yellow-900/20 dark:text-yellow-400 rounded-lg">
           <AlertCircle className="h-4 w-4 flex-shrink-0" />
-          <span>Log in to drag and drop issues between columns</span>
+          <span>{isMobile ? 'Log in to move issues' : 'Log in to drag and drop issues between columns'}</span>
+        </div>
+      )}
+
+      {/* Mobile column navigation */}
+      {isMobile && (
+        <div className="flex items-center justify-between px-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 touch-target"
+            onClick={() => scrollToColumn(Math.max(0, currentMobileColumn - 1))}
+            disabled={currentMobileColumn === 0}
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </Button>
+          
+          {/* Column indicator dots */}
+          <div className="flex items-center gap-1.5">
+            {STATUSES.map((status, index) => {
+              const config = STATUS_CONFIG[status];
+              const issueCount = (groupedIssues[status] || []).length;
+              return (
+                <button
+                  key={status}
+                  onClick={() => scrollToColumn(index)}
+                  className={cn(
+                    "flex items-center gap-1 px-2 py-1 rounded-full transition-all text-xs",
+                    currentMobileColumn === index 
+                      ? `${config.bgColor} ${config.color} font-medium` 
+                      : "text-muted-foreground"
+                  )}
+                >
+                  {currentMobileColumn === index ? (
+                    <>
+                      <span>{config.label}</span>
+                      <Badge variant="secondary" className="text-2xs h-4 px-1">
+                        {issueCount}
+                      </Badge>
+                    </>
+                  ) : (
+                    <span className={cn(
+                      "w-2 h-2 rounded-full",
+                      issueCount > 0 ? config.bgColor.replace('/10', '') : "bg-muted"
+                    )} />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 touch-target"
+            onClick={() => scrollToColumn(Math.min(STATUSES.length - 1, currentMobileColumn + 1))}
+            disabled={currentMobileColumn === STATUSES.length - 1}
+          >
+            <ChevronRight className="h-5 w-5" />
+          </Button>
         </div>
       )}
       
-      <div className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4">
-        {STATUSES.map((status) => {
+      <div 
+        ref={scrollContainerRef}
+        className={cn(
+          "flex gap-4 overflow-x-auto pb-4 -mx-4 px-4 scroll-touch",
+          isMobile && "snap-x snap-mandatory scrollbar-hide"
+        )}
+        onScrollEnd={handleScrollEnd}
+        onTouchEnd={() => setTimeout(handleScrollEnd, 100)}
+      >
+        {STATUSES.map((status, index) => {
           const config = STATUS_CONFIG[status];
           const issues = groupedIssues[status] || [];
           const Icon = config.icon;
@@ -240,7 +335,8 @@ export function KanbanBoard({
             <div
               key={status}
               className={cn(
-                'flex-shrink-0 w-72 flex flex-col rounded-lg border bg-card h-fit',
+                'flex-shrink-0 flex flex-col rounded-lg border bg-card h-fit',
+                isMobile ? 'w-[calc(100vw-2rem)] snap-center' : 'w-72',
                 isDropTarget && 'ring-2 ring-primary ring-offset-2'
               )}
               onDragOver={(e) => handleDragOver(e, status)}
@@ -259,7 +355,10 @@ export function KanbanBoard({
               </div>
 
               {/* Column content */}
-              <div className="flex-1 p-2 space-y-2 min-h-[200px] overflow-y-auto max-h-[calc(100vh-300px)]">
+              <div className={cn(
+                "flex-1 p-2 space-y-2 overflow-y-auto",
+                isMobile ? "min-h-[300px] max-h-[calc(100vh-280px)]" : "min-h-[200px] max-h-[calc(100vh-300px)]"
+              )}>
                 {issues.length === 0 ? (
                   <div className="flex items-center justify-center h-20 text-muted-foreground text-sm">
                     No issues
@@ -275,6 +374,19 @@ export function KanbanBoard({
                       onDragEnd={handleDragEnd}
                       isDragging={draggedIssue?.id === issue.id}
                       isAuthenticated={isAuthenticated}
+                      isMobile={isMobile}
+                      currentStatus={status}
+                      onMoveToStatus={isAuthenticated ? async (newStatus) => {
+                        try {
+                          await updateStatus.mutateAsync({
+                            issueId: issue.id,
+                            status: newStatus,
+                          });
+                          onStatusChange?.(issue.id, newStatus);
+                        } catch (error) {
+                          console.error('Failed to update issue status:', error);
+                        }
+                      } : undefined}
                     />
                   ))
                 )}
@@ -295,6 +407,9 @@ interface KanbanCardProps {
   onDragEnd: () => void;
   isDragging: boolean;
   isAuthenticated: boolean;
+  isMobile?: boolean;
+  currentStatus?: IssueStatus;
+  onMoveToStatus?: (status: IssueStatus) => void;
 }
 
 function KanbanCard({
@@ -305,23 +420,37 @@ function KanbanCard({
   onDragEnd,
   isDragging,
   isAuthenticated,
+  isMobile = false,
+  currentStatus,
+  onMoveToStatus,
 }: KanbanCardProps) {
+  const [showMobileActions, setShowMobileActions] = useState(false);
+
+  // Get adjacent statuses for mobile quick actions
+  const currentIndex = currentStatus ? STATUSES.indexOf(currentStatus) : -1;
+  const prevStatus = currentIndex > 0 ? STATUSES[currentIndex - 1] : null;
+  const nextStatus = currentIndex < STATUSES.length - 1 ? STATUSES[currentIndex + 1] : null;
+
   return (
     <div
-      draggable={isAuthenticated}
+      draggable={isAuthenticated && !isMobile}
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
       className={cn(
         'group bg-background border rounded-lg p-3 transition-all',
-        isAuthenticated && 'cursor-grab active:cursor-grabbing',
+        isAuthenticated && !isMobile && 'cursor-grab active:cursor-grabbing',
         !isAuthenticated && 'cursor-default',
         'hover:border-primary/50 hover:shadow-sm',
-        isDragging && 'opacity-50 ring-2 ring-primary'
+        isDragging && 'opacity-50 ring-2 ring-primary',
+        isMobile && 'active:bg-muted/50'
       )}
+      onClick={() => isMobile && isAuthenticated && setShowMobileActions(!showMobileActions)}
     >
       {/* Drag handle and issue number */}
       <div className="flex items-center gap-2 mb-2">
-        <GripVertical className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+        {!isMobile && (
+          <GripVertical className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+        )}
         <span className="text-xs font-mono text-muted-foreground">#{issue.number}</span>
       </div>
 
@@ -359,38 +488,83 @@ function KanbanCard({
         </div>
       )}
 
-      {/* Footer: Author and Assignee */}
-      <div className="flex items-center justify-between mt-3 pt-2 border-t">
-        {/* Author */}
-        {issue.author?.username && (
-          <Link
-            to={`/${issue.author.username}`}
-            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {issue.author.avatarUrl ? (
-              <img
-                src={issue.author.avatarUrl}
-                alt={issue.author.username}
-                className="h-4 w-4 rounded-full"
-              />
-            ) : (
-              <User className="h-3 w-3" />
-            )}
-            <span>{issue.author.username}</span>
-          </Link>
-        )}
+      {/* Mobile move actions */}
+      {isMobile && showMobileActions && isAuthenticated && onMoveToStatus && (
+        <div className="flex items-center gap-2 mt-3 pt-2 border-t">
+          {prevStatus && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1 h-8 text-xs gap-1 touch-target"
+              onClick={(e) => {
+                e.stopPropagation();
+                onMoveToStatus(prevStatus);
+                setShowMobileActions(false);
+              }}
+            >
+              <ChevronLeft className="h-3 w-3" />
+              {STATUS_CONFIG[prevStatus].label}
+            </Button>
+          )}
+          {nextStatus && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1 h-8 text-xs gap-1 touch-target"
+              onClick={(e) => {
+                e.stopPropagation();
+                onMoveToStatus(nextStatus);
+                setShowMobileActions(false);
+              }}
+            >
+              {STATUS_CONFIG[nextStatus].label}
+              <ChevronRight className="h-3 w-3" />
+            </Button>
+          )}
+        </div>
+      )}
 
-        {/* Assignee */}
-        {issue.assignee?.avatarUrl && (
-          <img
-            src={issue.assignee.avatarUrl}
-            alt={issue.assignee.username || 'Assignee'}
-            className="h-5 w-5 rounded-full ring-2 ring-background"
-            title={`Assigned to ${issue.assignee.username}`}
-          />
-        )}
-      </div>
+      {/* Footer: Author and Assignee */}
+      {!showMobileActions && (
+        <div className="flex items-center justify-between mt-3 pt-2 border-t">
+          {/* Author */}
+          {issue.author?.username && (
+            <Link
+              to={`/${issue.author.username}`}
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {issue.author.avatarUrl ? (
+                <img
+                  src={issue.author.avatarUrl}
+                  alt={issue.author.username}
+                  className="h-4 w-4 rounded-full"
+                />
+              ) : (
+                <User className="h-3 w-3" />
+              )}
+              <span>{issue.author.username}</span>
+            </Link>
+          )}
+
+          {/* Assignee */}
+          {issue.assignee?.avatarUrl && (
+            <img
+              src={issue.assignee.avatarUrl}
+              alt={issue.assignee.username || 'Assignee'}
+              className="h-5 w-5 rounded-full ring-2 ring-background"
+              title={`Assigned to ${issue.assignee.username}`}
+            />
+          )}
+        </div>
+      )}
+
+      {/* Tap hint for mobile */}
+      {isMobile && isAuthenticated && !showMobileActions && (
+        <p className="text-2xs text-muted-foreground text-center mt-2">
+          Tap to move
+        </p>
+      )}
     </div>
   );
 }

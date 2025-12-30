@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { ChevronDown, ChevronRight, File, Plus, MessageSquare, Columns, AlignJustify, Sparkles, Loader2, Lightbulb, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, File, Plus, MessageSquare, Columns, AlignJustify, Sparkles, Loader2, Lightbulb, X, Copy, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,7 @@ import { CommentThread } from './comment-thread';
 import { CommentForm } from './comment-form';
 import { SplitDiff } from './split-diff';
 import type { InlineCommentData } from './inline-comment';
+import { useMobile } from '@/hooks/use-mobile';
 
 export type DiffViewMode = 'unified' | 'split';
 
@@ -195,22 +196,8 @@ export function DiffViewer({
   onToggleViewed,
   showViewedToggle = false,
 }: DiffViewerProps) {
-  // Check if mobile device
-  const [isMobile, setIsMobile] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return window.innerWidth < 768;
-    }
-    return false;
-  });
-
-  // Listen for resize to update mobile status
-  useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  // Use the mobile hook for consistent detection
+  const isMobile = useMobile();
 
   // Initialize view mode from localStorage or default
   const [viewMode, setViewMode] = useState<DiffViewMode>(() => {
@@ -777,31 +764,66 @@ function DiffLineRow({
   canComment,
 }: DiffLineRowProps) {
   const [isHovered, setIsHovered] = useState(false);
+  const [showMobileActions, setShowMobileActions] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const isMobile = useMobile();
   const lineNum = line.type === 'remove' ? line.oldLineNumber : line.newLineNumber;
   const side: 'LEFT' | 'RIGHT' = line.type === 'remove' ? 'LEFT' : 'RIGHT';
+
+  // Handle long press for mobile to show actions
+  const handleTouchStart = useCallback(() => {
+    if (!isMobile) return;
+    const timer = setTimeout(() => {
+      setShowMobileActions(true);
+    }, 500); // 500ms long press
+    return () => clearTimeout(timer);
+  }, [isMobile]);
+
+  const handleCopyLine = useCallback(() => {
+    navigator.clipboard.writeText(line.content);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+    setShowMobileActions(false);
+  }, [line.content]);
 
   return (
     <>
       <tr
         key={lineIndex}
         className={cn(
-          'group hover:bg-muted/30',
+          'group',
+          // Touch-friendly: larger tap target on mobile
+          isMobile ? 'min-h-[36px]' : 'hover:bg-muted/30',
           line.type === 'add' && 'bg-green-500/10',
-          line.type === 'remove' && 'bg-red-500/10'
+          line.type === 'remove' && 'bg-red-500/10',
+          showMobileActions && 'bg-muted/40'
         )}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
+        onMouseEnter={() => !isMobile && setIsHovered(true)}
+        onMouseLeave={() => !isMobile && setIsHovered(false)}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={() => {
+          // Clear mobile actions after a delay if not interacting
+          if (showMobileActions) {
+            setTimeout(() => setShowMobileActions(false), 3000);
+          }
+        }}
       >
-        {/* Comment trigger button */}
+        {/* Comment trigger button - desktop hover / mobile action bar */}
         <td className="w-8 px-1 py-0.5 text-center select-none border-r border-border bg-inherit">
-          {canComment && lineNum && isHovered && !isCommentFormOpen && (
+          {canComment && lineNum && (isHovered || showMobileActions) && !isCommentFormOpen && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
-                  className="w-5 h-5 flex items-center justify-center rounded bg-primary/10 hover:bg-primary/20 text-primary transition-colors"
-                  onClick={() => onAddCommentClick(lineNum, side)}
+                  className={cn(
+                    "flex items-center justify-center rounded bg-primary/10 hover:bg-primary/20 text-primary transition-colors",
+                    isMobile ? "w-7 h-7 touch-target" : "w-5 h-5"
+                  )}
+                  onClick={() => {
+                    onAddCommentClick(lineNum, side);
+                    setShowMobileActions(false);
+                  }}
                 >
-                  <Plus className="h-3 w-3" />
+                  <Plus className={isMobile ? "h-4 w-4" : "h-3 w-3"} />
                 </button>
               </TooltipTrigger>
               <TooltipContent side="left">
@@ -809,26 +831,35 @@ function DiffLineRow({
               </TooltipContent>
             </Tooltip>
           )}
-          {threadData && !isHovered && (
+          {threadData && !isHovered && !showMobileActions && (
             <MessageSquare className="h-3 w-3 text-primary mx-auto" />
           )}
         </td>
 
-        {/* Old line number */}
-        <td className="w-12 px-2 py-0.5 text-right text-muted-foreground select-none border-r border-border sticky left-0 bg-inherit">
+        {/* Old line number - hide on mobile for more space */}
+        <td className={cn(
+          "px-2 py-0.5 text-right text-muted-foreground select-none border-r border-border sticky left-0 bg-inherit",
+          isMobile ? "w-8 text-2xs" : "w-12"
+        )}>
           {line.oldLineNumber || ''}
         </td>
 
         {/* New line number */}
-        <td className="w-12 px-2 py-0.5 text-right text-muted-foreground select-none border-r border-border sticky left-12 bg-inherit">
+        <td className={cn(
+          "px-2 py-0.5 text-right text-muted-foreground select-none border-r border-border sticky bg-inherit",
+          isMobile ? "w-8 left-8 text-2xs" : "w-12 left-12"
+        )}>
           {line.newLineNumber || ''}
         </td>
 
         {/* Content */}
-        <td className="px-4 py-0.5 whitespace-pre">
+        <td className={cn(
+          "whitespace-pre",
+          isMobile ? "px-2 py-1" : "px-4 py-0.5"
+        )}>
           <span
             className={cn(
-              'mr-2 inline-block w-3',
+              'mr-1 md:mr-2 inline-block w-3',
               line.type === 'add' && 'text-green-400',
               line.type === 'remove' && 'text-red-400'
             )}
@@ -838,6 +869,47 @@ function DiffLineRow({
           {line.content}
         </td>
       </tr>
+
+      {/* Mobile action bar */}
+      {isMobile && showMobileActions && (
+        <tr>
+          <td colSpan={4} className="py-2 px-3 bg-muted/40 border-t border-b border-border/50">
+            <div className="flex items-center justify-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 gap-1.5 touch-target"
+                onClick={handleCopyLine}
+              >
+                {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                <span className="text-xs">{copied ? 'Copied' : 'Copy'}</span>
+              </Button>
+              {canComment && lineNum && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-1.5 touch-target"
+                  onClick={() => {
+                    onAddCommentClick(lineNum, side);
+                    setShowMobileActions(false);
+                  }}
+                >
+                  <MessageSquare className="h-3.5 w-3.5" />
+                  <span className="text-xs">Comment</span>
+                </Button>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 touch-target"
+                onClick={() => setShowMobileActions(false)}
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </td>
+        </tr>
+      )}
 
       {/* Inline comment form */}
       {isCommentFormOpen && (

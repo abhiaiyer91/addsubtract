@@ -409,4 +409,86 @@ html {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
   }
+
+  /* Reduce container padding on mobile */
+  .container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  /* Bottom padding for fixed bottom nav */
+  main {
+    padding-bottom: calc(3.5rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* Touch-optimized form elements */
+@layer utilities {
+  .input-mobile {
+    @apply text-base py-3;
+  }
+}
+
+/* Mobile-friendly select dropdown */
+@media (max-width: 767px) {
+  [data-radix-popper-content-wrapper] {
+    max-height: 50vh !important;
+  }
+}
+
+/* Snap scroll utilities */
+.snap-x {
+  scroll-snap-type: x mandatory;
+}
+
+.snap-center {
+  scroll-snap-align: center;
+}
+
+.snap-start {
+  scroll-snap-align: start;
+}
+
+/* Overscroll behavior */
+.overscroll-contain {
+  overscroll-behavior: contain;
+}
+
+/* Active state for touch */
+@media (hover: none) {
+  .hover\:bg-muted\/40:active {
+    background-color: hsl(var(--muted) / 0.4);
+  }
+  
+  .hover\:bg-muted:active {
+    background-color: hsl(var(--muted));
+  }
+}
+
+/* Pulse animation for loading states */
+@keyframes pulse-dot {
+  0%, 100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.animate-pulse-dot {
+  animation: pulse-dot 1.5s ease-in-out infinite;
+}
+
+/* Mobile menu slide animation */
+@keyframes slide-in-from-left {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in-left {
+  animation: slide-in-from-left 0.3s ease-out;
 }

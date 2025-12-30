@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   GitBranch,
   Search,
@@ -32,23 +32,42 @@ import { useSession, signOut } from '@/lib/auth-client';
 import { trpc } from '@/lib/trpc';
 import { useSearchModalStore } from '@/components/search';
 import { isMac } from '@/lib/commands';
+import { useLockBodyScroll, useScrollDirection } from '@/hooks/use-mobile';
+import { cn } from '@/lib/utils';
 
 export function Header() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { data: session } = useSession();
   const user = session?.user;
   const authenticated = !!user;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { open: openSearch } = useSearchModalStore();
+  const scrollDirection = useScrollDirection();
+
+  // Lock body scroll when mobile menu is open
+  useLockBodyScroll(mobileMenuOpen);
+
+  // Close mobile menu on route change
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [location.pathname]);
 
   const handleLogout = async () => {
     await signOut();
+    setMobileMenuOpen(false);
     navigate('/');
   };
 
   return (
     <>
-      <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur-xl">
+      <header 
+        className={cn(
+          "sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur-xl transition-transform duration-300",
+          // Hide header on scroll down on mobile (only when menu is closed)
+          scrollDirection === 'down' && !mobileMenuOpen && "md:translate-y-0 -translate-y-full"
+        )}
+      >
         <div className="container flex h-14 md:h-16 items-center px-4 md:px-6">
           {/* Left section - Logo */}
           <div className="flex items-center gap-3 md:gap-4 flex-1">
@@ -217,117 +236,221 @@ export function Header() {
         </div>
       </header>
 
-      {/* Mobile navigation menu */}
-      {mobileMenuOpen && (
-        <div className="fixed inset-0 z-40 md:hidden">
-          {/* Backdrop */}
-          <div 
-            className="fixed inset-0 bg-background/80 backdrop-blur-sm" 
-            onClick={() => setMobileMenuOpen(false)}
-          />
-          
-          {/* Menu panel */}
-          <div className="fixed inset-y-0 left-0 w-72 bg-background border-r border-border p-4 pt-20 animate-slide-in-right">
-            {/* Mobile search - opens search modal */}
+      {/* Mobile navigation menu - full-screen overlay */}
+      <div 
+        className={cn(
+          "fixed inset-0 z-40 md:hidden transition-all duration-300",
+          mobileMenuOpen 
+            ? "opacity-100 pointer-events-auto" 
+            : "opacity-0 pointer-events-none"
+        )}
+      >
+        {/* Backdrop */}
+        <div 
+          className={cn(
+            "absolute inset-0 bg-background/95 backdrop-blur-md transition-opacity duration-300",
+            mobileMenuOpen ? "opacity-100" : "opacity-0"
+          )}
+          onClick={() => setMobileMenuOpen(false)}
+        />
+        
+        {/* Menu panel - slide from left */}
+        <div 
+          className={cn(
+            "absolute inset-y-0 left-0 w-full max-w-sm bg-background border-r border-border/50 shadow-2xl",
+            "flex flex-col transition-transform duration-300 ease-out",
+            mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+          )}
+        >
+          {/* Header with close button */}
+          <div className="flex items-center justify-between px-4 h-14 border-b border-border/40">
+            <Link to={authenticated && user?.username ? `/${user.username}` : "/"} className="flex items-center gap-2">
+              <div className="p-1.5 rounded-lg bg-primary/10">
+                <GitBranch className="h-4 w-4 text-primary" />
+              </div>
+              <span className="font-bold text-lg">wit</span>
+            </Link>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-10 w-10 touch-target"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
+
+          {/* User profile section (if authenticated) */}
+          {authenticated && (
+            <div className="px-4 py-4 border-b border-border/40 bg-muted/20">
+              <div className="flex items-center gap-3">
+                <Avatar className="h-12 w-12">
+                  <AvatarImage src={user?.image || undefined} />
+                  <AvatarFallback className="text-base">
+                    {user?.username?.slice(0, 2).toUpperCase() || 'U'}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium truncate">{user?.name || user?.username}</p>
+                  <p className="text-sm text-muted-foreground truncate">@{user?.username}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Mobile search - opens search modal */}
+          <div className="px-4 py-3">
             <button
               onClick={() => {
                 setMobileMenuOpen(false);
                 openSearch();
               }}
-              className="flex h-10 w-full items-center gap-2 rounded-lg border border-border/40 bg-muted/20 px-3 py-2 text-sm mb-6"
+              className="flex h-11 w-full items-center gap-3 rounded-xl border border-border/40 bg-muted/30 px-4 text-sm touch-target no-tap-highlight active:bg-muted/50 transition-colors"
             >
               <Search className="h-4 w-4 text-muted-foreground" />
-              <span className="flex-1 text-left text-muted-foreground/50">
+              <span className="flex-1 text-left text-muted-foreground">
                 Search...
               </span>
             </button>
+          </div>
 
-            {/* Mobile navigation links */}
-            <nav className="space-y-1">
-              {/* Leaderboard - visible to all */}
+          {/* Mobile navigation links */}
+          <nav className="flex-1 overflow-y-auto scroll-touch px-2 py-2">
+            {/* Quick actions for authenticated users */}
+            {authenticated && (
+              <div className="mb-4">
+                <p className="px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  Quick Actions
+                </p>
+                <Link
+                  to={user?.username ? `/${user.username}` : '/'}
+                  className="flex items-center gap-3 px-3 py-3 text-sm hover:bg-muted/40 rounded-xl transition-all touch-target no-tap-highlight active:bg-muted/60"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <Inbox className="h-5 w-5 text-muted-foreground" />
+                  <span className="font-medium">Home</span>
+                </Link>
+                <Link
+                  to="/new"
+                  className="flex items-center gap-3 px-3 py-3 text-sm hover:bg-muted/40 rounded-xl transition-all touch-target no-tap-highlight active:bg-muted/60"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <Plus className="h-5 w-5 text-muted-foreground" />
+                  <span className="font-medium">New repository</span>
+                </Link>
+                <Link
+                  to="/import"
+                  className="flex items-center gap-3 px-3 py-3 text-sm hover:bg-muted/40 rounded-xl transition-all touch-target no-tap-highlight active:bg-muted/60"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <Github className="h-5 w-5 text-muted-foreground" />
+                  <span className="font-medium">Import from GitHub</span>
+                </Link>
+              </div>
+            )}
+
+            {/* Explore section */}
+            <div className="mb-4">
+              <p className="px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Explore
+              </p>
               <Link
                 to="/leaderboard"
-                className="flex items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-lg transition-all"
+                className="flex items-center gap-3 px-3 py-3 text-sm hover:bg-muted/40 rounded-xl transition-all touch-target no-tap-highlight active:bg-muted/60"
                 onClick={() => setMobileMenuOpen(false)}
               >
-                <Trophy className="h-4 w-4" />
-                Leaderboard
+                <Trophy className="h-5 w-5 text-muted-foreground" />
+                <span className="font-medium">Leaderboard</span>
               </Link>
-              {/* Contribute - visible to all */}
               <Link
                 to="/contribute"
-                className="flex items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-lg transition-all"
+                className="flex items-center gap-3 px-3 py-3 text-sm hover:bg-muted/40 rounded-xl transition-all touch-target no-tap-highlight active:bg-muted/60"
                 onClick={() => setMobileMenuOpen(false)}
               >
-                <Heart className="h-4 w-4" />
-                Contribute
+                <Heart className="h-5 w-5 text-muted-foreground" />
+                <span className="font-medium">Contribute</span>
               </Link>
-              {authenticated && (
-                <>
-                  <Link
-                    to={user?.username ? `/${user.username}` : '/'}
-                    className="flex items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-lg transition-all"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    <Inbox className="h-4 w-4" />
-                    Home
-                  </Link>
-                  <Link
-                    to="/new"
-                    className="flex items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-lg transition-all"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    <Plus className="h-4 w-4" />
-                    New repository
-                  </Link>
-                  <Link
-                    to="/import"
-                    className="flex items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-lg transition-all"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    <Github className="h-4 w-4" />
-                    Import from GitHub
-                  </Link>
-<Link
-                                    to="/orgs/new"
-                                    className="flex items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-lg transition-all"
-                                    onClick={() => setMobileMenuOpen(false)}
-                                  >
-                                    <Building2 className="h-4 w-4" />
-                                    New organization
-                                  </Link>
-                                  <Link
-                                    to={`/${user?.username}/wrapped`}
-                                    className="flex items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-lg transition-all"
-                                    onClick={() => setMobileMenuOpen(false)}
-                                  >
-                                    <Flame className="h-4 w-4" />
-                                    Your Wrapped
-                                  </Link>
-                                </>
-                              )}
-              {!authenticated && (
-                <>
-                  <Link
-                    to="/login"
-                    className="flex items-center gap-3 px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-lg transition-all"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    Sign in
-                  </Link>
-                  <Link
-                    to="/register"
-                    className="flex items-center gap-3 px-3 py-2.5 text-sm text-primary font-medium hover:bg-primary/10 rounded-lg transition-all"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    Sign up
-                  </Link>
-                </>
-              )}
-            </nav>
+            </div>
+
+            {/* Account section */}
+            {authenticated && (
+              <div className="mb-4">
+                <p className="px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  Account
+                </p>
+                <Link
+                  to={`/${user?.username}`}
+                  className="flex items-center gap-3 px-3 py-3 text-sm hover:bg-muted/40 rounded-xl transition-all touch-target no-tap-highlight active:bg-muted/60"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <User className="h-5 w-5 text-muted-foreground" />
+                  <span className="font-medium">Your profile</span>
+                </Link>
+                <Link
+                  to={`/${user?.username}/wrapped`}
+                  className="flex items-center gap-3 px-3 py-3 text-sm hover:bg-muted/40 rounded-xl transition-all touch-target no-tap-highlight active:bg-muted/60"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <Flame className="h-5 w-5 text-muted-foreground" />
+                  <span className="font-medium">Your Wrapped</span>
+                </Link>
+                <Link
+                  to="/orgs/new"
+                  className="flex items-center gap-3 px-3 py-3 text-sm hover:bg-muted/40 rounded-xl transition-all touch-target no-tap-highlight active:bg-muted/60"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <Building2 className="h-5 w-5 text-muted-foreground" />
+                  <span className="font-medium">New organization</span>
+                </Link>
+                <Link
+                  to="/settings"
+                  className="flex items-center gap-3 px-3 py-3 text-sm hover:bg-muted/40 rounded-xl transition-all touch-target no-tap-highlight active:bg-muted/60"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <Settings className="h-5 w-5 text-muted-foreground" />
+                  <span className="font-medium">Settings</span>
+                </Link>
+              </div>
+            )}
+          </nav>
+
+          {/* Footer actions */}
+          <div className="border-t border-border/40 p-4 safe-bottom">
+            {authenticated ? (
+              <Button
+                variant="outline"
+                className="w-full h-11 touch-target text-destructive hover:text-destructive hover:bg-destructive/10"
+                onClick={handleLogout}
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Sign out
+              </Button>
+            ) : (
+              <div className="flex flex-col gap-2">
+                <Button
+                  className="w-full h-11 touch-target"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    navigate('/register');
+                  }}
+                >
+                  Sign up
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full h-11 touch-target"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    navigate('/login');
+                  }}
+                >
+                  Sign in
+                </Button>
+              </div>
+            )}
           </div>
         </div>
-      )}
+      </div>
     </>
   );
 }
