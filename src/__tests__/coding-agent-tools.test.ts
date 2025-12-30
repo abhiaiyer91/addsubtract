@@ -10,7 +10,6 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { Repository } from '../core/repository';
 import {
-  createTempDir,
   createRepoWithCommit,
   cleanupTempDir,
   createTestFile,

@@ -23,15 +23,12 @@ import { TsgitError, ErrorCode } from '../core/errors';
 import {
   fetchGitHubData,
   parseGitHubRepo,
-  validateImportOptions,
   getAuthenticatedCloneUrl,
-  formatImportSummary,
   GitHubImportOptions,
-  GitHubImportResult,
   ImportProgress,
 } from '../core/github-import';
 import { getGitHubToken, getGitHubManager } from '../core/github';
-import { exists, mkdirp } from '../utils/fs';
+import { mkdirp } from '../utils/fs';
 
 const colors = {
   green: (s: string) => `\x1b[32m${s}\x1b[0m`,
@@ -329,7 +326,7 @@ async function cloneRepository(
       timeout: 600000, // 10 minute timeout
     });
     return true;
-  } catch (error) {
+  } catch {
     return false;
   }
 }
@@ -370,7 +367,7 @@ export async function handleGitHubImport(args: string[]): Promise<void> {
   try {
     // Check authentication
     spinner.start('Checking GitHub authentication...');
-    let token = parsed.token || await getGitHubToken();
+    const token = parsed.token || await getGitHubToken();
     
     if (!token) {
       spinner.info('Not authenticated with GitHub (public repos only)');
@@ -457,13 +454,6 @@ export async function handleGitHubImport(args: string[]): Promise<void> {
     }
 
     // Show import summary
-    const totalImported = 
-      (parsed.import.labels ? data.labels.length : 0) +
-      (parsed.import.milestones ? data.milestones.length : 0) +
-      (parsed.import.issues ? data.issues.length : 0) +
-      (parsed.import.pullRequests ? data.pullRequests.length : 0) +
-      (parsed.import.releases ? data.releases.length : 0);
-
     console.log();
     console.log(colors.green('═'.repeat(50)));
     console.log(colors.green(colors.bold(' Import Complete!')));

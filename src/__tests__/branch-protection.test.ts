@@ -122,8 +122,6 @@ describe('branch protection system', () => {
       it('should update updatedAt timestamp', () => {
         const original = manager.addRule('main');
         
-        // Wait a bit to ensure time difference
-        const later = Date.now() + 10;
         const updated = manager.updateRule('main', { requirePullRequest: true });
 
         expect(updated.updatedAt).toBeGreaterThanOrEqual(original.createdAt);

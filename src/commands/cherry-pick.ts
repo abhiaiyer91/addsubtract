@@ -13,9 +13,9 @@
 
 import * as path from 'path';
 import { Repository } from '../core/repository';
-import { Commit, Tree, Blob } from '../core/object';
+import { Commit } from '../core/object';
 import { TsgitError, ErrorCode } from '../core/errors';
-import { Author, TreeEntry } from '../core/types';
+import { Author } from '../core/types';
 import { exists, readFile, writeFile, mkdirp } from '../utils/fs';
 
 const colors = {
@@ -391,11 +391,6 @@ export class CherryPickManager {
     const changeContent = this.repo.objects.readBlob(change.newHash!).toString();
     const headContent = this.repo.objects.readBlob(headHash).toString();
 
-    // Simple line-by-line merge attempt
-    const baseLines = baseContent.split('\n');
-    const changeLines = changeContent.split('\n');
-    const headLines = headContent.split('\n');
-
     // If head hasn't changed from base, we can use change directly
     if (headContent === baseContent) {
       const fullPath = path.join(this.repo.workDir, filePath);
@@ -492,8 +487,6 @@ ${changeContent}
       );
     }
 
-    // Check if there are unresolved conflicts
-    const status = this.repo.status();
     // For simplicity, assume staged changes mean conflicts are resolved
 
     // Create commit for current

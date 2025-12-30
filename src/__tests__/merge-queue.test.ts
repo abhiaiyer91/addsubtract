@@ -8,7 +8,7 @@
  * - Statistics
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
 // Mock the database before imports
 vi.mock('../db', () => {

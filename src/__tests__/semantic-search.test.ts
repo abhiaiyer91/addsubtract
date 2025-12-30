@@ -7,8 +7,6 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import * as path from 'path';
-import * as fs from 'fs';
 import {
   createRepoWithCommit,
   cleanupTempDir,
@@ -17,7 +15,7 @@ import {
   restoreCwd,
 } from './test-utils';
 import { Repository } from '../core/repository';
-import { chunkCode, CodeChunk } from '../search/chunker';
+import { chunkCode } from '../search/chunker';
 import { VectorStore, StoredVector } from '../search/vector-store';
 import { detectLanguage, cosineSimilarity } from '../search/embeddings';
 

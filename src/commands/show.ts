@@ -10,9 +10,8 @@
  * - wit show --name-only <commit> # Show commit with file names only
  */
 
-import * as path from 'path';
 import { Repository } from '../core/repository';
-import { Commit, Tag as TagObject, Blob, Tree } from '../core/object';
+import { Commit } from '../core/object';
 import { TsgitError, ErrorCode } from '../core/errors';
 import { diff, createHunks, formatColoredDiff, FileDiff } from '../core/diff';
 import { parseRevision } from './reset';
@@ -208,7 +207,7 @@ export function show(
   try {
     const hash = parseRevision(repo, ref);
     showCommit(repo, hash, options);
-  } catch (err) {
+  } catch {
     throw new TsgitError(
       `Unknown revision or path: ${ref}`,
       ErrorCode.REF_NOT_FOUND,

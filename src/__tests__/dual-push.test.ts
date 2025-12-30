@@ -4,14 +4,13 @@ import * as fs from 'fs';
 import * as os from 'os';
 import { Repository } from '../core/repository';
 import { RemoteManager } from '../core/remote';
-import { pushMultiAsync, PushOptions, MultiPushResult } from '../commands/push';
+import { PushOptions, MultiPushResult } from '../commands/push';
 
 describe('Dual-Push', () => {
   let tempDir: string;
   let repoDir: string;
   let remote1Dir: string;
   let remote2Dir: string;
-  let repo: Repository;
 
   beforeEach(() => {
     // Create temp directory structure

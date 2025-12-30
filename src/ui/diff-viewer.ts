@@ -460,8 +460,8 @@ export function renderInteractiveDiff(
   oldContent: string,
   newContent: string,
   filename: string,
-  onStageHunk?: (hunkIndex: number) => void,
-  onStageLine?: (lineIndex: number) => void
+  _onStageHunk?: (hunkIndex: number) => void,
+  _onStageLine?: (lineIndex: number) => void
 ): string {
   const language = detectLanguage(filename);
   const diffLines = diff(oldContent, newContent);

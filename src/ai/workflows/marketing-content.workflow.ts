@@ -182,7 +182,7 @@ const generateTweetStep = createStep({
     }
     
     // Clean up title for tweet
-    let cleanTitle = title
+    const cleanedTitle = title
       .replace(/^(feat|fix|chore|docs|refactor|test|style|perf|ci|build)(\([^)]+\))?:\s*/i, '')
       .replace(/\[.*?\]/g, '')
       .trim();
@@ -191,11 +191,11 @@ const generateTweetStep = createStep({
     let tweet = '';
     
     if (inputData.type === 'release_published' && releaseTag) {
-      tweet = `${emoji} ${repoFullName} ${releaseTag} is out!\n\n${cleanTitle}`;
+      tweet = `${emoji} ${repoFullName} ${releaseTag} is out!\n\n${cleanedTitle}`;
     } else if (prNumber) {
-      tweet = `${emoji} ${action}: ${cleanTitle}\n\n${repoFullName}#${prNumber}`;
+      tweet = `${emoji} ${action}: ${cleanedTitle}\n\n${repoFullName}#${prNumber}`;
     } else {
-      tweet = `${emoji} ${action}: ${cleanTitle}\n\n${repoFullName}`;
+      tweet = `${emoji} ${action}: ${cleanedTitle}\n\n${repoFullName}`;
     }
     
     // Truncate if needed (leave room for potential link)

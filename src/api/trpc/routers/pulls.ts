@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
-import * as path from 'path';
 import { router, publicProcedure, protectedProcedure } from '../trpc';
 import {
   prModel,
@@ -13,7 +12,6 @@ import {
   collaboratorModel,
   activityHelpers,
   stackModel,
-  stackBranchModel,
 } from '../../../db/models';
 import { mergePullRequest, checkMergeability, getDefaultMergeMessage } from '../../../server/storage/merge';
 import { getConflictDetails } from '../../../server/storage/conflicts';
@@ -21,7 +19,7 @@ import { resolveDiskPath, BareRepository } from '../../../server/storage/repos';
 import { triggerAsyncReview } from '../../../ai/services/pr-review';
 import { exists } from '../../../utils/fs';
 import { eventBus, extractMentions } from '../../../events';
-import { diff, createHunks, FileDiff } from '../../../core/diff';
+import { diff, createHunks } from '../../../core/diff';
 import { Blob, Tree, Commit } from '../../../core/object';
 import { TreeEntry, Author } from '../../../core/types';
 
@@ -927,8 +925,6 @@ export const pullsRouter = router({
       // Emit pr.commented event
       const repo = await repoModel.findById(pr.repoId);
       if (repo) {
-        const mentionedUsernames = extractMentions(input.body);
-        
         await eventBus.emit('pr.commented', ctx.user.id, {
           prId: pr.id,
           prNumber: pr.number,

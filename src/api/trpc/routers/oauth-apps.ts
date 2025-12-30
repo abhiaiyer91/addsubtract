@@ -23,11 +23,6 @@ import {
 const MAX_APPS_PER_USER = 25;
 
 /**
- * Zod schema for OAuth scopes
- */
-const scopeSchema = z.enum(OAUTH_SCOPES);
-
-/**
  * Zod schema for URL validation
  */
 const urlSchema = z.string().url('Must be a valid URL');

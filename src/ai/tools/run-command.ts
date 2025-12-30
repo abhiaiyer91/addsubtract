@@ -15,7 +15,6 @@ import { Repository } from '../../core/repository.js';
 import { 
   sandboxConfigModel, 
   sandboxKeyModel,
-  sandboxSessionModel,
   type SandboxProvider as SandboxProviderType 
 } from '../../db/models/sandbox.js';
 
@@ -156,7 +155,7 @@ async function executeInSandbox(
   truncated?: boolean;
   sandbox?: boolean;
 }> {
-  const { provider, apiKey, repoId, userId, cwd, timeout, env } = options;
+  const { provider, apiKey, cwd, timeout, env } = options;
 
   // Debug: Log sandbox execution request
   console.log('[Sandbox] executeInSandbox called:', {

@@ -12,7 +12,7 @@ import { Agent } from '@mastra/core/agent';
 import { Memory } from '@mastra/memory';
 import { LibSQLStore } from '@mastra/libsql';
 import { PostgresStore } from '@mastra/pg';
-import { witAgent, createTsgitAgent } from './agent.js';
+import { createTsgitAgent } from './agent.js';
 import { witTools } from './tools/index.js';
 import { prReviewWorkflow, issueTriageWorkflow, codeGenerationWorkflow, multiAgentPlanningWorkflow } from './workflows/index.js';
 import { ciExecutionWorkflow } from '../ci/workflows/index.js';

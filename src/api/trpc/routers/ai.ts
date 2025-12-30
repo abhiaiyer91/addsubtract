@@ -6,13 +6,12 @@
 
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
-import * as path from 'path';
 import { router, protectedProcedure, publicProcedure } from '../trpc';
 import { repoModel, prModel, collaboratorModel } from '../../../db/models';
 import { resolveDiskPath, BareRepository } from '../../../server/storage/repos';
 import { exists } from '../../../utils/fs';
 import { generatePRDescriptionTool } from '../../../ai/tools/generate-pr-description';
-import { getTsgitAgent, isAIAvailable } from '../../../ai/mastra';
+import { getTsgitAgent } from '../../../ai/mastra';
 import { diff, createHunks, formatUnifiedDiff, FileDiff } from '../../../core/diff';
 
 /**

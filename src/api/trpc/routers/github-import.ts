@@ -14,7 +14,7 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import * as path from 'path';
-import { execSync, spawn } from 'child_process';
+import { execSync } from 'child_process';
 import { router, protectedProcedure } from '../trpc';
 import {
   repoModel,
@@ -31,7 +31,7 @@ import {
   orgModel,
   orgMemberModel,
 } from '../../../db/models';
-import { RepoManager } from '../../../server/storage/repos';
+import '../../../server/storage/repos';
 import {
   fetchGitHubData,
   parseGitHubRepo,

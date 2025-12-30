@@ -4,16 +4,13 @@
  * Tests the centralized security layer for wi
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { 
   ACL, 
   ACLError, 
   checkRepoPermission, 
   checkOrgRole,
   logSecurityEvent,
-  type RepoPermission,
-  type OrgRole,
-  type AccessContext,
 } from '../core/acl';
 
 // Mock the database models

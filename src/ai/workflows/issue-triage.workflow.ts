@@ -196,7 +196,7 @@ const searchCodebaseStep = createStep({
     })),
   }),
   execute: async ({ inputData }) => {
-    const { findFilesInRepo, searchInRepo, readRepoFile } = await import('./utils.js');
+    const { findFilesInRepo, searchInRepo } = await import('./utils.js');
     const { exists } = await import('../../utils/fs.js');
     const path = await import('path');
     
@@ -325,7 +325,7 @@ const findSimilarIssuesStep = createStep({
     }> = [];
     
     try {
-      const { issueModel, issueLabelModel, labelModel } = await import('../../db/models/index.js');
+      const { issueModel, issueLabelModel } = await import('../../db/models/index.js');
       
       // Get recent issues from the same repo (get both open and closed)
       const [openIssues, closedIssues] = await Promise.all([

@@ -5,9 +5,6 @@
 
 import * as path from 'path';
 import { Repository } from './repository';
-import { Commit, Tree, Blob } from './object';
-import { TreeEntry } from './types';
-import { diff, DiffLine } from './diff';
 import { exists, readFile, writeFile, mkdirp, deleteFile } from '../utils/fs';
 import { TsgitError, ErrorCode } from './errors';
 
@@ -358,8 +355,6 @@ export class MergeManager {
 
       // Build content with conflict markers
       let content = '';
-      const oursLines = conflict.oursContent.split('\n');
-      const theirsLines = conflict.theirsContent.split('\n');
 
       // Simple approach: show full file conflict
       // A more sophisticated approach would show only conflicting regions

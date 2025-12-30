@@ -94,7 +94,7 @@ describe('tag command', () => {
     });
 
     it('should include tagger information', () => {
-      const hash = createAnnotatedTag(repo, 'v1.0.0', 'Release version 1.0.0');
+      createAnnotatedTag(repo, 'v1.0.0', 'Release version 1.0.0');
 
       const info = getTagInfo(repo, 'v1.0.0');
 

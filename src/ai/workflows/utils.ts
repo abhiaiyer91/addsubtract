@@ -6,8 +6,8 @@
  */
 
 import { Repository } from '../../core/repository.js';
-import { diff, createHunks, formatUnifiedDiff, type FileDiff, type DiffHunk } from '../../core/diff.js';
-import { exists, readFileText, writeFile, mkdirp, walkDir, readDir, isDirectory } from '../../utils/fs.js';
+import { diff, createHunks, formatUnifiedDiff, type FileDiff } from '../../core/diff.js';
+import { exists, readFileText, writeFile, mkdirp, walkDir } from '../../utils/fs.js';
 import * as path from 'path';
 
 /**

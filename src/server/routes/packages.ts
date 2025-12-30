@@ -532,7 +532,7 @@ export function createPackageRoutes(baseUrl: string): Hono {
     }
 
     // Get or create the package
-    let pkg = await packageModel.getByName(scope, name);
+    const pkg = await packageModel.getByName(scope, name);
     const isNewPackage = !pkg;
 
     if (pkg) {

@@ -9,10 +9,8 @@
  *   wit pull --ff-only            # Only fast-forward
  */
 
-import * as path from 'path';
 import { Repository } from '../core/repository';
 import { RemoteManager } from '../core/remote';
-import { MergeManager } from '../core/merge';
 import { TsgitError, ErrorCode } from '../core/errors';
 import { fetchAsync, FetchResult } from './fetch';
 
@@ -262,9 +260,9 @@ export async function pullAsync(
  * Pull changes from remote (sync version - only for local repos)
  */
 export function pull(
-  remoteName?: string,
-  branchName?: string,
-  options: PullOptions = {}
+  _remoteName?: string,
+  _branchName?: string,
+  _options: PullOptions = {}
 ): PullResult {
   throw new TsgitError(
     'Synchronous pull is not supported. Use pullAsync() instead.',
@@ -308,14 +306,11 @@ function performFastForward(
 function performMerge(
   repo: Repository,
   remoteHash: string,
-  remoteName: string,
-  branchName: string,
-  options: PullOptions
+  _remoteName: string,
+  _branchName: string,
+  _options: PullOptions
 ): PullResult {
   const mergeManager = repo.mergeManager;
-  
-  // Perform merge using the ref
-  const mergeRef = `${remoteName}/${branchName}`;
   
   try {
     const mergeResult = mergeManager.merge(remoteHash);

@@ -10,7 +10,6 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as path from 'path';
-import * as fs from 'fs';
 import { 
   createRepoWithCommit, 
   createRepoWithMultipleCommits,
@@ -18,7 +17,6 @@ import {
   cleanupTempDir, 
   createTestFile,
   suppressConsole,
-  captureConsole,
   restoreCwd,
 } from './test-utils';
 import { Repository } from '../core/repository';
@@ -26,7 +24,7 @@ import { Repository } from '../core/repository';
 // Import the plumbing commands
 import { revParse } from '../commands/rev-parse';
 import { updateRef, deleteRef } from '../commands/update-ref';
-import { readSymbolicRef, setSymbolicRef, deleteSymbolicRef } from '../commands/symbolic-ref';
+import { readSymbolicRef, setSymbolicRef } from '../commands/symbolic-ref';
 import { forEachRef, formatRef } from '../commands/for-each-ref';
 import { showRef, verifyRef } from '../commands/show-ref';
 import { fsck } from '../commands/fsck';
@@ -179,7 +177,7 @@ describe('update-ref command', () => {
       // Create a second commit
       createTestFile(testDir!, 'file2.txt', 'content2');
       repo.add(path.join(testDir!, 'file2.txt'));
-      const secondCommit = repo.commit('Second commit');
+      repo.commit('Second commit');
 
       // Update main to point to first commit
       updateRef(repo, 'refs/heads/main', commitHash);

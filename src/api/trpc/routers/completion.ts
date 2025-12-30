@@ -57,7 +57,7 @@ async function generateCompletion(
   language: string,
   filePath: string,
   repoId: string | null,
-  maxTokens: number = 150
+  _maxTokens: number = 150
 ): Promise<string> {
   // Get API key (repo-level or server-level)
   const apiKeyInfo = await getAnyApiKeyForRepo(repoId);

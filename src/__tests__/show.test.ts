@@ -7,13 +7,11 @@ import { show, showCommit, showFileAtCommit, showTag } from '../commands/show';
 import { createAnnotatedTag, createLightweightTag } from '../commands/tag';
 import { 
   createRepoWithMultipleCommits, 
-  createTestFile,
   cleanupTempDir,
   captureConsole,
   restoreCwd,
 } from './test-utils';
 import { Repository } from '../core/repository';
-import * as path from 'path';
 
 describe('show command', () => {
   let testDir: string | undefined;

@@ -11,11 +11,9 @@
  * - wit tag -v v1.0.0          # Show tag details
  */
 
-import * as path from 'path';
 import { Repository } from '../core/repository';
 import { Tag as TagObject } from '../core/object';
 import { TsgitError, ErrorCode } from '../core/errors';
-import { exists, readFileText, writeFile, readDir } from '../utils/fs';
 import { Author, ObjectType } from '../core/types';
 
 const colors = {

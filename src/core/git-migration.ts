@@ -8,12 +8,11 @@
  */
 
 import * as path from 'path';
-import * as fs from 'fs';
 import * as zlib from 'zlib';
 import * as crypto from 'crypto';
 import { exists, readFile, writeFile, mkdirp, readDir, isDirectory, readFileText } from '../utils/fs';
-import { compress, decompress } from '../utils/compression';
-import { ObjectType, TreeEntry, Author } from './types';
+import { compress } from '../utils/compression';
+import { ObjectType, Author } from './types';
 import { setHashAlgorithm, getHashAlgorithm, HashAlgorithm } from '../utils/hash';
 
 /**

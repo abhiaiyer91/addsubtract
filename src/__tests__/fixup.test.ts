@@ -17,7 +17,6 @@ import * as path from 'path';
 describe('fixup command', () => {
   let testDir: string | undefined;
   let repo: Repository;
-  let commits: string[];
   let consoleSuppressor: { restore: () => void };
 
   beforeEach(() => {
@@ -25,7 +24,6 @@ describe('fixup command', () => {
     const result = createRepoWithMultipleCommits(3);
     testDir = result.dir;
     repo = result.repo;
-    commits = result.commits;
   });
 
   afterEach(() => {

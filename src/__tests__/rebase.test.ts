@@ -9,7 +9,6 @@ import {
   createRepoWithCommit, 
   cleanupTempDir, 
   createTestFile,
-  readTestFile,
   fileExists,
   suppressConsole,
   restoreCwd,
@@ -51,7 +50,7 @@ describe('rebase command', () => {
       
       createTestFile(testDir, 'feature.txt', 'feature content\n');
       repo.add(path.join(testDir, 'feature.txt'));
-      const featureCommit = repo.commit('Feature commit');
+      repo.commit('Feature commit');
       
       // Rebase feature onto main
       const manager = new RebaseManager(repo, repo.gitDir);
@@ -82,7 +81,7 @@ describe('rebase command', () => {
       // Add commit to main
       createTestFile(testDir, 'main.txt', 'content\n');
       repo.add(path.join(testDir, 'main.txt'));
-      const mainCommit = repo.commit('Main commit');
+      repo.commit('Main commit');
       
       // Create feature from current main (no divergence)
       repo.createBranch('feature');
@@ -104,7 +103,7 @@ describe('rebase command', () => {
       // Add commit to main
       createTestFile(testDir, 'main.txt', 'content\n');
       repo.add(path.join(testDir, 'main.txt'));
-      const mainCommit = repo.commit('Main commit');
+      repo.commit('Main commit');
       
       // Create feature from base with multiple commits
       repo.checkout(baseCommit);
@@ -237,7 +236,7 @@ describe('rebase command', () => {
       const rebaseResult = manager.rebase('main');
       
       if (!rebaseResult.success && manager.isInProgress()) {
-        const skipResult = manager.skip();
+        manager.skip();
         
         // After skipping, should continue or complete
         expect(manager.isInProgress()).toBe(false);

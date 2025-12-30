@@ -5,8 +5,7 @@
 
 import * as path from 'path';
 import { Repository } from '../core/repository';
-import { Tree } from '../core/object';
-import { walkDir, isDirectory, stat } from '../utils/fs';
+import { stat } from '../utils/fs';
 
 /**
  * File tree node

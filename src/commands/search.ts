@@ -84,7 +84,7 @@ function printSemanticResult(result: {
   chunkType: string;
   chunkName?: string;
   language: string;
-}, index: number): void {
+}, _index: number): void {
   const scorePercent = Math.round(result.score * 100);
   const scoreColor = scorePercent >= 80 ? 'green' : scorePercent >= 60 ? 'yellow' : 'gray';
   
@@ -117,7 +117,7 @@ function printSemanticResult(result: {
 /**
  * Print a text search result
  */
-function printTextResult(result: ContentSearchResult, index: number): void {
+function printTextResult(result: ContentSearchResult, _index: number): void {
   console.log(`  ${c('cyan', '●')} ${c('bold', result.path)}:${c('yellow', String(result.lineNumber))}`);
   
   // Context before
@@ -242,7 +242,7 @@ async function handleStatus(repo: Repository): Promise<void> {
         console.log(`    Last update: ${c('dim', ago)}`);
       }
     }
-  } catch (error) {
+  } catch {
     console.log(`  ${c('yellow', '!')} Could not read index status`);
   }
   
@@ -304,7 +304,7 @@ async function doSemanticSearch(repo: Repository, query: string, limit: number):
     console.log();
     
     return true;
-  } catch (error) {
+  } catch {
     // Semantic search failed, fall back to text
     return false;
   }

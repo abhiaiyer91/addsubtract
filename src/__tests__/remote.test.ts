@@ -2,15 +2,12 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
-import { RemoteManager, Remote } from '../core/remote';
+import { RemoteManager } from '../core/remote';
 import {
-  parseRefAdvertisement,
   parseCapabilities,
   serializeCapabilities,
   parseRefspec,
   applyFetchRefspec,
-  getBranches,
-  getTags,
 } from '../core/protocol/refs-discovery';
 import {
   pktLine,
@@ -237,7 +234,6 @@ describe('Protocol - Pack File', () => {
   it('should apply delta', () => {
     // Create a simple delta that copies from source
     const source = Buffer.from('Hello, World!');
-    const target = Buffer.from('Hello, World!');
     
     // Delta format: source size, target size, copy instruction
     // Source size = 13 (0x0d)
@@ -315,7 +311,7 @@ describe('CredentialManager', () => {
       manager.clearCache();
       
       // This may return null or use git credential helper
-      const creds = await manager.getCredentials('https://example.com/repo.git');
+      await manager.getCredentials('https://example.com/repo.git');
       // We can't reliably test this as it depends on system configuration
       // Just verify it doesn't throw
     } finally {

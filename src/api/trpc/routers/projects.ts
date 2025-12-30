@@ -9,7 +9,6 @@ import {
   PROJECT_STATUSES,
   PROJECT_HEALTH,
 } from '../../../db/models';
-import type { ProjectStatus, ProjectHealth } from '../../../db/schema';
 
 // Zod schemas
 const projectStatusSchema = z.enum(['backlog', 'planned', 'in_progress', 'paused', 'completed', 'canceled']);

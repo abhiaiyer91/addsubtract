@@ -218,7 +218,7 @@ describe('Package Storage', () => {
       const binaryData = Buffer.from([0x00, 0x01, 0x02, 0xff, 0xfe, 0xfd]);
       const base64Data = binaryData.toString('base64');
 
-      const stored = await storage.storeBase64(null, 'binary-pkg', '1.0.0', base64Data);
+      await storage.storeBase64(null, 'binary-pkg', '1.0.0', base64Data);
 
       const retrieved = await storage.retrieve(null, 'binary-pkg', '1.0.0');
       expect(retrieved).toEqual(binaryData);
@@ -423,13 +423,11 @@ describe('Package Storage', () => {
 
 describe('Generate Package Metadata', () => {
   let generatePackageMetadata: typeof import('../db/models/packages').generatePackageMetadata;
-  let getFullPackageName: typeof import('../db/models/packages').getFullPackageName;
 
   beforeEach(async () => {
     vi.resetModules();
     const module = await import('../db/models/packages');
     generatePackageMetadata = module.generatePackageMetadata;
-    getFullPackageName = module.getFullPackageName;
   });
 
   it('should generate npm-compatible metadata', async () => {

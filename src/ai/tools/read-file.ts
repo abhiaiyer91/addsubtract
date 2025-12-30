@@ -7,7 +7,7 @@ import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 import * as path from 'path';
 import { Repository } from '../../core/repository.js';
-import { exists, readFileText, isDirectory, readFile } from '../../utils/fs.js';
+import { exists, isDirectory, readFile } from '../../utils/fs.js';
 
 export const readFileTool = createTool({
   id: 'wit-read-file',

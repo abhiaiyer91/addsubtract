@@ -69,7 +69,7 @@ const TEST_SESSION_ID = '00000000-0000-0000-0000-000000000001';
 const TEST_USER_ID = '00000000-0000-0000-0000-000000000002';
 const TEST_REPO_ID = '00000000-0000-0000-0000-000000000003';
 const TEST_CHANGE_ID = '00000000-0000-0000-0000-000000000004';
-const TEST_MSG_ID = '00000000-0000-0000-0000-000000000005';
+const _TEST_MSG_ID = '00000000-0000-0000-0000-000000000005';
 const TEST_SESSION_ID_2 = '00000000-0000-0000-0000-000000000006';
 
 // Mock agent models - must be inside the factory
@@ -106,7 +106,7 @@ vi.mock('../db/models', () => ({
 // Import after mocks are set up
 import { agentRouter } from '../api/trpc/routers/agent';
 import { router } from '../api/trpc/trpc';
-import { isAIAvailable, getTsgitAgent } from '../ai/mastra';
+import { getTsgitAgent } from '../ai/mastra';
 import { 
   agentSessionModel, 
   agentFileChangeModel 

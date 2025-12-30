@@ -7,7 +7,7 @@
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 import { Repository } from '../../core/repository.js';
-import { createSemanticSearch, type SemanticSearchResult } from '../../search/index.js';
+import { createSemanticSearch } from '../../search/index.js';
 
 /**
  * Semantic search tool for AI agent
@@ -74,7 +74,7 @@ The search returns code snippets ranked by semantic similarity to your query.`,
         query,
         searchTime: Date.now() - startTime,
       };
-    } catch (error) {
+    } catch {
       // Return empty results on error
       return {
         results: [],

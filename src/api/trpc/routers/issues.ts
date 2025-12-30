@@ -17,9 +17,8 @@ import {
 import { issueRelationModel } from '../../../db/models/issue-relations';
 import { issueActivityModel } from '../../../db/models/issue-activity';
 import { issueTemplateModel } from '../../../db/models/issue-template';
-import { issueViewModel, type ViewFilters, type ViewDisplayOptions } from '../../../db/models/issue-view';
+import { issueViewModel } from '../../../db/models/issue-view';
 import { eventBus, extractMentions } from '../../../events';
-import type { IssueStatus, IssuePriority, IssueRelationType } from '../../../db/schema';
 
 // Zod schemas for issue enums
 const issueStatusSchema = z.enum(['triage', 'backlog', 'todo', 'in_progress', 'in_review', 'done', 'canceled']);
@@ -530,8 +529,6 @@ export const issuesRouter = router({
       // Emit issue.commented event
       const repo = await repoModel.findById(issue.repoId);
       if (repo) {
-        const mentionedUsernames = extractMentions(input.body);
-
         await eventBus.emit('issue.commented', ctx.user.id, {
           issueId: issue.id,
           issueNumber: issue.number,

@@ -18,9 +18,7 @@
  */
 
 import { createWorkflow, createStep } from '@mastra/core/workflows';
-import { Agent } from '@mastra/core/agent';
 import { z } from 'zod';
-import type { AgentContext } from '../types.js';
 
 // =============================================================================
 // Type Definitions

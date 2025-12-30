@@ -32,7 +32,7 @@ describe('cherry-pick command', () => {
   });
 
   describe('basic cherry-pick', () => {
-    it('should apply a commit from another branch', () => {
+    it('should apply a commit from another branch', async () => {
       // Setup: create repo with initial commit
       const result = createRepoWithCommit();
       testDir = result.dir;
@@ -49,8 +49,9 @@ describe('cherry-pick command', () => {
       // Go back to main - delete the file manually since checkout doesn't clean WD
       repo.checkout('main');
       const featureFile = path.join(testDir, 'feature-only.txt');
-      if (require('fs').existsSync(featureFile)) {
-        require('fs').unlinkSync(featureFile);
+      const fs = await import('fs');
+      if (fs.existsSync(featureFile)) {
+        fs.unlinkSync(featureFile);
       }
       
       // Cherry-pick the feature commit
@@ -194,8 +195,6 @@ describe('cherry-pick command', () => {
       const result = createRepoWithCommit();
       testDir = result.dir;
       repo = result.repo;
-      
-      const originalHead = repo.refs.resolve('HEAD');
       
       // Create a conflict situation
       createTestFile(testDir, 'file.txt', 'original\n');

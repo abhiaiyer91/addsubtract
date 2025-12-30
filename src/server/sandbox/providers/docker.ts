@@ -12,35 +12,18 @@
  * Requires Docker to be installed and accessible.
  */
 
-import { EventEmitter } from 'events';
 import { spawn, ChildProcess } from 'child_process';
 import { PassThrough } from 'stream';
 import * as path from 'path';
 import type {
-  SandboxProvider,
   SandboxSession,
   SandboxSessionConfig,
-  SandboxState,
   SandboxStats,
   SandboxInfo,
   CommandResult,
   DockerProviderConfig,
 } from '../types';
 import { BaseSandboxProvider, BaseSandboxSession } from '../base-provider';
-
-// Docker types (simplified, actual Docker API is more complex)
-type DockerContainer = {
-  Id: string;
-  State: {
-    Status: string;
-    Running: boolean;
-    Paused: boolean;
-  };
-  Created: string;
-  Config: {
-    Labels: Record<string, string>;
-  };
-};
 
 /**
  * Docker Sandbox Session
@@ -148,7 +131,7 @@ class DockerSandboxSession extends BaseSandboxSession {
     args?: string[],
     options?: { timeout?: number; cwd?: string }
   ): Promise<CommandResult> {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       const execArgs = [
         ...this.getDockerArgs(),
         'exec',
@@ -207,7 +190,7 @@ class DockerSandboxSession extends BaseSandboxSession {
     this._stdin.write(data);
   }
 
-  async resize(cols: number, rows: number): Promise<void> {
+  async resize(_cols: number, _rows: number): Promise<void> {
     // Docker doesn't support PTY resize via CLI easily
     // Would need to use Docker API directly for this
     // For now, this is a no-op
@@ -304,7 +287,7 @@ class DockerSandboxSession extends BaseSandboxSession {
     }
   }
 
-  async setTimeout(timeoutMs: number): Promise<void> {
+  async setTimeout(_timeoutMs: number): Promise<void> {
     // Docker containers don't have built-in timeout
     // Would need to implement via external monitoring
     console.warn('setTimeout not fully supported for Docker containers');
@@ -330,7 +313,7 @@ class DockerSandboxSession extends BaseSandboxSession {
   }
 
   private async dockerCommand(args: string[]): Promise<CommandResult> {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       const proc = spawn('docker', [...this.getDockerArgs(), ...args]);
 
       let stdout = '';
@@ -386,7 +369,7 @@ export class DockerProvider extends BaseSandboxProvider {
     // Verify Docker is available
     try {
       await this.runDocker(['version']);
-    } catch (error) {
+    } catch {
       throw new Error(
         'Docker is not available. Make sure Docker is installed and running.'
       );
@@ -584,7 +567,7 @@ export class DockerProvider extends BaseSandboxProvider {
   }
 
   private async runDocker(args: string[]): Promise<CommandResult> {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       const dockerArgs: string[] = [];
 
       // Add host if configured
