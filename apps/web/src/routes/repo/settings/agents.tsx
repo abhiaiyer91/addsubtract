@@ -27,6 +27,11 @@ import {
   ExternalLink,
   Rabbit,
   FileSearch,
+  Search,
+  Plug,
+  Plus,
+  Settings,
+  Power,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -135,6 +140,13 @@ export function AgentsSettingsPage() {
   const [editedTweet, setEditedTweet] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
+  // MCP state
+  const [mcpSearchQuery, setMcpSearchQuery] = useState('');
+  const [mcpCategory, setMcpCategory] = useState<string | undefined>();
+  const [showMcpSearch, setShowMcpSearch] = useState(false);
+  const [configuringMcp, setConfiguringMcp] = useState<any>(null);
+  const [mcpConfig, setMcpConfig] = useState<Record<string, string>>({});
+
   const utils = trpc.useUtils();
 
   // Repository query
@@ -182,6 +194,17 @@ export function AgentsSettingsPage() {
   );
 
   const isMarketingEnabled = marketingConfig?.config?.enabled ?? false;
+
+  // MCP queries
+  const { data: mcpSearch, isLoading: mcpSearchLoading } = trpc.mcp.search.useQuery(
+    { query: mcpSearchQuery || undefined, category: mcpCategory, limit: 20 },
+    { enabled: showMcpSearch }
+  );
+
+  const { data: enabledMcps, isLoading: mcpsLoading } = trpc.mcp.listEnabled.useQuery(
+    { owner: owner!, repo: repo! },
+    { enabled: !!owner && !!repo && authenticated }
+  );
 
   // AI Mutations
   const setKeyMutation = trpc.repoAiKeys.set.useMutation({
@@ -242,6 +265,27 @@ export function AgentsSettingsPage() {
     onSuccess: () => {
       utils.marketing.list.invalidate({ repoId: repoData?.repo.id! });
       utils.marketing.pendingCount.invalidate({ repoId: repoData?.repo.id! });
+    },
+  });
+
+  // MCP Mutations
+  const enableMcpMutation = trpc.mcp.enable.useMutation({
+    onSuccess: () => {
+      utils.mcp.listEnabled.invalidate({ owner: owner!, repo: repo! });
+      setConfiguringMcp(null);
+      setMcpConfig({});
+    },
+  });
+
+  const disableMcpMutation = trpc.mcp.setEnabled.useMutation({
+    onSuccess: () => {
+      utils.mcp.listEnabled.invalidate({ owner: owner!, repo: repo! });
+    },
+  });
+
+  const removeMcpMutation = trpc.mcp.remove.useMutation({
+    onSuccess: () => {
+      utils.mcp.listEnabled.invalidate({ owner: owner!, repo: repo! });
     },
   });
 
@@ -360,6 +404,50 @@ export function AgentsSettingsPage() {
     await navigator.clipboard.writeText(text);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  // MCP handlers
+  const handleEnableMcp = (mcpServer: any) => {
+    if (mcpServer.requiresConfig) {
+      // Show config dialog
+      setConfiguringMcp(mcpServer);
+      setMcpConfig({});
+    } else {
+      // Enable directly
+      if (!enabledMcps?.repoId) return;
+      enableMcpMutation.mutate({
+        repoId: enabledMcps.repoId,
+        mcpSlug: mcpServer.slug,
+      });
+    }
+  };
+
+  const handleSaveMcpConfig = () => {
+    if (!configuringMcp || !enabledMcps?.repoId) return;
+    enableMcpMutation.mutate({
+      repoId: enabledMcps.repoId,
+      mcpSlug: configuringMcp.slug,
+      config: mcpConfig,
+    });
+  };
+
+  const handleToggleMcp = (mcpSlug: string, enabled: boolean) => {
+    if (!enabledMcps?.repoId) return;
+    disableMcpMutation.mutate({
+      repoId: enabledMcps.repoId,
+      mcpSlug,
+      enabled,
+    });
+  };
+
+  const handleRemoveMcp = (mcpSlug: string) => {
+    if (!enabledMcps?.repoId) return;
+    if (confirm('Remove this MCP integration? This will delete all configuration.')) {
+      removeMcpMutation.mutate({
+        repoId: enabledMcps.repoId,
+        mcpSlug,
+      });
+    }
   };
 
   const isLoading = aiLoading || triageLoading;
@@ -876,6 +964,260 @@ export function AgentsSettingsPage() {
               )}
             </CardContent>
           </Card>
+
+          {/* MCP Integrations Card */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+                    <Plug className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base">MCP Integrations</CardTitle>
+                    <CardDescription>Connect external tools to your AI agent</CardDescription>
+                  </div>
+                </div>
+                {enabledMcps?.servers && enabledMcps.servers.filter(s => s.enabled).length > 0 && (
+                  <Badge variant="secondary" className="bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
+                    {enabledMcps.servers.filter(s => s.enabled).length} active
+                  </Badge>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Enable MCP (Model Context Protocol) servers to give your AI agent access to external tools and services.
+              </p>
+
+              {/* Enabled MCPs list */}
+              {mcpsLoading ? (
+                <div className="flex justify-center py-4">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                </div>
+              ) : enabledMcps?.servers && enabledMcps.servers.length > 0 ? (
+                <div className="space-y-2">
+                  {enabledMcps.servers.map((mcp) => (
+                    <div
+                      key={mcp.id}
+                      className="flex items-center justify-between p-3 rounded-lg border bg-card"
+                    >
+                      <div className="flex items-center gap-3">
+                        {mcp.iconUrl ? (
+                          <img src={mcp.iconUrl} alt="" className="h-8 w-8 rounded" />
+                        ) : (
+                          <div className="h-8 w-8 rounded bg-muted flex items-center justify-center">
+                            <Plug className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                        )}
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium">{mcp.name}</span>
+                            {mcp.category && (
+                              <Badge variant="outline" className="text-xs">
+                                {mcp.category}
+                              </Badge>
+                            )}
+                          </div>
+                          {mcp.description && (
+                            <p className="text-xs text-muted-foreground line-clamp-1">
+                              {mcp.description}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={mcp.enabled}
+                          onCheckedChange={(checked) => handleToggleMcp(mcp.mcpSlug, checked)}
+                          disabled={disableMcpMutation.isPending}
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => handleRemoveMcp(mcp.mcpSlug)}
+                          disabled={removeMcpMutation.isPending}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-4 text-sm text-muted-foreground">
+                  No MCP integrations enabled yet.
+                </div>
+              )}
+
+              {/* Add MCP button */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowMcpSearch(true)}
+                className="w-full"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add MCP Integration
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* MCP Search Dialog */}
+          <Dialog open={showMcpSearch} onOpenChange={setShowMcpSearch}>
+            <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+              <DialogHeader>
+                <DialogTitle>Add MCP Integration</DialogTitle>
+                <DialogDescription>
+                  Search and enable MCP servers to extend your AI agent's capabilities.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 flex-1 overflow-hidden flex flex-col">
+                {/* Search and filter */}
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search MCPs..."
+                      value={mcpSearchQuery}
+                      onChange={(e) => setMcpSearchQuery(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
+                  <Select value={mcpCategory || ''} onValueChange={(v) => setMcpCategory(v || undefined)}>
+                    <SelectTrigger className="w-40">
+                      <SelectValue placeholder="Category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">All Categories</SelectItem>
+                      {mcpSearch?.categories?.map((cat) => (
+                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Results */}
+                <div className="flex-1 overflow-y-auto space-y-2 pr-2">
+                  {mcpSearchLoading ? (
+                    <div className="flex justify-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                    </div>
+                  ) : mcpSearch?.servers && mcpSearch.servers.length > 0 ? (
+                    mcpSearch.servers.map((server) => {
+                      const isEnabled = enabledMcps?.servers?.some(
+                        (s) => s.mcpSlug === server.slug
+                      );
+                      return (
+                        <div
+                          key={server.slug}
+                          className="flex items-start gap-3 p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
+                        >
+                          {server.iconUrl ? (
+                            <img src={server.iconUrl} alt="" className="h-10 w-10 rounded flex-shrink-0" />
+                          ) : (
+                            <div className="h-10 w-10 rounded bg-muted flex items-center justify-center flex-shrink-0">
+                              <Plug className="h-5 w-5 text-muted-foreground" />
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">{server.name}</span>
+                              <Badge variant="outline" className="text-xs">
+                                {server.category}
+                              </Badge>
+                              {server.requiresConfig && (
+                                <Badge variant="secondary" className="text-xs">
+                                  <Settings className="h-3 w-3 mr-1" />
+                                  Config
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-sm text-muted-foreground mt-1">
+                              {server.description}
+                            </p>
+                            <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+                              <span>{server.installCount?.toLocaleString() || 0} installs</span>
+                              {server.rating && (
+                                <>
+                                  <span>•</span>
+                                  <span>⭐ {server.rating}</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant={isEnabled ? 'secondary' : 'default'}
+                            disabled={isEnabled || enableMcpMutation.isPending}
+                            onClick={() => handleEnableMcp(server)}
+                          >
+                            {isEnabled ? (
+                              <>
+                                <Check className="h-4 w-4 mr-1" />
+                                Enabled
+                              </>
+                            ) : (
+                              <>
+                                <Plus className="h-4 w-4 mr-1" />
+                                Enable
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      No MCPs found. Try a different search.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* MCP Config Dialog */}
+          <Dialog open={!!configuringMcp} onOpenChange={() => setConfiguringMcp(null)}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Configure {configuringMcp?.name}</DialogTitle>
+                <DialogDescription>
+                  Enter the required configuration for this MCP integration.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                {configuringMcp?.configSchema?.map((field: any) => (
+                  <div key={field.name} className="space-y-2">
+                    <Label htmlFor={field.name}>
+                      {field.label}
+                      {field.required && <span className="text-destructive ml-1">*</span>}
+                    </Label>
+                    <Input
+                      id={field.name}
+                      type={field.type === 'password' ? 'password' : 'text'}
+                      placeholder={field.description}
+                      value={mcpConfig[field.name] || ''}
+                      onChange={(e) => setMcpConfig({ ...mcpConfig, [field.name]: e.target.value })}
+                    />
+                    {field.description && (
+                      <p className="text-xs text-muted-foreground">{field.description}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setConfiguringMcp(null)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleSaveMcpConfig} disabled={enableMcpMutation.isPending}>
+                  {enableMcpMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Enable
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           {/* Triage History (collapsible) */}
           {isTriageEnabled && (
