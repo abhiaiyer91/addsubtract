@@ -673,3 +673,86 @@ html {
   );
   opacity: 0.5;
 }
+
+/* ============================================
+   Warp-style Terminal Block Styling
+   ============================================ */
+
+/* Terminal block animations */
+@keyframes block-appear {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.terminal-block {
+  animation: block-appear 0.2s ease-out;
+}
+
+/* Subtle pulse for running commands */
+@keyframes pulse-subtle {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 2s ease-in-out infinite;
+}
+
+/* Terminal block hover effects */
+.terminal-block:hover {
+  background: rgba(39, 39, 42, 0.6);
+}
+
+/* Thin scrollbar utility classes */
+.scrollbar-thin {
+  scrollbar-width: thin;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-thumb-zinc-700::-webkit-scrollbar-thumb {
+  background: rgb(63, 63, 70);
+  border-radius: 3px;
+}
+
+.scrollbar-thumb-zinc-800::-webkit-scrollbar-thumb {
+  background: rgb(39, 39, 42);
+  border-radius: 3px;
+}
+
+.scrollbar-track-transparent::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Terminal input area styling */
+.terminal-input-area {
+  background: linear-gradient(to bottom, rgba(24, 24, 27, 0.5), rgba(24, 24, 27, 0.8));
+}
+
+/* Terminal input focus glow */
+.terminal-input:focus {
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+}
+
+/* Command history navigation hint */
+.terminal-history-hint {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.terminal-input:focus ~ .terminal-history-hint {
+  opacity: 1;
+}
