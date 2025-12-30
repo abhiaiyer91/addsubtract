@@ -35,6 +35,8 @@ import {
   ArrowRightLeft,
   GitBranch,
   Save,
+  LayoutGrid,
+  ChevronDown,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -80,6 +82,8 @@ export function VisualWorkflowCanvas({ onSave, onPreview, readOnly = false }: Vi
     validate,
     isDirty,
     validationErrors,
+    getNextNodePosition,
+    autoLayout,
   } = useWorkflowStore();
 
   // Convert workflow nodes to ReactFlow nodes
@@ -220,14 +224,16 @@ export function VisualWorkflowCanvas({ onSave, onPreview, readOnly = false }: Vi
     event.dataTransfer.dropEffect = 'move';
   }, []);
 
-  // Add node from menu
+  // Add node from menu - uses smart positioning and auto-connect
   const handleAddNode = (type: NodeType) => {
-    const centerPosition = reactFlowInstance.current?.project({
-      x: reactFlowWrapper.current?.clientWidth ? reactFlowWrapper.current.clientWidth / 2 : 300,
-      y: reactFlowWrapper.current?.clientHeight ? reactFlowWrapper.current.clientHeight / 2 : 200,
-    }) || { x: 300, y: 200 };
-    
-    addNode(type, centerPosition);
+    // Use smart positioning based on selected node or last node in chain
+    const position = getNextNodePosition(selectedNodeId || undefined);
+    addNode(type, position, { autoConnect: true, afterNodeId: selectedNodeId || undefined });
+  };
+
+  // Quick add step - the primary action for building workflows
+  const handleQuickAddStep = () => {
+    handleAddNode('step');
   };
 
   // Delete selected element
@@ -289,55 +295,66 @@ export function VisualWorkflowCanvas({ onSave, onPreview, readOnly = false }: Vi
           maskColor="rgba(0, 0, 0, 0.1)"
         />
 
-        {/* Toolbar Panel */}
+        {/* Toolbar Panel - Simplified */}
         {!readOnly && (
           <Panel position="top-left" className="flex gap-2">
-            {/* Add Node Menu */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button size="sm" className="gap-1.5">
-                  <Plus className="h-4 w-4" />
-                  Add Node
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-48">
-                <DropdownMenuLabel>Triggers</DropdownMenuLabel>
-                <DropdownMenuItem onClick={() => handleAddNode('trigger')}>
-                  <Zap className="h-4 w-4 mr-2 text-green-600" />
-                  Trigger
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuLabel>Steps</DropdownMenuLabel>
-                <DropdownMenuItem onClick={() => handleAddNode('step')}>
-                  <Box className="h-4 w-4 mr-2 text-blue-600" />
-                  Step
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleAddNode('parallel')}>
-                  <Shuffle className="h-4 w-4 mr-2 text-purple-600" />
-                  Parallel
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleAddNode('map')}>
-                  <ArrowRightLeft className="h-4 w-4 mr-2 text-amber-600" />
-                  Transform
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleAddNode('condition')}>
-                  <GitBranch className="h-4 w-4 mr-2 text-rose-600" />
-                  Condition
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {/* Primary Action: Add Step (with dropdown for other types) */}
+            <div className="flex">
+              <Button size="sm" className="gap-1.5 rounded-r-none" onClick={handleQuickAddStep}>
+                <Plus className="h-4 w-4" />
+                Add Step
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" className="rounded-l-none border-l-0 px-1.5">
+                    <ChevronDown className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-48">
+                  <DropdownMenuLabel>Node Types</DropdownMenuLabel>
+                  <DropdownMenuItem onClick={() => handleAddNode('trigger')}>
+                    <Zap className="h-4 w-4 mr-2 text-green-600" />
+                    Trigger
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleAddNode('step')}>
+                    <Box className="h-4 w-4 mr-2 text-blue-600" />
+                    Step
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel>Advanced</DropdownMenuLabel>
+                  <DropdownMenuItem onClick={() => handleAddNode('parallel')}>
+                    <Shuffle className="h-4 w-4 mr-2 text-purple-600" />
+                    Parallel
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleAddNode('map')}>
+                    <ArrowRightLeft className="h-4 w-4 mr-2 text-amber-600" />
+                    Transform
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleAddNode('condition')}>
+                    <GitBranch className="h-4 w-4 mr-2 text-rose-600" />
+                    Condition
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+
+            {/* Auto Layout */}
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={autoLayout}>
+              <LayoutGrid className="h-4 w-4" />
+              Auto Layout
+            </Button>
 
             {/* Undo/Redo */}
             <div className="flex gap-1">
-              <Button variant="outline" size="icon" className="h-8 w-8" onClick={undo}>
+              <Button variant="outline" size="icon" className="h-8 w-8" onClick={undo} title="Undo">
                 <Undo2 className="h-4 w-4" />
               </Button>
-              <Button variant="outline" size="icon" className="h-8 w-8" onClick={redo}>
+              <Button variant="outline" size="icon" className="h-8 w-8" onClick={redo} title="Redo">
                 <Redo2 className="h-4 w-4" />
               </Button>
             </div>
 
-            {/* Delete */}
+            {/* Delete - only show when something is selected */}
             {(selectedNodeId || selectedEdgeId) && (
               <Button 
                 variant="outline" 

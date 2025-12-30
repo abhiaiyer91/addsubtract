@@ -130,10 +130,16 @@ interface WorkflowState {
   updateWorkflowMeta: (updates: Partial<Pick<WorkflowDefinition, 'name' | 'description' | 'inputSchema' | 'outputSchema'>>) => void;
   
   // Node operations
-  addNode: (type: NodeType, position: { x: number; y: number }) => string;
+  addNode: (type: NodeType, position: { x: number; y: number }, options?: { autoConnect?: boolean; afterNodeId?: string }) => string;
+  addNodeAfter: (afterNodeId: string, type: NodeType) => string;
   updateNode: (nodeId: string, updates: Partial<WorkflowNode>) => void;
   deleteNode: (nodeId: string) => void;
   selectNode: (nodeId: string | null) => void;
+  
+  // Layout helpers
+  getLastNodeInChain: () => WorkflowNode | null;
+  getNextNodePosition: (afterNodeId?: string) => { x: number; y: number };
+  autoLayout: () => void;
   
   // Edge operations
   addEdge: (source: string, target: string, sourceHandle?: string, targetHandle?: string) => string;
@@ -230,9 +236,118 @@ export const useWorkflowStore = create<WorkflowState>()(
         }));
       },
 
-      addNode: (type, position) => {
+      getLastNodeInChain: () => {
+        const { workflow } = get();
+        if (workflow.nodes.length === 0) return null;
+        
+        // Find nodes that are targets of edges (have incoming edges)
+        const targetNodes = new Set(workflow.edges.map(e => e.target));
+        // Find nodes that are sources of edges (have outgoing edges)  
+        const sourceNodes = new Set(workflow.edges.map(e => e.source));
+        
+        // Find the last node (a node that is a source but not a target of any edge, or has no outgoing edges)
+        // Prefer nodes that have incoming edges but no outgoing edges (end of chain)
+        const endNodes = workflow.nodes.filter(n => 
+          targetNodes.has(n.id) && !sourceNodes.has(n.id)
+        );
+        
+        if (endNodes.length > 0) {
+          // Return the one with the highest x position (rightmost)
+          return endNodes.reduce((a, b) => a.position.x > b.position.x ? a : b);
+        }
+        
+        // If no end nodes, find the rightmost node
+        return workflow.nodes.reduce((a, b) => a.position.x > b.position.x ? a : b);
+      },
+
+      getNextNodePosition: (afterNodeId?: string) => {
+        const { workflow } = get();
+        const NODE_SPACING_X = 250;
+        const NODE_SPACING_Y = 0;
+        
+        if (afterNodeId) {
+          const afterNode = workflow.nodes.find(n => n.id === afterNodeId);
+          if (afterNode) {
+            return {
+              x: afterNode.position.x + NODE_SPACING_X,
+              y: afterNode.position.y + NODE_SPACING_Y,
+            };
+          }
+        }
+        
+        // Find the last node in the chain
+        const lastNode = get().getLastNodeInChain();
+        if (lastNode) {
+          return {
+            x: lastNode.position.x + NODE_SPACING_X,
+            y: lastNode.position.y,
+          };
+        }
+        
+        // Default position if no nodes exist
+        return { x: 100, y: 200 };
+      },
+
+      autoLayout: () => {
+        const { workflow } = get();
+        const NODE_SPACING_X = 250;
+        const START_X = 100;
+        const START_Y = 200;
+        
+        // Topological sort to get execution order
+        const sorted = topologicalSort(workflow.nodes, workflow.edges);
+        
+        // Position nodes in a horizontal flow
+        const updatedNodes = workflow.nodes.map(node => {
+          const sortIndex = sorted.findIndex(n => n.id === node.id);
+          if (sortIndex === -1) {
+            // Disconnected node - put it below
+            return {
+              ...node,
+              position: { x: START_X, y: START_Y + 150 },
+            };
+          }
+          return {
+            ...node,
+            position: {
+              x: START_X + sortIndex * NODE_SPACING_X,
+              y: START_Y,
+            },
+          };
+        });
+        
+        set((state) => ({
+          workflow: {
+            ...state.workflow,
+            nodes: updatedNodes,
+          },
+          isDirty: true,
+        }));
+      },
+
+      addNode: (type, position, options = {}) => {
+        const { autoConnect = true, afterNodeId } = options;
         const id = `${type}-${nanoid(8)}`;
         let node: WorkflowNode;
+        
+        // Determine the node to connect from
+        let connectFromNodeId: string | null = null;
+        if (autoConnect && type !== 'trigger') {
+          if (afterNodeId) {
+            connectFromNodeId = afterNodeId;
+          } else {
+            // Auto-connect to selected node or last node in chain
+            const { selectedNodeId } = get();
+            if (selectedNodeId) {
+              connectFromNodeId = selectedNodeId;
+            } else {
+              const lastNode = get().getLastNodeInChain();
+              if (lastNode) {
+                connectFromNodeId = lastNode.id;
+              }
+            }
+          }
+        }
 
         switch (type) {
           case 'trigger':
@@ -284,16 +399,33 @@ export const useWorkflowStore = create<WorkflowState>()(
             throw new Error(`Unknown node type: ${type}`);
         }
 
+        // Build the new edges array - auto-connect if we have a source node
+        let newEdges = get().workflow.edges;
+        if (connectFromNodeId) {
+          const edgeId = `edge-${nanoid(8)}`;
+          newEdges = [...newEdges, {
+            id: edgeId,
+            source: connectFromNodeId,
+            target: id,
+          }];
+        }
+
         set((state) => ({
           workflow: {
             ...state.workflow,
             nodes: [...state.workflow.nodes, node],
+            edges: newEdges,
           },
           selectedNodeId: id,
           isDirty: true,
         }));
 
         return id;
+      },
+
+      addNodeAfter: (afterNodeId, type) => {
+        const position = get().getNextNodePosition(afterNodeId);
+        return get().addNode(type, position, { autoConnect: true, afterNodeId });
       },
 
       updateNode: (nodeId, updates) => {
