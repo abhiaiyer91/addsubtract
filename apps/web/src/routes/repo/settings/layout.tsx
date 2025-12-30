@@ -29,7 +29,7 @@ export function SettingsLayout({ children }: SettingsLayoutProps) {
   };
 
   return (
-    <div className="flex gap-8">
+    <div className="flex gap-8 -mt-2">
       {/* Sidebar navigation */}
       <nav className="w-56 flex-shrink-0">
         <div className="sticky top-4 space-y-1">

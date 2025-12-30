@@ -47,6 +47,7 @@ const sandboxSettingsSchema = z.object({
 
   // Vercel settings
   vercelProjectId: z.string().optional(),
+  vercelTeamId: z.string().optional(),
   vercelRuntime: vercelRuntimeSchema.optional(),
 });
 
@@ -163,6 +164,7 @@ export const sandboxRouter = router({
           daytonaAutoStop: 15,
           dockerImage: 'wit-sandbox:latest',
           vercelProjectId: undefined,
+          vercelTeamId: undefined,
           vercelRuntime: 'node22' as const,
           dockerAvailable,
         };
@@ -185,6 +187,7 @@ export const sandboxRouter = router({
         daytonaAutoStop: config.daytonaAutoStop,
         dockerImage: config.dockerImage,
         vercelProjectId: (config as any).vercelProjectId ?? undefined,
+        vercelTeamId: (config as any).vercelTeamId ?? undefined,
         vercelRuntime: (config as any).vercelRuntime ?? 'node22',
         dockerAvailable,
       };
@@ -497,17 +500,25 @@ export const sandboxRouter = router({
           case 'vercel': {
             const { Sandbox } = await import('@vercel/sandbox');
 
-            // Get Vercel project ID from config (stored separately)
+            // Get Vercel project ID and team ID from config
             const vercelProjectId = (config as any).vercelProjectId;
+            const vercelTeamId = (config as any).vercelTeamId;
             if (!vercelProjectId) {
               throw new TRPCError({
                 code: 'BAD_REQUEST',
                 message: 'Vercel Project ID is not configured',
               });
             }
+            if (!vercelTeamId) {
+              throw new TRPCError({
+                code: 'BAD_REQUEST',
+                message: 'Vercel Team ID is not configured. This is required when using a personal access token.',
+              });
+            }
 
             const sandbox = await Sandbox.create({
               projectId: vercelProjectId,
+              teamId: vercelTeamId,
               accessToken: apiKey,
               timeout: config.timeoutMinutes * 60 * 1000,
               runtime: (config as any).vercelRuntime || 'node22',

@@ -2169,6 +2169,8 @@ export const repoSandboxConfig = pgTable('repo_sandbox_config', {
   // Vercel-specific settings
   /** Vercel Project ID */
   vercelProjectId: text('vercel_project_id'),
+  /** Vercel Team ID (required for personal access tokens) */
+  vercelTeamId: text('vercel_team_id'),
   /** Vercel runtime */
   vercelRuntime: text('vercel_runtime').default('node22'),
 
