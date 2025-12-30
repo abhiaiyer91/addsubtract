@@ -131,7 +131,6 @@ export function markdownToBlocks(markdown: string): Block[] {
   const lines = markdown.split('\n');
   const blocks: Block[] = [];
   let i = 0;
-  let listNumber = 1;
 
   while (i < lines.length) {
     const line = lines[i];
@@ -140,7 +139,6 @@ export function markdownToBlocks(markdown: string): Block[] {
     // Skip empty lines between blocks
     if (!trimmed) {
       i++;
-      listNumber = 1; // Reset list number on empty line
       continue;
     }
 
@@ -179,11 +177,17 @@ export function markdownToBlocks(markdown: string): Block[] {
       continue;
     }
 
-    // Numbered list
+    // Numbered list - determine list number based on previous block
     const numberedMatch = trimmed.match(/^(\d+)\. /);
     if (numberedMatch) {
       const block = createBlock('numberedList', trimmed.slice(numberedMatch[0].length));
-      block.listNumber = listNumber++;
+      // Check if previous block is also a numbered list to continue numbering
+      const prevBlock = blocks[blocks.length - 1];
+      if (prevBlock?.type === 'numberedList' && prevBlock.listNumber) {
+        block.listNumber = prevBlock.listNumber + 1;
+      } else {
+        block.listNumber = 1;
+      }
       blocks.push(block);
       i++;
       continue;
@@ -233,7 +237,6 @@ export function markdownToBlocks(markdown: string): Block[] {
     // Default to paragraph
     blocks.push(createBlock('paragraph', trimmed));
     i++;
-    listNumber = 1; // Reset list number
   }
 
   // Ensure there's always at least one block
