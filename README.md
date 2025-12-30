@@ -123,6 +123,7 @@ Check the [ROADMAP](./ROADMAP.md) for details and what's coming.
 | [Commands](https://docs.wit.sh/commands/overview) | Every command documented |
 | [AI Features](https://docs.wit.sh/features/ai-powered) | Commit messages, review, semantic search |
 | [Self-Hosting](https://docs.wit.sh/platform/self-hosting) | Run your own wit server |
+| [IDE & Agent Vision](./docs/IDE_AND_AGENT_VISION.mdx) | Our roadmap to the best IDE ever |
 
 ## Command Reference
 

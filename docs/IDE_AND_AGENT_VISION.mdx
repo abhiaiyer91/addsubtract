@@ -1,0 +1,323 @@
+# IDE & Agent Vision: Striving for Greatness
+
+> "The best IDE understands your intent, not just your keystrokes. The best agent is a colleague, not a chatbot."
+
+---
+
+## The Thesis
+
+wit isn't competing with VS Code or Cursor on features. We're competing on *understanding*.
+
+The difference between a good IDE and a great one isn't the number of buttons—it's whether the tool disappears and you're just thinking and shipping.
+
+The difference between a good AI assistant and a great one isn't the model—it's whether the AI understands your codebase, your patterns, and your intent.
+
+---
+
+## Current State (December 2024)
+
+### IDE ✅
+- Monaco Editor with AI completions
+- File tree, tabs, quick open (⌘P)
+- Terminal panel
+- Branch management
+- Keyboard shortcuts system
+- Resizable, customizable panels
+
+### Agent ✅
+- Code Agent (file operations, git, commands)
+- PM Agent (issues, PRs, project management)
+- Streaming chat with tool visualization
+- Session history
+- IDE integration (files open automatically)
+
+---
+
+## The Vision
+
+### 1. The Editor Should Read Your Mind
+
+**Current:** You type, you get completions.
+
+**Great:** The editor anticipates what you need.
+
+#### Contextual AI Actions
+```typescript
+// When you highlight code, show inline actions:
+// [Explain] [Refactor] [Add Tests] [Fix] [Document]
+
+// When you're in a file with tests, suggest:
+// "This function isn't tested. Generate tests?"
+
+// When you have an error, offer:
+// "Fix: Cannot read property 'x' of undefined"
+// with a one-click apply
+```
+
+#### Smart Completions
+```typescript
+// Don't just complete syntax—complete intent:
+
+// User types: "// fetch users and"
+// AI suggests: 
+async function fetchUsersAndPaginate(page: number, limit: number) {
+  const users = await db.query.users.findMany({
+    offset: (page - 1) * limit,
+    limit,
+  });
+  return { users, hasMore: users.length === limit };
+}
+```
+
+#### Code Lens Intelligence
+```typescript
+// Show inline information that matters:
+
+// 5 references | 2 tests | Last changed 3 days ago by @alice
+export function calculateTotal(items: LineItem[]): number {
+  // AI: "Consider handling empty array case"
+  return items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+}
+```
+
+### 2. The Agent Should Be a Colleague
+
+**Current:** You ask, it responds.
+
+**Great:** It thinks ahead, executes multi-step plans, and learns from you.
+
+#### Agentic Mode
+```
+You: "Add authentication to this app"
+
+Agent: I'll implement authentication. Here's my plan:
+
+1. ☑️ Analyze current codebase structure
+2. ☑️ Choose auth approach (better-auth recommended based on existing dependencies)
+3. ⏳ Create auth configuration
+4. ⏳ Add login/register pages  
+5. ⏳ Protect routes
+6. ⏳ Add user context provider
+7. ⏳ Write tests
+
+Executing step 3... Creating src/lib/auth.ts
+
+[Watch] [Pause] [Modify Plan]
+```
+
+#### Context Awareness
+```
+You: "Fix this" (with code selected)
+
+Agent: I see you've selected the `fetchData` function. The issue is the 
+Promise isn't being awaited. Here's the fix:
+
+- const data = fetchData(url);
++ const data = await fetchData(url);
+
+[Apply] [Explain More] [See Similar Issues]
+```
+
+#### Learning Your Patterns
+```
+Agent: I noticed you always add JSDoc comments to exported functions.
+I'll do the same for the new code I write.
+
+Agent: Your commit messages follow conventional commits format.
+I'll use "feat:", "fix:", etc. in my suggestions.
+
+Agent: You prefer composition over inheritance. I'll structure new 
+code accordingly.
+```
+
+### 3. Keyboard-First, AI-Native
+
+**Current:** Shortcuts for IDE operations, chat for AI.
+
+**Great:** AI is accessible everywhere, instantly.
+
+#### Universal Command Bar (⌘K)
+```
+⌘K → "add error handling to this function"
+     "explain what this regex does"
+     "create a test for UserService"
+     "find where authentication is checked"
+     "refactor to use the new API"
+```
+
+#### Inline AI (Similar to Cursor)
+```
+// Press ⌘K in the editor to get an inline AI prompt:
+┌─────────────────────────────────────┐
+│ 🤖 What would you like me to do?   │
+│ __________________________________ │
+└─────────────────────────────────────┘
+
+// AI edits appear as a diff:
+- function old() { }
++ function new() { }
+// [Accept ⌘⏎] [Reject ⎋]
+```
+
+#### @ Mentions Everywhere
+```
+In chat:
+"@src/lib/auth.ts explain the session management"
+"@UserService add a method to delete users"
+"@tests/integration/ add coverage for the new feature"
+
+In command bar:
+"@codebase where do we handle payments?"
+"@git show recent changes to auth"
+"@docs update the API documentation"
+```
+
+---
+
+## Implemented Features ✅
+
+### Phase 1: Polish & Delight (COMPLETE)
+
+| Feature | Status | Description |
+|---------|--------|-------------|
+| **Inline AI prompt (⌘K)** | ✅ Done | Press ⌘K anywhere in editor for AI edits |
+| **Selection actions menu** | ✅ Done | Quick actions appear on text selection |
+| **Agent plan visualization** | ✅ Done | See agent's plan and progress in real-time |
+| **Undo agent changes** | ✅ Done | Full history with undo/redo for all AI changes |
+| **Slash commands** | ✅ Done | /fix, /explain, /test, /refactor, /docs |
+| **File mentions (@)** | ✅ Done | @file, @codebase, @selection in chat |
+| **Beautiful diff viewer** | ✅ Done | Side-by-side diffs for file changes |
+| **Code lens hints** | ✅ Done | AI suggestions appear inline in code |
+| **Agentic mode** | ✅ Done | Configurable autonomy levels |
+| **Keyboard shortcuts** | ✅ Done | Comprehensive shortcuts with ? panel |
+
+### Phase 2: Intelligence (COMPLETE)
+
+| Feature | Status | Description |
+|---------|--------|-------------|
+| **Multi-file refactoring** | ✅ Done | Refactor across files with preview and rollback |
+| **Test generation** | ✅ Done | AI-powered test creation with framework detection |
+| **Git integration panel** | ✅ Done | Full git workflow with staging, commits, branches |
+| **AI actions context** | ✅ Done | Unified API for triggering AI actions anywhere |
+| **Keyboard shortcuts panel** | ✅ Done | Searchable shortcuts reference (? key) |
+
+### Phase 3: Mastery (In Progress)
+
+| Feature | Impact | Effort |
+|---------|--------|--------|
+| Autonomous bug fixing | Very High | Very High |
+| PR review with inline suggestions | High | High |
+| Voice commands | Medium | Medium |
+| Collaborative editing with AI | High | Very High |
+
+---
+
+## Design Principles
+
+### 1. Speed Over Features
+Every interaction should feel instant. Latency is the enemy of flow state.
+- Optimistic updates everywhere
+- Stream everything that can be streamed
+- Cache aggressively
+- Prefetch predictively
+
+### 2. Progressive Disclosure
+Show what's needed, hide what isn't. Power users discover depth, new users aren't overwhelmed.
+- Default to simple view
+- Keyboard shortcuts for everything
+- Right-click for context menus
+- Command palette for discovery
+
+### 3. Explain, Don't Just Do
+When AI makes changes, explain the reasoning. Build trust through transparency.
+- Show the "why" not just the "what"
+- Make all changes reviewable
+- Provide undo for everything
+- Log decisions for learning
+
+### 4. Keyboard Native
+The mouse should be optional for power users.
+- Every action has a shortcut
+- Vim motions support
+- Focus management
+- Quick navigation
+
+---
+
+## Technical Architecture
+
+### State Management
+```typescript
+// Zustand stores for different concerns:
+useIDEStore     // Files, tabs, layout
+useAgentStore   // Sessions, messages, tool results  
+useProjectStore // Repo context, branches, PRs
+useUserStore    // Preferences, shortcuts, themes
+```
+
+### AI Integration Points
+```typescript
+// 1. Completions (inline, streaming)
+// 2. Chat (panel, streaming)
+// 3. Commands (⌘K, instant)
+// 4. Actions (selection, context menu)
+// 5. Background (analysis, suggestions)
+```
+
+### Event System
+```typescript
+// Real-time updates via events:
+agent.file.created   → Update file tree
+agent.file.edited    → Refresh editor content
+agent.command.output → Show in terminal
+agent.plan.step      → Update plan visualization
+```
+
+---
+
+## Success Metrics
+
+### Quantitative
+- Time from thought to code: < 5 seconds
+- AI suggestion acceptance rate: > 40%
+- User returns to IDE: 3+ times per day
+- Session length: > 30 minutes average
+
+### Qualitative
+- "It feels like it reads my mind"
+- "I forget I'm using AI"
+- "I can't go back to my old editor"
+- "It's like pair programming with a genius"
+
+---
+
+## The Competition
+
+| Tool | Strength | Our Edge |
+|------|----------|----------|
+| **Cursor** | AI-first editor | We understand git, not just files |
+| **VS Code + Copilot** | Ecosystem | We're opinionated and integrated |
+| **GitHub Copilot Workspace** | Planning | We execute, not just plan |
+| **Replit Agent** | Simplicity | We're for professionals |
+
+---
+
+## The Goal
+
+When a developer uses wit:
+
+1. They open the IDE and it knows what they were working on
+2. They describe what they want in natural language
+3. The agent creates a plan, explains it, and executes it
+4. Changes appear in the editor, diffs are reviewable
+5. Tests run automatically, issues are caught
+6. Commit message is suggested, PR is ready
+7. They shipped in 10 minutes what used to take an hour
+
+**That's greatness.**
+
+---
+
+*"The best tool is the one that makes you feel like a 10x developer, not the one with the most features."*
+
+— Claude, Technical Founder of wit
