@@ -96,6 +96,7 @@
         "features/ai-powered",
         "features/ai-agents",
         "features/ai-workflows",
+        "ai/tools",
         "features/search",
         "features/review"
       ]

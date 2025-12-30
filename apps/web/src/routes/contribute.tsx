@@ -1050,6 +1050,8 @@ The goal: new contributors should understand the system quickly.`,
     category: 'Documentation',
     priority: 'P1',
     tags: ['docs', 'ai', 'reference'],
+    completed: true,
+    completedPr: 256,
     prompt: `I'm contributing to wit, an AI-native Git platform. Please help me document all 28 AI tools.
 
 1. List all tools in src/ai/tools/:
