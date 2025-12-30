@@ -222,3 +222,19 @@ export {
   getAchievementKeyForMilestone,
   type AchievementDefinition,
 } from './achievement-definitions';
+
+// Subscription and monetization models
+export {
+  subscriptionModel,
+  usageModel,
+  TIER_LIMITS,
+  TIER_PRICING,
+  enforceUsageLimit,
+  formatUsageLimitMessage,
+  formatTierDisplay,
+  formatUsageBar,
+  type SubscriptionTier,
+  type SubscriptionStatus,
+  type AIFeature,
+  type TierLimits,
+} from './subscription';

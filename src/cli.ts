@@ -106,6 +106,8 @@ import {
   handleWrapped,
   // Repository management
   handleRepo,
+  // Billing management
+  handleBilling,
 } from './commands';
 import { handleHooks } from './core/hooks';
 import { handleSubmodule } from './core/submodule';
@@ -497,6 +499,8 @@ const COMMANDS = [
   'wrapped',
   // Repository management
   'repo',
+  // Billing and subscriptions
+  'billing',
   'help',
 ];
 
@@ -1219,6 +1223,18 @@ function main(): void {
       // Repository management (transfer, etc.)
       case 'repo':
         handleRepo(args.slice(args.indexOf('repo') + 1)).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
+          }
+          process.exit(1);
+        });
+        return;
+
+      // Billing and subscription management
+      case 'billing':
+        handleBilling({ _: args }).catch((error: Error) => {
           if (error instanceof TsgitError) {
             console.error((error as TsgitError).format());
           } else {

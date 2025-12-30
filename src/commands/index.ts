@@ -123,6 +123,9 @@ export { handleWrapped } from './wrapped';
 // Repository management (transfer, etc.)
 export { handleRepo, REPO_HELP } from './repo';
 
+// Billing and subscription management
+export { billingCommand as handleBilling } from './billing';
+
 // Collaborator management
 export {
   handleCollaborator,
