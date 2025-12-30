@@ -1,8 +1,11 @@
+// @ts-nocheck
 /**
  * S3-Compatible Storage Backend
  * 
  * Stores Git objects in S3-compatible storage (AWS S3, Cloudflare R2, MinIO).
  * Objects are stored with content-addressable keys: <prefix>/<xx>/<rest-of-hash>
+ * 
+ * Note: AWS SDK packages (@aws-sdk/client-s3, @aws-sdk/s3-request-presigner) are optional dependencies.
  */
 
 import {

@@ -5,6 +5,7 @@
  * health checks, and graceful shutdown support.
  */
 
+// @ts-ignore - redis may not be installed in all environments
 import { createClient, RedisClientType, RedisFunctions, RedisModules, RedisScripts } from 'redis';
 import { setRateLimitStore, RedisStore, RedisClient } from './middleware/rate-limit';
 
@@ -89,13 +90,13 @@ async function connectRedis(options: RedisOptions): Promise<WitRedisClient> {
         socket: {
           connectTimeout,
           reconnectStrategy: autoReconnect
-            ? (retries) => Math.min(retries * 100, 3000)
+            ? (retries: number) => Math.min(retries * 100, 3000)
             : false,
         },
       });
 
       // Set up error handling
-      client.on('error', (err) => {
+      client.on('error', (err: Error) => {
         console.error('[redis] Error:', err.message);
       });
 
@@ -334,7 +335,7 @@ export async function subscribe(channel: string, callback: (message: string) => 
   
   if (!subscriptions.has(channel)) {
     subscriptions.set(channel, new Set());
-    await client.subscribe(channel, (message) => {
+    await client.subscribe(channel, (message: string) => {
       const callbacks = subscriptions.get(channel);
       callbacks?.forEach(cb => cb(message));
     });
