@@ -162,6 +162,48 @@ class VercelSandboxSession extends BaseSandboxSession {
     return this._stderr;
   }
 
+  /**
+   * Parse a command string into executable and arguments
+   * Handles quoted strings properly
+   */
+  private parseCommand(command: string): { executable: string; args: string[] } {
+    const tokens: string[] = [];
+    let current = '';
+    let inQuote = false;
+    let quoteChar = '';
+
+    for (let i = 0; i < command.length; i++) {
+      const char = command[i];
+      
+      if (inQuote) {
+        if (char === quoteChar) {
+          inQuote = false;
+        } else {
+          current += char;
+        }
+      } else if (char === '"' || char === "'") {
+        inQuote = true;
+        quoteChar = char;
+      } else if (char === ' ' || char === '\t') {
+        if (current) {
+          tokens.push(current);
+          current = '';
+        }
+      } else {
+        current += char;
+      }
+    }
+    
+    if (current) {
+      tokens.push(current);
+    }
+
+    return {
+      executable: tokens[0] || command,
+      args: tokens.slice(1),
+    };
+  }
+
   async exec(
     command: string,
     args?: string[],
@@ -176,8 +218,21 @@ class VercelSandboxSession extends BaseSandboxSession {
         timeoutId = setTimeout(() => controller.abort(), options.timeout);
       }
 
+      // Parse the command string if no args provided
+      // Vercel SDK expects executable and args separately
+      let executable = command;
+      let execArgs = args || [];
+      
+      if (!args || args.length === 0) {
+        // Parse command string to extract executable and arguments
+        // Handle quoted strings properly
+        const parsed = this.parseCommand(command);
+        executable = parsed.executable;
+        execArgs = parsed.args;
+      }
+
       try {
-        const result = await this.sandbox.runCommand(command, args, {
+        const result = await this.sandbox.runCommand(executable, execArgs, {
           signal: controller.signal,
         });
 
