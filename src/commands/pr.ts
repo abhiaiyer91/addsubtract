@@ -369,9 +369,14 @@ async function handlePrView(args: string[]): Promise<void> {
   const prNumber = parseInt(positional[0], 10);
 
   if (isNaN(prNumber)) {
-    console.error(colors.red('error: ') + 'PR number required');
-    console.error('usage: wit pr view <number>');
-    process.exit(1);
+    throw new TsgitError(
+      'PR number required to view details',
+      ErrorCode.INVALID_ARGUMENT,
+      [
+        'wit pr view 123    # View PR #123',
+        'wit pr list        # List all PRs to find the number',
+      ]
+    );
   }
 
   const repo = Repository.find();
@@ -419,9 +424,14 @@ async function handlePrCheckout(args: string[]): Promise<void> {
   const prNumber = parseInt(positional[0], 10);
 
   if (isNaN(prNumber)) {
-    console.error(colors.red('error: ') + 'PR number required');
-    console.error('usage: wit pr checkout <number>');
-    process.exit(1);
+    throw new TsgitError(
+      'PR number required to checkout',
+      ErrorCode.INVALID_ARGUMENT,
+      [
+        'wit pr checkout 123    # Checkout PR #123 locally',
+        'wit pr list            # List all PRs to find the number',
+      ]
+    );
   }
 
   const repo = Repository.find();
@@ -471,9 +481,15 @@ async function handlePrMerge(args: string[]): Promise<void> {
   const prNumber = parseInt(positional[0], 10);
 
   if (isNaN(prNumber)) {
-    console.error(colors.red('error: ') + 'PR number required');
-    console.error('usage: wit pr merge <number>');
-    process.exit(1);
+    throw new TsgitError(
+      'PR number required to merge',
+      ErrorCode.INVALID_ARGUMENT,
+      [
+        'wit pr merge 123              # Merge PR #123',
+        'wit pr merge 123 --squash     # Squash merge PR #123',
+        'wit pr list                   # List all PRs to find the number',
+      ]
+    );
   }
 
   const repo = Repository.find();
@@ -502,8 +518,14 @@ async function handlePrMerge(args: string[]): Promise<void> {
     console.log(colors.green('✓') + ` Merged PR #${prNumber}`);
     console.log(`  Merge commit: ${result.sha.slice(0, 8)}`);
   } else {
-    console.error(colors.red('error: ') + 'Failed to merge PR');
-    process.exit(1);
+    throw new TsgitError(
+      `Failed to merge PR #${prNumber}`,
+      ErrorCode.OPERATION_FAILED,
+      [
+        'wit pr view ' + prNumber + '    # Check PR status and conflicts',
+        'The PR may have merge conflicts or failed checks',
+      ]
+    );
   }
 }
 
@@ -515,9 +537,14 @@ async function handlePrClose(args: string[]): Promise<void> {
   const prNumber = parseInt(positional[0], 10);
 
   if (isNaN(prNumber)) {
-    console.error(colors.red('error: ') + 'PR number required');
-    console.error('usage: wit pr close <number>');
-    process.exit(1);
+    throw new TsgitError(
+      'PR number required to close',
+      ErrorCode.INVALID_ARGUMENT,
+      [
+        'wit pr close 123    # Close PR #123',
+        'wit pr list         # List all PRs to find the number',
+      ]
+    );
   }
 
   const repo = Repository.find();
@@ -538,9 +565,14 @@ async function handlePrReopen(args: string[]): Promise<void> {
   const prNumber = parseInt(positional[0], 10);
 
   if (isNaN(prNumber)) {
-    console.error(colors.red('error: ') + 'PR number required');
-    console.error('usage: wit pr reopen <number>');
-    process.exit(1);
+    throw new TsgitError(
+      'PR number required to reopen',
+      ErrorCode.INVALID_ARGUMENT,
+      [
+        'wit pr reopen 123    # Reopen PR #123',
+        'wit pr list --state closed    # List closed PRs',
+      ]
+    );
   }
 
   const repo = Repository.find();

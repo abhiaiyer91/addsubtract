@@ -67,9 +67,12 @@ export async function commitWithOptions(
   // Validate message
   if (!options.message || options.message.trim() === '') {
     throw new TsgitError(
-      'Empty commit message',
+      'Commit message cannot be empty',
       ErrorCode.INVALID_ARGUMENT,
-      ['Provide a message with -m "your message"']
+      [
+        'wit commit -m "Your commit message"',
+        'wit ai commit    # Let AI generate a commit message',
+      ]
     );
   }
 
@@ -99,8 +102,14 @@ export async function commitWithOptions(
         repo.add(file);
       } catch (error) {
         throw new TsgitError(
-          `Cannot commit '${file}': ${error instanceof Error ? error.message : 'Unknown error'}`,
-          ErrorCode.FILE_NOT_FOUND
+          `Cannot commit '${file}': file not found or not accessible`,
+          ErrorCode.FILE_NOT_FOUND,
+          [
+            `Check the file exists: ls ${file}`,
+            'wit status    # See tracked and untracked files',
+            'wit add <file>    # Stage the file first if needed',
+          ],
+          { file, originalError: error instanceof Error ? error.message : 'Unknown error' }
         );
       }
     }
@@ -331,7 +340,15 @@ function getTimezone(): string {
  */
 export async function commit(message: string): Promise<void> {
   if (!message || message.trim() === '') {
-    console.error('error: empty commit message');
+    const error = new TsgitError(
+      'Commit message cannot be empty',
+      ErrorCode.INVALID_ARGUMENT,
+      [
+        'wit commit -m "Your commit message"',
+        'wit ai commit    # Let AI generate a commit message',
+      ]
+    );
+    console.error(error.format());
     process.exit(1);
   }
 
@@ -404,25 +421,15 @@ export async function handleCommit(args: string[]): Promise<void> {
   }
 
   if (!options.message) {
-    console.error('error: switch `m\' requires a value');
-    console.error('\nUsage: wit commit [options] [files...] -m <message>');
-    console.error('\nOptions:');
-    console.error('  -m, --message <msg>  Commit message');
-    console.error('  -a, --all            Stage and commit all tracked changes');
-    console.error('  --amend              Amend the previous commit');
-    console.error('  --allow-empty        Allow empty commits');
-    console.error('  --author <author>    Override author (format: "Name <email>")');
-    console.error('  --no-verify          Skip pre-commit and commit-msg hooks');
-    console.error('  --dry-run            Show what would be committed');
-    console.error('  --closes <issue>     Close issue(s) with this commit (e.g., WIT-1,WIT-2)');
-    console.error('  --refs <issue>       Reference issue(s) without closing');
-    console.error('\nExamples:');
-    console.error('  wit commit -m "Add feature"');
-    console.error('  wit commit -a -m "Update all"');
-    console.error('  wit commit file.ts -m "Fix bug"');
-    console.error('  wit commit -m "Fix login" --closes WIT-123');
-    console.error('  wit commit -m "Progress" --refs WIT-456');
-    process.exit(1);
+    throw new TsgitError(
+      'Commit message is required',
+      ErrorCode.INVALID_ARGUMENT,
+      [
+        'wit commit -m "Your message"    # Commit with a message',
+        'wit ai commit                   # Let AI generate a commit message',
+        'wit commit --help               # See all options',
+      ]
+    );
   }
 
   try {

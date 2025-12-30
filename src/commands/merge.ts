@@ -5,8 +5,15 @@
 
 import { Repository } from '../core/repository';
 import { MergeManager, MergeOptions, formatMergeResult, formatConflict } from '../core/merge';
-import { TsgitError, ErrorCode } from '../core/errors';
+import { TsgitError, ErrorCode, Errors } from '../core/errors';
 import { HookManager } from '../core/hooks';
+
+const colors = {
+  red: (s: string) => `\x1b[31m${s}\x1b[0m`,
+  yellow: (s: string) => `\x1b[33m${s}\x1b[0m`,
+  cyan: (s: string) => `\x1b[36m${s}\x1b[0m`,
+  dim: (s: string) => `\x1b[2m${s}\x1b[0m`,
+};
 
 /**
  * Extended merge options with hook support
@@ -59,8 +66,14 @@ export function mergeAbort(): void {
   const mergeManager = new MergeManager(repo, repo.gitDir);
 
   if (!mergeManager.isInProgress()) {
-    console.error('No merge in progress');
-    process.exit(1);
+    throw new TsgitError(
+      'No merge in progress to abort',
+      ErrorCode.OPERATION_FAILED,
+      [
+        'wit status    # Check repository status',
+        'wit merge <branch>    # Start a new merge',
+      ]
+    );
   }
 
   mergeManager.abort();
@@ -75,8 +88,30 @@ export function mergeContinue(message?: string): void {
   const mergeManager = new MergeManager(repo, repo.gitDir);
 
   if (!mergeManager.isInProgress()) {
-    console.error('No merge in progress');
-    process.exit(1);
+    throw new TsgitError(
+      'No merge in progress to continue',
+      ErrorCode.OPERATION_FAILED,
+      [
+        'wit status    # Check repository status',
+        'wit merge <branch>    # Start a new merge',
+      ]
+    );
+  }
+
+  // Check for unresolved conflicts
+  const unresolved = mergeManager.getUnresolvedConflicts();
+  if (unresolved.length > 0) {
+    const files = unresolved.map(c => c.path);
+    throw new TsgitError(
+      `Cannot continue merge: ${unresolved.length} unresolved conflict(s)`,
+      ErrorCode.MERGE_CONFLICT,
+      [
+        `Unresolved files: ${files.slice(0, 3).join(', ')}${files.length > 3 ? ` (+${files.length - 3} more)` : ''}`,
+        'wit merge --conflicts    # View all conflicts',
+        'wit merge --resolve <file>    # Mark file as resolved after fixing',
+      ],
+      { files }
+    );
   }
 
   try {
@@ -128,8 +163,14 @@ export function resolveFile(filePath: string): void {
   const mergeManager = new MergeManager(repo, repo.gitDir);
 
   if (!mergeManager.isInProgress()) {
-    console.error('No merge in progress');
-    process.exit(1);
+    throw new TsgitError(
+      'No merge in progress - cannot mark file as resolved',
+      ErrorCode.OPERATION_FAILED,
+      [
+        'wit status    # Check repository status',
+        'wit merge <branch>    # Start a new merge',
+      ]
+    );
   }
 
   try {
@@ -138,9 +179,9 @@ export function resolveFile(filePath: string): void {
 
     const remaining = mergeManager.getUnresolvedConflicts();
     if (remaining.length === 0) {
-      console.log('\nAll conflicts resolved. Run `wit merge --continue` to complete.');
+      console.log(`\n${colors.cyan('hint:')} All conflicts resolved. Run ${colors.cyan('wit merge --continue')} to complete.`);
     } else {
-      console.log(`\n${remaining.length} conflict(s) remaining`);
+      console.log(`\n${colors.yellow(remaining.length.toString())} conflict(s) remaining`);
     }
   } catch (error) {
     if (error instanceof TsgitError) {
@@ -201,27 +242,37 @@ export async function handleMerge(args: string[]): Promise<void> {
       break;
     case 'resolve':
       if (!resolveFilePath) {
-        console.error('error: --resolve requires a file path');
-        process.exit(1);
+        throw new TsgitError(
+          '--resolve requires a file path',
+          ErrorCode.INVALID_ARGUMENT,
+          [
+            'wit merge --resolve <file>    # Mark specific file as resolved',
+            'wit merge --conflicts         # View files with conflicts',
+          ]
+        );
       }
       resolveFile(resolveFilePath);
       break;
     case 'merge':
     default:
       if (!branchName) {
-        console.error('error: Branch name required');
-        console.error('\nUsage: wit merge [options] <branch>');
-        console.error('\nOptions:');
-        console.error('  --abort           Abort the current merge');
-        console.error('  --continue        Continue after resolving conflicts');
-        console.error('  --conflicts       Show current conflicts');
-        console.error('  --resolve <file>  Mark file as resolved');
-        console.error('  --no-commit       Perform merge but don\'t commit');
-        console.error('  --no-ff           Create merge commit even for fast-forward');
-        console.error('  --squash          Squash commits');
-        console.error('  --no-verify       Skip post-merge hooks');
-        console.error('  -m <message>      Merge commit message');
-        process.exit(1);
+        const repo = Repository.find();
+        const branches = repo.refs.listBranches();
+        const currentBranch = repo.refs.getCurrentBranch();
+        const otherBranches = branches.filter(b => b !== currentBranch).slice(0, 3);
+
+        const suggestions: string[] = [];
+        if (otherBranches.length > 0) {
+          suggestions.push(`Available branches: ${otherBranches.join(', ')}${branches.length > 4 ? '...' : ''}`);
+        }
+        suggestions.push('wit branch    # List all branches');
+        suggestions.push('wit merge --help    # See all options');
+
+        throw new TsgitError(
+          'Branch name required for merge',
+          ErrorCode.INVALID_ARGUMENT,
+          suggestions
+        );
       }
       await merge(branchName, options);
       break;

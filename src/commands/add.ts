@@ -49,15 +49,12 @@ export function add(files: string[]): void {
           added.push(file);
         } catch (err) {
           if (err instanceof Error && err.message.includes('outside')) {
-            console.error(`error: '${file}' is outside the repository`);
-            console.error('\nhint:');
-            console.error('  Check that you are in the correct directory');
-            process.exit(1);
+            throw Errors.pathOutsideRepository(file);
           }
           throw err;
         }
       }
-      
+
       // Report results
       if (added.length > 0) {
         if (added.length <= 10) {
@@ -68,14 +65,10 @@ export function add(files: string[]): void {
           console.log(`Added ${added.length} files to staging area`);
         }
       }
-      
+
       // Report files not found
       if (notFound.length > 0) {
-        console.error(`\nerror: pathspec '${notFound.join("', '")}' did not match any files`);
-        console.error('\nhint:');
-        console.error('  ls                    # Check files in current directory');
-        console.error('  wit status            # See tracked and untracked files');
-        process.exit(1);
+        throw Errors.pathspecNotFound(notFound.join("', '"));
       }
     }
   } catch (error) {
