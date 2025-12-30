@@ -11,7 +11,7 @@ import { router, protectedProcedure } from '../trpc';
 import { repoModel, repoAiKeyModel } from '../../../db/models';
 
 // Valid AI providers
-const aiProviderSchema = z.enum(['openai', 'anthropic']);
+const aiProviderSchema = z.enum(['openai', 'anthropic', 'coderabbit']);
 
 /**
  * Helper to get repo by owner/name and verify ownership
@@ -156,6 +156,9 @@ export const repoAiKeysRouter = router({
           message: 'Anthropic API keys should start with "sk-ant-"',
         });
       }
+      
+      // CodeRabbit keys don't have a specific prefix requirement
+      // but should be non-empty (already validated by z.string().min(1))
       
       const keyInfo = await repoAiKeyModel.setKey(
         input.repoId,

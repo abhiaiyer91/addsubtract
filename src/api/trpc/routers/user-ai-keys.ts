@@ -11,7 +11,7 @@ import { router, protectedProcedure } from '../trpc';
 import { userAiKeyModel } from '../../../db/models';
 
 // Valid AI providers
-const aiProviderSchema = z.enum(['openai', 'anthropic']);
+const aiProviderSchema = z.enum(['openai', 'anthropic', 'coderabbit']);
 
 export const userAiKeysRouter = router({
   /**
@@ -75,6 +75,9 @@ export const userAiKeysRouter = router({
           message: 'Anthropic API keys should start with "sk-ant-"',
         });
       }
+      
+      // CodeRabbit keys don't have a specific prefix requirement
+      // but should be non-empty (already validated by z.string().min(1))
       
       const keyInfo = await userAiKeyModel.setKey(
         ctx.user.id,
