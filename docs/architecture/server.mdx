@@ -1,0 +1,834 @@
+---
+title: "Server Architecture"
+description: "HTTP, SSH, and API infrastructure"
+---
+
+The `src/server/` module provides wit's hosting platform with HTTP, SSH, and WebSocket protocols. Built on [Hono](https://hono.dev/) for high performance.
+
+## Overview
+
+```mermaid
+flowchart TB
+    subgraph Clients["Clients"]
+        cli["CLI"]
+        web["Web App"]
+        git["Git Client"]
+    end
+
+    subgraph Server["wit Server"]
+        subgraph HTTP["HTTP Layer (Hono)"]
+            rest["REST Routes"]
+            trpc["tRPC API"]
+            auth["Auth Middleware"]
+            ws["WebSocket"]
+        end
+
+        subgraph Git["Git Protocol"]
+            smart["Smart HTTP"]
+            sshsrv["SSH Server"]
+        end
+
+        subgraph Services["Services"]
+            repoMgr["RepoManager"]
+            sandbox["Sandbox Pool"]
+            events["Event Bus"]
+        end
+    end
+
+    subgraph Data["Data Layer"]
+        pg["PostgreSQL"]
+        disk["Disk Storage"]
+    end
+
+    cli --> smart
+    cli --> trpc
+    web --> trpc
+    web --> ws
+    git --> smart
+    git --> sshsrv
+
+    rest --> repoMgr
+    trpc --> pg
+    smart --> repoMgr
+    sshsrv --> repoMgr
+    repoMgr --> disk
+    sandbox --> events
+```
+
+## Key Files
+
+| File | Purpose |
+|------|---------|
+| `index.ts` | Server entry point, startup logic |
+| `routes/git.ts` | Smart HTTP protocol endpoints |
+| `routes/repos.ts` | Repository management |
+| `routes/pulls.ts` | Pull request endpoints |
+| `routes/issues.ts` | Issue management |
+| `routes/packages.ts` | NPM-compatible registry |
+| `routes/agent-stream.ts` | AI agent streaming |
+| `middleware/auth.ts` | Authentication |
+| `middleware/rate-limit.ts` | Rate limiting |
+| `ssh/index.ts` | SSH server |
+| `sandbox/manager.ts` | Sandbox management |
+
+## Server Configuration
+
+```typescript
+interface ServerOptions {
+  port: number;           // HTTP port
+  reposDir: string;       // Repository storage path
+  verbose?: boolean;      // Enable logging
+  host?: string;          // Bind address (default: 0.0.0.0)
+  dataDir?: string;       // Data directory for SSH keys, config
+  ssh?: {
+    enabled: boolean;
+    port?: number;        // SSH port (default: 22)
+    host?: string;
+    hostKeyPaths?: string[];
+    allowAnonymousRead?: boolean;
+    banner?: string;
+  };
+}
+
+interface WitServer {
+  app: Hono;
+  server: ServerType;
+  repoManager: RepoManager;
+  sshServer?: SSHServer;
+  keyManager?: SSHKeyManager;
+  stop: () => Promise<void>;
+}
+```
+
+## Starting the Server
+
+```typescript
+import { startServer } from 'wit/server';
+
+const server = startServer({
+  port: 3000,
+  reposDir: '/var/wit/repos',
+  ssh: {
+    enabled: true,
+    port: 2222,
+  },
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => server.stop());
+```
+
+## HTTP Routes
+
+### Route Organization
+
+```
+/                          # Root
+├── /health               # Health check
+├── /repos                # List repositories
+├── /sync                 # Sync repos to database
+├── /api/
+│   ├── /auth/*          # Better-Auth routes
+│   ├── /repos/*         # Repository REST API
+│   ├── /agent/*         # AI agent streaming
+│   ├── /planning/*      # Multi-agent planning
+│   ├── /sandbox/*       # Sandbox management
+│   └── /packages/*      # Package registry
+├── /trpc/*              # tRPC API
+├── /oauth/*             # OAuth endpoints
+└── /:owner/:repo.wit/*  # Git Smart HTTP
+```
+
+### Creating Routes
+
+Routes are created using Hono's router:
+
+```typescript
+// src/server/routes/repos.ts
+import { Hono } from 'hono';
+
+export function createRepoRoutes(): Hono {
+  const app = new Hono();
+
+  app.get('/:owner/:repo', async (c) => {
+    const { owner, repo } = c.req.param();
+    // Implementation
+    return c.json(repository);
+  });
+
+  app.post('/:owner/:repo', authMiddleware, async (c) => {
+    // Create repository
+  });
+
+  return app;
+}
+```
+
+### Route Registration
+
+```typescript
+// src/server/index.ts
+export function createApp(repoManager: RepoManager): Hono {
+  const app = new Hono();
+
+  // Middleware
+  app.use('*', cors({ /* ... */ }));
+  app.use('*', logger());
+
+  // Routes
+  app.route('/api/repos', createRepoRoutes());
+  app.route('/api/agent', createAgentStreamRoutes());
+  app.route('/', createGitRoutes(repoManager));
+
+  // tRPC
+  app.use('/trpc/*', trpcServer({
+    router: appRouter,
+    createContext,
+  }));
+
+  return app;
+}
+```
+
+## Git Smart HTTP
+
+The Smart HTTP protocol enables Git operations over HTTP.
+
+### Endpoints
+
+```typescript
+// GET /:owner/:repo.wit/info/refs?service=git-upload-pack
+// Returns ref advertisement for fetch
+
+// POST /:owner/:repo.wit/git-upload-pack
+// Handles fetch - returns packfile
+
+// GET /:owner/:repo.wit/info/refs?service=git-receive-pack
+// Returns ref advertisement for push
+
+// POST /:owner/:repo.wit/git-receive-pack
+// Handles push - receives packfile
+```
+
+### Implementation
+
+```typescript
+// src/server/routes/git.ts
+export function createGitRoutes(repoManager: RepoManager): Hono {
+  const app = new Hono();
+
+  // Ref advertisement
+  app.get('/:owner/:repo.wit/info/refs', async (c) => {
+    const service = c.req.query('service');
+    const { owner, repo } = c.req.param();
+
+    const repository = repoManager.getRepo(owner, repo);
+    const refs = repository.refs.listRefs();
+
+    // Format ref advertisement
+    return c.body(formatRefs(refs, service), {
+      headers: {
+        'Content-Type': `application/x-${service}-advertisement`,
+      },
+    });
+  });
+
+  // Upload pack (fetch)
+  app.post('/:owner/:repo.wit/git-upload-pack', async (c) => {
+    const body = await c.req.arrayBuffer();
+    const { wants, haves } = parseUploadPackRequest(body);
+
+    const packfile = await createPackfile(repository, wants, haves);
+
+    return c.body(packfile, {
+      headers: { 'Content-Type': 'application/x-git-upload-pack-result' },
+    });
+  });
+
+  // Receive pack (push)
+  app.post('/:owner/:repo.wit/git-receive-pack', gitAuthMiddleware, async (c) => {
+    const body = await c.req.arrayBuffer();
+    const { commands, packfile } = parseReceivePackRequest(body);
+
+    // Check permissions
+    await checkPushPermissions(c.get('user'), repository, commands);
+
+    // Apply changes
+    await applyPackfile(repository, packfile);
+    await updateRefs(repository, commands);
+
+    // Emit events
+    eventBus.emit(createEvent('push', { repository, commands }));
+
+    return c.body(formatReceivePackResult(results));
+  });
+
+  return app;
+}
+```
+
+### Protocol Flow
+
+```mermaid
+sequenceDiagram
+    participant Client as Git Client
+    participant Server as wit Server
+    participant Repo as Repository
+    participant Events as Event Bus
+
+    Note over Client,Events: Fetch Operation
+    Client->>Server: GET /info/refs?service=git-upload-pack
+    Server->>Repo: List refs
+    Repo-->>Server: Refs
+    Server-->>Client: Ref advertisement
+
+    Client->>Server: POST /git-upload-pack
+    Note right of Client: wants: [commit hashes]<br/>haves: [commit hashes]
+    Server->>Repo: Create packfile
+    Repo-->>Server: Packfile
+    Server-->>Client: Packfile
+
+    Note over Client,Events: Push Operation
+    Client->>Server: GET /info/refs?service=git-receive-pack
+    Server-->>Client: Ref advertisement
+
+    Client->>Server: POST /git-receive-pack
+    Note right of Client: commands + packfile
+    Server->>Server: Verify auth
+    Server->>Server: Check branch protection
+    Server->>Repo: Apply packfile
+    Server->>Repo: Update refs
+    Server->>Events: Emit 'push' event
+    Server-->>Client: Status report
+```
+
+## SSH Server
+
+The SSH server enables Git operations over SSH protocol.
+
+### Configuration
+
+```typescript
+interface SSHServerOptions {
+  hostKeys: Buffer[];          // Host key files
+  port: number;                // SSH port
+  host: string;                // Bind address
+  repoRoot: string;            // Repository root
+  allowAnonymousRead: boolean; // Allow unauthenticated reads
+  banner?: string;             // Welcome banner
+}
+```
+
+### Implementation
+
+```typescript
+// src/server/ssh/index.ts
+import { Server } from 'ssh2';
+
+export class SSHServer extends EventEmitter {
+  private server: Server;
+  private keyManager: SSHKeyManager;
+
+  constructor(options: SSHServerOptions, keyManager: SSHKeyManager) {
+    this.server = new Server({
+      hostKeys: options.hostKeys,
+    });
+
+    this.server.on('connection', (client) => {
+      client.on('authentication', async (ctx) => {
+        if (ctx.method === 'publickey') {
+          const authorized = await this.keyManager.verifyKey(
+            ctx.username,
+            ctx.key
+          );
+          if (authorized) {
+            ctx.accept();
+          } else {
+            ctx.reject();
+          }
+        }
+      });
+
+      client.on('session', (accept) => {
+        const session = accept();
+        session.on('exec', (accept, reject, info) => {
+          this.handleGitCommand(info.command, session);
+        });
+      });
+    });
+  }
+
+  private async handleGitCommand(command: string, session: Session) {
+    // Parse command: git-upload-pack '/owner/repo.git'
+    const match = command.match(/^git-(upload|receive)-pack '([^']+)'$/);
+    if (!match) {
+      session.stderr.write('Invalid command\n');
+      session.exit(1);
+      return;
+    }
+
+    const [, service, repoPath] = match;
+    // Handle Git operation...
+  }
+}
+```
+
+### Key Management
+
+```typescript
+// src/server/ssh/keys.ts
+export class SSHKeyManager {
+  constructor(options: { storagePath: string; accessControl: AccessControl });
+
+  // Verify a public key
+  async verifyKey(username: string, key: ParsedKey): Promise<boolean>;
+
+  // Add a key for user
+  async addKey(userId: string, publicKey: string, title: string): Promise<void>;
+
+  // Remove a key
+  async removeKey(keyId: string): Promise<void>;
+
+  // List user's keys
+  async listKeys(userId: string): Promise<SSHKey[]>;
+}
+```
+
+## tRPC API
+
+Type-safe API layer using tRPC.
+
+### Router Structure
+
+```typescript
+// src/api/trpc/index.ts
+export const appRouter = router({
+  repository: repositoryRouter,
+  pullRequest: pullRequestRouter,
+  issue: issueRouter,
+  user: userRouter,
+  organization: organizationRouter,
+  webhook: webhookRouter,
+  activity: activityRouter,
+  notification: notificationRouter,
+  ai: aiRouter,
+  agent: agentRouter,
+  search: searchRouter,
+  cycle: cycleRouter,
+  project: projectRouter,
+  // ... 35+ routers
+});
+
+export type AppRouter = typeof appRouter;
+```
+
+### Procedure Types
+
+```typescript
+// Public - no auth required
+export const publicProcedure = t.procedure;
+
+// Protected - requires authentication
+export const protectedProcedure = t.procedure.use(isAuthed);
+
+// Repo scoped - requires repo access
+export const repoProcedure = t.procedure
+  .use(isAuthed)
+  .use(withRepoPermission);
+
+// Admin - requires admin role
+export const adminProcedure = t.procedure
+  .use(isAuthed)
+  .use(isRepoAdmin);
+```
+
+### Example Router
+
+```typescript
+// src/api/trpc/routers/repository.ts
+export const repositoryRouter = router({
+  get: publicProcedure
+    .input(z.object({
+      owner: z.string(),
+      name: z.string(),
+    }))
+    .query(async ({ input, ctx }) => {
+      const repo = await db.query.repositories.findFirst({
+        where: and(
+          eq(repositories.ownerName, input.owner),
+          eq(repositories.name, input.name),
+        ),
+      });
+
+      if (!repo) throw new TRPCError({ code: 'NOT_FOUND' });
+
+      // Check visibility
+      if (repo.isPrivate && !ctx.user) {
+        throw new TRPCError({ code: 'FORBIDDEN' });
+      }
+
+      return repo;
+    }),
+
+  create: protectedProcedure
+    .input(z.object({
+      name: z.string(),
+      description: z.string().optional(),
+      isPrivate: z.boolean().default(false),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      // Create repository
+    }),
+});
+```
+
+## Middleware
+
+### Authentication
+
+```typescript
+// src/server/middleware/auth.ts
+export const authMiddleware = async (c: Context, next: Next) => {
+  const auth = c.req.header('Authorization');
+
+  if (auth?.startsWith('Bearer ')) {
+    const token = auth.slice(7);
+    const user = await verifyToken(token);
+    c.set('user', user);
+  }
+
+  await next();
+};
+
+export const requireAuth = async (c: Context, next: Next) => {
+  if (!c.get('user')) {
+    return c.json({ error: 'Unauthorized' }, 401);
+  }
+  await next();
+};
+```
+
+### Git Authentication
+
+```typescript
+export const gitAuthMiddleware = async (c: Context, next: Next) => {
+  const auth = c.req.header('Authorization');
+
+  if (auth?.startsWith('Basic ')) {
+    // Decode Basic auth
+    const credentials = Buffer.from(auth.slice(6), 'base64').toString();
+    const [username, password] = credentials.split(':');
+
+    // Check if password is a token
+    const user = await verifyCredentials(username, password);
+    c.set('user', user);
+  }
+
+  await next();
+};
+```
+
+### Rate Limiting
+
+```typescript
+// src/server/middleware/rate-limit.ts
+import { rateLimiter } from 'hono-rate-limiter';
+
+export const rateLimit = rateLimiter({
+  windowMs: 60 * 1000,  // 1 minute
+  limit: 100,           // 100 requests per window
+  keyGenerator: (c) => c.get('user')?.id || c.req.header('x-forwarded-for'),
+});
+```
+
+## Sandbox System
+
+Sandboxes provide isolated code execution environments.
+
+### Architecture
+
+```mermaid
+flowchart TB
+    subgraph API["API Layer"]
+        routes["Sandbox Routes"]
+        ws["WebSocket"]
+    end
+
+    subgraph Manager["Sandbox Manager"]
+        pool["Instance Pool"]
+        lifecycle["Lifecycle"]
+    end
+
+    subgraph Providers["Providers"]
+        docker["Docker"]
+        e2b["E2B"]
+        daytona["Daytona"]
+    end
+
+    routes --> Manager
+    ws --> Manager
+    Manager --> pool
+    pool --> docker
+    pool --> e2b
+    pool --> daytona
+```
+
+### Provider Interface
+
+```typescript
+// src/server/sandbox/base-provider.ts
+export abstract class SandboxProvider {
+  abstract name: string;
+
+  abstract create(options: CreateOptions): Promise<Sandbox>;
+  abstract destroy(sandboxId: string): Promise<void>;
+  abstract execute(sandboxId: string, command: string): Promise<ExecResult>;
+  abstract writeFile(sandboxId: string, path: string, content: string): Promise<void>;
+  abstract readFile(sandboxId: string, path: string): Promise<string>;
+}
+```
+
+### Sandbox Manager
+
+```typescript
+// src/server/sandbox/manager.ts
+export class SandboxManager {
+  private providers: Map<string, SandboxProvider>;
+  private pool: SandboxPool;
+
+  constructor() {
+    this.providers = new Map();
+    this.pool = new SandboxPool();
+
+    // Register providers
+    if (process.env.E2B_API_KEY) {
+      this.providers.set('e2b', new E2BProvider());
+    }
+    if (process.env.DAYTONA_API_KEY) {
+      this.providers.set('daytona', new DaytonaProvider());
+    }
+    this.providers.set('docker', new DockerProvider());
+  }
+
+  async create(options: SandboxOptions): Promise<Sandbox> {
+    const provider = this.selectProvider(options);
+    return provider.create(options);
+  }
+
+  async execute(sandboxId: string, command: string): Promise<ExecResult> {
+    const sandbox = this.pool.get(sandboxId);
+    return sandbox.provider.execute(sandboxId, command);
+  }
+}
+```
+
+### WebSocket Streaming
+
+```typescript
+// src/server/routes/sandbox-ws.ts
+export function createSandboxWsRoutes(upgradeWebSocket: UpgradeWebSocket): Hono {
+  const app = new Hono();
+
+  app.get('/ws/:sandboxId', upgradeWebSocket((c) => ({
+    onOpen(event, ws) {
+      const { sandboxId } = c.req.param();
+      // Set up terminal stream
+    },
+    onMessage(event, ws) {
+      // Forward input to sandbox
+    },
+    onClose() {
+      // Clean up
+    },
+  })));
+
+  return app;
+}
+```
+
+## Repository Manager
+
+Manages repository storage on disk.
+
+```typescript
+// src/server/storage/repos.ts
+export class RepoManager {
+  constructor(reposDir: string);
+
+  // List all repositories
+  listRepos(): RepoInfo[];
+
+  // Get repository by owner/name
+  getRepo(owner: string, name: string): Repository;
+
+  // Create new repository
+  createRepo(owner: string, name: string): Repository;
+
+  // Delete repository
+  deleteRepo(owner: string, name: string): void;
+
+  // Check if repository exists
+  exists(owner: string, name: string): boolean;
+}
+```
+
+## Database Sync
+
+Sync filesystem repositories to database.
+
+```typescript
+// src/server/storage/sync.ts
+export async function syncReposToDatabase(
+  repoManager: RepoManager
+): Promise<SyncResult[]> {
+  const repos = repoManager.listRepos();
+  const results: SyncResult[] = [];
+
+  for (const repo of repos) {
+    try {
+      // Check if exists in database
+      const existing = await db.query.repositories.findFirst({
+        where: and(
+          eq(repositories.ownerName, repo.owner),
+          eq(repositories.name, repo.name),
+        ),
+      });
+
+      if (!existing) {
+        // Create database record
+        await db.insert(repositories).values({
+          ownerName: repo.owner,
+          name: repo.name,
+          diskPath: repo.path,
+          // ... other fields
+        });
+        results.push({ repo, action: 'created' });
+      } else {
+        results.push({ repo, action: 'skipped' });
+      }
+    } catch (error) {
+      results.push({ repo, action: 'error', error });
+    }
+  }
+
+  return results;
+}
+```
+
+## Event Integration
+
+Server integrates with the event system:
+
+```typescript
+// On server start
+registerNotificationHandlers();
+registerCIHandlers();
+registerTriageHandlers();
+registerMergeQueueHandlers();
+registerMarketingHandlers();
+```
+
+Events are emitted for:
+- Push operations
+- PR creation/updates
+- Issue creation/updates
+- Merge queue state changes
+- CI status changes
+
+## Health Check
+
+```typescript
+app.get('/health', async (c) => {
+  const dbStatus = await dbHealthCheck();
+
+  return c.json({
+    status: dbStatus.ok ? 'ok' : 'degraded',
+    version: '2.0.0',
+    timestamp: new Date().toISOString(),
+    database: {
+      connected: dbStatus.ok,
+      latency: dbStatus.latency,
+    },
+  });
+});
+```
+
+## Extension Points
+
+### Adding Routes
+
+```typescript
+// 1. Create route file
+// src/server/routes/my-routes.ts
+export function createMyRoutes(): Hono {
+  const app = new Hono();
+  app.get('/my-endpoint', (c) => c.json({ ok: true }));
+  return app;
+}
+
+// 2. Register in createApp
+app.route('/api/my-feature', createMyRoutes());
+```
+
+### Adding Sandbox Provider
+
+```typescript
+// 1. Implement provider
+class MyProvider extends SandboxProvider {
+  name = 'my-provider';
+
+  async create(options: CreateOptions) { /* ... */ }
+  async destroy(sandboxId: string) { /* ... */ }
+  // ... other methods
+}
+
+// 2. Register in manager
+this.providers.set('my-provider', new MyProvider());
+```
+
+### Adding Middleware
+
+```typescript
+// 1. Create middleware
+const myMiddleware = async (c: Context, next: Next) => {
+  // Pre-processing
+  await next();
+  // Post-processing
+};
+
+// 2. Apply to routes
+app.use('/api/*', myMiddleware);
+```
+
+## Environment Variables
+
+```bash
+# Server
+PORT=3000
+HOST=0.0.0.0
+
+# Database
+DATABASE_URL=postgresql://user:pass@localhost:5432/wit
+
+# CORS
+CORS_ORIGINS=http://localhost:5173,http://localhost:3000
+
+# SSH
+SSH_PORT=2222
+SSH_HOST_KEY_PATH=/path/to/key
+
+# Sandbox providers
+E2B_API_KEY=...
+DAYTONA_API_KEY=...
+```
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="Self-Hosting" icon="server" href="/platform/self-hosting">
+    Deployment guide
+  </Card>
+  <Card title="API Reference" icon="code" href="/api-reference/overview">
+    API documentation
+  </Card>
+</CardGroup>
