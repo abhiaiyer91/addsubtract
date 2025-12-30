@@ -1208,9 +1208,9 @@ export function PlanningPage() {
 
   // Fetch current run data if we have a runId
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: existingRun } = (trpc as any).planning?.getRun?.useQuery(
+  const { data: existingRun, error: existingRunError, isLoading: isLoadingRun } = (trpc as any).planning?.getRun?.useQuery(
     { runId: urlRunId! },
-    { enabled: !!urlRunId }
+    { enabled: !!urlRunId, retry: false }
   ) as { 
     data: {
       id: string;
@@ -1228,6 +1228,8 @@ export function PlanningPage() {
       createBranch: boolean;
       branchName?: string;
     } | undefined;
+    error: { message: string } | null;
+    isLoading: boolean;
   };
 
   // Activity log helper
@@ -1794,6 +1796,25 @@ export function PlanningPage() {
                   Add an API key in repository settings to use AI planning.
                 </p>
               </div>
+            </div>
+          )}
+
+          {/* Run Not Found Error */}
+          {urlRunId && existingRunError && !isLoadingRun && (
+            <div className="flex items-center gap-3 p-4 rounded-xl bg-destructive/10 border border-destructive/30">
+              <AlertCircle className="h-5 w-5 text-destructive shrink-0" />
+              <div className="flex-1">
+                <p className="font-medium text-destructive">
+                  Run not found
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  This planning run may have expired or been deleted. Start a new task to continue.
+                </p>
+              </div>
+              <Button variant="outline" size="sm" onClick={handleNewTask}>
+                <Plus className="h-4 w-4 mr-1" />
+                New Task
+              </Button>
             </div>
           )}
 
