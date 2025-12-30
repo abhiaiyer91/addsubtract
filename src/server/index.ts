@@ -36,6 +36,7 @@ import { createSandboxRoutes, createSandboxWsRoutes } from './routes/sandbox-ws'
 import { createRepoRoutes } from './routes/repos';
 import { createPullRoutes } from './routes/pulls';
 import { createPublicApiV1 } from './routes/public-api';
+import { createStorageRoutes } from './routes/storage';
 import { RepoManager } from './storage/repos';
 import { syncReposToDatabase } from './storage/sync';
 import { appRouter, createContext } from '../api/trpc';
@@ -218,6 +219,10 @@ export function createApp(repoManager: RepoManager, options: { verbose?: boolean
   // Public REST API v1 (GitHub-compatible)
   const publicApiV1 = createPublicApiV1();
   app.route('/api/v1', publicApiV1);
+
+  // Storage configuration API
+  const storageRoutes = createStorageRoutes();
+  app.route('/api/storage', storageRoutes);
 
   // Package registry routes (npm-compatible)
   // Base URL is used for generating tarball download URLs
