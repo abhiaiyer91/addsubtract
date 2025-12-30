@@ -63,13 +63,10 @@ export function PullsPage() {
     { enabled: !!repoData?.repo.id }
   );
 
-  // Fetch counts for both states (for tab badges)
-  const { data: openPullsData } = trpc.pulls.list.useQuery(
-    { repoId: repoData?.repo.id!, state: 'open', limit: 100 },
-    { enabled: !!repoData?.repo.id }
-  );
-  const { data: closedPullsData } = trpc.pulls.list.useQuery(
-    { repoId: repoData?.repo.id!, state: 'closed', limit: 100 },
+  // Fetch counts
+  // @ts-expect-error - Type generation may be stale
+  const { data: prCounts } = trpc.pulls.count.useQuery(
+    { repoId: repoData?.repo.id! },
     { enabled: !!repoData?.repo.id }
   );
 
@@ -88,8 +85,8 @@ export function PullsPage() {
   });
 
   // Count PRs by state
-  const openCount = openPullsData?.length || 0;
-  const closedCount = closedPullsData?.length || 0;
+  const openCount = prCounts?.open || 0;
+  const closedCount = (prCounts?.closed || 0) + (prCounts?.merged || 0);
 
   const handleStateChange = (state: string) => {
     const params = new URLSearchParams(searchParams);

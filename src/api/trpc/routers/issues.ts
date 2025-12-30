@@ -75,6 +75,24 @@ export const issuesRouter = router({
     }),
 
   /**
+   * Count issues for a repository
+   */
+  count: publicProcedure
+    .input(
+      z.object({
+        repoId: z.string().uuid(),
+        projectId: z.string().uuid().optional(),
+        cycleId: z.string().uuid().optional(),
+      })
+    )
+    .query(async ({ input }) => {
+      return issueModel.countByRepo(input.repoId, {
+        projectId: input.projectId,
+        cycleId: input.cycleId,
+      });
+    }),
+
+  /**
    * Get a single issue by number (with author, labels, assignee)
    */
   get: publicProcedure

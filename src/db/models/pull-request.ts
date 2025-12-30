@@ -1,4 +1,4 @@
-import { eq, and, desc, sql, inArray, or, isNull, isNotNull, ne } from 'drizzle-orm';
+import { eq, and, desc, sql, inArray, or, isNull, isNotNull, ne, count } from 'drizzle-orm';
 import { getDb } from '../index';
 import {
   pullRequests,
@@ -212,6 +212,55 @@ export const prModel = {
     }
 
     return query;
+  },
+
+  /**
+   * Count PRs by repo
+   */
+  async countByRepo(
+    repoId: string,
+    options: {
+      authorId?: string;
+    } = {}
+  ): Promise<{ open: number; closed: number; merged: number; total: number }> {
+    const db = getDb();
+    const conditions = [eq(pullRequests.repoId, repoId)];
+
+    if (options.authorId) {
+      conditions.push(eq(pullRequests.authorId, options.authorId));
+    }
+
+    // Count open PRs
+    const openConditions = [...conditions, eq(pullRequests.state, 'open')];
+    const [openResult] = await db
+      .select({ count: count() })
+      .from(pullRequests)
+      .where(and(...openConditions));
+
+    // Count closed PRs
+    const closedConditions = [...conditions, eq(pullRequests.state, 'closed')];
+    const [closedResult] = await db
+      .select({ count: count() })
+      .from(pullRequests)
+      .where(and(...closedConditions));
+
+    // Count merged PRs
+    const mergedConditions = [...conditions, eq(pullRequests.state, 'merged')];
+    const [mergedResult] = await db
+      .select({ count: count() })
+      .from(pullRequests)
+      .where(and(...mergedConditions));
+
+    const openCount = Number(openResult?.count ?? 0);
+    const closedCount = Number(closedResult?.count ?? 0);
+    const mergedCount = Number(mergedResult?.count ?? 0);
+
+    return {
+      open: openCount,
+      closed: closedCount,
+      merged: mergedCount,
+      total: openCount + closedCount + mergedCount,
+    };
   },
 
   /**

@@ -322,6 +322,63 @@ export const issueModel = {
   },
 
   /**
+   * Count issues by repo with filtering
+   */
+  async countByRepo(
+    repoId: string,
+    options: {
+      state?: 'open' | 'closed';
+      status?: IssueStatus;
+      priority?: IssuePriority;
+      assigneeId?: string;
+      projectId?: string;
+      cycleId?: string;
+    } = {}
+  ): Promise<{ open: number; closed: number; total: number }> {
+    const db = getDb();
+    const conditions = [eq(issues.repoId, repoId)];
+
+    if (options.status) {
+      conditions.push(eq(issues.status, options.status));
+    }
+    if (options.priority) {
+      conditions.push(eq(issues.priority, options.priority));
+    }
+    if (options.assigneeId) {
+      conditions.push(eq(issues.assigneeId, options.assigneeId));
+    }
+    if (options.projectId) {
+      conditions.push(eq(issues.projectId, options.projectId));
+    }
+    if (options.cycleId) {
+      conditions.push(eq(issues.cycleId, options.cycleId));
+    }
+
+    // Count open issues
+    const openConditions = [...conditions, eq(issues.state, 'open')];
+    const [openResult] = await db
+      .select({ count: count() })
+      .from(issues)
+      .where(and(...openConditions));
+
+    // Count closed issues
+    const closedConditions = [...conditions, eq(issues.state, 'closed')];
+    const [closedResult] = await db
+      .select({ count: count() })
+      .from(issues)
+      .where(and(...closedConditions));
+
+    const openCount = Number(openResult?.count ?? 0);
+    const closedCount = Number(closedResult?.count ?? 0);
+
+    return {
+      open: openCount,
+      closed: closedCount,
+      total: openCount + closedCount,
+    };
+  },
+
+  /**
    * List issues with authors for Kanban board (optimized single query)
    */
   async listByRepoWithAuthors(

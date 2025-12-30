@@ -332,6 +332,19 @@ export const pullsRouter = router({
     }),
 
   /**
+   * Count pull requests for a repository
+   */
+  count: publicProcedure
+    .input(
+      z.object({
+        repoId: z.string().uuid(),
+      })
+    )
+    .query(async ({ input }) => {
+      return prModel.countByRepo(input.repoId);
+    }),
+
+  /**
    * Get a single pull request by number (with author and labels)
    */
   get: publicProcedure
