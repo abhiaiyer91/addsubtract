@@ -2160,6 +2160,624 @@ The goal: documentation should live alongside code, not in a separate tool.`,
 
 The goal: stay informed about what's happening in your projects.`,
   },
+  // Storage & Scaling
+  {
+    id: 'repository-sharding',
+    title: 'Design Repository Sharding Strategy',
+    category: 'Infrastructure',
+    priority: 'P2',
+    tags: ['scaling', 'storage', 'architecture'],
+    prompt: `I'm contributing to wit, an AI-native Git platform. Please help me design a repository sharding strategy for scaling beyond a single volume.
+
+1. Research how others solve this:
+   - GitHub uses "Spokes" (DGit) with 3-way replication
+   - GitLab uses Gitaly for distributed git storage
+   - Study consistent hashing for shard assignment
+
+2. Understand current storage:
+   - Check src/server/storage/ for current implementation
+   - Look at how repos are stored on disk
+   - Identify the storage abstraction layer
+
+3. Design the sharding system:
+   - Shard assignment: hash(repo_id) -> shard_id
+   - Routing layer: map requests to correct shard
+   - Metadata store: track repo -> shard mapping
+   - Support for multiple volumes/mount points
+
+4. Implementation approach:
+   - Create src/core/storage/shard-manager.ts
+   - Add shard configuration to config
+   - Implement shard discovery and health checks
+   - Add migration tools for rebalancing
+
+5. Consider:
+   - Hot/cold tiering for frequently vs rarely accessed repos
+   - Replication strategy (single, 2x, 3x)
+   - Failover and recovery
+   - Cross-shard operations (forks, mirrors)
+
+6. CLI commands:
+   - wit admin shards list
+   - wit admin shards add /mnt/storage2
+   - wit admin shards rebalance
+   - wit admin shards status
+
+7. Write tests and documentation
+
+The goal: support millions of repositories across multiple storage volumes.`,
+  },
+  {
+    id: 'git-lfs-support',
+    title: 'Implement Git LFS Support',
+    category: 'Platform',
+    priority: 'P2',
+    tags: ['git', 'lfs', 'storage'],
+    prompt: `I'm contributing to wit, an AI-native Git platform. Please help me implement Git LFS (Large File Storage) support.
+
+1. Understand Git LFS protocol:
+   - LFS uses pointer files in git, actual files in separate storage
+   - HTTP API for batch uploads/downloads
+   - Authentication integration
+
+2. Check current state:
+   - Look for any existing LFS code
+   - Check src/server/routes/ for git endpoints
+   - Understand the storage layer
+
+3. Implement LFS server:
+   - POST /objects/batch - batch API endpoint
+   - PUT /objects/:oid - upload object
+   - GET /objects/:oid - download object
+   - Verify endpoint for uploads
+
+4. Storage backend:
+   - Store LFS objects separately from git repos
+   - Support local filesystem initially
+   - Abstract for S3/GCS/Azure later
+   - Content-addressable storage (by SHA-256)
+
+5. CLI integration:
+   - wit lfs install
+   - wit lfs track "*.psd"
+   - wit lfs ls-files
+   - wit lfs migrate
+
+6. Web UI:
+   - Show LFS file indicators
+   - Display LFS storage usage
+   - Download button for LFS files
+
+7. Quota management:
+   - Per-repo LFS quota
+   - Per-user LFS quota
+   - Usage tracking and alerts
+
+8. Write tests and documentation
+
+The goal: handle large binary files (images, videos, models) efficiently.`,
+  },
+  {
+    id: 'webhooks-system',
+    title: 'Implement Webhooks System',
+    category: 'Platform',
+    priority: 'P2',
+    tags: ['webhooks', 'integrations', 'events'],
+    prompt: `I'm contributing to wit, an AI-native Git platform. Please help me implement a comprehensive webhooks system.
+
+1. Understand current event system:
+   - Check src/events/ for event bus
+   - Look at existing event types
+   - Review how events are dispatched
+
+2. Webhook events to support:
+   - push - code pushed to repo
+   - pull_request - PR opened/closed/merged
+   - pull_request_review - review submitted
+   - issues - issue opened/closed
+   - issue_comment - comment added
+   - create/delete - branch/tag created/deleted
+   - release - release published
+   - star - repo starred
+   - fork - repo forked
+
+3. Database models:
+   - webhooks table (id, repo_id, url, secret, events, active)
+   - webhook_deliveries (id, webhook_id, event, payload, response, status)
+   - Create in src/db/models/webhooks.ts
+
+4. Webhook delivery:
+   - Queue-based delivery (don't block on HTTP)
+   - Retry with exponential backoff
+   - Signature verification (HMAC-SHA256)
+   - Delivery logs with request/response
+
+5. API endpoints:
+   - POST /repos/:id/hooks - create webhook
+   - GET /repos/:id/hooks - list webhooks
+   - PATCH /repos/:id/hooks/:id - update
+   - DELETE /repos/:id/hooks/:id - delete
+   - POST /repos/:id/hooks/:id/test - send test
+
+6. CLI commands:
+   - wit webhook create --url https://...
+   - wit webhook list
+   - wit webhook test 123
+   - wit webhook deliveries 123
+
+7. Web UI:
+   - Webhooks settings in repo settings
+   - Event selector
+   - Delivery history with payloads
+   - Redeliver button
+
+8. Write tests and documentation
+
+The goal: enable integrations with external services via webhooks.`,
+  },
+  {
+    id: 'api-rate-limiting',
+    title: 'Implement API Rate Limiting',
+    category: 'Infrastructure',
+    priority: 'P2',
+    tags: ['api', 'security', 'rate-limiting'],
+    prompt: `I'm contributing to wit, an AI-native Git platform. Please help me implement API rate limiting to protect the platform.
+
+1. Understand current API:
+   - Check src/api/ for API structure
+   - Look at src/server/middleware/ for existing middleware
+   - Review authentication flow
+
+2. Rate limiting strategy:
+   - Per-user limits (authenticated)
+   - Per-IP limits (unauthenticated)
+   - Per-endpoint limits (some endpoints more expensive)
+   - Burst allowance for short spikes
+
+3. Implementation:
+   - Create src/server/middleware/rate-limit.ts
+   - Use sliding window algorithm
+   - Store in Redis or in-memory for single instance
+   - Return proper headers (X-RateLimit-*)
+
+4. Rate limit tiers:
+   - Anonymous: 60 requests/hour
+   - Authenticated: 5000 requests/hour
+   - CI/bots: 10000 requests/hour
+   - Custom limits per user/org
+
+5. Response headers:
+   - X-RateLimit-Limit: max requests
+   - X-RateLimit-Remaining: requests left
+   - X-RateLimit-Reset: reset timestamp
+   - Retry-After: on 429 response
+
+6. Graceful handling:
+   - Return 429 Too Many Requests
+   - Include helpful message
+   - Suggest waiting or upgrading
+
+7. Admin controls:
+   - wit admin rate-limits list
+   - wit admin rate-limits set user:123 10000
+   - Rate limit dashboard in admin UI
+
+8. Write tests and documentation
+
+The goal: protect the platform from abuse while allowing legitimate heavy usage.`,
+  },
+  {
+    id: 'backup-restore',
+    title: 'Implement Backup and Restore System',
+    category: 'Infrastructure',
+    priority: 'P2',
+    tags: ['backup', 'disaster-recovery', 'ops'],
+    prompt: `I'm contributing to wit, an AI-native Git platform. Please help me implement a backup and restore system.
+
+1. Identify what needs backup:
+   - Git repositories (bare repos on disk)
+   - Database (PostgreSQL)
+   - LFS objects (if implemented)
+   - Configuration files
+   - Uploaded assets (avatars, attachments)
+
+2. Backup strategies:
+   - Full backup: everything
+   - Incremental: only changes since last backup
+   - Differential: changes since last full backup
+   - Continuous: real-time replication
+
+3. Implementation:
+   - Create src/core/backup.ts
+   - Backup scheduler (cron-style)
+   - Backup storage (local, S3, GCS)
+   - Encryption at rest
+   - Compression
+
+4. CLI commands:
+   - wit admin backup create
+   - wit admin backup create --incremental
+   - wit admin backup list
+   - wit admin backup restore <backup-id>
+   - wit admin backup schedule "0 2 * * *"
+
+5. Database backup:
+   - Use pg_dump for PostgreSQL
+   - Point-in-time recovery with WAL
+   - Test restore regularly
+
+6. Git repository backup:
+   - Git bundle or tar of bare repos
+   - Incremental with git pack
+   - Verify integrity after backup
+
+7. Restore procedures:
+   - Document step-by-step restore
+   - Test restore in isolated environment
+   - Partial restore (single repo)
+   - Point-in-time restore
+
+8. Monitoring:
+   - Backup success/failure alerts
+   - Backup age warnings
+   - Storage usage tracking
+
+9. Write tests and documentation
+
+The goal: never lose data, recover quickly from any failure.`,
+  },
+  {
+    id: 'object-storage-backend',
+    title: 'Add S3/Object Storage Backend',
+    category: 'Infrastructure',
+    priority: 'P2',
+    tags: ['storage', 's3', 'cloud'],
+    prompt: `I'm contributing to wit, an AI-native Git platform. Please help me add S3-compatible object storage support.
+
+1. Understand current storage:
+   - Check src/server/storage/ for current implementation
+   - Identify what uses local filesystem
+   - Find abstraction points
+
+2. Storage types to migrate:
+   - LFS objects
+   - Attachments (issue/PR attachments)
+   - Avatars and images
+   - Backup archives
+   - (NOT git repos - those stay on filesystem)
+
+3. Create storage abstraction:
+   - src/core/storage/provider.ts - interface
+   - src/core/storage/local.ts - local filesystem
+   - src/core/storage/s3.ts - S3-compatible
+   - Support: AWS S3, MinIO, Cloudflare R2, GCS, Azure Blob
+
+4. S3 implementation:
+   - Use @aws-sdk/client-s3
+   - Presigned URLs for uploads/downloads
+   - Multipart uploads for large files
+   - Server-side encryption
+
+5. Configuration:
+   STORAGE_PROVIDER=s3
+   S3_BUCKET=wit-storage
+   S3_REGION=us-east-1
+   S3_ENDPOINT=https://s3.amazonaws.com  # or MinIO URL
+   S3_ACCESS_KEY=...
+   S3_SECRET_KEY=...
+
+6. Migration tools:
+   - wit admin storage migrate local-to-s3
+   - Progress tracking
+   - Verification
+   - Rollback capability
+
+7. CLI commands:
+   - wit admin storage status
+   - wit admin storage usage
+
+8. Write tests (mock S3 with localstack)
+
+The goal: support cloud object storage for scalability and cost efficiency.`,
+  },
+  {
+    id: 'repository-mirroring',
+    title: 'Implement Repository Mirroring',
+    category: 'Platform',
+    priority: 'P2',
+    tags: ['git', 'mirroring', 'sync'],
+    prompt: `I'm contributing to wit, an AI-native Git platform. Please help me implement repository mirroring.
+
+1. Mirror types:
+   - Push mirror: wit pushes to external remote
+   - Pull mirror: wit pulls from external remote
+   - Two-way sync (advanced)
+
+2. Check existing code:
+   - Look at src/core/remote.ts
+   - Check for any sync functionality
+   - Review git fetch/push implementation
+
+3. Pull mirror (import from external):
+   - wit mirror add https://github.com/org/repo --pull
+   - Scheduled sync (every N minutes)
+   - Only pulls, local changes forbidden
+   - Good for read-only mirrors
+
+4. Push mirror (export to external):
+   - wit mirror add https://github.com/org/repo --push
+   - Push on every local push
+   - Keep external repo in sync
+   - Useful for backup or migration
+
+5. Database model:
+   - mirrors table (id, repo_id, url, type, interval, last_sync)
+   - mirror_logs (sync history)
+
+6. Implementation:
+   - src/core/mirror.ts
+   - Background job for scheduled syncs
+   - Handle authentication (tokens, SSH keys)
+   - Conflict detection for two-way
+
+7. CLI commands:
+   - wit mirror add <url> --pull|--push
+   - wit mirror list
+   - wit mirror sync <id>
+   - wit mirror remove <id>
+   - wit mirror status
+
+8. Web UI:
+   - Mirror settings in repo settings
+   - Sync status and history
+   - Manual sync button
+
+9. Write tests and documentation
+
+The goal: keep repositories synchronized across platforms.`,
+  },
+  {
+    id: 'audit-logging',
+    title: 'Implement Comprehensive Audit Logging',
+    category: 'Security',
+    priority: 'P2',
+    tags: ['security', 'audit', 'compliance'],
+    prompt: `I'm contributing to wit, an AI-native Git platform. Please help me implement comprehensive audit logging.
+
+1. Events to audit:
+   - Authentication: login, logout, failed attempts
+   - Repository: create, delete, visibility change
+   - Access: permission changes, team membership
+   - Git operations: push, force push, branch delete
+   - Admin actions: user management, settings changes
+   - Sensitive: SSH key added, token created
+
+2. Audit log schema:
+   - timestamp
+   - actor (user_id, username)
+   - action (e.g., "repo.create")
+   - target (e.g., repo_id, user_id)
+   - metadata (additional context)
+   - ip_address
+   - user_agent
+   - result (success/failure)
+
+3. Implementation:
+   - src/core/audit.ts - audit logger
+   - src/db/models/auditLogs.ts - database model
+   - Integration points in relevant code
+
+4. Storage considerations:
+   - High volume - consider separate table/database
+   - Retention policy (e.g., 90 days, 1 year)
+   - Archival to cold storage
+
+5. CLI commands:
+   - wit admin audit --user alice
+   - wit admin audit --repo org/project
+   - wit admin audit --action "repo.*"
+   - wit admin audit --since "2024-01-01"
+   - wit admin audit export --format json
+
+6. Web UI:
+   - Audit log page for admins
+   - Filters: user, action, date range
+   - Search functionality
+   - Export to CSV
+
+7. Security:
+   - Audit logs are append-only
+   - Protected from tampering
+   - Access restricted to admins
+
+8. Write tests and documentation
+
+The goal: complete visibility into all actions for security and compliance.`,
+  },
+  {
+    id: 'ssh-key-management',
+    title: 'Improve SSH Key Management',
+    category: 'Security',
+    priority: 'P2',
+    tags: ['ssh', 'security', 'authentication'],
+    prompt: `I'm contributing to wit, an AI-native Git platform. Please help me improve SSH key management.
+
+1. Understand current implementation:
+   - Check src/server/ssh/ for SSH server
+   - Look at src/db/models/sshKeys.ts
+   - Review key authentication flow
+
+2. Key management features:
+   - Add multiple SSH keys per user
+   - Key titles/labels for identification
+   - Key fingerprint display
+   - Last used timestamp
+   - Key expiration (optional)
+
+3. Key types to support:
+   - RSA (2048, 4096 bit)
+   - Ed25519 (recommended)
+   - ECDSA
+   - Reject weak keys (< 2048 bit RSA)
+
+4. CLI commands:
+   - wit ssh-key add < ~/.ssh/id_ed25519.pub
+   - wit ssh-key add --title "Work laptop"
+   - wit ssh-key list
+   - wit ssh-key remove <fingerprint>
+   - wit ssh-key test
+
+5. Web UI improvements:
+   - SSH keys settings page
+   - Add key form with validation
+   - Show fingerprint and type
+   - Last used indicator
+   - Delete confirmation
+
+6. Security features:
+   - Validate key format before saving
+   - Check for duplicate keys (across all users)
+   - Notify user when key is used from new IP
+   - Audit log for key operations
+
+7. Deploy keys (per-repo):
+   - Read-only or read-write keys
+   - For CI/CD systems
+   - Scoped to single repository
+
+8. Signing keys:
+   - Git commit signing with SSH keys
+   - Key verification for signed commits
+
+9. Write tests and documentation
+
+The goal: secure, user-friendly SSH key management.`,
+  },
+  {
+    id: 'two-factor-auth',
+    title: 'Implement Two-Factor Authentication',
+    category: 'Security',
+    priority: 'P2',
+    tags: ['2fa', 'security', 'authentication'],
+    prompt: `I'm contributing to wit, an AI-native Git platform. Please help me implement two-factor authentication (2FA).
+
+1. 2FA methods to support:
+   - TOTP (Time-based One-Time Password) - Authenticator apps
+   - Recovery codes - backup for lost device
+   - WebAuthn/FIDO2 (future) - hardware keys
+
+2. Check current auth:
+   - src/core/auth.ts
+   - src/db/models/users.ts
+   - src/lib/auth.ts
+
+3. TOTP implementation:
+   - Generate secret for user
+   - Show QR code for scanning
+   - Verify code to enable
+   - Store encrypted secret
+
+4. Recovery codes:
+   - Generate 10 single-use codes
+   - Store hashed codes
+   - User can regenerate codes
+   - Warn when codes are low
+
+5. Database changes:
+   - users.two_factor_enabled
+   - users.two_factor_secret (encrypted)
+   - two_factor_recovery_codes table
+
+6. Login flow with 2FA:
+   - Username/password first
+   - Then 2FA code screen
+   - Remember device option (30 days)
+   - Recovery code fallback
+
+7. CLI commands:
+   - wit auth 2fa enable
+   - wit auth 2fa disable
+   - wit auth 2fa recovery-codes
+
+8. Web UI:
+   - 2FA setup wizard
+   - QR code display
+   - Recovery codes display (show once)
+   - Disable 2FA (requires current code)
+
+9. Git operations with 2FA:
+   - Use SSH keys (no change)
+   - Or personal access tokens
+   - Password auth requires token
+
+10. Write tests and documentation
+
+The goal: optional but encouraged 2FA for enhanced security.`,
+  },
+  {
+    id: 'personal-access-tokens',
+    title: 'Implement Personal Access Tokens',
+    category: 'Security',
+    priority: 'P2',
+    tags: ['tokens', 'api', 'authentication'],
+    prompt: `I'm contributing to wit, an AI-native Git platform. Please help me implement personal access tokens (PATs).
+
+1. Understand current auth:
+   - Check src/core/auth.ts
+   - Look at API authentication
+   - Review session handling
+
+2. Token features:
+   - Create tokens with custom name
+   - Expiration date (optional)
+   - Scoped permissions
+   - Revoke individual tokens
+
+3. Token scopes:
+   - repo - full repository access
+   - repo:read - read-only repo access
+   - user - user profile access
+   - org - organization access
+   - admin - admin operations
+   - write:packages - package registry
+
+4. Database model:
+   - personal_access_tokens table
+   - id, user_id, name, token_hash, scopes, expires_at, last_used
+
+5. Token format:
+   - wit_pat_xxxxxxxxxxxx (prefix for identification)
+   - Secure random generation
+   - Only show full token once on creation
+
+6. CLI commands:
+   - wit token create --name "CI" --scopes repo
+   - wit token create --expires 90d
+   - wit token list
+   - wit token revoke <id>
+
+7. Web UI:
+   - Tokens settings page
+   - Create token form with scope checkboxes
+   - Show token once with copy button
+   - Token list with last used
+   - Revoke button with confirmation
+
+8. Usage:
+   - Git: use as password for HTTPS
+   - API: Authorization: Bearer <token>
+   - Show scope errors clearly
+
+9. Security:
+   - Rate limit per token
+   - Audit log token usage
+   - Email on new token creation
+   - Expire unused tokens
+
+10. Write tests and documentation
+
+The goal: secure, scoped tokens for API and git access.`,
+  },
   // Add more P2 and P3 items following the same pattern...
   {
     id: 'git-achievements',
@@ -2209,6 +2827,416 @@ The goal: stay informed about what's happening in your projects.`,
 7. Write tests (and have fun!)
 
 The goal: make using wit delightful with small rewards.`,
+  },
+  {
+    id: 'cli-themes',
+    title: 'Add CLI Themes and Customization',
+    category: 'Fun',
+    priority: 'P3',
+    tags: ['cli', 'themes', 'customization'],
+    prompt: `I'm contributing to wit, an AI-native Git platform. Please help me add CLI themes and customization.
+
+1. Theme system:
+   - Color schemes for CLI output
+   - Preset themes: default, dracula, monokai, nord, solarized
+   - Custom themes via config
+
+2. Configuration:
+   - wit config theme dracula
+   - wit config theme custom --primary "#ff79c6"
+   - Store in ~/.witconfig or wit.toml
+
+3. Customizable elements:
+   - Branch colors (current, local, remote)
+   - Status colors (modified, added, deleted)
+   - Prompt colors
+   - Error/warning/success colors
+   - Diff colors
+
+4. Implementation:
+   - src/ui/themes.ts - theme definitions
+   - src/ui/colors.ts - color helpers
+   - Update all CLI output to use theme
+
+5. CLI commands:
+   - wit themes list
+   - wit themes preview <name>
+   - wit themes set <name>
+   - wit themes export
+   - wit themes import
+
+6. Fun extras:
+   - Nyan cat progress bar
+   - ASCII art banners
+   - Seasonal themes (halloween, christmas)
+   - wit vibes command for mood
+
+7. Write tests and documentation
+
+The goal: let developers personalize their git experience.`,
+  },
+  {
+    id: 'git-aliases',
+    title: 'Implement Smart Git Aliases',
+    category: 'CLI',
+    priority: 'P3',
+    tags: ['cli', 'productivity', 'aliases'],
+    prompt: `I'm contributing to wit, an AI-native Git platform. Please help me implement a smart alias system.
+
+1. Built-in aliases:
+   - wit co = wit checkout
+   - wit br = wit branch
+   - wit ci = wit commit
+   - wit st = wit status
+   - wit lg = wit log --oneline --graph
+
+2. Custom aliases:
+   - wit alias add wip "commit -m 'WIP' --no-verify"
+   - wit alias add undo "reset HEAD~1 --soft"
+   - wit alias add nah "reset --hard && clean -fd"
+
+3. Shell command aliases:
+   - wit alias add count "!git rev-list --count HEAD"
+   - Support for shell expansion
+   - Pipeline support
+
+4. Parameterized aliases:
+   - wit alias add feature "checkout -b feature/$1"
+   - wit feature login-page -> checkout -b feature/login-page
+
+5. Configuration:
+   - Store in ~/.witconfig
+   - List aliases: wit alias list
+   - Remove: wit alias remove <name>
+   - Show: wit alias show <name>
+
+6. Smart suggestions:
+   - When user types unknown command, suggest similar alias
+   - "Did you mean 'wit co'?"
+   - AI-powered command suggestions
+
+7. Share aliases:
+   - Export aliases to file
+   - Import from file
+   - Community alias collections
+
+8. Write tests and documentation
+
+The goal: reduce keystrokes for common operations.`,
+  },
+  {
+    id: 'commit-message-templates',
+    title: 'Add Commit Message Templates',
+    category: 'CLI',
+    priority: 'P3',
+    tags: ['commits', 'templates', 'productivity'],
+    prompt: `I'm contributing to wit, an AI-native Git platform. Please help me add commit message templates.
+
+1. Template types:
+   - Conventional commits (feat, fix, docs, etc.)
+   - Issue linking ([#123])
+   - Custom per-repo templates
+
+2. Built-in templates:
+   - conventional: "type(scope): description"
+   - simple: "What this commit does"
+   - detailed: "Summary + body + footer"
+
+3. Configuration:
+   - .wit/commit-template in repo
+   - Or wit config commit.template conventional
+   - Template variables: $BRANCH, $ISSUE, $USER
+
+4. Interactive mode:
+   - wit commit -i
+   - Prompts for type, scope, description
+   - Validates format
+   - Suggests based on diff
+
+5. Integration with AI:
+   - wit ai commit uses template format
+   - Validates AI suggestions match template
+   - Falls back to template on AI failure
+
+6. Template customization:
+   - wit template create my-template
+   - wit template edit my-template
+   - wit template list
+   - wit template set my-template
+
+7. Validation:
+   - Pre-commit hook validates format
+   - Clear error messages
+   - Suggest corrections
+
+8. Write tests and documentation
+
+The goal: consistent, informative commit messages across the team.`,
+  },
+  {
+    id: 'interactive-staging',
+    title: 'Implement Interactive Staging UI',
+    category: 'CLI',
+    priority: 'P3',
+    tags: ['cli', 'staging', 'tui'],
+    prompt: `I'm contributing to wit, an AI-native Git platform. Please help me implement an interactive staging TUI.
+
+1. Inspiration:
+   - git add -p (patch mode)
+   - lazygit staging interface
+   - tig interactive mode
+
+2. Features:
+   - View all changed files
+   - Stage/unstage individual files
+   - Stage/unstage hunks within files
+   - Stage/unstage individual lines
+   - Split hunks
+
+3. TUI interface:
+   - File list panel (left)
+   - Diff view panel (right)
+   - Status bar with shortcuts
+   - Keyboard navigation
+
+4. Key bindings:
+   - j/k - navigate files
+   - h/l - navigate hunks
+   - s - stage file/hunk
+   - u - unstage file/hunk
+   - a - stage all
+   - c - commit staged
+   - q - quit
+
+5. Command:
+   - wit stage (opens TUI)
+   - wit stage -p (patch mode like git)
+   - wit add -i (alias)
+
+6. Implementation:
+   - Use Ink or blessed for TUI
+   - src/ui/staging-tui.ts
+   - Integration with existing diff code
+
+7. Extra features:
+   - Discard changes
+   - Edit hunks manually
+   - Stash from TUI
+   - View staged vs unstaged
+
+8. Write tests and documentation
+
+The goal: precise control over what gets committed.`,
+  },
+  {
+    id: 'git-worktree-ui',
+    title: 'Improve Worktree Management',
+    category: 'CLI',
+    priority: 'P3',
+    tags: ['worktrees', 'productivity', 'cli'],
+    prompt: `I'm contributing to wit, an AI-native Git platform. Please help me improve worktree management.
+
+1. Understand current implementation:
+   - src/commands/worktree.ts
+   - How worktrees are created and managed
+
+2. Improved commands:
+   - wit worktree add feature/login
+   - wit worktree list
+   - wit worktree remove feature/login
+   - wit worktree switch feature/login
+
+3. Smart worktree naming:
+   - Auto-name based on branch: ../repo-feature-login
+   - Custom path support
+   - Configurable default location
+
+4. Worktree dashboard:
+   - wit worktrees (TUI showing all worktrees)
+   - Show status of each worktree
+   - Navigate between worktrees
+   - Quick actions (delete, switch)
+
+5. Integration features:
+   - Open worktree in new terminal
+   - Open worktree in editor
+   - Copy path to clipboard
+   - Show dirty worktrees
+
+6. Cleanup:
+   - wit worktree prune (remove stale)
+   - wit worktree clean (remove all)
+   - Warning for dirty worktrees
+
+7. Templates:
+   - Worktree with specific node_modules
+   - Pre-configured environment per worktree
+   - Shared vs separate dependencies
+
+8. Write tests and documentation
+
+The goal: work on multiple branches simultaneously with ease.`,
+  },
+  {
+    id: 'blame-explorer',
+    title: 'Build Interactive Blame Explorer',
+    category: 'CLI',
+    priority: 'P3',
+    tags: ['blame', 'history', 'tui'],
+    prompt: `I'm contributing to wit, an AI-native Git platform. Please help me build an interactive blame explorer.
+
+1. Check current blame:
+   - src/commands/blame.ts
+   - src/ui/blame-view.ts
+
+2. Interactive features:
+   - View blame with syntax highlighting
+   - Click/select line to see commit details
+   - Navigate through file history
+   - Jump to parent commit
+   - See changes in context
+
+3. TUI interface:
+   - Code panel with blame annotations
+   - Commit detail panel (on select)
+   - Navigation breadcrumbs
+   - Search within blame
+
+4. Key bindings:
+   - j/k - navigate lines
+   - Enter - show commit details
+   - p - go to parent commit
+   - b - blame at that commit
+   - / - search
+   - q - quit
+
+5. Blame information:
+   - Commit hash (shortened)
+   - Author name
+   - Date (relative)
+   - Line number
+   - Code content
+
+6. Extra features:
+   - Ignore whitespace changes
+   - Follow renames
+   - Show moved lines
+   - Copy commit hash
+   - Open in web UI
+
+7. AI integration:
+   - "Why was this line changed?"
+   - Summarize file history
+   - Find related changes
+
+8. Write tests and documentation
+
+The goal: understand code history interactively.`,
+  },
+  {
+    id: 'time-machine',
+    title: 'Create Git Time Machine',
+    category: 'Fun',
+    priority: 'P3',
+    tags: ['history', 'exploration', 'fun'],
+    prompt: `I'm contributing to wit, an AI-native Git platform. Please help me create a "time machine" feature for exploring repository history.
+
+1. Time machine concept:
+   - Visual way to explore repo at any point in time
+   - Timeline slider/navigation
+   - See how code evolved
+
+2. Features:
+   - wit timemachine src/core/merge.ts
+   - Timeline showing all changes to file
+   - Scrub through time
+   - See file at any commit
+
+3. TUI timeline:
+   - Visual timeline with commits
+   - Jump to date: wit timemachine --date "2024-01-01"
+   - Milestone markers (tags, releases)
+   - Contributor avatars on timeline
+
+4. File evolution view:
+   - Side-by-side: before/after
+   - Animation of changes over time
+   - Lines added/removed visualization
+   - Heat map of change frequency
+
+5. Repository-wide view:
+   - wit timemachine --repo
+   - File tree at any point in time
+   - See what existed when
+   - "What did the repo look like in v1.0?"
+
+6. Fun features:
+   - Birthday: when was this file created?
+   - First commit: explore the beginning
+   - Most changed: highlight hotspots
+   - Author timeline: who worked when
+
+7. AI integration:
+   - "Tell me the story of this file"
+   - "What major changes happened in 2023?"
+   - "Who should I ask about this code?"
+
+8. Write tests and documentation
+
+The goal: explore repository history like a time traveler.`,
+  },
+  {
+    id: 'contribution-graphs',
+    title: 'Add Contribution Graphs and Visualizations',
+    category: 'Fun',
+    priority: 'P3',
+    tags: ['visualization', 'stats', 'fun'],
+    prompt: `I'm contributing to wit, an AI-native Git platform. Please help me add contribution graphs and visualizations.
+
+1. GitHub-style contribution graph:
+   - wit graph --year 2024
+   - Calendar heatmap of commits
+   - Color intensity by commit count
+   - ASCII art in terminal
+
+2. Contribution streaks:
+   - Current streak (consecutive days)
+   - Longest streak
+   - Streak calendar view
+   - Streak achievements
+
+3. Activity graphs:
+   - Commits per day/week/month
+   - Lines added/removed over time
+   - PR/issue activity
+   - Review activity
+
+4. Language breakdown:
+   - Pie chart of languages used
+   - Lines of code per language
+   - Language trends over time
+
+5. Time-based patterns:
+   - Most productive day of week
+   - Most productive hour
+   - Weekend warrior stats
+   - Night owl vs early bird
+
+6. Team visualizations:
+   - Contribution leaderboard
+   - Collaboration graph (who works with whom)
+   - Bus factor visualization
+   - Knowledge distribution
+
+7. Export options:
+   - PNG image
+   - SVG
+   - Share link
+   - Embed in README
+
+8. Write tests and documentation
+
+The goal: beautiful visualizations of coding activity.`,
   },
 ];
 
