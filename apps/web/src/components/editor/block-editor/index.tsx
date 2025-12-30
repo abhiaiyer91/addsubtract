@@ -113,6 +113,8 @@ export function BlockEditor({
   const lastExternalValue = useRef<string>(value);
   // Use a ref to store onChange to avoid infinite loops
   const onChangeRef = useRef(onChange);
+  // Use a ref to track if we're in the middle of an internal update
+  const isInternalUpdate = useRef(false);
 
   // Keep onChangeRef updated
   useEffect(() => {
@@ -153,19 +155,26 @@ export function BlockEditor({
     }
 
     const markdown = blocksToMarkdown(blocks);
-    // Update the ref so we don't process our own changes
-    lastExternalValue.current = markdown;
-    onChangeRef.current(markdown);
+    // Only call onChange if the content actually changed
+    if (markdown !== lastExternalValue.current) {
+      // Mark that this is an internal update to prevent the value sync effect from running
+      isInternalUpdate.current = true;
+      lastExternalValue.current = markdown;
+      onChangeRef.current(markdown);
+    }
   }, [blocks]);
 
   // Update blocks when external value changes
   useEffect(() => {
-    // Normalize both values by parsing and re-serializing to get canonical form
-    // This avoids infinite loops from whitespace/formatting differences
-    const canonicalValue = blocksToMarkdown(markdownToBlocks(value));
-    const canonicalLast = blocksToMarkdown(markdownToBlocks(lastExternalValue.current));
-    
-    if (canonicalValue !== canonicalLast) {
+    // Skip if this change originated from our own onChange call
+    if (isInternalUpdate.current) {
+      isInternalUpdate.current = false;
+      return;
+    }
+
+    // Only update if the raw value is different from what we last received
+    // This prevents loops from normalization differences
+    if (value !== lastExternalValue.current) {
       lastExternalValue.current = value;
       const newBlocks = markdownToBlocks(value);
       setBlocks(newBlocks);
