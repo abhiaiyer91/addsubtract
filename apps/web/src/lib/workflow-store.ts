@@ -539,8 +539,9 @@ function generateMastraCode(workflow: WorkflowDefinition): string {
   // Build execution order from edges
   const executionOrder = topologicalSort(workflow.nodes, workflow.edges);
   const stepNodes = executionOrder.filter((n) => n.type === 'step');
-  const parallelNodes = executionOrder.filter((n) => n.type === 'parallel');
-  const mapNodes = executionOrder.filter((n) => n.type === 'map');
+  // Note: parallelNodes and mapNodes are reserved for future use
+  // const parallelNodes = executionOrder.filter((n) => n.type === 'parallel');
+  // const mapNodes = executionOrder.filter((n) => n.type === 'map');
 
   // Generate step definitions
   lines.push('// =============================================================================');

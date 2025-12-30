@@ -13,28 +13,24 @@ import { useState, useCallback, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   Save, 
-  Eye, 
   Code, 
-  Play, 
   Settings,
   ChevronLeft,
   ChevronRight,
   FileCode,
   Layers,
   Library,
-  Wand2,
   Download,
   Upload,
-  X,
 } from 'lucide-react';
 import Editor from '@monaco-editor/react';
 import { ReactFlowProvider } from 'reactflow';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Card, CardContent } from '@/components/ui/card';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -46,10 +42,10 @@ import {
 } from '@/components/ui/resizable';
 import { trpc } from '@/lib/trpc';
 import { RepoLayout } from './components/repo-layout';
-import { VisualWorkflowCanvas, NodePalette } from '@/components/workflow/visual-workflow-canvas';
+import { VisualWorkflowCanvas } from '@/components/workflow/visual-workflow-canvas';
 import { StepConfigurator } from '@/components/workflow/step-configurator';
 import { ActionLibrary } from '@/components/workflow/action-library';
-import { useWorkflowStore } from '@/lib/workflow-store';
+import { useWorkflowStore, type WorkflowDefinition } from '@/lib/workflow-store';
 import { cn } from '@/lib/utils';
 
 // =============================================================================
@@ -65,16 +61,12 @@ export function WorkflowEditor() {
   const {
     workflow,
     selectedNodeId,
-    isCodePreviewOpen,
     generatedCode,
     isDirty,
     validationErrors,
-    setWorkflow,
     updateWorkflowMeta,
     generateCode,
-    toggleCodePreview,
     validate,
-    reset,
   } = useWorkflowStore();
 
   const [activeTab, setActiveTab] = useState<'visual' | 'code' | 'yaml'>('visual');
@@ -97,7 +89,8 @@ export function WorkflowEditor() {
   }, [selectedNodeId]);
 
   // Save mutation
-  const saveMutation = trpc.repos.updateFile.useMutation({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const saveMutation = (trpc as any).repos.updateFile.useMutation({
     onSuccess: () => {
       navigate(`/${owner}/${repo}/actions`);
     },
@@ -133,7 +126,7 @@ export function WorkflowEditor() {
 
   return (
     <RepoLayout owner={owner!} repo={repo!}>
-      <div className="flex flex-col h-[calc(100vh-120px)]">
+      <div className="flex flex-col" style={{ height: 'calc(100vh - 280px)', minHeight: '500px' }}>
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b bg-background">
           <div className="flex items-center gap-4">
@@ -200,7 +193,7 @@ export function WorkflowEditor() {
 
         {/* Main Content */}
         <div className="flex-1 overflow-hidden">
-          <TabsContent value="visual" className="h-full m-0" forceMount hidden={activeTab !== 'visual'}>
+          <div className={cn("h-full", activeTab !== 'visual' && 'hidden')}>
             <ResizablePanelGroup direction="horizontal" className="h-full">
               {/* Left Panel - Actions Library */}
               <ResizablePanel
@@ -283,9 +276,9 @@ export function WorkflowEditor() {
                 </div>
               )}
             </ResizablePanelGroup>
-          </TabsContent>
+          </div>
 
-          <TabsContent value="code" className="h-full m-0" forceMount hidden={activeTab !== 'code'}>
+          <div className={cn("h-full", activeTab !== 'code' && 'hidden')}>
             <div className="h-full flex flex-col">
               <div className="px-4 py-2 border-b flex items-center justify-between bg-muted/30">
                 <div className="flex items-center gap-2">
@@ -319,11 +312,11 @@ export function WorkflowEditor() {
                 />
               </div>
             </div>
-          </TabsContent>
+          </div>
 
-          <TabsContent value="yaml" className="h-full m-0" forceMount hidden={activeTab !== 'yaml'}>
+          <div className={cn("h-full", activeTab !== 'yaml' && 'hidden')}>
             <YAMLEditor workflow={workflow} />
-          </TabsContent>
+          </div>
         </div>
 
         {/* Workflow Settings Sheet */}
@@ -344,7 +337,7 @@ export function WorkflowEditor() {
 // YAML Editor Component
 // =============================================================================
 
-function YAMLEditor({ workflow }: { workflow: ReturnType<typeof useWorkflowStore>['workflow'] }) {
+function YAMLEditor({ workflow }: { workflow: WorkflowDefinition }) {
   const [yamlContent, setYamlContent] = useState('');
   const [yamlError, setYamlError] = useState<string | null>(null);
 
@@ -531,7 +524,7 @@ function WorkflowSettings() {
 // Helper Functions
 // =============================================================================
 
-function generateYAML(workflow: ReturnType<typeof useWorkflowStore>['workflow']): string {
+function generateYAML(workflow: WorkflowDefinition): string {
   const lines: string[] = [];
   
   lines.push(`name: ${workflow.name}`);

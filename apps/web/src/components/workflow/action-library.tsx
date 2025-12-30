@@ -13,7 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-import { useWorkflowStore, type StepConfig, type SchemaField } from '@/lib/workflow-store';
+import { useWorkflowStore, type StepConfig } from '@/lib/workflow-store';
 
 // =============================================================================
 // Action Templates

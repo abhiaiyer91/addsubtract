@@ -5,9 +5,9 @@
  * Supports editing step ID, schemas, execute code, and more.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import Editor from '@monaco-editor/react';
-import { X, Plus, Trash2, ChevronDown, ChevronRight, Wand2 } from 'lucide-react';
+import { X, Plus, Trash2, ChevronDown, Wand2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,7 +18,6 @@ import { Switch } from '@/components/ui/switch';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
 import {
   useWorkflowStore,
   type WorkflowNode,
