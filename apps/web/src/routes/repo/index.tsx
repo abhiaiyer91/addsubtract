@@ -144,7 +144,7 @@ export function RepoPage() {
             </Link>
           </div>
         ) : isOwner ? (
-          <div className="space-y-3">
+          <>
             <p className="text-sm text-muted-foreground">
               Create versioned releases of your software
             </p>
@@ -154,7 +154,7 @@ export function RepoPage() {
                 Create a release
               </Button>
             </Link>
-          </div>
+          </>
         ) : (
           <Link 
             to={`/${owner}/${repo}/releases`}
@@ -186,7 +186,7 @@ export function RepoPage() {
             )}
           </div>
         ) : isOwner ? (
-          <div className="space-y-3">
+          <>
             <p className="text-sm text-muted-foreground">
               Publish this repo as an npm package
             </p>
@@ -196,7 +196,7 @@ export function RepoPage() {
                 Enable Package Registry
               </Button>
             </Link>
-          </div>
+          </>
         ) : (
           <p className="text-sm text-muted-foreground">No package published</p>
         )}
