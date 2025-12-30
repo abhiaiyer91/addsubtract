@@ -6,9 +6,10 @@ WORKDIR /app
 RUN apk add --no-cache git docker-cli curl bash
 
 # Install CodeRabbit CLI for AI code reviews
-RUN curl -fsSL https://cli.coderabbit.ai/install.sh | sh && \
+RUN curl -fsSL https://cli.coderabbit.ai/install.sh | bash && \
     ln -sf /root/.local/bin/coderabbit /usr/local/bin/coderabbit && \
-    ln -sf /root/.local/bin/coderabbit /usr/local/bin/cr
+    ln -sf /root/.local/bin/coderabbit /usr/local/bin/cr && \
+    coderabbit --version
 
 # Install dependencies
 COPY package*.json ./
