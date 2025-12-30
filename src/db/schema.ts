@@ -9,6 +9,7 @@ import {
   primaryKey,
   unique,
   jsonb,
+  index,
 } from 'drizzle-orm/pg-core';
 
 // Import better-auth user table for foreign key references
@@ -298,7 +299,21 @@ export const repositories = pgTable('repositories', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   pushedAt: timestamp('pushed_at', { withTimezone: true }),
-});
+}, (table) => ({
+  // Index for listing repos by owner (most common query)
+  ownerIdx: index('idx_repositories_owner').on(table.ownerId, table.ownerType),
+  // Index for owner + name lookup (repo page URL resolution)
+  ownerNameIdx: index('idx_repositories_owner_name').on(table.ownerId, table.name),
+  // Index for listing public repos
+  isPrivateIdx: index('idx_repositories_is_private').on(table.isPrivate),
+  // Index for listing forks of a repo
+  forkedFromIdx: index('idx_repositories_forked_from').on(table.forkedFromId),
+  // Index for sorting by activity
+  updatedAtIdx: index('idx_repositories_updated_at').on(table.updatedAt),
+  pushedAtIdx: index('idx_repositories_pushed_at').on(table.pushedAt),
+  // Index for trending/popular repos
+  starsCountIdx: index('idx_repositories_stars_count').on(table.starsCount),
+}));
 
 export const collaborators = pgTable(
   'collaborators',
@@ -312,6 +327,8 @@ export const collaborators = pgTable(
   },
   (table) => ({
     pk: primaryKey({ columns: [table.repoId, table.userId] }),
+    // Index for listing repos a user collaborates on
+    userIdIdx: index('idx_collaborators_user_id').on(table.userId),
   })
 );
 
@@ -326,6 +343,10 @@ export const stars = pgTable(
   },
   (table) => ({
     pk: primaryKey({ columns: [table.repoId, table.userId] }),
+    // Index for listing user's starred repos
+    userIdIdx: index('idx_stars_user_id').on(table.userId),
+    // Composite index for user + created at (sorted starred repos)
+    userCreatedAtIdx: index('idx_stars_user_created_at').on(table.userId, table.createdAt),
   })
 );
 
@@ -340,6 +361,10 @@ export const watches = pgTable(
   },
   (table) => ({
     pk: primaryKey({ columns: [table.repoId, table.userId] }),
+    // Index for listing user's watched repos
+    userIdIdx: index('idx_watches_user_id').on(table.userId),
+    // Composite index for user + created at (sorted watched repos)
+    userCreatedAtIdx: index('idx_watches_user_created_at').on(table.userId, table.createdAt),
   })
 );
 
@@ -457,7 +482,26 @@ export const pullRequests = pgTable('pull_requests', {
   mergedAt: timestamp('merged_at', { withTimezone: true }),
   closedAt: timestamp('closed_at', { withTimezone: true }),
   mergedById: text('merged_by_id'), // References better-auth user.id
-});
+}, (table) => ({
+  // Index for listing PRs by repo (most common query)
+  repoIdIdx: index('idx_pull_requests_repo_id').on(table.repoId),
+  // Composite index for repo + state (PR list filtering)
+  repoStateIdx: index('idx_pull_requests_repo_state').on(table.repoId, table.state),
+  // Composite index for repo + number (PR page URL resolution)
+  repoNumberIdx: index('idx_pull_requests_repo_number').on(table.repoId, table.number),
+  // Index for author's PRs (inbox queries)
+  authorIdx: index('idx_pull_requests_author').on(table.authorId),
+  // Index for milestone PRs
+  milestoneIdx: index('idx_pull_requests_milestone').on(table.milestoneId),
+  // Index for stack PRs
+  stackIdx: index('idx_pull_requests_stack').on(table.stackId),
+  // Composite index for sorting by creation date within a repo
+  repoCreatedAtIdx: index('idx_pull_requests_repo_created_at').on(table.repoId, table.createdAt),
+  // Index for finding PRs by head SHA (CI status checks)
+  headShaIdx: index('idx_pull_requests_head_sha').on(table.headSha),
+  // Index for finding PRs by target branch (merge queue)
+  repoTargetBranchIdx: index('idx_pull_requests_repo_target_branch').on(table.repoId, table.targetBranch),
+}));
 
 export const prReviews = pgTable('pr_reviews', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -472,7 +516,14 @@ export const prReviews = pgTable('pr_reviews', {
 
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
-});
+}, (table) => ({
+  // Index for listing reviews by PR
+  prIdIdx: index('idx_pr_reviews_pr_id').on(table.prId),
+  // Composite index for PR + created at (sorted reviews)
+  prCreatedAtIdx: index('idx_pr_reviews_pr_created_at').on(table.prId, table.createdAt),
+  // Composite index for PR + user (get user's latest review on a PR)
+  prUserIdx: index('idx_pr_reviews_pr_user').on(table.prId, table.userId),
+}));
 
 export const prComments = pgTable('pr_comments', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -509,7 +560,18 @@ export const prComments = pgTable('pr_comments', {
 
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
-});
+}, (table) => ({
+  // Index for listing comments by PR
+  prIdIdx: index('idx_pr_comments_pr_id').on(table.prId),
+  // Composite index for PR + created at (sorted comments)
+  prCreatedAtIdx: index('idx_pr_comments_pr_created_at').on(table.prId, table.createdAt),
+  // Composite index for PR + path (inline comments for a file)
+  prPathIdx: index('idx_pr_comments_pr_path').on(table.prId, table.path),
+  // Index for review comments
+  reviewIdIdx: index('idx_pr_comments_review_id').on(table.reviewId),
+  // Index for reply threads
+  replyToIdIdx: index('idx_pr_comments_reply_to_id').on(table.replyToId),
+}));
 
 // ============ PR REVIEWERS (for inbox) ============
 
@@ -539,6 +601,12 @@ export const prReviewers = pgTable(
   (table) => ({
     // Each user can only be requested once per PR
     uniqueReviewer: unique().on(table.prId, table.userId),
+    // Index for listing reviewers by PR
+    prIdIdx: index('idx_pr_reviewers_pr_id').on(table.prId),
+    // Composite index for user + state (inbox - PRs awaiting my review)
+    userStateIdx: index('idx_pr_reviewers_user_state').on(table.userId, table.state),
+    // Index for finding pending review requests (critical for inbox)
+    userPendingIdx: index('idx_pr_reviewers_user_pending').on(table.userId),
   })
 );
 
@@ -644,7 +712,32 @@ export const issues = pgTable('issues', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   closedAt: timestamp('closed_at', { withTimezone: true }),
   closedById: text('closed_by_id'), // References better-auth user.id
-});
+}, (table) => ({
+  // Index for listing issues by repo (most common query)
+  repoIdIdx: index('idx_issues_repo_id').on(table.repoId),
+  // Composite index for repo + state (issue list filtering)
+  repoStateIdx: index('idx_issues_repo_state').on(table.repoId, table.state),
+  // Composite index for repo + number (issue page URL resolution)
+  repoNumberIdx: index('idx_issues_repo_number').on(table.repoId, table.number),
+  // Composite index for repo + status (Kanban board)
+  repoStatusIdx: index('idx_issues_repo_status').on(table.repoId, table.status),
+  // Composite index for repo + stage (custom workflow)
+  repoStageIdx: index('idx_issues_repo_stage').on(table.repoId, table.stageId),
+  // Index for author's issues (inbox queries)
+  authorIdx: index('idx_issues_author').on(table.authorId),
+  // Index for assignee's issues (inbox queries)
+  assigneeIdx: index('idx_issues_assignee').on(table.assigneeId),
+  // Index for project issues
+  projectIdx: index('idx_issues_project').on(table.projectId),
+  // Index for cycle/sprint issues
+  cycleIdx: index('idx_issues_cycle').on(table.cycleId),
+  // Index for sub-issues
+  parentIdx: index('idx_issues_parent').on(table.parentId),
+  // Index for milestone issues
+  milestoneIdx: index('idx_issues_milestone').on(table.milestoneId),
+  // Composite index for sorting by creation date within a repo
+  repoCreatedAtIdx: index('idx_issues_repo_created_at').on(table.repoId, table.createdAt),
+}));
 
 export const issueComments = pgTable('issue_comments', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -657,7 +750,12 @@ export const issueComments = pgTable('issue_comments', {
 
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
-});
+}, (table) => ({
+  // Index for listing comments by issue
+  issueIdIdx: index('idx_issue_comments_issue_id').on(table.issueId),
+  // Composite index for issue + created at (sorted comments)
+  issueCreatedAtIdx: index('idx_issue_comments_issue_created_at').on(table.issueId, table.createdAt),
+}));
 
 export const labels = pgTable('labels', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -670,7 +768,12 @@ export const labels = pgTable('labels', {
   description: text('description'),
 
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-});
+}, (table) => ({
+  // Index for listing labels by repo
+  repoIdIdx: index('idx_labels_repo_id').on(table.repoId),
+  // Composite index for repo + name (label lookup by name)
+  repoNameIdx: index('idx_labels_repo_name').on(table.repoId, table.name),
+}));
 
 export const issueLabels = pgTable(
   'issue_labels',
@@ -876,7 +979,12 @@ export const issueActivities = pgTable('issue_activities', {
   metadata: text('metadata'),
   
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-});
+}, (table) => ({
+  // Index for listing activities by issue
+  issueIdIdx: index('idx_issue_activities_issue_id').on(table.issueId),
+  // Composite index for issue + created at (sorted activity log)
+  issueCreatedAtIdx: index('idx_issue_activities_issue_created_at').on(table.issueId, table.createdAt),
+}));
 
 export const prLabels = pgTable(
   'pr_labels',
@@ -1039,7 +1147,16 @@ export const activities = pgTable('activities', {
   payload: text('payload'), // JSON data
 
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-});
+}, (table) => ({
+  // Index for listing activities by actor (user activity feed)
+  actorIdIdx: index('idx_activities_actor_id').on(table.actorId),
+  // Composite index for actor + created at (sorted user activity)
+  actorCreatedAtIdx: index('idx_activities_actor_created_at').on(table.actorId, table.createdAt),
+  // Index for listing activities by repo
+  repoIdIdx: index('idx_activities_repo_id').on(table.repoId),
+  // Composite index for repo + created at (sorted repo activity)
+  repoCreatedAtIdx: index('idx_activities_repo_created_at').on(table.repoId, table.createdAt),
+}));
 
 // ============ WEBHOOKS ============
 
@@ -1188,7 +1305,14 @@ export const mergeQueueEntries = pgTable('merge_queue_entries', {
   
   /** When completed (merged or failed) */
   completedAt: timestamp('completed_at', { withTimezone: true }),
-});
+}, (table) => ({
+  // Index for looking up queue entry by PR
+  prIdIdx: index('idx_merge_queue_entries_pr_id').on(table.prId),
+  // Composite index for repo + target branch + position (queue ordering)
+  repoTargetBranchPositionIdx: index('idx_merge_queue_entries_repo_target_branch_position').on(table.repoId, table.targetBranch, table.position),
+  // Composite index for repo + state (filtering queue entries)
+  repoStateIdx: index('idx_merge_queue_entries_repo_state').on(table.repoId, table.state),
+}));
 
 /**
  * Merge queue batches
@@ -1307,7 +1431,18 @@ export const workflowRuns = pgTable('workflow_runs', {
   
   /** When the workflow run completed */
   completedAt: timestamp('completed_at', { withTimezone: true }),
-});
+}, (table) => ({
+  // Index for listing workflow runs by repo
+  repoIdIdx: index('idx_workflow_runs_repo_id').on(table.repoId),
+  // Composite index for repo + created at (sorting runs)
+  repoCreatedAtIdx: index('idx_workflow_runs_repo_created_at').on(table.repoId, table.createdAt),
+  // Composite index for repo + commit SHA (CI status checks - critical for PR pages)
+  repoCommitShaIdx: index('idx_workflow_runs_repo_commit_sha').on(table.repoId, table.commitSha),
+  // Index for finding runs by state (processing queued runs)
+  stateIdx: index('idx_workflow_runs_state').on(table.state),
+  // Composite index for repo + state (filtering runs by status)
+  repoStateIdx: index('idx_workflow_runs_repo_state').on(table.repoId, table.state),
+}));
 
 /**
  * Job runs table
@@ -1345,7 +1480,12 @@ export const jobRuns = pgTable('job_runs', {
   
   /** JSON-serialized job outputs */
   outputs: text('outputs'),
-});
+}, (table) => ({
+  // Index for listing jobs by workflow run
+  workflowRunIdIdx: index('idx_job_runs_workflow_run_id').on(table.workflowRunId),
+  // Composite index for workflow run + state (filtering jobs)
+  workflowRunStateIdx: index('idx_job_runs_workflow_run_state').on(table.workflowRunId, table.state),
+}));
 
 /**
  * Step runs table
@@ -1380,7 +1520,12 @@ export const stepRuns = pgTable('step_runs', {
   
   /** Step execution logs */
   logs: text('logs'),
-});
+}, (table) => ({
+  // Index for listing steps by job run (ordered by step number)
+  jobRunIdIdx: index('idx_step_runs_job_run_id').on(table.jobRunId),
+  // Composite index for job run + step number (ordered step display)
+  jobRunStepNumberIdx: index('idx_step_runs_job_run_step_number').on(table.jobRunId, table.stepNumber),
+}));
 
 // ============ NOTIFICATIONS ============
 
@@ -1431,7 +1576,16 @@ export const notifications = pgTable('notifications', {
   emailSentAt: timestamp('email_sent_at', { withTimezone: true }),
   
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-});
+}, (table) => ({
+  // Index for user's notifications (inbox - most common query)
+  userIdIdx: index('idx_notifications_user_id').on(table.userId),
+  // Composite index for user + read status (unread count, filtering)
+  userReadIdx: index('idx_notifications_user_read').on(table.userId, table.read),
+  // Composite index for user + created at (sorting notifications)
+  userCreatedAtIdx: index('idx_notifications_user_created_at').on(table.userId, table.createdAt),
+  // Index for pending email notifications
+  emailSentIdx: index('idx_notifications_email_sent').on(table.emailSent),
+}));
 
 // ============ EMAIL NOTIFICATION PREFERENCES ============
 
@@ -1520,7 +1674,16 @@ export const agentSessions = pgTable('agent_sessions', {
   // Timestamps
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
-});
+}, (table) => ({
+  // Index for listing sessions by user
+  userIdIdx: index('idx_agent_sessions_user_id').on(table.userId),
+  // Composite index for user + created at (sorted sessions)
+  userCreatedAtIdx: index('idx_agent_sessions_user_created_at').on(table.userId, table.createdAt),
+  // Index for listing sessions by repo
+  repoIdIdx: index('idx_agent_sessions_repo_id').on(table.repoId),
+  // Index for active sessions
+  statusIdx: index('idx_agent_sessions_status').on(table.status),
+}));
 
 /**
  * Agent file changes table
