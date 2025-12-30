@@ -26,6 +26,12 @@ export function ReleasesPage() {
     { enabled: !!repoData?.repo.id }
   );
 
+  // Check if user has write permission (owner or collaborator with write access)
+  const { data: permissionData } = trpc.collaborators.checkPermission.useQuery(
+    { repoId: repoData?.repo.id!, permission: 'write' },
+    { enabled: !!repoData?.repo.id && authenticated }
+  );
+
   const isLoading = repoLoading || releasesLoading;
 
   if (isLoading) {
@@ -47,7 +53,7 @@ export function ReleasesPage() {
   }
 
   const releases = releasesData?.releases || [];
-  const isOwner = session?.user?.id === repoData.repo.ownerId;
+  const canWrite = permissionData?.hasPermission ?? false;
 
   return (
     <RepoLayout owner={owner!} repo={repo!}>
@@ -59,7 +65,7 @@ export function ReleasesPage() {
               Packaged versions of your software.
             </p>
           </div>
-          {authenticated && isOwner && (
+          {authenticated && canWrite && (
             <Link to={`/${owner}/${repo}/releases/new`}>
               <Button className="gap-2">
                 <Plus className="h-4 w-4" />
@@ -77,7 +83,7 @@ export function ReleasesPage() {
                 title="No releases"
                 description="Releases are used to distribute versions of your software."
                 action={
-                  authenticated && isOwner ? (
+                  authenticated && canWrite ? (
                     <Link to={`/${owner}/${repo}/releases/new`}>
                       <Button className="gap-2">
                         <Plus className="h-4 w-4" />
@@ -98,7 +104,7 @@ export function ReleasesPage() {
                 owner={owner!}
                 repo={repo!}
                 isLatest={index === 0 && !release.isDraft && !release.isPrerelease}
-                canEdit={authenticated && isOwner}
+                canEdit={authenticated && canWrite}
               />
             ))}
           </div>

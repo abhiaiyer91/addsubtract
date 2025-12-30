@@ -35,6 +35,12 @@ export function EditReleasePage() {
     { enabled: !!owner && !!repo }
   );
 
+  // Check if user has write permission (owner or collaborator with write access)
+  const { data: permissionData, isLoading: permissionLoading } = trpc.collaborators.checkPermission.useQuery(
+    { repoId: repoData?.repo.id!, permission: 'write' },
+    { enabled: !!repoData?.repo.id && authenticated }
+  );
+
   const { data: release, isLoading: releaseLoading } = trpc.releases.getById.useQuery(
     { id: id! },
     { enabled: !!id }
@@ -182,7 +188,7 @@ export function EditReleasePage() {
     );
   }
 
-  const isLoading = repoLoading || releaseLoading;
+  const isLoading = repoLoading || releaseLoading || permissionLoading;
 
   if (isLoading) {
     return (
@@ -197,6 +203,21 @@ export function EditReleasePage() {
       <RepoLayout owner={owner!} repo={repo!}>
         <div className="text-center py-12">
           <p className="text-muted-foreground">Release not found.</p>
+          <Link to={`/${owner}/${repo}/releases`}>
+            <Button variant="outline" className="mt-4">
+              Back to releases
+            </Button>
+          </Link>
+        </div>
+      </RepoLayout>
+    );
+  }
+
+  if (!permissionData?.hasPermission) {
+    return (
+      <RepoLayout owner={owner!} repo={repo!}>
+        <div className="text-center py-12">
+          <p className="text-muted-foreground">You don't have permission to edit releases in this repository.</p>
           <Link to={`/${owner}/${repo}/releases`}>
             <Button variant="outline" className="mt-4">
               Back to releases
