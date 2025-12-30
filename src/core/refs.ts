@@ -228,7 +228,10 @@ export class Refs {
    */
   deleteBranch(name: string): void {
     const branchPath = path.join(this.headsDir, name);
-    if (!exists(branchPath)) {
+    const looseExists = exists(branchPath);
+    const packedRef = this.getPackedRef(`refs/heads/${name}`);
+    
+    if (!looseExists && !packedRef) {
       throw new Error(`Branch '${name}' not found`);
     }
 
@@ -237,7 +240,15 @@ export class Refs {
       throw new Error(`Cannot delete the current branch '${name}'`);
     }
 
-    require('fs').unlinkSync(branchPath);
+    // Delete loose ref if it exists
+    if (looseExists) {
+      require('fs').unlinkSync(branchPath);
+    }
+    
+    // Remove from packed-refs if it exists there
+    if (packedRef) {
+      this.removeFromPackedRefs(`refs/heads/${name}`);
+    }
   }
 
   /**
