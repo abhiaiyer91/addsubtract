@@ -85,6 +85,20 @@
       "when": 1767024300000,
       "tag": "0011_sandbox_config",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1767024400000,
+      "tag": "0012_marketing_content",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1767024500000,
+      "tag": "0013_add_vercel_sandbox_provider",
+      "breakpoints": true
     }
   ]
 }
