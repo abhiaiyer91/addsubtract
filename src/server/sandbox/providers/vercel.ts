@@ -31,11 +31,13 @@ type VercelSandboxInstance = {
   sandboxId: string;
   status: 'pending' | 'running' | 'stopping' | 'stopped' | 'failed';
   timeout: number;
-  runCommand: (
-    command: string,
-    args?: string[],
-    opts?: { signal?: AbortSignal }
-  ) => Promise<{
+  runCommand: (params: {
+    cmd: string;
+    args?: string[];
+    cwd?: string;
+    env?: Record<string, string>;
+    signal?: AbortSignal;
+  }) => Promise<{
     exitCode: number;
     stdout: string;
     stderr: string;
@@ -183,7 +185,9 @@ class VercelSandboxSession extends BaseSandboxSession {
       let execArgs = ['-c', args && args.length > 0 ? `${command} ${args.join(' ')}` : command];
 
       try {
-        const result = await this.sandbox.runCommand(executable, execArgs, {
+        const result = await this.sandbox.runCommand({
+          cmd: executable,
+          args: execArgs,
           signal: controller.signal,
         });
 

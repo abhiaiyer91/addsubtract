@@ -465,13 +465,20 @@ async function executeInVercel(
     });
 
     try {
-      const result = await sandbox.runCommand(command, args, {
+      let result = await sandbox.runCommand({
+        cmd: command,
+        args: args,
         signal: AbortSignal.timeout(options.timeout),
       });
 
+      // Handle Command vs CommandFinished - wait for completion if needed
+      if (!('stdout' in result)) {
+        result = await result.wait();
+      }
+
       return {
         success: result.exitCode === 0,
-        exitCode: result.exitCode,
+        exitCode: result.exitCode ?? 1,
         stdout: result.stdout,
         stderr: result.stderr,
         sandbox: true,
