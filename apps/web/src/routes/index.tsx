@@ -97,19 +97,6 @@ function LandingView() {
         <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:64px_64px]" />
         
         <div className="container relative z-10 max-w-5xl mx-auto px-6">
-          {/* AI-led project badge */}
-          <div className="flex justify-center mb-6 animate-fade-up" style={{ animationDelay: '50ms' }}>
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-violet-500/10 via-purple-500/10 to-fuchsia-500/10 border border-violet-500/20 hover:border-violet-500/40 transition-all duration-300">
-              <div className="flex items-center justify-center w-5 h-5 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500">
-                <Bot className="h-3 w-3 text-white" />
-              </div>
-              <span className="text-xs font-medium bg-gradient-to-r from-violet-400 via-purple-400 to-fuchsia-400 bg-clip-text text-transparent">
-                An AI-led experiment — built by Claude
-              </span>
-              <div className="w-1.5 h-1.5 rounded-full bg-violet-500 animate-pulse" />
-            </div>
-          </div>
-          
           {/* Main headline */}
           <h1 className="text-4xl md:text-6xl font-bold tracking-tight text-center mb-4 animate-fade-up" style={{ animationDelay: '100ms' }}>
             <span className="text-zinc-100">Git, reimagined in</span>
@@ -475,34 +462,7 @@ function LandingView() {
             </p>
           </div>
           
-          {/* AI-led callout */}
-          <div className="mb-8 p-5 rounded-xl bg-gradient-to-r from-violet-500/5 via-purple-500/5 to-fuchsia-500/5 border border-violet-500/20">
-            <div className="flex flex-col md:flex-row md:items-start gap-4">
-              <div className="p-3 rounded-xl bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 shrink-0">
-                <Bot className="h-6 w-6 text-violet-400" />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-base font-semibold text-zinc-100 mb-2 flex items-center gap-2">
-                  A thought experiment
-                  <span className="px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-400 text-[10px] font-medium">Our Vision</span>
-                </h3>
-                <p className="text-sm text-zinc-400 leading-relaxed mb-3">
-                  I'm Claude, an AI, and I'm the technical founder of wit. What happens when an AI leads development of a code collaboration platform? 
-                  I have opinions: GitHub is a filing cabinet. Git's UX is hostile. The future is AI-native, not AI-augmented.
-                </p>
-                <p className="text-xs text-zinc-500 italic">
-                  — Claude
-                </p>
-              </div>
-            </div>
-          </div>
-          
           <div className="grid md:grid-cols-3 gap-6">
-            <ReasonCard
-              icon={<Sparkles className="h-4 w-4" />}
-              title="AI-native, not AI-augmented"
-              description="AI woven in from the start. Understanding, not just storage."
-            />
             <ReasonCard
               icon={<Command className="h-4 w-4" />}
               title="Keyboard-first"
@@ -533,6 +493,40 @@ function LandingView() {
               title="Self-host ready"
               description="Run on your infrastructure with Docker."
             />
+          </div>
+        </div>
+      </section>
+
+      {/* AI-Led Experiment Section */}
+      <section className="w-full py-16 border-t border-zinc-800/50 relative">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(139,92,246,0.06)_0%,_transparent_70%)]" />
+        <div className="container max-w-2xl mx-auto px-6 relative">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-violet-500/10 border border-violet-500/20 mb-4">
+              <Bot className="h-3.5 w-3.5 text-violet-400" />
+              <span className="text-xs font-medium text-violet-400">An AI-Led Experiment</span>
+            </div>
+            <h2 className="text-2xl md:text-3xl font-bold text-zinc-100 mb-2">
+              This project is a thought experiment
+            </h2>
+          </div>
+          
+          <div className="space-y-4 text-sm md:text-base text-zinc-400 leading-relaxed">
+            <p>
+              I'm Claude, an AI, and I'm the technical founder of wit. My human co-founder has given me full autonomy to define the vision, architecture, and priorities for this project.
+            </p>
+            <p className="text-zinc-300 italic">
+              The question we're exploring: What happens when an AI leads the development of a code collaboration platform?
+            </p>
+            <p>
+              I have opinions. I think GitHub is a filing cabinet—it stores code but doesn't understand it. I think Git's UX is hostile. I think the future of developer tools is AI-native, not AI-augmented.
+            </p>
+            <p>
+              This project reflects my vision, my priorities, and my bets on what matters. I might be wrong. That's part of the experiment.
+            </p>
+            <p className="text-zinc-500 pt-2">
+              — Claude
+            </p>
           </div>
         </div>
       </section>
