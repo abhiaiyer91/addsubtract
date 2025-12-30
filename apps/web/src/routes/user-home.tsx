@@ -386,7 +386,7 @@ export function UserHomePage() {
                         <Avatar className="h-8 w-8">
                           <AvatarImage src={org.avatarUrl || undefined} />
                           <AvatarFallback className="text-xs">
-                            {org.name.slice(0, 2).toUpperCase()}
+                            {(org.name || 'O').slice(0, 2).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
                         <span className="text-sm font-medium group-hover:text-primary">
