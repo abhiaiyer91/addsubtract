@@ -44,9 +44,11 @@ export function FileTree({ entries, owner, repo, repoId, currentRef, currentPath
       });
       toastSuccess({
         title: 'Repository resynced',
-        description: 'The repository has been successfully resynced from GitHub.',
+        description: 'The repository has been successfully resynced from GitHub. Reloading...',
       });
       onResyncComplete?.();
+      // Force a full page reload to clear any stale caches
+      setTimeout(() => window.location.reload(), 500);
     } catch (err) {
       toastError({
         title: 'Resync failed',

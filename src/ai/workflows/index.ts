@@ -26,3 +26,11 @@ export {
   type CodeGenerationInput,
   type CodeGenerationOutput,
 } from './code-generation.workflow.js';
+
+// Marketing Content Workflow
+export {
+  marketingContentWorkflow,
+  runMarketingContentWorkflow,
+  type MarketingContentInput,
+  type MarketingContentOutput,
+} from './marketing-content.workflow.js';

@@ -197,7 +197,7 @@ export function RepoPage() {
             )}
           </div>
         ) : isOwner ? (
-          <div className="space-y-2">
+          <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
               Publish this repo as an npm package
             </p>

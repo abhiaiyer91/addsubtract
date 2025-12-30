@@ -654,12 +654,33 @@ export const githubImportRouter = router({
           
           // Verify the clone was successful
           const objectsPath = path.join(absolutePath, 'objects');
+          const refsPath = path.join(absolutePath, 'refs');
+          const headPath = path.join(absolutePath, 'HEAD');
           const cloneExists = await exists(absolutePath);
           const objectsExist = await exists(objectsPath);
-          console.log(`[GitHub Resync] Clone verification:`, { absolutePath, cloneExists, objectsExist });
+          const refsExist = await exists(refsPath);
+          const headExists = await exists(headPath);
+          
+          // List files in the cloned directory for debugging
+          let dirContents: string[] = [];
+          try {
+            const { readdirSync } = await import('fs');
+            dirContents = readdirSync(absolutePath);
+          } catch {
+            dirContents = ['(could not list directory)'];
+          }
+          
+          console.log(`[GitHub Resync] Clone verification:`, { 
+            absolutePath, 
+            cloneExists, 
+            objectsExist,
+            refsExist,
+            headExists,
+            dirContents,
+          });
           
           if (!objectsExist) {
-            throw new Error('Clone completed but objects directory not found');
+            throw new Error(`Clone completed but objects directory not found. Directory contents: ${dirContents.join(', ')}`);
           }
         } catch (cloneError) {
           const cloneMsg = cloneError instanceof Error ? cloneError.message : 'Unknown error';

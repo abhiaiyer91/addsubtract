@@ -8,6 +8,7 @@ import {
   uuid,
   primaryKey,
   unique,
+  jsonb,
 } from 'drizzle-orm/pg-core';
 
 // Import better-auth user table for foreign key references
@@ -1699,6 +1700,59 @@ export const triageAgentRuns = pgTable('triage_agent_runs', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+// ============ MARKETING CONTENT ============
+
+/**
+ * Marketing content status enum
+ */
+export const marketingContentStatusEnum = pgEnum('marketing_content_status', [
+  'pending',    // Generated, awaiting review
+  'approved',   // Approved for posting
+  'posted',     // Posted to social media
+  'rejected',   // Rejected/discarded
+]);
+
+/**
+ * Marketing content source type enum
+ */
+export const marketingContentSourceEnum = pgEnum('marketing_content_source', [
+  'pr_merged',
+  'release_published',
+]);
+
+/**
+ * Marketing content table
+ * Stores AI-generated social media content from PRs and releases
+ */
+export const marketingContent = pgTable('marketing_content', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  
+  // Repository this content is for
+  repoId: uuid('repo_id')
+    .notNull()
+    .references(() => repositories.id, { onDelete: 'cascade' }),
+  
+  // Source of the content
+  sourceType: marketingContentSourceEnum('source_type').notNull(),
+  sourceId: text('source_id').notNull(), // PR ID or Release ID
+  sourceRef: text('source_ref').notNull(), // PR number or release tag
+  
+  // Generated content
+  tweet: text('tweet').notNull(), // Main tweet (280 chars)
+  thread: jsonb('thread'), // Array of tweets for thread
+  
+  // Status
+  status: marketingContentStatusEnum('status').notNull().default('pending'),
+  
+  // Posted info
+  postedAt: timestamp('posted_at', { withTimezone: true }),
+  postedUrl: text('posted_url'), // URL to the posted tweet
+  
+  // Timestamps
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
 // ============ JOURNAL (Notion-like documentation) ============
 
 /**
@@ -2425,3 +2479,9 @@ export type NewOAuthRefreshToken = typeof oauthRefreshTokens.$inferInsert;
 
 export type OAuthAppWebhook = typeof oauthAppWebhooks.$inferSelect;
 export type NewOAuthAppWebhook = typeof oauthAppWebhooks.$inferInsert;
+
+// Marketing content types
+export type MarketingContentStatus = (typeof marketingContentStatusEnum.enumValues)[number];
+export type MarketingContentSource = (typeof marketingContentSourceEnum.enumValues)[number];
+export type MarketingContent = typeof marketingContent.$inferSelect;
+export type NewMarketingContent = typeof marketingContent.$inferInsert;

@@ -12,6 +12,7 @@ export { registerCIHandlers } from './handlers/ci';
 export { registerMergeQueueHandlers, mergeQueueHandler } from './handlers/merge-queue';
 export { registerTriageHandlers } from './handlers/triage';
 export { registerPRReviewHandlers, triggerAsyncPRReview } from './handlers/pr-review';
+export { registerMarketingHandlers, triggerMarketingContent } from './handlers/marketing';
 
 /**
  * Helper to extract @mentions from text

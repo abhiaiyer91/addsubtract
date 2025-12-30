@@ -130,6 +130,19 @@ export const sandboxRouter = router({
       const keys = await sandboxKeyModel.listKeys(repo.id);
       const currentProviderKey = keys.find((k) => k.provider === (config?.provider ?? 'e2b'));
 
+      // Check Docker availability if Docker provider is selected/default
+      let dockerAvailable: boolean | undefined;
+      const provider = config?.provider ?? 'e2b';
+      if (provider === 'docker') {
+        try {
+          const { execSync } = await import('child_process');
+          execSync('docker version', { stdio: 'ignore', timeout: 5000 });
+          dockerAvailable = true;
+        } catch {
+          dockerAvailable = false;
+        }
+      }
+
       // Return full settings for owners
       if (!config) {
         // Return defaults if no config exists
@@ -151,6 +164,7 @@ export const sandboxRouter = router({
           dockerImage: 'wit-sandbox:latest',
           vercelProjectId: undefined,
           vercelRuntime: 'node22' as const,
+          dockerAvailable,
         };
       }
 
@@ -172,6 +186,7 @@ export const sandboxRouter = router({
         dockerImage: config.dockerImage,
         vercelProjectId: (config as any).vercelProjectId ?? undefined,
         vercelRuntime: (config as any).vercelRuntime ?? 'node22',
+        dockerAvailable,
       };
     }),
 

@@ -132,9 +132,10 @@ export function RepoSettingsPage() {
 
     setTransferError(null);
     transferRepo.mutate({
-      repoId: repoData.repo.id,
+      owner: owner!,
+      repo: repo!,
       newOwner: transferNewOwner.trim(),
-      toOrg: transferToOrg,
+      newOwnerType: transferToOrg ? 'organization' : 'user',
     });
   };
 

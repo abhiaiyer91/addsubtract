@@ -19,6 +19,7 @@ import {
   ExternalLink,
   Info,
   Zap,
+  CheckCircle2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -681,6 +682,24 @@ export function SandboxSettingsPage() {
                 <CardDescription>Configure Docker-specific options.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                {(settings as any).dockerAvailable === false && (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      <strong>Docker is not available on this server.</strong> The sandbox will not work until Docker is installed and running. Consider using E2B or Daytona as cloud-based alternatives.
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {(settings as any).dockerAvailable === true && (
+                  <Alert>
+                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    <AlertDescription>
+                      Docker is available and ready to use.
+                    </AlertDescription>
+                  </Alert>
+                )}
+
                 <div className="space-y-2">
                   <Label htmlFor="dockerImage">Sandbox Image</Label>
                   <Input

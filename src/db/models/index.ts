@@ -195,3 +195,6 @@ export {
   type SandboxKeyInfo,
   type SandboxSession,
 } from './sandbox';
+
+// Marketing content model (auto-generated social content)
+export { marketingContentModel } from './marketing-content';
