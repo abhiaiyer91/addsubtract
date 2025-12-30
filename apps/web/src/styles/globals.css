@@ -493,36 +493,183 @@ html {
   animation: slide-in-from-left 0.3s ease-out;
 }
 
-/* XTerm.js terminal styling - ensure proper scrolling */
+/* ============================================
+   Premium XTerm.js Terminal Styling
+   Inspired by Warp, iTerm2, and Hyper terminals
+   ============================================ */
+
+/* Terminal container with subtle glow effect */
+.terminal-container {
+  position: relative;
+  background: #0c0c0f;
+}
+
+.terminal-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(16, 185, 129, 0.3), transparent);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.terminal-container:focus-within::before {
+  opacity: 1;
+}
+
+/* Terminal header styling */
+.terminal-header {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* Terminal content area */
+.terminal-content {
+  padding: 8px 12px;
+  overflow: hidden;
+}
+
+/* Empty state styling */
+.terminal-empty-state {
+  background: radial-gradient(ellipse at center, rgba(39, 39, 42, 0.3) 0%, transparent 70%);
+}
+
+/* Core xterm styling */
 .xterm {
   height: 100%;
   width: 100%;
+  padding: 4px 0;
 }
 
+/* Custom cursor glow effect */
+.xterm-cursor-layer {
+  filter: drop-shadow(0 0 3px rgba(16, 185, 129, 0.5));
+}
+
+/* Enhanced scrollbar styling */
 .xterm-viewport {
   overflow-y: auto !important;
   scrollbar-width: thin;
-  scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+  scrollbar-color: rgba(113, 113, 122, 0.4) transparent;
 }
 
 .xterm-viewport::-webkit-scrollbar {
-  width: 8px;
+  width: 6px;
 }
 
 .xterm-viewport::-webkit-scrollbar-track {
   background: transparent;
+  margin: 4px 0;
 }
 
 .xterm-viewport::-webkit-scrollbar-thumb {
-  background: hsl(var(--muted-foreground) / 0.3);
-  border-radius: 4px;
+  background: rgba(113, 113, 122, 0.3);
+  border-radius: 3px;
+  transition: background 0.2s ease;
 }
 
 .xterm-viewport::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--muted-foreground) / 0.5);
+  background: rgba(113, 113, 122, 0.5);
+}
+
+.xterm-viewport::-webkit-scrollbar-thumb:active {
+  background: rgba(16, 185, 129, 0.5);
+}
+
+/* Hide scrollbar until hover */
+.terminal-content:not(:hover) .xterm-viewport::-webkit-scrollbar-thumb {
+  background: transparent;
+}
+
+.terminal-content:hover .xterm-viewport::-webkit-scrollbar-thumb {
+  background: rgba(113, 113, 122, 0.3);
 }
 
 /* Ensure xterm screen takes full height */
 .xterm-screen {
   height: 100%;
+}
+
+/* Text selection styling */
+.xterm .xterm-selection div {
+  background: rgba(16, 185, 129, 0.25) !important;
+}
+
+/* Link styling */
+.xterm-link-layer a {
+  color: #60a5fa !important;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.xterm-link-layer a:hover {
+  color: #93c5fd !important;
+}
+
+/* Character rendering improvements */
+.xterm-rows {
+  font-feature-settings: "liga" 1, "calt" 1;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Bold text enhancement */
+.xterm-bold {
+  font-weight: 600;
+}
+
+/* Terminal welcome message animation */
+@keyframes terminal-line-appear {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Cursor blink animation - smoother */
+@keyframes terminal-cursor-blink {
+  0%, 50% {
+    opacity: 1;
+  }
+  51%, 100% {
+    opacity: 0;
+  }
+}
+
+.xterm-cursor-blink {
+  animation: terminal-cursor-blink 1s step-end infinite;
+}
+
+/* Focus ring for accessibility */
+.terminal-content:focus-within {
+  outline: none;
+}
+
+/* Command prompt styling enhancement */
+.xterm-rows > div {
+  min-height: 1.4em;
+}
+
+/* Subtle scanline effect (optional, can be removed if performance is a concern) */
+.terminal-container.terminal-scanlines::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.03) 2px,
+    rgba(0, 0, 0, 0.03) 4px
+  );
+  opacity: 0.5;
 }

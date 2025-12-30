@@ -48,37 +48,50 @@ export function SandboxTerminal({
   useEffect(() => {
     if (!terminalRef.current || xtermRef.current) return;
 
+    // Premium terminal theme inspired by best-in-class terminals
+    const xtermTheme = {
+      background: '#0c0c0f',
+      foreground: '#e8e8ed',
+      cursor: '#10b981',
+      cursorAccent: '#0c0c0f',
+      selectionBackground: 'rgba(16, 185, 129, 0.25)',
+      selectionForeground: '#ffffff',
+      black: '#1a1a1f',
+      red: '#ff6b6b',
+      green: '#10b981',
+      yellow: '#fbbf24',
+      blue: '#60a5fa',
+      magenta: '#c084fc',
+      cyan: '#22d3ee',
+      white: '#e8e8ed',
+      brightBlack: '#71717a',
+      brightRed: '#fca5a5',
+      brightGreen: '#34d399',
+      brightYellow: '#fde047',
+      brightBlue: '#93c5fd',
+      brightMagenta: '#d8b4fe',
+      brightCyan: '#67e8f9',
+      brightWhite: '#ffffff',
+    };
+
     const xterm = new XTerm({
-      theme: {
-        background: '#09090b', // zinc-950
-        foreground: '#a1a1aa', // zinc-400
-        cursor: '#f4f4f5', // zinc-100
-        cursorAccent: '#09090b',
-        selectionBackground: '#3f3f46', // zinc-700
-        black: '#18181b',
-        red: '#ef4444',
-        green: '#22c55e',
-        yellow: '#eab308',
-        blue: '#3b82f6',
-        magenta: '#a855f7',
-        cyan: '#06b6d4',
-        white: '#f4f4f5',
-        brightBlack: '#52525b',
-        brightRed: '#f87171',
-        brightGreen: '#4ade80',
-        brightYellow: '#facc15',
-        brightBlue: '#60a5fa',
-        brightMagenta: '#c084fc',
-        brightCyan: '#22d3ee',
-        brightWhite: '#ffffff',
-      },
-      fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
+      theme: xtermTheme,
+      fontFamily: '"JetBrains Mono", "Fira Code", "Cascadia Code", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
       fontSize: 13,
-      lineHeight: 1.4,
+      fontWeight: '400',
+      fontWeightBold: '600',
+      lineHeight: 1.5,
+      letterSpacing: 0,
       cursorBlink: true,
       cursorStyle: 'bar',
+      cursorWidth: 2,
       scrollback: 10000,
       tabStopWidth: 4,
+      allowProposedApi: true,
+      macOptionIsMeta: true,
+      macOptionClickForcesSelection: true,
+      drawBoldTextInBrightColors: true,
+      minimumContrastRatio: 4.5,
     });
 
     const fitAddon = new FitAddon();
@@ -230,38 +243,63 @@ export function SandboxTerminal({
   }, [disconnect]);
 
   return (
-    <div className={cn('flex flex-col bg-zinc-950 rounded-lg border border-zinc-800', className)}>
-      {/* Header */}
-      <div className="flex items-center justify-between h-10 px-3 border-b border-zinc-800">
-        <div className="flex items-center gap-2">
-          <Terminal className="h-4 w-4 text-zinc-400" />
-          <span className="text-sm font-medium text-zinc-300">Sandbox Terminal</span>
+    <div className={cn('terminal-container flex flex-col bg-[#0c0c0f] rounded-xl border border-zinc-800/50 overflow-hidden shadow-2xl shadow-black/20', className)}>
+      {/* Premium Header */}
+      <div className="terminal-header flex items-center justify-between h-10 px-3 border-b border-zinc-800/50 bg-gradient-to-b from-zinc-900/80 to-zinc-900/40">
+        <div className="flex items-center gap-3">
+          {/* Traffic light buttons */}
+          <div className="flex items-center gap-1.5 mr-1">
+            <button 
+              className="w-3 h-3 rounded-full bg-zinc-700 hover:bg-red-500 transition-colors group relative"
+              title="Close"
+            >
+              <span className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 text-red-900 text-[8px] font-bold">×</span>
+            </button>
+            <button 
+              className="w-3 h-3 rounded-full bg-zinc-700 hover:bg-yellow-500 transition-colors group relative"
+              title="Minimize"
+            >
+              <span className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 text-yellow-900 text-[8px] font-bold">−</span>
+            </button>
+            <button 
+              className="w-3 h-3 rounded-full bg-zinc-700 hover:bg-green-500 transition-colors group relative"
+              title="Maximize"
+            >
+              <span className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 text-green-900 text-[8px] font-bold">+</span>
+            </button>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <Terminal className="h-4 w-4 text-zinc-500" />
+            <span className="text-sm font-medium text-zinc-300">Sandbox Terminal</span>
+          </div>
           
           {sessionState === 'connected' && (
-            <Badge variant="outline" className="text-xs bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
+            <Badge variant="outline" className="h-5 text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border-emerald-500/30 shadow-sm shadow-emerald-500/10">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5 animate-pulse" />
               Connected
             </Badge>
           )}
           {sessionState === 'connecting' && (
-            <Badge variant="outline" className="text-xs bg-amber-500/10 text-amber-400 border-amber-500/20">
-              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+            <Badge variant="outline" className="h-5 text-[10px] font-medium bg-amber-500/10 text-amber-400 border-amber-500/30 shadow-sm shadow-amber-500/10">
+              <Loader2 className="h-2.5 w-2.5 mr-1 animate-spin" />
               Connecting
             </Badge>
           )}
           {sessionState === 'error' && (
-            <Badge variant="outline" className="text-xs bg-red-500/10 text-red-400 border-red-500/20">
-              <AlertCircle className="h-3 w-3 mr-1" />
+            <Badge variant="outline" className="h-5 text-[10px] font-medium bg-red-500/10 text-red-400 border-red-500/30 shadow-sm shadow-red-500/10">
+              <AlertCircle className="h-2.5 w-2.5 mr-1" />
               Error
             </Badge>
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           {sessionState === 'disconnected' || sessionState === 'error' ? (
             <Button
               variant="ghost"
               size="sm"
-              className="h-7 text-xs gap-1.5"
+              className="h-7 text-xs gap-1.5 text-zinc-400 hover:text-emerald-400 hover:bg-emerald-500/10"
               onClick={connect}
             >
               <Power className="h-3.5 w-3.5" />
@@ -271,7 +309,7 @@ export function SandboxTerminal({
             <Button
               variant="ghost"
               size="sm"
-              className="h-7 text-xs gap-1.5 text-red-400 hover:text-red-300"
+              className="h-7 text-xs gap-1.5 text-zinc-400 hover:text-red-400 hover:bg-red-500/10"
               onClick={disconnect}
               disabled={sessionState === 'connecting'}
             >
@@ -285,13 +323,14 @@ export function SandboxTerminal({
       {/* Terminal */}
       <div 
         ref={terminalRef} 
-        className="flex-1 p-2"
+        className="terminal-content flex-1"
         style={{ minHeight: '300px' }}
       />
 
       {/* Error message */}
       {error && (
-        <div className="px-3 py-2 text-xs text-red-400 border-t border-zinc-800 bg-red-500/5">
+        <div className="px-4 py-2.5 text-xs text-red-400 border-t border-red-500/20 bg-red-500/5 flex items-center gap-2">
+          <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
           {error}
         </div>
       )}

@@ -2,12 +2,13 @@ import { useRef, useEffect, useState, useCallback } from 'react';
 import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
-import { Terminal, Trash2, Loader2, AlertCircle, Power, PowerOff } from 'lucide-react';
+import { Terminal, Trash2, Loader2, AlertCircle, Power, PowerOff, Circle } from 'lucide-react';
 import { useIDEStore } from '@/lib/ide-store';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { trpc } from '@/lib/trpc';
+import { cn } from '@/lib/utils';
 import '@xterm/xterm/css/xterm.css';
 
 interface TerminalPanelProps {
@@ -20,28 +21,32 @@ interface TerminalPanelProps {
 type TerminalTab = 'output' | 'sandbox';
 type SandboxState = 'disconnected' | 'connecting' | 'connected' | 'error';
 
-// Shared xterm theme
+// Premium terminal theme inspired by best-in-class terminals (Warp, iTerm2, Hyper)
 const xtermTheme = {
-  background: '#09090b', // zinc-950
-  foreground: '#e4e4e7', // zinc-200 - brighter for better readability
-  cursor: '#f4f4f5', // zinc-100
-  cursorAccent: '#09090b',
-  selectionBackground: '#3f3f46', // zinc-700
-  black: '#18181b',
-  red: '#ef4444',
-  green: '#22c55e',
-  yellow: '#eab308',
-  blue: '#3b82f6',
-  magenta: '#a855f7',
-  cyan: '#06b6d4',
-  white: '#f4f4f5',
+  // Background with subtle warmth for reduced eye strain
+  background: '#0c0c0f', // Slightly warmer than pure black
+  foreground: '#e8e8ed', // Soft white for better contrast
+  cursor: '#10b981', // Emerald cursor matching brand
+  cursorAccent: '#0c0c0f',
+  selectionBackground: 'rgba(16, 185, 129, 0.25)', // Brand color selection
+  selectionForeground: '#ffffff',
+  // ANSI colors - carefully tuned for readability
+  black: '#1a1a1f',
+  red: '#ff6b6b', // Softer red
+  green: '#10b981', // Brand emerald
+  yellow: '#fbbf24', // Amber
+  blue: '#60a5fa', // Soft blue
+  magenta: '#c084fc', // Purple
+  cyan: '#22d3ee', // Cyan
+  white: '#e8e8ed',
+  // Bright variants
   brightBlack: '#71717a', // zinc-500
-  brightRed: '#f87171',
-  brightGreen: '#4ade80',
-  brightYellow: '#facc15',
-  brightBlue: '#60a5fa',
-  brightMagenta: '#c084fc',
-  brightCyan: '#22d3ee',
+  brightRed: '#fca5a5',
+  brightGreen: '#34d399', // Brighter emerald
+  brightYellow: '#fde047',
+  brightBlue: '#93c5fd',
+  brightMagenta: '#d8b4fe',
+  brightCyan: '#67e8f9',
   brightWhite: '#ffffff',
 };
 
@@ -76,11 +81,16 @@ export function TerminalPanel({ height, repoId, owner, repo }: TerminalPanelProp
 
     const xterm = new XTerm({
       theme: xtermTheme,
-      fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
+      // Premium font stack with ligature support
+      fontFamily: '"JetBrains Mono", "Fira Code", "Cascadia Code", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
       fontSize: 13,
-      lineHeight: 1.4,
+      fontWeight: '400',
+      fontWeightBold: '600',
+      lineHeight: 1.5,
+      letterSpacing: 0,
       cursorBlink: false,
       cursorStyle: 'bar',
+      cursorWidth: 2,
       scrollback: 10000,
       tabStopWidth: 4,
       disableStdin: true, // Output terminal is read-only
@@ -88,6 +98,11 @@ export function TerminalPanel({ height, repoId, owner, repo }: TerminalPanelProp
       scrollOnUserInput: true,
       fastScrollModifier: 'alt', // Hold alt for fast scrolling
       smoothScrollDuration: 0, // Instant scrolling for better responsiveness
+      allowProposedApi: true,
+      macOptionIsMeta: true,
+      macOptionClickForcesSelection: true,
+      drawBoldTextInBrightColors: true,
+      minimumContrastRatio: 4.5, // WCAG AA contrast
     });
 
     const fitAddon = new FitAddon();
@@ -189,16 +204,26 @@ export function TerminalPanel({ height, repoId, owner, repo }: TerminalPanelProp
 
     const xterm = new XTerm({
       theme: xtermTheme,
-      fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
+      // Premium font stack with ligature support
+      fontFamily: '"JetBrains Mono", "Fira Code", "Cascadia Code", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
       fontSize: 13,
-      lineHeight: 1.4,
+      fontWeight: '400',
+      fontWeightBold: '600',
+      lineHeight: 1.5,
+      letterSpacing: 0,
       cursorBlink: true,
       cursorStyle: 'bar',
+      cursorWidth: 2,
       scrollback: 10000,
       tabStopWidth: 4,
       scrollOnUserInput: true,
       fastScrollModifier: 'alt',
       smoothScrollDuration: 0,
+      allowProposedApi: true,
+      macOptionIsMeta: true,
+      macOptionClickForcesSelection: true,
+      drawBoldTextInBrightColors: true,
+      minimumContrastRatio: 4.5, // WCAG AA contrast
     });
 
     const fitAddon = new FitAddon();
@@ -374,79 +399,114 @@ export function TerminalPanel({ height, repoId, owner, repo }: TerminalPanelProp
   }, []);
 
   return (
-    <div className="flex flex-col border-t bg-zinc-950" style={{ height }}>
-      {/* Header */}
-      <div className="flex items-center justify-between h-8 px-3 border-b border-zinc-800 flex-shrink-0">
-        <div className="flex items-center gap-2">
-          <Terminal className="h-3.5 w-3.5 text-muted-foreground" />
+    <div className="terminal-container flex flex-col border-t border-zinc-800/50 bg-[#0c0c0f]" style={{ height }}>
+      {/* Premium Terminal Header */}
+      <div className="terminal-header flex items-center justify-between h-9 px-3 border-b border-zinc-800/50 flex-shrink-0 bg-gradient-to-b from-zinc-900/80 to-zinc-900/40">
+        {/* Left side - Traffic lights & tabs */}
+        <div className="flex items-center gap-3">
+          {/* Traffic light buttons */}
+          <div className="flex items-center gap-1.5 mr-1">
+            <button 
+              className="w-3 h-3 rounded-full bg-zinc-700 hover:bg-red-500 transition-colors group relative"
+              title="Close"
+            >
+              <span className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 text-red-900 text-[8px] font-bold">×</span>
+            </button>
+            <button 
+              className="w-3 h-3 rounded-full bg-zinc-700 hover:bg-yellow-500 transition-colors group relative"
+              title="Minimize"
+            >
+              <span className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 text-yellow-900 text-[8px] font-bold">−</span>
+            </button>
+            <button 
+              className="w-3 h-3 rounded-full bg-zinc-700 hover:bg-green-500 transition-colors group relative"
+              title="Maximize"
+            >
+              <span className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 text-green-900 text-[8px] font-bold">+</span>
+            </button>
+          </div>
           
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TerminalTab)}>
-            <TabsList className="h-6 bg-transparent p-0 gap-1">
+            <TabsList className="h-7 bg-transparent p-0 gap-0.5">
               <TabsTrigger 
                 value="output" 
-                className="h-6 px-2 text-xs data-[state=active]:bg-zinc-800"
+                className={cn(
+                  "h-7 px-3 text-xs font-medium rounded-md transition-all",
+                  "data-[state=active]:bg-zinc-800/80 data-[state=active]:text-zinc-100",
+                  "data-[state=inactive]:text-zinc-500 data-[state=inactive]:hover:text-zinc-300"
+                )}
               >
+                <Terminal className="h-3 w-3 mr-1.5" />
                 Output
               </TabsTrigger>
               <TabsTrigger 
                 value="sandbox" 
-                className="h-6 px-2 text-xs data-[state=active]:bg-zinc-800"
+                className={cn(
+                  "h-7 px-3 text-xs font-medium rounded-md transition-all",
+                  "data-[state=active]:bg-zinc-800/80 data-[state=active]:text-zinc-100",
+                  "data-[state=inactive]:text-zinc-500 data-[state=inactive]:hover:text-zinc-300",
+                  "disabled:opacity-40"
+                )}
                 disabled={!sandboxAvailable}
               >
+                <Circle className={cn(
+                  "h-2 w-2 mr-1.5 transition-colors",
+                  sandboxAvailable ? "fill-emerald-500 text-emerald-500" : "fill-zinc-600 text-zinc-600"
+                )} />
                 Sandbox
-                {sandboxAvailable && (
-                  <span className="ml-1.5 w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                )}
               </TabsTrigger>
             </TabsList>
           </Tabs>
 
+          {/* Status badges */}
           {activeTab === 'sandbox' && (
-            <>
+            <div className="flex items-center">
               {sandboxState === 'connecting' && (
-                <Badge variant="outline" className="h-5 text-[10px] bg-amber-500/10 text-amber-400 border-amber-500/20">
+                <Badge variant="outline" className="h-5 text-[10px] font-medium bg-amber-500/10 text-amber-400 border-amber-500/30 shadow-sm shadow-amber-500/10">
                   <Loader2 className="h-2.5 w-2.5 mr-1 animate-spin" />
                   Connecting
                 </Badge>
               )}
               {sandboxState === 'connected' && (
-                <Badge variant="outline" className="h-5 text-[10px] bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
+                <Badge variant="outline" className="h-5 text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border-emerald-500/30 shadow-sm shadow-emerald-500/10">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5 animate-pulse" />
                   Connected
                 </Badge>
               )}
               {sandboxState === 'error' && (
-                <Badge variant="outline" className="h-5 text-[10px] bg-red-500/10 text-red-400 border-red-500/20">
+                <Badge variant="outline" className="h-5 text-[10px] font-medium bg-red-500/10 text-red-400 border-red-500/30 shadow-sm shadow-red-500/10">
                   <AlertCircle className="h-2.5 w-2.5 mr-1" />
                   Error
                 </Badge>
               )}
-            </>
+            </div>
           )}
         </div>
 
-        <div className="flex items-center gap-1">
+        {/* Right side - Actions */}
+        <div className="flex items-center gap-0.5">
           {activeTab === 'sandbox' && sandboxAvailable && (
             <>
               {sandboxState === 'disconnected' || sandboxState === 'error' ? (
                 <Button
                   variant="ghost"
                   size="icon-sm"
-                  className="h-6 w-6 text-muted-foreground hover:text-emerald-400"
+                  className="h-6 w-6 text-zinc-500 hover:text-emerald-400 hover:bg-emerald-500/10 transition-all"
                   onClick={connectToSandbox}
-                  title="Connect"
+                  title="Connect to sandbox"
                 >
-                  <Power className="h-3 w-3" />
+                  <Power className="h-3.5 w-3.5" />
                 </Button>
               ) : (
                 <Button
                   variant="ghost"
                   size="icon-sm"
-                  className="h-6 w-6 text-muted-foreground hover:text-red-400"
+                  className="h-6 w-6 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-all"
                   onClick={disconnectFromSandbox}
                   disabled={sandboxState === 'connecting'}
-                  title="Disconnect"
+                  title="Disconnect from sandbox"
                 >
-                  <PowerOff className="h-3 w-3" />
+                  <PowerOff className="h-3.5 w-3.5" />
                 </Button>
               )}
             </>
@@ -454,45 +514,46 @@ export function TerminalPanel({ height, repoId, owner, repo }: TerminalPanelProp
           <Button
             variant="ghost"
             size="icon-sm"
-            className="h-6 w-6 text-muted-foreground hover:text-foreground"
+            className="h-6 w-6 text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800/50 transition-all"
             onClick={activeTab === 'output' ? clearOutputTerminal : clearSandboxTerminal}
-            title="Clear"
+            title="Clear terminal"
           >
-            <Trash2 className="h-3 w-3" />
+            <Trash2 className="h-3.5 w-3.5" />
           </Button>
         </div>
       </div>
 
-      {/* Content - Terminal containers need explicit height for xterm scrolling */}
+      {/* Terminal Content Area */}
       {activeTab === 'output' ? (
         /* Output Tab - xterm.js terminal for agent command results */
         <div 
           ref={outputContainerRef} 
-          className="flex-1 min-h-0"
-          style={{ 
-            padding: '4px',
-            // Ensure xterm can calculate proper dimensions
-            overflow: 'hidden',
-          }}
+          className="terminal-content flex-1 min-h-0"
         />
       ) : (
         /* Sandbox Tab - xterm.js Interactive terminal */
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
           {!sandboxAvailable ? (
-            <div className="p-3 font-mono text-xs text-zinc-500">
+            <div className="terminal-empty-state p-6 flex flex-col items-center justify-center h-full text-center">
+              <div className="w-12 h-12 rounded-xl bg-zinc-800/50 flex items-center justify-center mb-4">
+                <Terminal className="h-6 w-6 text-zinc-500" />
+              </div>
               {sandboxStatus?.provider === 'docker' && sandboxStatus?.dockerAvailable === false ? (
                 <>
-                  <p className="text-amber-400">Docker sandbox is configured but Docker is not available.</p>
-                  <p className="mt-2">
-                    Either install Docker, ensure it's running, or switch to E2B/Daytona/Vercel provider in{' '}
+                  <p className="text-amber-400 font-medium text-sm mb-2">Docker Not Available</p>
+                  <p className="text-zinc-500 text-xs max-w-sm">
+                    Docker sandbox is configured but Docker is not running.
+                    Install Docker or switch to E2B/Daytona provider in{' '}
                     <span className="text-zinc-300">Settings → Sandbox</span>.
                   </p>
                 </>
               ) : (
                 <>
-                  <p>Sandbox is not configured for this repository.</p>
-                  <p className="mt-2">
-                    Go to <span className="text-zinc-300">Settings → Sandbox</span> to enable it.
+                  <p className="text-zinc-300 font-medium text-sm mb-2">Sandbox Not Configured</p>
+                  <p className="text-zinc-500 text-xs max-w-sm">
+                    Enable sandbox execution in{' '}
+                    <span className="text-emerald-400">Settings → Sandbox</span>{' '}
+                    to run commands in an isolated environment.
                   </p>
                 </>
               )}
@@ -500,8 +561,7 @@ export function TerminalPanel({ height, repoId, owner, repo }: TerminalPanelProp
           ) : (
             <div 
               ref={sandboxContainerRef} 
-              className="flex-1 min-h-0 p-1"
-              style={{ overflow: 'hidden' }}
+              className="terminal-content flex-1 min-h-0"
             />
           )}
         </div>
