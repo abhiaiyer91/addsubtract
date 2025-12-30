@@ -15,6 +15,75 @@ import {
 // Import better-auth user table for foreign key references
 import { user as authUser } from './auth-schema';
 
+// ============ STORAGE CONFIGURATION TYPES ============
+
+/**
+ * Base storage configuration shared by all backends
+ */
+export interface BaseStorageConfig {
+  /** Optional prefix/subdirectory for all objects */
+  prefix?: string;
+  /** Reference to stored credentials (for cloud backends) */
+  credentialsId?: string;
+  /** Enable compression for objects */
+  compression?: boolean;
+  /** Enable encryption at rest */
+  encryption?: boolean;
+}
+
+/**
+ * Local filesystem storage configuration
+ */
+export interface LocalStorageConfig extends BaseStorageConfig {
+  /** Override the default disk path */
+  path?: string;
+}
+
+/**
+ * S3-compatible storage configuration (S3, R2, MinIO)
+ */
+export interface S3StorageConfig extends BaseStorageConfig {
+  /** Bucket name (required) */
+  bucket: string;
+  /** AWS region (default: us-east-1) */
+  region?: string;
+  /** Custom endpoint URL (for R2, MinIO) */
+  endpoint?: string;
+  /** Force path-style URLs (required for some S3-compatible services) */
+  forcePathStyle?: boolean;
+  /** Storage class (STANDARD, INTELLIGENT_TIERING, etc.) */
+  storageClass?: string;
+}
+
+/**
+ * Google Cloud Storage configuration
+ */
+export interface GCSStorageConfig extends BaseStorageConfig {
+  /** Bucket name (required) */
+  bucket: string;
+  /** Project ID */
+  projectId?: string;
+}
+
+/**
+ * Azure Blob Storage configuration
+ */
+export interface AzureStorageConfig extends BaseStorageConfig {
+  /** Container name (required) */
+  container: string;
+  /** Storage account name */
+  accountName?: string;
+}
+
+/**
+ * Union type for all storage configurations
+ */
+export type StorageConfig = 
+  | LocalStorageConfig 
+  | S3StorageConfig 
+  | GCSStorageConfig 
+  | AzureStorageConfig;
+
 // ============ ENUMS ============
 
 export const ownerTypeEnum = pgEnum('owner_type', ['user', 'organization']);
@@ -109,6 +178,19 @@ export const mergeQueueStrategyEnum = pgEnum('merge_queue_strategy', [
   'sequential',   // Merge PRs one at a time in order
   'optimistic',   // Speculatively merge batches, rollback on failure
   'adaptive',     // AI-driven: analyze conflicts and determine best order
+]);
+
+/**
+ * Storage backend type enum
+ * Defines where Git objects are stored for a repository
+ */
+export const storageBackendEnum = pgEnum('storage_backend', [
+  'local',        // Local filesystem (default)
+  's3',           // AWS S3
+  'r2',           // Cloudflare R2 (S3-compatible)
+  'gcs',          // Google Cloud Storage
+  'minio',        // Self-hosted MinIO
+  'azure',        // Azure Blob Storage
 ]);
 
 // ============ USERS ============
@@ -293,8 +375,25 @@ export const repositories = pgTable('repositories', {
   languageStats: jsonb('language_stats'),
   languageStatsUpdatedAt: timestamp('language_stats_updated_at', { withTimezone: true }),
 
-  // Filesystem path to bare repo
+  // Filesystem path to bare repo (used for local storage backend)
   diskPath: text('disk_path').notNull(),
+
+  // Storage configuration
+  // Defines where Git objects are stored for this repository
+  storageBackend: storageBackendEnum('storage_backend').notNull().default('local'),
+  
+  // Storage-specific configuration (bucket, prefix, credentials ref, etc.)
+  // Structure depends on storageBackend:
+  // - local: { path?: string } (override diskPath)
+  // - s3/r2/minio: { bucket, prefix?, region?, endpoint?, credentialsId? }
+  // - gcs: { bucket, prefix?, credentialsId? }
+  // - azure: { container, prefix?, credentialsId? }
+  storageConfig: jsonb('storage_config').$type<StorageConfig>(),
+
+  // Storage statistics
+  storageSizeBytes: integer('storage_size_bytes').default(0),
+  storageObjectCount: integer('storage_object_count').default(0),
+  storageLastSyncAt: timestamp('storage_last_sync_at', { withTimezone: true }),
 
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
@@ -313,6 +412,49 @@ export const repositories = pgTable('repositories', {
   pushedAtIdx: index('idx_repositories_pushed_at').on(table.pushedAt),
   // Index for trending/popular repos
   starsCountIdx: index('idx_repositories_stars_count').on(table.starsCount),
+  // Index for storage backend (for migration/cleanup operations)
+  storageBackendIdx: index('idx_repositories_storage_backend').on(table.storageBackend),
+}));
+
+// ============ STORAGE CREDENTIALS ============
+
+/**
+ * Stored credentials for cloud storage backends
+ * Credentials are encrypted at rest using ENCRYPTION_KEY
+ */
+export const storageCredentials = pgTable('storage_credentials', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  
+  // Owner of the credentials (user or org)
+  ownerId: text('owner_id').notNull(),
+  ownerType: ownerTypeEnum('owner_type').notNull(),
+  
+  // Human-readable name
+  name: text('name').notNull(),
+  
+  // Which backend this is for
+  backendType: storageBackendEnum('backend_type').notNull(),
+  
+  // Encrypted credentials JSON
+  encryptedCredentials: text('encrypted_credentials').notNull(),
+  
+  // Metadata for display (not sensitive)
+  metadata: jsonb('metadata').$type<{
+    bucket?: string;
+    region?: string;
+    endpoint?: string;
+    accountName?: string;
+  }>(),
+  
+  // Usage tracking
+  lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+  usageCount: integer('usage_count').default(0),
+  
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  // Index for listing credentials by owner
+  ownerIdx: index('idx_storage_credentials_owner').on(table.ownerId, table.ownerType),
 }));
 
 export const collaborators = pgTable(
@@ -1729,6 +1871,7 @@ export const aiProviderEnum = pgEnum('ai_provider', [
   'openai',
   'anthropic',
   'coderabbit',
+  'openrouter',
 ]);
 
 /**
@@ -1744,7 +1887,7 @@ export const repoAiKeys = pgTable('repo_ai_keys', {
     .notNull()
     .references(() => repositories.id, { onDelete: 'cascade' }),
   
-  // AI provider (openai, anthropic)
+  // AI provider (openai, anthropic, coderabbit, openrouter)
   provider: aiProviderEnum('provider').notNull(),
   
   // Encrypted API key (we store encrypted, never plain text)
@@ -1779,7 +1922,7 @@ export const userAiKeys = pgTable('user_ai_keys', {
     .notNull()
     .references(() => authUser.id, { onDelete: 'cascade' }),
   
-  // AI provider (openai, anthropic)
+  // AI provider (openai, anthropic, coderabbit, openrouter)
   provider: aiProviderEnum('provider').notNull(),
   
   // Encrypted API key (we store encrypted, never plain text)
@@ -2864,3 +3007,270 @@ export const repoMcpServers = pgTable('repo_mcp_servers', {
 // MCP Server types
 export type RepoMcpServer = typeof repoMcpServers.$inferSelect;
 export type NewRepoMcpServer = typeof repoMcpServers.$inferInsert;
+
+// ============ SENTINEL (Code Scanning) ============
+
+/**
+ * Sentinel scan status enum
+ */
+export const sentinelScanStatusEnum = pgEnum('sentinel_scan_status', [
+  'pending',
+  'running',
+  'completed',
+  'failed',
+  'cancelled',
+]);
+
+/**
+ * Sentinel finding severity enum
+ */
+export const sentinelFindingSeverityEnum = pgEnum('sentinel_finding_severity', [
+  'critical',
+  'high',
+  'medium',
+  'low',
+  'info',
+]);
+
+/**
+ * Sentinel finding category enum
+ */
+export const sentinelFindingCategoryEnum = pgEnum('sentinel_finding_category', [
+  'security',
+  'performance',
+  'maintainability',
+  'reliability',
+  'accessibility',
+  'best_practice',
+  'code_style',
+  'documentation',
+  'dependency',
+  'other',
+]);
+
+/**
+ * Sentinel configuration for a repository
+ * Controls automated scanning behavior and thresholds
+ */
+export const sentinelConfig = pgTable('sentinel_config', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  
+  /** Repository this config belongs to */
+  repoId: uuid('repo_id')
+    .notNull()
+    .references(() => repositories.id, { onDelete: 'cascade' })
+    .unique(),
+  
+  /** Whether sentinel is enabled for this repo */
+  enabled: boolean('enabled').notNull().default(false),
+  
+  /** Whether to run CodeRabbit analysis */
+  useCodeRabbit: boolean('use_coderabbit').notNull().default(true),
+  
+  /** Whether to run built-in security analysis */
+  useSecurityAnalysis: boolean('use_security_analysis').notNull().default(true),
+  
+  /** Whether to run code quality analysis */
+  useCodeQualityAnalysis: boolean('use_code_quality_analysis').notNull().default(true),
+  
+  /** Whether to run dependency vulnerability checks */
+  useDependencyCheck: boolean('use_dependency_check').notNull().default(true),
+  
+  /** Whether to auto-create issues for critical/high findings */
+  autoCreateIssues: boolean('auto_create_issues').notNull().default(false),
+  
+  /** Minimum severity to create issues for: critical, high, medium, low */
+  autoCreateIssueSeverity: text('auto_create_issue_severity').notNull().default('high'),
+  
+  /** Branches to scan (glob patterns, e.g., ["main", "develop", "release/*"]) */
+  branchPatterns: jsonb('branch_patterns').$type<string[]>().notNull().default(['main']),
+  
+  /** File patterns to exclude from scanning */
+  excludePatterns: jsonb('exclude_patterns').$type<string[]>().notNull().default([]),
+  
+  /** Schedule for automated scans (cron expression, null = manual only) */
+  scanSchedule: text('scan_schedule'),
+  
+  /** Custom instructions for the AI analysis */
+  customPrompt: text('custom_prompt'),
+  
+  /** User who last updated this config */
+  updatedById: text('updated_by_id')
+    .notNull()
+    .references(() => authUser.id, { onDelete: 'cascade' }),
+  
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  repoIdx: index('idx_sentinel_config_repo_id').on(table.repoId),
+}));
+
+/**
+ * Sentinel scan record - tracks each scan run
+ */
+export const sentinelScans = pgTable('sentinel_scans', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  
+  /** Repository being scanned */
+  repoId: uuid('repo_id')
+    .notNull()
+    .references(() => repositories.id, { onDelete: 'cascade' }),
+  
+  /** Current status of the scan */
+  status: sentinelScanStatusEnum('status').notNull().default('pending'),
+  
+  /** Branch that was scanned */
+  branch: text('branch').notNull(),
+  
+  /** Commit SHA that was scanned */
+  commitSha: text('commit_sha').notNull(),
+  
+  /** User who triggered the scan (null for scheduled scans) */
+  triggeredById: text('triggered_by_id')
+    .references(() => authUser.id, { onDelete: 'set null' }),
+  
+  /** Whether this was a scheduled scan */
+  isScheduled: boolean('is_scheduled').notNull().default(false),
+  
+  /** Number of files scanned */
+  filesScanned: integer('files_scanned').default(0),
+  
+  /** Number of findings by severity */
+  criticalCount: integer('critical_count').default(0),
+  highCount: integer('high_count').default(0),
+  mediumCount: integer('medium_count').default(0),
+  lowCount: integer('low_count').default(0),
+  infoCount: integer('info_count').default(0),
+  
+  /** Overall health score (0-100) */
+  healthScore: integer('health_score'),
+  
+  /** Summary of findings */
+  summary: text('summary'),
+  
+  /** AI-generated recommendations for improvement */
+  recommendations: jsonb('recommendations').$type<string[]>(),
+  
+  /** Raw output from analyzers (for debugging) */
+  rawOutput: jsonb('raw_output'),
+  
+  /** Error message if scan failed */
+  errorMessage: text('error_message'),
+  
+  /** When the scan started */
+  startedAt: timestamp('started_at', { withTimezone: true }),
+  
+  /** When the scan completed */
+  completedAt: timestamp('completed_at', { withTimezone: true }),
+  
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  repoIdx: index('idx_sentinel_scans_repo_id').on(table.repoId),
+  statusIdx: index('idx_sentinel_scans_status').on(table.status),
+  createdAtIdx: index('idx_sentinel_scans_created_at').on(table.createdAt),
+}));
+
+/**
+ * Sentinel findings - individual issues found during scans
+ */
+export const sentinelFindings = pgTable('sentinel_findings', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  
+  /** Scan this finding belongs to */
+  scanId: uuid('scan_id')
+    .notNull()
+    .references(() => sentinelScans.id, { onDelete: 'cascade' }),
+  
+  /** Repository for quick lookups */
+  repoId: uuid('repo_id')
+    .notNull()
+    .references(() => repositories.id, { onDelete: 'cascade' }),
+  
+  /** Severity of the finding */
+  severity: sentinelFindingSeverityEnum('severity').notNull(),
+  
+  /** Category of the finding */
+  category: sentinelFindingCategoryEnum('category').notNull(),
+  
+  /** Which analyzer found this (e.g., 'coderabbit', 'security', 'dependency') */
+  analyzer: text('analyzer').notNull(),
+  
+  /** Rule/check ID if applicable */
+  ruleId: text('rule_id'),
+  
+  /** File path where the issue was found */
+  filePath: text('file_path').notNull(),
+  
+  /** Line number (start) */
+  line: integer('line'),
+  
+  /** End line number */
+  endLine: integer('end_line'),
+  
+  /** Column number */
+  column: integer('column'),
+  
+  /** Title/short description of the finding */
+  title: text('title').notNull(),
+  
+  /** Detailed message about the finding */
+  message: text('message').notNull(),
+  
+  /** Suggested fix or recommendation */
+  suggestion: text('suggestion'),
+  
+  /** Code snippet showing the issue */
+  codeSnippet: text('code_snippet'),
+  
+  /** Suggested replacement code */
+  suggestedFix: text('suggested_fix'),
+  
+  /** Whether this finding has been acknowledged/dismissed */
+  isDismissed: boolean('is_dismissed').notNull().default(false),
+  
+  /** Reason for dismissal */
+  dismissedReason: text('dismissed_reason'),
+  
+  /** User who dismissed the finding */
+  dismissedById: text('dismissed_by_id')
+    .references(() => authUser.id, { onDelete: 'set null' }),
+  
+  /** When the finding was dismissed */
+  dismissedAt: timestamp('dismissed_at', { withTimezone: true }),
+  
+  /** Issue created from this finding (if any) */
+  linkedIssueId: uuid('linked_issue_id')
+    .references(() => issues.id, { onDelete: 'set null' }),
+  
+  /** Fingerprint for deduplication across scans */
+  fingerprint: text('fingerprint').notNull(),
+  
+  /** First seen in this commit */
+  firstSeenCommit: text('first_seen_commit'),
+  
+  /** First seen timestamp */
+  firstSeenAt: timestamp('first_seen_at', { withTimezone: true }).defaultNow().notNull(),
+  
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  scanIdx: index('idx_sentinel_findings_scan_id').on(table.scanId),
+  repoIdx: index('idx_sentinel_findings_repo_id').on(table.repoId),
+  severityIdx: index('idx_sentinel_findings_severity').on(table.severity),
+  categoryIdx: index('idx_sentinel_findings_category').on(table.category),
+  fingerprintIdx: index('idx_sentinel_findings_fingerprint').on(table.fingerprint),
+  filePathIdx: index('idx_sentinel_findings_file_path').on(table.filePath),
+}));
+
+// Sentinel types
+export type SentinelScanStatus = (typeof sentinelScanStatusEnum.enumValues)[number];
+export type SentinelFindingSeverity = (typeof sentinelFindingSeverityEnum.enumValues)[number];
+export type SentinelFindingCategory = (typeof sentinelFindingCategoryEnum.enumValues)[number];
+
+export type SentinelConfig = typeof sentinelConfig.$inferSelect;
+export type NewSentinelConfig = typeof sentinelConfig.$inferInsert;
+
+export type SentinelScan = typeof sentinelScans.$inferSelect;
+export type NewSentinelScan = typeof sentinelScans.$inferInsert;
+
+export type SentinelFinding = typeof sentinelFindings.$inferSelect;
+export type NewSentinelFinding = typeof sentinelFindings.$inferInsert;

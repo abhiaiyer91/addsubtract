@@ -8,13 +8,14 @@ import { RepoManager, BareRepository } from '../storage/repos';
 describe('Git Server', () => {
   let tempDir: string;
   let repoManager: RepoManager;
-  let app: ReturnType<typeof createApp>;
+  let app: ReturnType<typeof createApp>['app'];
 
   beforeEach(() => {
     // Create temporary directory
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wit-server-test-'));
     repoManager = new RepoManager(tempDir);
-    app = createApp(repoManager, { verbose: false });
+    const { app: honoApp } = createApp(repoManager, { verbose: false });
+    app = honoApp;
   });
 
   afterEach(() => {

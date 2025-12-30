@@ -1,0 +1,619 @@
+---
+title: "Scaling Implementation Plan"
+description: "Actionable implementation plan for scaling wit to millions of repositories"
+---
+
+# Scaling Implementation Plan
+
+This document provides a step-by-step implementation guide for the highest priority scaling changes. These changes will allow wit to scale from single-server deployments to millions of repositories.
+
+---
+
+## Quick Wins (Week 1)
+
+### 1. Enable Redis for Rate Limiting
+
+The Redis rate limiter is already implemented but not enabled by default.
+
+**File:** `src/server/index.ts`
+
+```typescript
+import { createClient } from 'redis';
+import { RedisStore, setRateLimitStore } from './middleware/rate-limit';
+
+export function startServer(options: ServerOptions): WitServer {
+  // ... existing code ...
+  
+  // Add Redis initialization
+  if (process.env.REDIS_URL) {
+    initRedisRateLimiting().catch(err => {
+      console.warn('⚠ Redis rate limiting not available:', err.message);
+    });
+  }
+  
+  // ... rest of function
+}
+
+async function initRedisRateLimiting(): Promise<void> {
+  const redis = createClient({ url: process.env.REDIS_URL });
+  await redis.connect();
+  setRateLimitStore(new RedisStore(redis));
+  console.log('✓ Redis rate limiting enabled');
+}
+```
+
+**Environment:**
+```bash
+REDIS_URL=redis://localhost:6379
+```
+
+---
+
+### 2. Configure Database Connection Pool
+
+**File:** `src/db/index.ts`
+
+```typescript
+export function initDatabase(connectionString: string | PoolConfig): Database {
+  const config: PoolConfig =
+    typeof connectionString === 'string'
+      ? { 
+          connectionString,
+          // Production-ready pool settings
+          max: parseInt(process.env.DB_POOL_MAX || '50', 10),
+          min: parseInt(process.env.DB_POOL_MIN || '10', 10),
+          idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT || '30000', 10),
+          connectionTimeoutMillis: parseInt(process.env.DB_CONNECT_TIMEOUT || '5000', 10),
+          // Enable connection validation
+          allowExitOnIdle: false,
+        }
+      : connectionString;
+
+  pool = new Pool(config);
+  
+  // Log pool events in development
+  if (process.env.NODE_ENV !== 'production') {
+    pool.on('connect', () => console.log('[db] Client connected'));
+    pool.on('remove', () => console.log('[db] Client removed'));
+  }
+  
+  // Monitor pool health
+  pool.on('error', (err) => {
+    console.error('[db] Unexpected pool error:', err);
+  });
+  
+  db = drizzle(pool, { schema });
+  return db;
+}
+```
+
+---
+
+## Storage Backend (Week 2-3)
+
+### 3. Create S3 Object Storage Interface
+
+**File:** `src/core/storage/types.ts`
+
+```typescript
+export interface ObjectStorageBackend {
+  writeObject(type: ObjectType, content: Buffer): Promise<string>;
+  readObject(hash: string): Promise<{ type: ObjectType; content: Buffer }>;
+  hasObject(hash: string): Promise<boolean>;
+  deleteObject(hash: string): Promise<void>;
+}
+
+export interface StorageConfig {
+  type: 'disk' | 's3';
+  // For disk
+  basePath?: string;
+  // For S3
+  bucket?: string;
+  region?: string;
+  endpoint?: string; // For MinIO/R2 compatibility
+}
+```
+
+**File:** `src/core/storage/s3.ts`
+
+```typescript
+import { S3Client, GetObjectCommand, PutObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
+import { ObjectType } from '../types';
+import { ObjectStorageBackend } from './types';
+import { createObjectBuffer, parseObjectBuffer, hashObject } from '../../utils/hash';
+import { compress, decompress } from '../../utils/compression';
+
+export class S3ObjectStorage implements ObjectStorageBackend {
+  private s3: S3Client;
+  private bucket: string;
+  
+  constructor(config: { bucket: string; region?: string; endpoint?: string }) {
+    this.s3 = new S3Client({
+      region: config.region || 'us-east-1',
+      endpoint: config.endpoint,
+    });
+    this.bucket = config.bucket;
+  }
+  
+  private getKey(hash: string): string {
+    // Use Git's object directory structure for compatibility
+    return `objects/${hash.slice(0, 2)}/${hash.slice(2)}`;
+  }
+  
+  async writeObject(type: ObjectType, content: Buffer): Promise<string> {
+    const hash = hashObject(type, content);
+    const key = this.getKey(hash);
+    
+    // Check if object already exists (deduplication)
+    if (await this.hasObject(hash)) {
+      return hash;
+    }
+    
+    const buffer = createObjectBuffer(type, content);
+    const compressed = compress(buffer);
+    
+    await this.s3.send(new PutObjectCommand({
+      Bucket: this.bucket,
+      Key: key,
+      Body: compressed,
+      ContentType: 'application/x-git-loose-object',
+      ContentEncoding: 'zlib',
+      // Enable server-side encryption
+      ServerSideEncryption: 'AES256',
+    }));
+    
+    return hash;
+  }
+  
+  async readObject(hash: string): Promise<{ type: ObjectType; content: Buffer }> {
+    const key = this.getKey(hash);
+    
+    const response = await this.s3.send(new GetObjectCommand({
+      Bucket: this.bucket,
+      Key: key,
+    }));
+    
+    const body = await response.Body?.transformToByteArray();
+    if (!body) {
+      throw new Error(`Object not found: ${hash}`);
+    }
+    
+    const data = decompress(Buffer.from(body));
+    return parseObjectBuffer(data);
+  }
+  
+  async hasObject(hash: string): Promise<boolean> {
+    const key = this.getKey(hash);
+    
+    try {
+      await this.s3.send(new HeadObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+      }));
+      return true;
+    } catch (error: any) {
+      if (error.name === 'NotFound') {
+        return false;
+      }
+      throw error;
+    }
+  }
+  
+  async deleteObject(hash: string): Promise<void> {
+    const { DeleteObjectCommand } = await import('@aws-sdk/client-s3');
+    const key = this.getKey(hash);
+    
+    await this.s3.send(new DeleteObjectCommand({
+      Bucket: this.bucket,
+      Key: key,
+    }));
+  }
+}
+```
+
+---
+
+### 4. Create Storage Factory
+
+**File:** `src/core/storage/factory.ts`
+
+```typescript
+import { ObjectStorageBackend, StorageConfig } from './types';
+import { DiskObjectStorage } from './disk';
+import { S3ObjectStorage } from './s3';
+
+export function createObjectStorage(config: StorageConfig): ObjectStorageBackend {
+  switch (config.type) {
+    case 's3':
+      if (!config.bucket) {
+        throw new Error('S3 bucket is required');
+      }
+      return new S3ObjectStorage({
+        bucket: config.bucket,
+        region: config.region,
+        endpoint: config.endpoint,
+      });
+    
+    case 'disk':
+    default:
+      if (!config.basePath) {
+        throw new Error('Base path is required for disk storage');
+      }
+      return new DiskObjectStorage(config.basePath);
+  }
+}
+
+// Get config from environment
+export function getStorageConfig(): StorageConfig {
+  if (process.env.S3_BUCKET) {
+    return {
+      type: 's3',
+      bucket: process.env.S3_BUCKET,
+      region: process.env.AWS_REGION,
+      endpoint: process.env.S3_ENDPOINT, // For MinIO/R2
+    };
+  }
+  
+  return {
+    type: 'disk',
+    basePath: process.env.REPOS_DIR || './repos',
+  };
+}
+```
+
+---
+
+## Vector Search Upgrade (Week 4)
+
+### 5. Add Qdrant Vector Store
+
+**File:** `src/search/qdrant-store.ts`
+
+```typescript
+import { QdrantClient } from '@qdrant/js-client-rest';
+import { VectorMetadata, VectorQueryResult, StoredVector } from './vector-store';
+
+export interface QdrantConfig {
+  url: string;
+  apiKey?: string;
+  collection?: string;
+}
+
+export class QdrantVectorStore {
+  private client: QdrantClient;
+  private collection: string;
+  
+  constructor(config: QdrantConfig) {
+    this.client = new QdrantClient({
+      url: config.url,
+      apiKey: config.apiKey,
+    });
+    this.collection = config.collection || 'wit_code_embeddings';
+  }
+  
+  async init(): Promise<void> {
+    try {
+      await this.client.getCollection(this.collection);
+    } catch {
+      // Collection doesn't exist, create it
+      await this.client.createCollection(this.collection, {
+        vectors: {
+          size: 1536, // OpenAI ada-002 dimensions
+          distance: 'Cosine',
+        },
+        optimizers_config: {
+          indexing_threshold: 20000,
+        },
+        replication_factor: 2,
+      });
+      
+      // Create indexes for filtering
+      await this.client.createPayloadIndex(this.collection, {
+        field_name: 'repo_id',
+        field_schema: 'keyword',
+      });
+      
+      await this.client.createPayloadIndex(this.collection, {
+        field_name: 'language',
+        field_schema: 'keyword',
+      });
+    }
+  }
+  
+  async upsert(repoId: string, vectors: StoredVector[]): Promise<void> {
+    const points = vectors.map(v => ({
+      id: v.id,
+      vector: v.embedding,
+      payload: {
+        repo_id: repoId,
+        path: v.metadata.path,
+        start_line: v.metadata.startLine,
+        end_line: v.metadata.endLine,
+        content: v.metadata.content,
+        chunk_type: v.metadata.chunkType,
+        chunk_name: v.metadata.chunkName,
+        language: v.metadata.language,
+        updated_at: Date.now(),
+      },
+    }));
+    
+    // Upsert in batches of 100
+    for (let i = 0; i < points.length; i += 100) {
+      const batch = points.slice(i, i + 100);
+      await this.client.upsert(this.collection, {
+        wait: true,
+        points: batch,
+      });
+    }
+  }
+  
+  async search(
+    queryVector: number[],
+    options: {
+      repoId?: string;
+      topK?: number;
+      minScore?: number;
+      language?: string;
+      pathPattern?: string;
+    } = {}
+  ): Promise<VectorQueryResult[]> {
+    const { topK = 10, minScore = 0.5, repoId, language } = options;
+    
+    // Build filter
+    const mustConditions: any[] = [];
+    if (repoId) {
+      mustConditions.push({ key: 'repo_id', match: { value: repoId } });
+    }
+    if (language) {
+      mustConditions.push({ key: 'language', match: { value: language } });
+    }
+    
+    const filter = mustConditions.length > 0 ? { must: mustConditions } : undefined;
+    
+    const results = await this.client.search(this.collection, {
+      vector: queryVector,
+      limit: topK,
+      score_threshold: minScore,
+      filter,
+      with_payload: true,
+    });
+    
+    return results.map(result => ({
+      vector: {
+        id: String(result.id),
+        embedding: [], // Don't return embeddings for efficiency
+        metadata: {
+          path: result.payload?.path as string,
+          startLine: result.payload?.start_line as number,
+          endLine: result.payload?.end_line as number,
+          content: result.payload?.content as string,
+          chunkType: result.payload?.chunk_type as string,
+          chunkName: result.payload?.chunk_name as string,
+          language: result.payload?.language as string,
+        },
+        updatedAt: result.payload?.updated_at as number,
+      },
+      similarity: result.score,
+    }));
+  }
+  
+  async deleteForRepo(repoId: string): Promise<void> {
+    await this.client.delete(this.collection, {
+      wait: true,
+      filter: {
+        must: [{ key: 'repo_id', match: { value: repoId } }],
+      },
+    });
+  }
+  
+  async getStats(): Promise<{ vectorCount: number }> {
+    const info = await this.client.getCollection(this.collection);
+    return {
+      vectorCount: info.points_count || 0,
+    };
+  }
+}
+```
+
+---
+
+## Environment Configuration
+
+Add these environment variables for production:
+
+```bash
+# .env.production
+
+# Database
+DATABASE_URL=postgresql://user:password@host:5432/wit
+DB_POOL_MAX=50
+DB_POOL_MIN=10
+DB_IDLE_TIMEOUT=30000
+DB_CONNECT_TIMEOUT=5000
+
+# Redis
+REDIS_URL=redis://redis-cluster:6379
+
+# Object Storage (S3/R2/MinIO)
+S3_BUCKET=wit-objects
+AWS_REGION=us-east-1
+# For MinIO/R2:
+# S3_ENDPOINT=https://your-minio-endpoint
+
+# Vector Search (Qdrant)
+QDRANT_URL=http://qdrant:6333
+QDRANT_API_KEY=your-api-key
+
+# Performance
+NODE_ENV=production
+UV_THREADPOOL_SIZE=16
+```
+
+---
+
+## Docker Compose for Local Testing
+
+```yaml
+# docker-compose.scale-test.yml
+version: '3.8'
+
+services:
+  wit-api:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://wit:wit@postgres:5432/wit
+      - REDIS_URL=redis://redis:6379
+      - S3_BUCKET=wit-objects
+      - S3_ENDPOINT=http://minio:9000
+      - AWS_ACCESS_KEY_ID=minioadmin
+      - AWS_SECRET_ACCESS_KEY=minioadmin
+      - QDRANT_URL=http://qdrant:6333
+    depends_on:
+      - postgres
+      - redis
+      - minio
+      - qdrant
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: wit
+      POSTGRES_PASSWORD: wit
+      POSTGRES_DB: wit
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant-data:/qdrant/storage
+
+volumes:
+  postgres-data:
+  redis-data:
+  minio-data:
+  qdrant-data:
+```
+
+---
+
+## Testing the Scaling Changes
+
+### Unit Tests
+
+```typescript
+// src/__tests__/s3-storage.test.ts
+
+import { S3ObjectStorage } from '../core/storage/s3';
+import { mockClient } from 'aws-sdk-client-mock';
+import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+
+describe('S3ObjectStorage', () => {
+  const s3Mock = mockClient(S3Client);
+  
+  beforeEach(() => {
+    s3Mock.reset();
+  });
+  
+  it('should write objects with deduplication', async () => {
+    const storage = new S3ObjectStorage({ bucket: 'test' });
+    const content = Buffer.from('test content');
+    
+    // First write
+    const hash1 = await storage.writeObject('blob', content);
+    
+    // Second write should not upload again
+    s3Mock.on(GetObjectCommand).resolves({});
+    const hash2 = await storage.writeObject('blob', content);
+    
+    expect(hash1).toBe(hash2);
+    expect(s3Mock.calls()).toHaveLength(1);
+  });
+});
+```
+
+### Load Test Script
+
+```typescript
+// tests/load/scale-test.ts
+
+import http from 'k6/http';
+import { check, sleep } from 'k6';
+import { randomString } from 'https://jslib.k6.io/k6-utils/1.4.0/index.js';
+
+export const options = {
+  scenarios: {
+    repo_operations: {
+      executor: 'ramping-vus',
+      startVUs: 0,
+      stages: [
+        { duration: '1m', target: 100 },
+        { duration: '3m', target: 100 },
+        { duration: '1m', target: 0 },
+      ],
+    },
+  },
+};
+
+const BASE_URL = __ENV.BASE_URL || 'http://localhost:3000';
+
+export default function() {
+  // Simulate repository list query
+  const listRepos = http.get(`${BASE_URL}/api/repos`);
+  check(listRepos, {
+    'list repos status 200': (r) => r.status === 200,
+    'list repos < 200ms': (r) => r.timings.duration < 200,
+  });
+  
+  // Simulate search
+  const search = http.post(`${BASE_URL}/trpc/search.semantic`, JSON.stringify({
+    query: 'authentication handler',
+  }), {
+    headers: { 'Content-Type': 'application/json' },
+  });
+  check(search, {
+    'search status 200': (r) => r.status === 200,
+    'search < 500ms': (r) => r.timings.duration < 500,
+  });
+  
+  sleep(1);
+}
+```
+
+---
+
+## Next Steps
+
+After implementing these changes:
+
+1. **Benchmark**: Run load tests to measure improvements
+2. **Monitor**: Set up Prometheus/Grafana for production monitoring
+3. **Iterate**: Based on metrics, identify next bottlenecks
+4. **Scale horizontally**: Add Kubernetes manifests for auto-scaling
+
+See [scaling-investigation.mdx](/architecture/scaling-investigation) for the full scaling roadmap.

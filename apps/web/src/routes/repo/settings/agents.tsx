@@ -11,13 +11,11 @@ import {
   EyeOff,
   ShieldAlert,
   Tags,
-  UserCheck,
   AlertTriangle,
   MessageSquare,
   History,
   ChevronDown,
   ChevronUp,
-  Sparkles,
   Megaphone,
   Twitter,
   GitMerge,
@@ -31,7 +29,11 @@ import {
   Plug,
   Plus,
   Settings,
-  Power,
+  Radar,
+  Play,
+  Clock,
+  Bug,
+  CheckCircle2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -60,7 +62,6 @@ import {
 } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loading } from '@/components/ui/loading';
-import { EmptyState } from '@/components/ui/empty-state';
 import { RepoLayout } from '../components/repo-layout';
 import { SettingsLayout } from './layout';
 import { useSession } from '@/lib/auth-client';
@@ -75,6 +76,13 @@ const AI_PROVIDERS = [
     description: 'Claude (Recommended)',
     placeholder: 'sk-ant-...',
     prefix: 'sk-ant-',
+  },
+  { 
+    value: 'openrouter', 
+    label: 'OpenRouter', 
+    description: 'Any model',
+    placeholder: 'sk-or-...',
+    prefix: 'sk-or-',
   },
   { 
     value: 'openai', 
@@ -146,6 +154,19 @@ export function AgentsSettingsPage() {
   const [showMcpSearch, setShowMcpSearch] = useState(false);
   const [configuringMcp, setConfiguringMcp] = useState<any>(null);
   const [mcpConfig, setMcpConfig] = useState<Record<string, string>>({});
+
+  // Sentinel state
+  const [sentinelEnabled, setSentinelEnabled] = useState(false);
+  const [sentinelSchedule, setSentinelSchedule] = useState('');
+  const [sentinelAutoIssues, setSentinelAutoIssues] = useState(true);
+  const [sentinelSeverity, setSentinelSeverity] = useState('high');
+  const [sentinelLoading, setSentinelLoading] = useState(true);
+  const [sentinelSaving, setSentinelSaving] = useState(false);
+  const [sentinelScanning, setSentinelScanning] = useState(false);
+  const [sentinelStatus, setSentinelStatus] = useState<{
+    latestScan?: { healthScore: number; summary: string; createdAt: string };
+    activeFindings?: number;
+  } | null>(null);
 
   const utils = trpc.useUtils();
 
@@ -296,6 +317,92 @@ export function AgentsSettingsPage() {
     }
   }, [triageSettings?.config?.prompt]);
 
+  // Fetch Sentinel status
+  useEffect(() => {
+    async function fetchSentinel() {
+      if (!owner || !repo) return;
+      try {
+        const res = await fetch(`/api/repos/${owner}/${repo}/sentinel/status`);
+        if (res.ok) {
+          const data = await res.json();
+          setSentinelEnabled(data.enabled || false);
+          setSentinelSchedule(data.config?.scanSchedule || '');
+          setSentinelAutoIssues(data.config?.autoCreateIssues ?? true);
+          setSentinelSeverity(data.config?.autoCreateIssueSeverity || 'high');
+          setSentinelStatus({
+            latestScan: data.latestScan,
+            activeFindings: data.activeFindings,
+          });
+        }
+      } catch {
+        // Sentinel not configured yet
+      } finally {
+        setSentinelLoading(false);
+      }
+    }
+    fetchSentinel();
+  }, [owner, repo]);
+
+  // Sentinel handlers
+  const handleSentinelToggle = async (enabled: boolean) => {
+    if (!owner || !repo) return;
+    setSentinelSaving(true);
+    try {
+      await fetch(`/api/repos/${owner}/${repo}/sentinel/enable`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled }),
+      });
+      setSentinelEnabled(enabled);
+    } catch {
+      // Revert on error
+    } finally {
+      setSentinelSaving(false);
+    }
+  };
+
+  const handleSentinelSave = async () => {
+    if (!owner || !repo) return;
+    setSentinelSaving(true);
+    try {
+      await fetch(`/api/repos/${owner}/${repo}/sentinel/config`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          enabled: sentinelEnabled,
+          scanSchedule: sentinelSchedule || null,
+          autoCreateIssues: sentinelAutoIssues,
+          autoCreateIssueSeverity: sentinelSeverity,
+        }),
+      });
+    } finally {
+      setSentinelSaving(false);
+    }
+  };
+
+  const handleSentinelScan = async () => {
+    if (!owner || !repo) return;
+    setSentinelScanning(true);
+    try {
+      await fetch(`/api/repos/${owner}/${repo}/sentinel/scan`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ branch: 'main' }),
+      });
+      // Refresh status after scan
+      const res = await fetch(`/api/repos/${owner}/${repo}/sentinel/status`);
+      if (res.ok) {
+        const data = await res.json();
+        setSentinelStatus({
+          latestScan: data.latestScan,
+          activeFindings: data.activeFindings,
+        });
+      }
+    } finally {
+      setSentinelScanning(false);
+    }
+  };
+
   // Dialog handlers
   const closeDialog = () => {
     setIsDialogOpen(false);
@@ -323,7 +430,7 @@ export function AgentsSettingsPage() {
     }
 
     const providerConfig = AI_PROVIDERS.find(p => p.value === selectedProvider);
-    if (providerConfig && !apiKey.startsWith(providerConfig.prefix)) {
+    if (providerConfig && providerConfig.prefix && !apiKey.startsWith(providerConfig.prefix)) {
       setKeyError(`${providerConfig.label} API keys should start with "${providerConfig.prefix}"`);
       return;
     }
@@ -960,6 +1067,153 @@ export function AgentsSettingsPage() {
                       </a>
                     </Button>
                   </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Sentinel Agent Card */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-cyan-100 dark:bg-cyan-900/30 rounded-lg">
+                    <Radar className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base">Sentinel</CardTitle>
+                    <CardDescription>Proactive code scanning</CardDescription>
+                  </div>
+                </div>
+                <Switch
+                  checked={sentinelEnabled}
+                  onCheckedChange={handleSentinelToggle}
+                  disabled={sentinelLoading || sentinelSaving}
+                />
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Automatically scans your codebase for security vulnerabilities, code quality issues, and dependency problems. Creates issues for findings.
+              </p>
+
+              {sentinelEnabled && (
+                <div className="space-y-4">
+                  {/* Status */}
+                  {sentinelStatus?.latestScan && (
+                    <div className="p-3 rounded-lg bg-muted/50 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">Last Scan</span>
+                        <Badge 
+                          variant="secondary" 
+                          className={sentinelStatus.latestScan.healthScore >= 60 
+                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                            : 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
+                          }
+                        >
+                          Health: {sentinelStatus.latestScan.healthScore}/100
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {sentinelStatus.latestScan.summary}
+                      </p>
+                      {sentinelStatus.activeFindings != null && sentinelStatus.activeFindings > 0 && (
+                        <Button variant="link" size="sm" className="h-auto p-0 text-xs" asChild>
+                          <a href={`/${owner}/${repo}/sentinel`}>
+                            View {sentinelStatus.activeFindings} active finding{sentinelStatus.activeFindings !== 1 ? 's' : ''}
+                            <ExternalLink className="h-3 w-3 ml-1" />
+                          </a>
+                        </Button>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Schedule */}
+                  <div className="space-y-2">
+                    <Label className="text-xs flex items-center gap-2">
+                      <Clock className="h-3 w-3" />
+                      Scan Schedule
+                    </Label>
+                    <Select value={sentinelSchedule || 'manual'} onValueChange={(v) => setSentinelSchedule(v === 'manual' ? '' : v)}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="manual">Manual only</SelectItem>
+                        <SelectItem value="hourly">Hourly</SelectItem>
+                        <SelectItem value="daily">Daily</SelectItem>
+                        <SelectItem value="weekly">Weekly</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Auto-create issues */}
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="flex items-center gap-2">
+                      <Bug className="h-4 w-4 text-muted-foreground" />
+                      Auto-create issues
+                    </span>
+                    <Switch
+                      checked={sentinelAutoIssues}
+                      onCheckedChange={setSentinelAutoIssues}
+                      disabled={sentinelSaving}
+                    />
+                  </div>
+
+                  {sentinelAutoIssues && (
+                    <div className="pl-6 space-y-2">
+                      <Label className="text-xs">Minimum severity for issues</Label>
+                      <Select value={sentinelSeverity} onValueChange={setSentinelSeverity}>
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="critical">Critical only</SelectItem>
+                          <SelectItem value="high">High and above</SelectItem>
+                          <SelectItem value="medium">Medium and above</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  <Separator />
+
+                  {/* Actions */}
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleSentinelScan}
+                      disabled={sentinelScanning}
+                      className="flex-1"
+                    >
+                      {sentinelScanning ? (
+                        <Loader2 className="h-3 w-3 mr-2 animate-spin" />
+                      ) : (
+                        <Play className="h-3 w-3 mr-2" />
+                      )}
+                      {sentinelScanning ? 'Scanning...' : 'Run Scan'}
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={handleSentinelSave}
+                      disabled={sentinelSaving}
+                    >
+                      {sentinelSaving ? (
+                        <Loader2 className="h-3 w-3 mr-2 animate-spin" />
+                      ) : (
+                        <Check className="h-3 w-3 mr-2" />
+                      )}
+                      Save
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {!sentinelEnabled && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <CheckCircle2 className="h-4 w-4" />
+                  <span>Enable to start scanning your codebase</span>
                 </div>
               )}
             </CardContent>

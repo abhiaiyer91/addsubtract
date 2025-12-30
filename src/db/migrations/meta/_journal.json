@@ -141,6 +141,34 @@
       "when": 1767025100000,
       "tag": "0019_gamification",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1767025200000,
+      "tag": "0020_mcp_servers",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1767125000000,
+      "tag": "0021_add_openrouter_provider",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1767125100000,
+      "tag": "0022_sentinel",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1767125200000,
+      "tag": "0023_add_storage_backend",
+      "breakpoints": true
     }
   ]
 }

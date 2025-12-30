@@ -1,4 +1,5 @@
-import { RepoManager } from './repos';
+import { RepoManager, RepoInfo } from './repos';
+import { StorageAwareRepoManager } from '../../storage';
 import { repoModel, userModel } from '../../db/models';
 import { isConnected } from '../../db';
 
@@ -12,12 +13,18 @@ export interface SyncResult {
   message?: string;
 }
 
+// Interface for repo managers that can list repos (used for type checking)
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+interface RepoLister {
+  listRepos(): RepoInfo[];
+}
+
 /**
  * Sync all existing bare repositories to the database
  * Creates placeholder users for owners that don't exist
  */
 export async function syncReposToDatabase(
-  repoManager: RepoManager
+  repoManager: RepoManager | StorageAwareRepoManager
 ): Promise<SyncResult[]> {
   const results: SyncResult[] = [];
 

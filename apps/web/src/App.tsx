@@ -47,7 +47,9 @@ import { WebhooksPage } from './routes/repo/settings/webhooks';
 import { AgentsSettingsPage } from './routes/repo/settings/agents';
 import { SandboxSettingsPage } from './routes/repo/settings/sandbox';
 import { PackageSettingsPage } from './routes/repo/settings/package';
+import { StorageSettingsPage } from './routes/repo/settings/storage';
 import { PackagePage } from './routes/repo/package';
+import { SentinelPage } from './routes/repo/sentinel';
 import { ReleasesPage } from './routes/repo/releases';
 import { NewReleasePage } from './routes/repo/releases/new';
 import { ReleaseDetailPage } from './routes/repo/releases/detail';
@@ -65,6 +67,7 @@ import { OAuthAppsPage } from './routes/settings/oauth-apps';
 import { OAuthAppDetailPage } from './routes/settings/oauth-app-detail';
 import { AuthorizedAppsPage } from './routes/settings/authorized-apps';
 import { KeyboardShortcutsPage } from './routes/settings/keyboard';
+import { StorageCredentialsPage } from './routes/settings/storage-credentials';
 import { OAuthAuthorizePage } from './routes/oauth/authorize';
 import { NewRepoPage } from './routes/new';
 import { ImportPage } from './routes/import';
@@ -124,6 +127,7 @@ export function App() {
             <Route path="/settings/oauth-apps/:id" element={<OAuthAppDetailPage />} />
             <Route path="/settings/authorized-apps" element={<AuthorizedAppsPage />} />
             <Route path="/settings/keyboard" element={<KeyboardShortcutsPage />} />
+            <Route path="/settings/storage" element={<StorageCredentialsPage />} />
             <Route path="/oauth/authorize" element={<OAuthAuthorizePage />} />
             <Route path="/new" element={<NewRepoPage />} />
             <Route path="/import" element={<ImportPage />} />
@@ -204,11 +208,15 @@ export function App() {
             <Route path="/:owner/:repo/journal/new" element={<NewJournalPage />} />
             <Route path="/:owner/:repo/journal/:slug" element={<JournalPageDetail />} />
 
+            {/* Sentinel */}
+            <Route path="/:owner/:repo/sentinel" element={<SentinelPage />} />
+
             {/* Repository settings */}
             <Route path="/:owner/:repo/settings" element={<RepoSettingsPage />} />
             <Route path="/:owner/:repo/settings/collaborators" element={<CollaboratorsPage />} />
             <Route path="/:owner/:repo/settings/branches" element={<BranchProtectionPage />} />
             <Route path="/:owner/:repo/settings/webhooks" element={<WebhooksPage />} />
+            <Route path="/:owner/:repo/settings/storage" element={<StorageSettingsPage />} />
             <Route path="/:owner/:repo/settings/agents" element={<AgentsSettingsPage />} />
             <Route path="/:owner/:repo/settings/sandbox" element={<SandboxSettingsPage />} />
             <Route path="/:owner/:repo/settings/package" element={<PackageSettingsPage />} />

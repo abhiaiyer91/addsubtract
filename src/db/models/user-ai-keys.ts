@@ -210,14 +210,20 @@ export const userAiKeyModel = {
 
   /**
    * Get any available LLM API key for a user
-   * Prefers Anthropic, then OpenAI
+   * Prefers Anthropic, then OpenRouter (any model), then OpenAI
    * Note: Does not return CodeRabbit keys as they are not LLM providers
    */
-  async getAnyKey(userId: string): Promise<{ provider: 'openai' | 'anthropic'; key: string } | null> {
+  async getAnyKey(userId: string): Promise<{ provider: 'openai' | 'anthropic' | 'openrouter'; key: string } | null> {
     // Try Anthropic first
     const anthropicKey = await this.getDecryptedKey(userId, 'anthropic');
     if (anthropicKey) {
       return { provider: 'anthropic', key: anthropicKey };
+    }
+    
+    // Try OpenRouter (supports any model)
+    const openrouterKey = await this.getDecryptedKey(userId, 'openrouter');
+    if (openrouterKey) {
+      return { provider: 'openrouter', key: openrouterKey };
     }
     
     // Fall back to OpenAI
@@ -293,7 +299,8 @@ export const userAiKeyModel = {
     // Check if server has global keys
     const hasServerKeys = !!(
       process.env.OPENAI_API_KEY || 
-      process.env.ANTHROPIC_API_KEY
+      process.env.ANTHROPIC_API_KEY ||
+      process.env.OPENROUTER_API_KEY
     );
     
     return {

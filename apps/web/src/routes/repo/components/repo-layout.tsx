@@ -20,6 +20,7 @@ import {
   Package,
   Play,
   Wand2,
+  Radar,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -280,6 +281,7 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
     if (path.includes('/planning')) return 'planning';
     if (path.includes('/stacks')) return 'stacks';
     if (path.includes('/journal')) return 'journal';
+    if (path.includes('/sentinel') && !path.includes('/settings/sentinel')) return 'sentinel';
     if (path.includes('/package') && !path.includes('/settings/package')) return 'package';
     if (path.includes('/settings')) return 'settings';
     return 'code';
@@ -528,6 +530,10 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
               <BookOpen className="h-4 w-4" />
               <span className="sr-only sm:not-sr-only sm:inline">Journal</span>
             </Link>
+            <Link to={`/${owner}/${repo}/sentinel`} className={tabClass('sentinel')}>
+              <Radar className="h-4 w-4" />
+              <span className="sr-only sm:not-sr-only sm:inline">Sentinel</span>
+            </Link>
             {packageData && (
               <Link to={`/${owner}/${repo}/package`} className={tabClass('package')}>
                 <Package className="h-4 w-4" />
@@ -581,6 +587,10 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
           <Link to={`/${owner}/${repo}/journal`} className={tabClass('journal')}>
             <BookOpen className="h-4 w-4" />
             <span>Journal</span>
+          </Link>
+          <Link to={`/${owner}/${repo}/sentinel`} className={tabClass('sentinel')}>
+            <Radar className="h-4 w-4" />
+            <span>Sentinel</span>
           </Link>
           {packageData && (
             <Link to={`/${owner}/${repo}/package`} className={tabClass('package')}>

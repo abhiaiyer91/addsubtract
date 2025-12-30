@@ -238,3 +238,13 @@ export {
   type AIFeature,
   type TierLimits,
 } from './subscription';
+
+// Sentinel models (code scanning)
+export {
+  sentinelConfigModel,
+  sentinelScanModel,
+  sentinelFindingModel,
+  type FindingFilters,
+  type FindingStats,
+  type ScanWithStats,
+} from './sentinel';

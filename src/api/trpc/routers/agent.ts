@@ -339,7 +339,7 @@ export const agentRouter = router({
       z.object({
         sessionId: z.string().uuid(),
         message: z.string().min(1).max(32000),
-        provider: z.enum(['anthropic', 'openai']).optional(),
+        provider: z.enum(['anthropic', 'openai', 'openrouter']).optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -381,9 +381,14 @@ export const agentRouter = router({
           apiKey = process.env.ANTHROPIC_API_KEY;
         } else if (provider === 'openai' && process.env.OPENAI_API_KEY) {
           apiKey = process.env.OPENAI_API_KEY;
+        } else if (provider === 'openrouter' && process.env.OPENROUTER_API_KEY) {
+          apiKey = process.env.OPENROUTER_API_KEY;
         } else if (process.env.ANTHROPIC_API_KEY) {
           apiKey = process.env.ANTHROPIC_API_KEY;
           provider = 'anthropic';
+        } else if (process.env.OPENROUTER_API_KEY) {
+          apiKey = process.env.OPENROUTER_API_KEY;
+          provider = 'openrouter';
         } else if (process.env.OPENAI_API_KEY) {
           apiKey = process.env.OPENAI_API_KEY;
           provider = 'openai';
@@ -401,9 +406,14 @@ export const agentRouter = router({
       // This is a temporary override for this request
       const originalAnthropicKey = process.env.ANTHROPIC_API_KEY;
       const originalOpenAIKey = process.env.OPENAI_API_KEY;
+      const originalOpenAIBaseUrl = process.env.OPENAI_BASE_URL;
       
       if (provider === 'anthropic') {
         process.env.ANTHROPIC_API_KEY = apiKey;
+      } else if (provider === 'openrouter') {
+        // OpenRouter uses OpenAI-compatible API with a different base URL
+        process.env.OPENAI_API_KEY = apiKey;
+        process.env.OPENAI_BASE_URL = 'https://openrouter.ai/api/v1';
       } else {
         process.env.OPENAI_API_KEY = apiKey;
       }
@@ -419,6 +429,11 @@ export const agentRouter = router({
           process.env.OPENAI_API_KEY = originalOpenAIKey;
         } else {
           delete process.env.OPENAI_API_KEY;
+        }
+        if (originalOpenAIBaseUrl !== undefined) {
+          process.env.OPENAI_BASE_URL = originalOpenAIBaseUrl;
+        } else {
+          delete process.env.OPENAI_BASE_URL;
         }
       };
 
@@ -501,7 +516,13 @@ export const agentRouter = router({
       // Get agent based on mode (or fallback to general agent)
       // Treat legacy 'questions' mode as 'pm'
       const sessionMode = (session.mode === 'questions' ? 'pm' : session.mode || 'pm') as AgentMode;
-      const modelId = provider === 'anthropic' ? 'anthropic/claude-opus-4-5' : 'openai/gpt-5.2';
+      // Select model based on provider
+      // OpenRouter can use any model - default to Claude for best results
+      const modelId = provider === 'anthropic' 
+        ? 'anthropic/claude-opus-4-5' 
+        : provider === 'openrouter' 
+          ? 'openai/gpt-4o'  // OpenRouter uses OpenAI-compatible format
+          : 'openai/gpt-5.2';
       
       // Use mode-based agent if we have a repo context, otherwise fallback to general agent
       const agent = agentContext 

@@ -16,8 +16,13 @@ dotenv.config({ path: path.join(__dirname, '../../.env') }); // Try project root
 import { Hono } from 'hono';
 import { serve, ServerType } from '@hono/node-server';
 import { createNodeWebSocket } from '@hono/node-ws';
-import { logger } from 'hono/logger';
+import { logger as honoLogger } from 'hono/logger';
 import { cors } from 'hono/cors';
+
+// Internal modules
+import { loadConfig, printConfigSummary, getCorsOrigins, features } from './config';
+import { logger, requestLogger, metricsHandler, metrics } from './logger';
+import { initRedisRateLimiting, closeAllRedis } from './redis';
 import { trpcServer } from '@hono/trpc-server';
 import { createGitRoutes } from './routes/git';
 import { createIssueRoutes } from './routes/issues';
@@ -31,7 +36,13 @@ import { createSandboxRoutes, createSandboxWsRoutes } from './routes/sandbox-ws'
 import { createRepoRoutes } from './routes/repos';
 import { createPullRoutes } from './routes/pulls';
 import { createPublicApiV1 } from './routes/public-api';
+import { createSentinelRoutes } from './routes/sentinel';
+import { createStorageRoutes } from './routes/storage';
 import { RepoManager } from './storage/repos';
+import { StorageAwareRepoManager } from '../storage';
+
+// Union type for both repo manager types
+type AnyRepoManager = RepoManager | StorageAwareRepoManager;
 import { syncReposToDatabase } from './storage/sync';
 import { appRouter, createContext } from '../api/trpc';
 import * as fs from 'fs';
@@ -40,7 +51,7 @@ import { SSHServer, generateHostKey, SSHServerOptions } from './ssh';
 import { SSHKeyManager, FileBasedAccessControl } from './ssh/keys';
 import { Repository } from '../core/repository';
 import { createAuth } from '../lib/auth';
-import { registerNotificationHandlers, registerCIHandlers, registerTriageHandlers, registerMergeQueueHandlers, registerMarketingHandlers } from '../events';
+import { registerNotificationHandlers, registerCIHandlers, registerTriageHandlers, registerMergeQueueHandlers, registerMarketingHandlers, registerSentinelHandlers } from '../events';
 
 /**
  * Server configuration options
@@ -71,6 +82,8 @@ export interface ServerOptions {
   };
   /** Data directory for SSH keys and config */
   dataDir?: string;
+  /** Use storage-aware repository manager for cloud storage support */
+  useStorageAwareRepos?: boolean;
 }
 
 /**
@@ -82,7 +95,7 @@ export interface WitServer {
   /** The underlying HTTP server */
   server: ServerType;
   /** Repository manager */
-  repoManager: RepoManager;
+  repoManager: AnyRepoManager;
   /** SSH server (if enabled) */
   sshServer?: SSHServer;
   /** SSH key manager (if SSH enabled) */
@@ -94,33 +107,39 @@ export interface WitServer {
 /**
  * Create and configure the Hono app
  */
-export function createApp(repoManager: RepoManager, options: { verbose?: boolean } = {}): { app: Hono; injectWebSocket: (server: ServerType) => void } {
+export function createApp(repoManager: AnyRepoManager, options: { verbose?: boolean } = {}): { app: Hono; injectWebSocket: (server: ServerType) => void } {
   const app = new Hono();
   
   // Create WebSocket support
   const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app });
 
-  // Add logger middleware if verbose
+  // Add structured request logging
+  app.use('*', requestLogger({
+    skip: (c) => c.req.path === '/health' || c.req.path === '/metrics',
+  }));
+
+  // Add verbose hono logger if requested
   if (options.verbose) {
-    app.use('*', logger());
+    app.use('*', honoLogger());
   }
 
-  // Enable CORS for web clients
-  // In production, set CORS_ORIGINS env var (comma-separated list)
-  const corsOrigins = process.env.CORS_ORIGINS 
-    ? process.env.CORS_ORIGINS.split(',').map(o => o.trim())
-    : ['http://localhost:5173', 'http://localhost:3000'];
+  // Enable CORS for web clients using config
+  const corsOrigins = getCorsOrigins();
   
   app.use('*', cors({
-    origin: corsOrigins,
+    origin: corsOrigins.length > 0 ? corsOrigins : '*',
     allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowHeaders: ['Content-Type', 'Authorization'],
+    allowHeaders: ['Content-Type', 'Authorization', 'X-Trace-Id'],
     credentials: true,
   }));
 
   // Health check endpoint
   app.get('/health', async (c) => {
     const dbStatus = await dbHealthCheck();
+    
+    // Update metrics
+    metrics.set('health_status', dbStatus.ok ? 1 : 0);
+    metrics.observe('db_health_check_latency_ms', dbStatus.latency);
     
     return c.json({
       status: dbStatus.ok ? 'ok' : 'degraded',
@@ -130,8 +149,17 @@ export function createApp(repoManager: RepoManager, options: { verbose?: boolean
         connected: dbStatus.ok,
         latency: dbStatus.latency,
       },
+      features: {
+        redis: features.hasRedis(),
+        ai: features.hasAI(),
+        objectStorage: features.hasObjectStorage(),
+        vectorSearch: features.hasVectorSearch(),
+      },
     });
   });
+
+  // Metrics endpoint for monitoring
+  app.get('/metrics', metricsHandler);
 
   // List repositories endpoint
   app.get('/repos', (c) => {
@@ -183,12 +211,14 @@ export function createApp(repoManager: RepoManager, options: { verbose?: boolean
   const oauthRoutes = createOAuthRoutes();
   const sandboxRoutes = createSandboxRoutes();
   const sandboxWsRoutes = createSandboxWsRoutes(upgradeWebSocket);
+  const sentinelRoutes = createSentinelRoutes();
   
   app.route('/api/repos', repoRoutes);
   app.route('/api/repos', issueRoutes);
   app.route('/api/repos', projectRoutes);
   app.route('/api/repos', cycleRoutes);
   app.route('/api/repos', pullRoutes);
+  app.route('/api/repos', sentinelRoutes);
   app.route('/api/agent', agentStreamRoutes);
   app.route('/api/planning', planningStreamRoutes);
   app.route('/api/sandbox', sandboxRoutes);
@@ -198,6 +228,10 @@ export function createApp(repoManager: RepoManager, options: { verbose?: boolean
   // Public REST API v1 (GitHub-compatible)
   const publicApiV1 = createPublicApiV1();
   app.route('/api/v1', publicApiV1);
+
+  // Storage configuration API
+  const storageRoutes = createStorageRoutes();
+  app.route('/api/storage', storageRoutes);
 
   // Package registry routes (npm-compatible)
   // Base URL is used for generating tarball download URLs
@@ -229,33 +263,64 @@ export function createApp(repoManager: RepoManager, options: { verbose?: boolean
 export function startServer(options: ServerOptions): WitServer {
   const { port, reposDir, verbose = false, host = '0.0.0.0' } = options;
 
+  // Load and validate configuration
+  try {
+    loadConfig();
+    if (verbose) {
+      printConfigSummary();
+    }
+  } catch (error) {
+    logger.error('Configuration error', { error: (error as Error).message });
+    // Continue with defaults in development
+  }
+
   // Initialize database if DATABASE_URL is set
   const databaseUrl = process.env.DATABASE_URL;
   if (databaseUrl) {
     try {
       initDatabase(databaseUrl);
-      console.log('✓ Database connected');
+      logger.info('Database connected');
       
-      // Register event handlers for notifications, CI, triage, merge queue, and marketing
+      // Register event handlers for notifications, CI, triage, merge queue, marketing, and sentinel
       registerNotificationHandlers();
       registerCIHandlers();
       registerTriageHandlers();
       registerMergeQueueHandlers();
       registerMarketingHandlers();
-      console.log('✓ Event handlers registered');
+      registerSentinelHandlers();
+      logger.info('Event handlers registered');
     } catch (error) {
-      console.error('✗ Database connection failed:', error instanceof Error ? error.message : error);
-      console.warn('⚠ Running without database');
+      logger.error('Database connection failed', { error: (error as Error).message });
+      logger.warn('Running without database');
     }
   } else {
-    console.warn('⚠ DATABASE_URL not set - running without database');
+    logger.warn('DATABASE_URL not set - running without database');
+  }
+
+  // Initialize Redis for rate limiting and caching
+  const redisUrl = process.env.REDIS_URL;
+  if (redisUrl) {
+    initRedisRateLimiting(redisUrl).then(() => {
+      logger.info('Redis rate limiting enabled');
+    }).catch((error) => {
+      logger.warn('Redis initialization failed, using in-memory rate limiting', { error: (error as Error).message });
+    });
+  } else {
+    logger.info('REDIS_URL not set - using in-memory rate limiting');
   }
 
   // Resolve repos directory
   const absoluteReposDir = path.resolve(reposDir);
 
   // Create repository manager
-  const repoManager = new RepoManager(absoluteReposDir);
+  // Use storage-aware manager for cloud storage support, or legacy manager for local-only
+  const repoManager = options.useStorageAwareRepos
+    ? new StorageAwareRepoManager(absoluteReposDir)
+    : new RepoManager(absoluteReposDir);
+  
+  if (options.useStorageAwareRepos) {
+    logger.info('Using storage-aware repository manager (cloud storage enabled)');
+  }
 
   // Create app
   const { app, injectWebSocket } = createApp(repoManager, { verbose });
@@ -321,22 +386,29 @@ export function startServer(options: ServerOptions): WitServer {
     sshServer,
     keyManager,
     stop: async () => {
+      logger.info('Shutting down server...');
       const promises: Promise<void>[] = [];
       
       promises.push(new Promise<void>((resolve) => {
         server.close(() => {
-          console.log('[server] HTTP server stopped');
+          logger.info('HTTP server stopped');
           resolve();
         });
       }));
 
       if (sshServer) {
         promises.push(sshServer.stop().then(() => {
-          console.log('[server] SSH server stopped');
+          logger.info('SSH server stopped');
         }));
       }
 
+      // Close Redis connections
+      promises.push(closeAllRedis().then(() => {
+        logger.info('Redis connections closed');
+      }).catch(() => {}));
+
       await Promise.all(promises);
+      logger.info('Server shutdown complete');
     },
   };
 }
