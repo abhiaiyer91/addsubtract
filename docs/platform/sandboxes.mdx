@@ -24,6 +24,7 @@ Sandbox providers enable:
 | E2B | ~150ms | Production, fast iteration | No |
 | Vercel | ~1s | Node.js/Python workloads | No |
 | Daytona | ~2s | Full dev environments | No |
+| ComputeSDK | Varies | Multi-provider, GPU (Modal), collaboration | No |
 
 ## Docker Provider
 
@@ -350,6 +351,92 @@ await session.stop();
 
 ---
 
+## ComputeSDK Provider
+
+Unified multi-provider access via [ComputeSDK](https://computesdk.com). Enables access to Modal (GPU workloads), CodeSandbox (collaboration), and more through a single API.
+
+### Features
+
+- Unified API across multiple providers
+- Zero-config auto-detection from environment variables
+- Access to Modal for GPU-accelerated Python
+- Access to CodeSandbox for collaborative sandboxes
+- Seamless provider switching without code changes
+
+### Configuration
+
+```typescript
+import { ComputeSDKProvider } from 'wit/server/sandbox/providers/computesdk';
+
+const computesdk = new ComputeSDKProvider({
+  type: 'computesdk',
+  options: {
+    // Explicit provider selection (or auto-detect from env)
+    provider: 'modal', // 'e2b' | 'daytona' | 'modal' | 'codesandbox'
+    // Provider-specific API key (or use env variables)
+    providerApiKey: process.env.MODAL_TOKEN_ID,
+    timeoutMs: 300000,
+    autoDetect: true, // Auto-detect provider from environment
+  },
+});
+
+await computesdk.initialize();
+```
+
+### Environment Variables
+
+```bash
+# Auto-detection checks these in order:
+MODAL_TOKEN_ID=your_modal_token_id
+MODAL_TOKEN_SECRET=your_modal_token_secret
+
+# Or for other providers:
+E2B_API_KEY=your_e2b_key
+DAYTONA_API_KEY=your_daytona_key
+CODESANDBOX_TOKEN=your_codesandbox_token
+
+# ComputeSDK-specific config
+SANDBOX_PROVIDER=computesdk
+COMPUTESDK_PROVIDER=modal  # Override auto-detection
+COMPUTESDK_TIMEOUT_MS=300000
+```
+
+### Creating a Session
+
+```typescript
+const session = await computesdk.createSession({
+  sessionId: 'session-123',
+  userId: 'user-456',
+  env: {
+    NODE_ENV: 'development',
+  },
+});
+
+// Execute commands (works across all providers)
+const result = await session.exec('python --version');
+console.log(result.stdout);
+
+// Run code directly
+const codeResult = await session.runCode(`
+import numpy as np
+print(np.array([1, 2, 3]) * 2)
+`, 'python');
+
+// Cleanup
+await session.stop();
+```
+
+### Use Cases
+
+| Use Case | Recommended Provider via ComputeSDK |
+|----------|-------------------------------------|
+| GPU/ML workloads | Modal |
+| Collaborative coding | CodeSandbox |
+| Data science | E2B |
+| Full dev environments | Daytona |
+
+---
+
 ## Provider Comparison
 
 ### When to Use Each Provider
@@ -363,18 +450,23 @@ await session.stop();
 | Full dev environment | Daytona |
 | Node.js/Python workloads | Vercel |
 | Cost-sensitive | Docker (self-hosted) |
+| GPU/ML workloads | ComputeSDK (Modal) |
+| Multi-provider flexibility | ComputeSDK |
+| Collaborative sandboxes | ComputeSDK (CodeSandbox) |
 
 ### Feature Comparison
 
-| Feature | Docker | E2B | Vercel | Daytona |
-|---------|--------|-----|--------|---------|
-| PTY Support | Yes | Limited | No | Yes |
-| File Operations | Yes | Yes | Yes | Yes |
-| Code Interpreter | No | Yes | Yes | Yes |
-| Network Isolation | Yes | Yes | Yes | Yes |
-| Resource Limits | Yes | Yes | Limited | Yes |
-| Persistence | Manual | Dashboard | No | Yes |
-| Git Built-in | No | No | No | Yes |
+| Feature | Docker | E2B | Vercel | Daytona | ComputeSDK |
+|---------|--------|-----|--------|---------|------------|
+| PTY Support | Yes | Limited | No | Yes | Varies |
+| File Operations | Yes | Yes | Yes | Yes | Yes |
+| Code Interpreter | No | Yes | Yes | Yes | Yes |
+| Network Isolation | Yes | Yes | Yes | Yes | Yes |
+| Resource Limits | Yes | Yes | Limited | Yes | Varies |
+| Persistence | Manual | Dashboard | No | Yes | Varies |
+| Git Built-in | No | No | No | Yes | No |
+| GPU Support | No | No | No | No | Yes (Modal) |
+| Multi-provider | No | No | No | No | Yes |
 
 ---
 

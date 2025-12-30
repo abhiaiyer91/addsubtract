@@ -16,7 +16,7 @@ import { EventEmitter } from 'events';
 /**
  * Sandbox provider types
  */
-export type SandboxProviderType = 'e2b' | 'daytona' | 'docker' | 'vercel';
+export type SandboxProviderType = 'e2b' | 'daytona' | 'docker' | 'vercel' | 'computesdk';
 
 /**
  * Network isolation mode
@@ -469,13 +469,57 @@ export interface VercelProviderConfig extends SandboxProviderConfig {
 }
 
 /**
+ * ComputeSDK provider configuration
+ *
+ * ComputeSDK provides a unified API across multiple sandbox providers,
+ * allowing you to switch between E2B, Daytona, Modal, CodeSandbox, and more
+ * with zero code changes.
+ *
+ * @see https://computesdk.com/docs
+ */
+export interface ComputeSDKProviderConfig extends SandboxProviderConfig {
+  type: 'computesdk';
+  options: {
+    /**
+     * ComputeSDK API key (optional, for managed gateway)
+     */
+    apiKey?: string;
+    /**
+     * Underlying provider to use
+     * Default: auto-detected from environment variables
+     */
+    provider?: 'e2b' | 'daytona' | 'modal' | 'codesandbox' | 'blaxel' | 'vercel';
+    /**
+     * Provider-specific API key (required for most providers)
+     * Will be passed to the underlying provider
+     */
+    providerApiKey?: string;
+    /**
+     * Default sandbox timeout in milliseconds
+     * Default: 300000 (5 minutes)
+     */
+    timeoutMs?: number;
+    /**
+     * Auto-detect provider from environment variables
+     * Default: true
+     */
+    autoDetect?: boolean;
+    /**
+     * Metadata to attach to sandboxes
+     */
+    metadata?: Record<string, string>;
+  };
+}
+
+/**
  * Union of all provider configurations
  */
 export type ProviderConfig =
   | E2BProviderConfig
   | DaytonaProviderConfig
   | DockerProviderConfig
-  | VercelProviderConfig;
+  | VercelProviderConfig
+  | ComputeSDKProviderConfig;
 
 /**
  * Sandbox provider interface
@@ -655,5 +699,15 @@ export const PROVIDER_FEATURES = {
     persistence: false,
     pricing: 'Per-second billing',
     bestFor: 'AI agents, code generation, ephemeral workloads',
+  },
+  computesdk: {
+    name: 'ComputeSDK',
+    isolation: 'Varies by provider',
+    startupTime: 'Varies by provider',
+    ptySupport: true,
+    codeInterpreter: true,
+    persistence: true,
+    pricing: 'Varies by provider',
+    bestFor: 'Multi-provider flexibility, Modal GPU workloads, CodeSandbox collaboration',
   },
 } as const;

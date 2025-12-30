@@ -77,6 +77,7 @@ export type {
   DaytonaProviderConfig,
   DockerProviderConfig,
   VercelProviderConfig,
+  ComputeSDKProviderConfig,
   ProviderConfig,
   SandboxProvider,
   SandboxManagerConfig,
@@ -106,6 +107,7 @@ export { E2BProvider } from './providers/e2b';
 export { DaytonaProvider } from './providers/daytona';
 export { DockerProvider } from './providers/docker';
 export { VercelProvider } from './providers/vercel';
+export { ComputeSDKProvider } from './providers/computesdk';
 
 // Sandbox Pool (for reusing sandboxes across requests)
 export {

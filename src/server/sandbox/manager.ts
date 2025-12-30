@@ -132,6 +132,11 @@ export class SandboxManager extends EventEmitter {
           const { VercelProvider } = await import('./providers/vercel');
           return new VercelProvider(config);
         }
+        case 'computesdk': {
+          if (config.type !== 'computesdk') return null;
+          const { ComputeSDKProvider } = await import('./providers/computesdk');
+          return new ComputeSDKProvider(config);
+        }
         default:
           return null;
       }
@@ -502,6 +507,30 @@ export function createSandboxManagerFromEnv(
             timeoutMs: parseInt(process.env.VERCEL_SANDBOX_TIMEOUT_MS || '300000', 10),
             runtime: (process.env.VERCEL_SANDBOX_RUNTIME as 'node22' | 'python3.13') || 'node22',
             vcpus: parseInt(process.env.VERCEL_SANDBOX_VCPUS || '1', 10),
+          },
+        },
+        enableAuditLog: process.env.SANDBOX_AUDIT_LOG === 'true',
+      };
+      break;
+
+    case 'computesdk':
+      config = {
+        repoRoot,
+        provider: {
+          type: 'computesdk',
+          options: {
+            apiKey: process.env.COMPUTESDK_API_KEY,
+            provider: process.env.COMPUTESDK_PROVIDER as
+              | 'e2b'
+              | 'daytona'
+              | 'modal'
+              | 'codesandbox'
+              | 'blaxel'
+              | 'vercel'
+              | undefined,
+            providerApiKey: process.env.COMPUTESDK_PROVIDER_API_KEY,
+            timeoutMs: parseInt(process.env.COMPUTESDK_TIMEOUT_MS || '300000', 10),
+            autoDetect: process.env.COMPUTESDK_AUTO_DETECT !== 'false',
           },
         },
         enableAuditLog: process.env.SANDBOX_AUDIT_LOG === 'true',
