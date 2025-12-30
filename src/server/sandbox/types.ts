@@ -5,18 +5,32 @@
  * safe code execution in isolated environments.
  *
  * Supported providers:
- * - E2B: Firecracker microVM sandboxes (e2b.dev) - Recommended for production
- * - Daytona: Cloud dev environments with PTY support (daytona.io)
  * - Docker: Local container-based isolation (self-hosted)
- * - Vercel: Vercel Sandbox ephemeral compute (vercel.com) - Great for AI agents
+ * - ComputeSDK: Unified API for cloud providers (E2B, Daytona, Modal, CodeSandbox, Vercel)
+ *
+ * @see https://computesdk.com/docs
  */
 
 import { EventEmitter } from 'events';
 
 /**
  * Sandbox provider types
+ *
+ * - docker: Self-hosted container-based sandboxes
+ * - computesdk: Cloud sandboxes via ComputeSDK (E2B, Daytona, Modal, CodeSandbox, Vercel, Blaxel)
  */
-export type SandboxProviderType = 'e2b' | 'daytona' | 'docker' | 'vercel' | 'computesdk';
+export type SandboxProviderType = 'docker' | 'computesdk';
+
+/**
+ * ComputeSDK underlying provider types
+ */
+export type ComputeSDKUnderlyingProvider =
+  | 'e2b'
+  | 'daytona'
+  | 'modal'
+  | 'codesandbox'
+  | 'vercel'
+  | 'blaxel';
 
 /**
  * Network isolation mode
@@ -80,7 +94,7 @@ export interface SandboxSessionConfig {
   image?: string;
   /** Working directory inside sandbox */
   workdir?: string;
-  /** Language runtime (for Daytona: 'python' | 'typescript' | 'javascript') */
+  /** Language runtime */
   language?: 'python' | 'typescript' | 'javascript';
   /** Auto-stop interval in minutes (0 = never, default: 15) */
   autoStopMinutes?: number;
@@ -271,83 +285,6 @@ export interface SandboxProviderConfig {
 }
 
 /**
- * E2B provider configuration
- *
- * E2B provides Firecracker microVM sandboxes with ~150ms startup time.
- * Best for: AI code execution, code interpreters, secure sandboxing
- *
- * @see https://e2b.dev/docs
- */
-export interface E2BProviderConfig extends SandboxProviderConfig {
-  type: 'e2b';
-  options: {
-    /** E2B API key (required) */
-    apiKey: string;
-    /**
-     * Custom template ID for the sandbox
-     * Use 'e2b template list' to see available templates
-     * Default: base template
-     */
-    templateId?: string;
-    /**
-     * Default sandbox timeout in milliseconds
-     * Default: 300000 (5 minutes)
-     */
-    timeoutMs?: number;
-    /**
-     * Metadata to attach to sandboxes
-     */
-    metadata?: Record<string, string>;
-  };
-}
-
-/**
- * Daytona provider configuration
- *
- * Daytona provides cloud development environments with full PTY support,
- * git operations, LSP, and more.
- * Best for: AI coding agents, interactive development, full IDE-like experience
- *
- * @see https://www.daytona.io/docs
- */
-export interface DaytonaProviderConfig extends SandboxProviderConfig {
-  type: 'daytona';
-  options: {
-    /** Daytona API key (required) */
-    apiKey: string;
-    /**
-     * Snapshot name/ID for the sandbox template
-     * Create snapshots in the Daytona dashboard
-     */
-    snapshot?: string;
-    /**
-     * Default language runtime
-     * Default: 'typescript'
-     */
-    language?: 'python' | 'typescript' | 'javascript';
-    /**
-     * Auto-stop interval in minutes (0 = never)
-     * Default: 15
-     */
-    autoStopInterval?: number;
-    /**
-     * Auto-archive interval in minutes after stopped (0 = max 30 days)
-     * Default: 10080 (7 days)
-     */
-    autoArchiveInterval?: number;
-    /**
-     * Labels to attach to sandboxes
-     */
-    labels?: Record<string, string>;
-    /**
-     * Region for sandbox deployment
-     * Default: 'us'
-     */
-    region?: 'us' | 'eu';
-  };
-}
-
-/**
  * Docker provider configuration
  *
  * Docker provides local container-based isolation for self-hosted deployments.
@@ -408,72 +345,11 @@ export interface DockerProviderConfig extends SandboxProviderConfig {
 }
 
 /**
- * Vercel Sandbox provider configuration
- *
- * Vercel Sandbox provides ephemeral compute environments for AI agents
- * and code execution with ~1s startup time.
- * Best for: AI agents, code generation, developer experimentation
- *
- * @see https://vercel.com/docs/vercel-sandbox
- */
-export interface VercelProviderConfig extends SandboxProviderConfig {
-  type: 'vercel';
-  options: {
-    /**
-     * Vercel access token (required unless using OIDC)
-     * Create at: https://vercel.com/account/tokens
-     */
-    accessToken?: string;
-    /**
-     * Vercel team ID (required for team-scoped sandboxes)
-     */
-    teamId?: string;
-    /**
-     * Vercel project ID (required)
-     */
-    projectId: string;
-    /**
-     * Default sandbox timeout in milliseconds
-     * Default: 300000 (5 minutes)
-     * Maximum depends on your Vercel plan
-     */
-    timeoutMs?: number;
-    /**
-     * Runtime to use for sandboxes
-     * Default: 'node22'
-     */
-    runtime?: 'node22' | 'python3.13';
-    /**
-     * Number of vCPUs for the sandbox
-     * Default: 1
-     */
-    vcpus?: number;
-    /**
-     * Ports to expose from the sandbox
-     * Used for development servers, etc.
-     */
-    ports?: number[];
-    /**
-     * Git repository to clone into the sandbox
-     */
-    source?: {
-      type: 'git';
-      url: string;
-      revision?: string;
-      depth?: number;
-    } | {
-      type: 'tarball';
-      url: string;
-    };
-  };
-}
-
-/**
  * ComputeSDK provider configuration
  *
  * ComputeSDK provides a unified API across multiple sandbox providers,
- * allowing you to switch between E2B, Daytona, Modal, CodeSandbox, and more
- * with zero code changes.
+ * allowing you to switch between E2B, Daytona, Modal, CodeSandbox, Vercel,
+ * and more with zero code changes.
  *
  * @see https://computesdk.com/docs
  */
@@ -487,11 +363,20 @@ export interface ComputeSDKProviderConfig extends SandboxProviderConfig {
     /**
      * Underlying provider to use
      * Default: auto-detected from environment variables
+     *
+     * Detection order: Modal → E2B → Daytona → CodeSandbox → Vercel → Blaxel
      */
-    provider?: 'e2b' | 'daytona' | 'modal' | 'codesandbox' | 'blaxel' | 'vercel';
+    provider?: ComputeSDKUnderlyingProvider;
     /**
      * Provider-specific API key (required for most providers)
      * Will be passed to the underlying provider
+     *
+     * Alternatively, set the provider's env var directly:
+     * - E2B: E2B_API_KEY
+     * - Daytona: DAYTONA_API_KEY
+     * - Modal: MODAL_TOKEN_ID + MODAL_TOKEN_SECRET
+     * - CodeSandbox: CODESANDBOX_TOKEN
+     * - Vercel: VERCEL_TOKEN
      */
     providerApiKey?: string;
     /**
@@ -514,12 +399,7 @@ export interface ComputeSDKProviderConfig extends SandboxProviderConfig {
 /**
  * Union of all provider configurations
  */
-export type ProviderConfig =
-  | E2BProviderConfig
-  | DaytonaProviderConfig
-  | DockerProviderConfig
-  | VercelProviderConfig
-  | ComputeSDKProviderConfig;
+export type ProviderConfig = DockerProviderConfig | ComputeSDKProviderConfig;
 
 /**
  * Sandbox provider interface
@@ -658,28 +538,10 @@ export interface SandboxAuditEvent {
 
 /**
  * Provider comparison helper
+ *
+ * ComputeSDK provides access to multiple cloud providers through a unified API.
  */
 export const PROVIDER_FEATURES = {
-  e2b: {
-    name: 'E2B',
-    isolation: 'Firecracker microVM',
-    startupTime: '~150ms',
-    ptySupport: true,
-    codeInterpreter: true,
-    persistence: true,
-    pricing: 'Per-second billing',
-    bestFor: 'AI code execution, secure sandboxing',
-  },
-  daytona: {
-    name: 'Daytona',
-    isolation: 'Container/VM',
-    startupTime: 'Warm pool: instant, Cold: seconds',
-    ptySupport: true,
-    codeInterpreter: true,
-    persistence: true,
-    pricing: 'Per-second billing',
-    bestFor: 'AI coding agents, full dev environments',
-  },
   docker: {
     name: 'Docker',
     isolation: 'Container',
@@ -688,26 +550,24 @@ export const PROVIDER_FEATURES = {
     codeInterpreter: false,
     persistence: true,
     pricing: 'Self-hosted',
-    bestFor: 'Development, self-hosted production',
-  },
-  vercel: {
-    name: 'Vercel Sandbox',
-    isolation: 'Linux MicroVM',
-    startupTime: '~1s',
-    ptySupport: false,
-    codeInterpreter: true,
-    persistence: false,
-    pricing: 'Per-second billing',
-    bestFor: 'AI agents, code generation, ephemeral workloads',
+    bestFor: 'Development, self-hosted production, air-gapped environments',
   },
   computesdk: {
     name: 'ComputeSDK',
-    isolation: 'Varies by provider',
-    startupTime: 'Varies by provider',
+    isolation: 'Varies by underlying provider',
+    startupTime: 'Varies (E2B: ~150ms, Modal: ~2s, Vercel: ~1s)',
     ptySupport: true,
     codeInterpreter: true,
     persistence: true,
     pricing: 'Varies by provider',
-    bestFor: 'Multi-provider flexibility, Modal GPU workloads, CodeSandbox collaboration',
+    bestFor: 'Cloud sandboxes, GPU workloads (Modal), collaboration (CodeSandbox)',
+    underlyingProviders: {
+      e2b: 'Firecracker microVMs, ~150ms startup, great for AI code execution',
+      daytona: 'Full dev environments with PTY, git, LSP support',
+      modal: 'GPU-accelerated Python, great for ML workloads',
+      codesandbox: 'Collaborative sandboxes with real-time editing',
+      vercel: 'Ephemeral Node.js/Python compute, ~1s startup',
+      blaxel: 'AI-powered code execution',
+    },
   },
 } as const;
