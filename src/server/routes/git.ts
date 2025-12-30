@@ -23,6 +23,16 @@ export function createGitRoutes(repoManager: RepoManager): Hono {
   // Apply auth middleware to all git routes
   app.use('*', gitAuthMiddleware);
 
+  // Skip git routes for /api/* paths - they should be handled by other routers
+  app.use('*', async (c, next) => {
+    const path = c.req.path;
+    if (path.startsWith('/api/')) {
+      // Let 404 handler deal with unmatched /api/* routes
+      return c.notFound();
+    }
+    return next();
+  });
+
   /**
    * GET /:owner/:repo/info/refs
    * Ref discovery for clone/fetch (upload-pack) or push (receive-pack)
