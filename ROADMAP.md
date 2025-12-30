@@ -470,7 +470,7 @@ Not grep. Understanding.
 |------|----------|--------|
 | Fix integration test failures | P0 | In Progress |
 | ESM/CommonJS configuration cleanup | P1 | TODO |
-| Error message audit | P1 | TODO |
+| Error message audit | P1 | Complete |
 | Dogfood: use wit to build wit | P0 | Ongoing |
 
 **Success metric:** All tests pass, daily development uses wit.
@@ -615,7 +615,6 @@ Not grep. Understanding.
 
 1. **Fix failing tests** - `npm test` should pass
 2. **Documentation** - Command reference
-3. **Error message improvements** - Helpful suggestions
 
 ### How to Help
 
