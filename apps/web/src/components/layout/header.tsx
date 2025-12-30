@@ -146,7 +146,7 @@ export function Header() {
                       <ChevronDown className="h-3 w-3" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuContent align="end" className="w-52">
                     <DropdownMenuItem onClick={() => navigate('/new')}>
                       <BookOpen className="mr-2 h-4 w-4" />
                       New repository
