@@ -68,6 +68,8 @@ interface ContributionPrompt {
   priority: 'P0' | 'P1' | 'P2' | 'P3';
   tags: string[];
   prompt: string;
+  completed?: boolean;
+  completedPr?: number; // PR number that implemented this feature
 }
 
 const CONTRIBUTION_PROMPTS: ContributionPrompt[] = [
@@ -338,6 +340,8 @@ The goal: new users should never see a cryptic "module not found" error - they s
     category: 'User Experience',
     priority: 'P1',
     tags: ['ux', 'cli', 'error-handling'],
+    completed: true,
+    completedPr: 223,
     prompt: `I'm contributing to wit, an AI-native Git platform. Please help me audit and improve error messages to be helpful, not frustrating.
 
 1. Find all error messages in the codebase:
@@ -786,6 +790,8 @@ The goal: see Git status at a glance while browsing files.`,
     category: 'Web UI',
     priority: 'P1',
     tags: ['frontend', 'ux', 'accessibility'],
+    completed: true,
+    completedPr: 235,
     prompt: `I'm contributing to wit, an AI-native Git platform. Please help me implement a comprehensive keyboard shortcuts system.
 
 1. Understand current shortcuts:
@@ -3848,15 +3854,37 @@ function CopyablePrompt({ prompt }: CopyablePromptProps) {
     <div className={cn(
       'border rounded-lg p-4 transition-all',
       priorityStyle.border,
-      expanded && 'bg-muted/30'
+      expanded && 'bg-muted/30',
+      prompt.completed && 'opacity-60'
     )}>
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-2">
+            {prompt.completed && (
+              prompt.completedPr ? (
+                <a
+                  href={`https://github.com/abhiaiyer91/wit/pull/${prompt.completedPr}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Badge variant="secondary" className="text-xs bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-800 cursor-pointer">
+                    <Check className="h-3 w-3 mr-1" />
+                    Completed in PR #{prompt.completedPr}
+                  </Badge>
+                </a>
+              ) : (
+                <Badge variant="secondary" className="text-xs bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
+                  <Check className="h-3 w-3 mr-1" />
+                  Completed
+                </Badge>
+              )
+            )}
             <Badge variant="secondary" className={cn('text-xs', priorityStyle.bg, priorityStyle.text)}>
               {prompt.priority}
             </Badge>
-            <span className="font-medium">{prompt.title}</span>
+            <span className={cn('font-medium', prompt.completed && 'line-through')}>{prompt.title}</span>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             {prompt.tags.slice(0, 3).map((tag) => (
