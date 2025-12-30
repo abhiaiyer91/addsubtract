@@ -108,6 +108,13 @@ export function BlockItem({
     }
   }, [isFocused]);
 
+  // Auto-resize textarea on mount and when content changes
+  useEffect(() => {
+    if (inputRef.current && inputRef.current instanceof HTMLTextAreaElement) {
+      autoResize(inputRef.current);
+    }
+  }, [block.content, autoResize]);
+
   // Auto-resize textarea
   const autoResize = useCallback((element: HTMLTextAreaElement) => {
     element.style.height = 'auto';

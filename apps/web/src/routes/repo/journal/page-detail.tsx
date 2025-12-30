@@ -61,8 +61,8 @@ export function JournalPageDetail() {
   const authenticated = !!session?.user;
   const utils = trpc.useUtils();
 
-  const [editedContent, setEditedContent] = useState('');
-  const [editedTitle, setEditedTitle] = useState('');
+  const [editedContent, setEditedContent] = useState<string | null>(null);
+  const [editedTitle, setEditedTitle] = useState<string | null>(null);
   const [showIconPicker, setShowIconPicker] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [pendingContent, setPendingContent] = useState<string | null>(null);
@@ -140,6 +140,10 @@ export function JournalPageDetail() {
     }
   }, [page]);
 
+  // Derive actual content to use - prioritize edited content, fall back to page content
+  const currentContent = editedContent ?? page?.content ?? '';
+  const currentTitle = editedTitle ?? page?.title ?? '';
+
   // Auto-save content with debounce
   const handleContentChange = useCallback(
     (newContent: string) => {
@@ -195,10 +199,11 @@ export function JournalPageDetail() {
 
   // Save changes on blur
   const handleTitleBlur = () => {
-    if (page && editedTitle !== page.title) {
+    const titleToSave = editedTitle ?? page?.title ?? '';
+    if (page && titleToSave !== page.title) {
       updateMutation.mutate({
         pageId: page.id,
-        title: editedTitle || 'Untitled',
+        title: titleToSave || 'Untitled',
       });
     }
   };
@@ -354,7 +359,7 @@ export function JournalPageDetail() {
             {canEdit ? (
               <textarea
                 ref={titleRef}
-                value={editedTitle}
+                value={currentTitle}
                 onChange={handleTitleChange}
                 onBlur={handleTitleBlur}
                 placeholder="Untitled"
@@ -485,7 +490,8 @@ export function JournalPageDetail() {
 
             {/* Content - Block Editor */}
             <BlockEditor
-              value={editedContent}
+              key={page.id}
+              value={currentContent}
               onChange={handleContentChange}
               placeholder="Start writing or type '/' for commands..."
               readOnly={!canEdit}
