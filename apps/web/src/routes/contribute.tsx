@@ -1096,6 +1096,8 @@ The goal: developers should understand and extend the AI tool system.`,
     category: 'Documentation',
     priority: 'P1',
     tags: ['docs', 'database', 'reference'],
+    completed: true,
+    completedPr: 258,
     prompt: `I'm contributing to wit, an AI-native Git platform. Please help me document the database schema.
 
 1. Find all models:
