@@ -155,7 +155,7 @@ async function executeInSandbox(
   truncated?: boolean;
   sandbox?: boolean;
 }> {
-  const { provider, apiKey, cwd, timeout, env } = options;
+  const { provider, apiKey, repoId, userId, cwd, timeout, env } = options;
 
   // Debug: Log sandbox execution request
   console.log('[Sandbox] executeInSandbox called:', {

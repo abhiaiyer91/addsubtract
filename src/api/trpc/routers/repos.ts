@@ -1149,6 +1149,9 @@ export const reposRouter = router({
       }
 
       try {
+        // Resolve ref - if it's HEAD use directly, otherwise prefix with refs/heads/
+        const refToResolve = input.ref === 'HEAD' ? 'HEAD' : `refs/heads/${input.ref}`;
+        
         // Log available refs for debugging
         const allBranches = bareRepo.refs.listBranches();
         console.log(`[repos.getTree] Attempting to resolve ref '${refToResolve}', available branches: ${allBranches.join(', ') || '(none)'}`);
