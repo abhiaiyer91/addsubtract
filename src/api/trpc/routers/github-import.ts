@@ -524,4 +524,108 @@ export const githubImportRouter = router({
         };
       }
     }),
+
+  /**
+   * Re-sync/re-clone a repository from GitHub
+   * This is useful when the initial import failed or the repository data is corrupted
+   */
+  resync: protectedProcedure
+    .input(
+      z.object({
+        repoId: z.string().uuid(),
+        githubRepo: z.string().min(1, 'GitHub repository is required'),
+        token: z.string().optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      // Find the existing repository
+      const repo = await repoModel.findById(input.repoId);
+      if (!repo) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Repository not found',
+        });
+      }
+
+      // Check ownership
+      if (repo.ownerId !== ctx.user.id) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to resync this repository',
+        });
+      }
+
+      const parsed = parseGitHubRepo(input.githubRepo);
+      if (!parsed) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Invalid GitHub repository format',
+        });
+      }
+
+      try {
+        // Fetch GitHub repo info to get clone URL
+        const storedToken = await getGitHubToken();
+        const token = input.token || storedToken || null;
+        const data = await fetchGitHubData({
+          repo: input.githubRepo,
+          token: token ?? undefined,
+          import: {
+            repository: true,
+            issues: false,
+            pullRequests: false,
+            labels: false,
+            milestones: false,
+            releases: false,
+          },
+        });
+
+        // Resolve the disk path
+        const reposDir = process.env.REPOS_DIR || './repos';
+        const relativePath = repo.diskPath.replace(/^\/repos\//, '');
+        const absolutePath = path.isAbsolute(reposDir)
+          ? path.join(reposDir, relativePath)
+          : path.join(process.cwd(), reposDir, relativePath);
+
+        // Remove existing repository directory if it exists
+        if (await exists(absolutePath)) {
+          console.log(`[GitHub Resync] Removing existing directory: ${absolutePath}`);
+          execSync(`rm -rf "${absolutePath}"`, { stdio: 'pipe' });
+        }
+
+        // Create parent directory
+        mkdirp(path.dirname(absolutePath));
+
+        // Get authenticated clone URL
+        const cloneUrl = getAuthenticatedCloneUrl(data.repo.clone_url, token);
+
+        // Clone as a bare repository
+        console.log(`[GitHub Resync] Cloning ${data.repo.full_name} to ${absolutePath}`);
+        execSync(`git clone --bare "${cloneUrl}" "${absolutePath}"`, {
+          stdio: 'pipe',
+          timeout: 300000, // 5 minute timeout
+        });
+
+        // Update the repository's default branch if it changed
+        if (data.repo.default_branch !== repo.defaultBranch) {
+          await repoModel.update(repo.id, { defaultBranch: data.repo.default_branch });
+        }
+
+        console.log(`[GitHub Resync] Successfully resynced ${repo.name}`);
+
+        return {
+          success: true,
+          message: 'Repository resynced successfully',
+          defaultBranch: data.repo.default_branch,
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.error(`[GitHub Resync] Error:`, error);
+        
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: `Failed to resync repository: ${errorMessage}`,
+        });
+      }
+    }),
 });

@@ -4,6 +4,7 @@ import { BranchSelector } from '@/components/repo/branch-selector';
 import { RepoLayout } from './components/repo-layout';
 import { trpc } from '@/lib/trpc';
 import { Loading } from '@/components/ui/loading';
+import { useSession } from '@/lib/auth-client';
 
 export function TreePage() {
   const { owner, repo, ref, '*': path } = useParams<{
@@ -12,9 +13,17 @@ export function TreePage() {
     ref: string;
     '*': string;
   }>();
+  const { data: session } = useSession();
+  const utils = trpc.useUtils();
 
   const currentRef = ref || 'main';
   const currentPath = path || '';
+
+  // Fetch repo data to check ownership
+  const { data: repoData } = trpc.repos.get.useQuery(
+    { owner: owner!, repo: repo! },
+    { enabled: !!owner && !!repo }
+  );
 
   // Fetch real tree data from tRPC
   const { data: treeData, isLoading: treeLoading } = trpc.repos.getTree.useQuery(
@@ -27,6 +36,9 @@ export function TreePage() {
     { owner: owner!, repo: repo! },
     { enabled: !!owner && !!repo }
   );
+  
+  const repoInfo = repoData?.repo;
+  const isOwner = session?.user?.id === repoInfo?.ownerId;
 
   const tree: TreeEntry[] = treeData?.entries?.map(entry => ({
     name: entry.name,
@@ -69,9 +81,14 @@ export function TreePage() {
           entries={tree}
           owner={owner!}
           repo={repo!}
+          repoId={repoInfo?.id}
           currentRef={currentRef}
           currentPath={currentPath}
           error={treeError}
+          canResync={isOwner && !!treeError}
+          onResyncComplete={() => {
+            utils.repos.getTree.invalidate({ owner: owner!, repo: repo! });
+          }}
         />
       </div>
     </RepoLayout>

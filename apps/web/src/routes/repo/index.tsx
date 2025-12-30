@@ -78,7 +78,12 @@ export function RepoPage() {
   const tree = treeData?.entries || [];
   const treeError = treeData?.error;
   const readme = readmeData?.encoding === 'utf-8' ? readmeData.content : null;
+  
+  // Check if current user is the owner
   const isOwner = session?.user?.id === repoInfo?.ownerId;
+  
+  // Utils for the trpc context
+  const utils = trpc.useUtils();
 
   const cloneUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/${ownerUsername}/${repoInfo?.name || repo}.wit`;
 
@@ -139,8 +144,13 @@ export function RepoPage() {
             entries={tree}
             owner={ownerUsername}
             repo={repoInfo?.name || repo!}
+            repoId={repoInfo?.id}
             currentRef={repoInfo?.defaultBranch || 'main'}
             error={treeError}
+            canResync={isOwner && !!treeError}
+            onResyncComplete={() => {
+              utils.repos.getTree.invalidate({ owner: owner!, repo: repo! });
+            }}
           />
 
           {/* README */}
@@ -197,21 +207,21 @@ export function RepoPage() {
           <div className="border rounded-lg p-4 space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="font-semibold text-sm">Releases</h3>
-              {releases && releases.length > 0 && (
+              {releases && releases.releases.length > 0 && (
                 <Badge variant="secondary" className="text-xs">
-                  {releases.length}
+                  {releases.total}
                 </Badge>
               )}
             </div>
             
-            {releases && releases.length > 0 ? (
+            {releases && releases.releases.length > 0 ? (
               <div className="space-y-2">
                 <Link
-                  to={`/${owner}/${repo}/releases/tag/${releases[0].tagName}`}
+                  to={`/${owner}/${repo}/releases/tag/${releases.releases[0].tagName}`}
                   className="flex items-center gap-2 text-sm hover:text-primary"
                 >
                   <Tag className="h-4 w-4" />
-                  <span className="font-mono">{releases[0].tagName}</span>
+                  <span className="font-mono">{releases.releases[0].tagName}</span>
                   <Badge variant="outline" className="text-xs">Latest</Badge>
                 </Link>
                 <Link
