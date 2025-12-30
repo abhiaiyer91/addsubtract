@@ -2,8 +2,8 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Install git for any git operations
-RUN apk add --no-cache git
+# Install git for any git operations and docker CLI for sandbox
+RUN apk add --no-cache git docker-cli
 
 # Install dependencies
 COPY package*.json ./

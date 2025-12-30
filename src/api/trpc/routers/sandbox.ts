@@ -471,7 +471,17 @@ export const sandboxRouter = router({
           }
 
           case 'docker': {
-            const { spawn } = await import('child_process');
+            const { spawn, execSync } = await import('child_process');
+
+            // Check if Docker is available
+            try {
+              execSync('docker version', { stdio: 'ignore', timeout: 5000 });
+            } catch {
+              throw new TRPCError({
+                code: 'INTERNAL_SERVER_ERROR',
+                message: 'Docker is not available. Either Docker is not installed, not running, or the Docker socket is not accessible. Consider using E2B or Daytona provider instead.',
+              });
+            }
 
             return new Promise((resolve) => {
               const dockerArgs = [
@@ -517,9 +527,16 @@ export const sandboxRouter = router({
 
               child.on('error', (err) => {
                 clearTimeout(timer);
+                // Provide helpful error message for common issues
+                let errorMsg = err.message;
+                if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+                  errorMsg = 'Docker CLI not found. Install Docker or use E2B/Daytona provider.';
+                } else if ((err as NodeJS.ErrnoException).code === 'EACCES') {
+                  errorMsg = 'Permission denied accessing Docker. Check Docker socket permissions.';
+                }
                 resolve({
                   success: false,
-                  error: err.message,
+                  error: errorMsg,
                   exitCode: -1,
                 });
               });

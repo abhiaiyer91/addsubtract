@@ -90,7 +90,13 @@ export function TerminalPanel({ height, repoId, owner, repo }: TerminalPanelProp
       credentials: 'include',
       body: JSON.stringify({ command: commandInput }),
     })
-      .then((res) => res.json())
+      .then(async (res) => {
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(text.startsWith('<') ? `Server returned ${res.status}` : text);
+        }
+        return res.json();
+      })
       .then((result) => {
         setSandboxOutput((prev) => [
           ...prev,
@@ -264,10 +270,22 @@ export function TerminalPanel({ height, repoId, owner, repo }: TerminalPanelProp
             <div ref={scrollRef} className="p-3 font-mono text-xs space-y-0.5">
               {!sandboxAvailable ? (
                 <div className="text-zinc-500">
-                  <p>Sandbox is not configured for this repository.</p>
-                  <p className="mt-2">
-                    Go to <span className="text-zinc-300">Settings → Sandbox</span> to enable it.
-                  </p>
+                  {sandboxStatus?.provider === 'docker' && sandboxStatus?.dockerAvailable === false ? (
+                    <>
+                      <p className="text-amber-400">Docker sandbox is configured but Docker is not available.</p>
+                      <p className="mt-2">
+                        Either install Docker, ensure it's running, or switch to E2B/Daytona provider in{' '}
+                        <span className="text-zinc-300">Settings → Sandbox</span>.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p>Sandbox is not configured for this repository.</p>
+                      <p className="mt-2">
+                        Go to <span className="text-zinc-300">Settings → Sandbox</span> to enable it.
+                      </p>
+                    </>
+                  )}
                 </div>
               ) : sandboxOutput.length === 0 ? (
                 <div className="text-zinc-500">
