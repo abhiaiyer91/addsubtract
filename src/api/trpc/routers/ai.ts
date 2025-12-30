@@ -189,11 +189,13 @@ export const aiRouter = router({
   status: publicProcedure.query(async ({ ctx }) => {
     const hasServerOpenAI = !!process.env.OPENAI_API_KEY;
     const hasServerAnthropic = !!process.env.ANTHROPIC_API_KEY;
-    const serverAvailable = hasServerOpenAI || hasServerAnthropic;
+    const hasServerOpenRouter = !!process.env.OPENROUTER_API_KEY;
+    const serverAvailable = hasServerOpenAI || hasServerAnthropic || hasServerOpenRouter;
     
     // If user is authenticated, check their personal keys too
     let hasUserOpenAI = false;
     let hasUserAnthropic = false;
+    let hasUserOpenRouter = false;
     let userKeySource: 'user' | 'server' | null = null;
     
     if (ctx.user) {
@@ -201,10 +203,12 @@ export const aiRouter = router({
       const { userAiKeyModel } = await import('../../../db/models');
       const userOpenAIKey = await userAiKeyModel.getDecryptedKey(ctx.user.id, 'openai');
       const userAnthropicKey = await userAiKeyModel.getDecryptedKey(ctx.user.id, 'anthropic');
+      const userOpenRouterKey = await userAiKeyModel.getDecryptedKey(ctx.user.id, 'openrouter');
       hasUserOpenAI = !!userOpenAIKey;
       hasUserAnthropic = !!userAnthropicKey;
+      hasUserOpenRouter = !!userOpenRouterKey;
       
-      if (hasUserOpenAI || hasUserAnthropic) {
+      if (hasUserOpenAI || hasUserAnthropic || hasUserOpenRouter) {
         userKeySource = 'user';
       } else if (serverAvailable) {
         userKeySource = 'server';
@@ -213,22 +217,24 @@ export const aiRouter = router({
     
     const hasOpenAI = hasUserOpenAI || hasServerOpenAI;
     const hasAnthropic = hasUserAnthropic || hasServerAnthropic;
-    const available = hasOpenAI || hasAnthropic;
+    const hasOpenRouter = hasUserOpenRouter || hasServerOpenRouter;
+    const available = hasOpenAI || hasAnthropic || hasOpenRouter;
     
     return {
       available,
       providers: {
         openai: hasOpenAI,
         anthropic: hasAnthropic,
+        openrouter: hasOpenRouter,
       },
       features: {
-        semanticSearch: hasOpenAI, // Requires OpenAI for embeddings
+        semanticSearch: hasOpenAI || hasOpenRouter, // OpenRouter can also use OpenAI embeddings
         codeGeneration: available,
         prDescription: available,
         codeReview: available,
       },
       source: userKeySource,
-      hasUserKeys: hasUserOpenAI || hasUserAnthropic,
+      hasUserKeys: hasUserOpenAI || hasUserAnthropic || hasUserOpenRouter,
       hasServerKeys: serverAvailable,
       message: !available 
         ? 'AI features are not configured. Add an API key in Settings > AI to enable AI-powered features.'

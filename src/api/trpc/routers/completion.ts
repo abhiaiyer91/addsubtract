@@ -63,10 +63,17 @@ async function generateCompletion(
   const apiKeyInfo = await getAnyApiKeyForRepo(repoId);
   
   if (!apiKeyInfo) {
-    throw new Error('No AI API key configured. Set ANTHROPIC_API_KEY or OPENAI_API_KEY, or add an API key in repository settings.');
+    throw new Error('No AI API key configured. Set ANTHROPIC_API_KEY, OPENROUTER_API_KEY, or OPENAI_API_KEY, or add an API key in repository settings.');
+  }
+
+  // Set OpenRouter base URL if using OpenRouter
+  if (apiKeyInfo.provider === 'openrouter') {
+    process.env.OPENAI_API_KEY = apiKeyInfo.key;
+    process.env.OPENAI_BASE_URL = 'https://openrouter.ai/api/v1';
   }
 
   // Determine model based on provider
+  // OpenRouter uses OpenAI-compatible format
   const model = apiKeyInfo.provider === 'anthropic' 
     ? 'anthropic/claude-sonnet-4-20250514'
     : 'openai/gpt-4o-mini';

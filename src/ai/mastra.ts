@@ -136,9 +136,10 @@ export function isAIAvailable(): boolean {
   // Check for common AI provider API keys
   const hasOpenAI = !!process.env.OPENAI_API_KEY;
   const hasAnthropic = !!process.env.ANTHROPIC_API_KEY;
+  const hasOpenRouter = !!process.env.OPENROUTER_API_KEY;
   const hasCustomModel = !!process.env.WIT_AI_MODEL;
   
-  return hasOpenAI || hasAnthropic || hasCustomModel;
+  return hasOpenAI || hasAnthropic || hasOpenRouter || hasCustomModel;
 }
 
 /**
@@ -167,7 +168,7 @@ export async function isAIAvailableForRepo(repoId: string): Promise<boolean> {
  */
 export async function getApiKeyForRepo(
   repoId: string | null,
-  provider: 'openai' | 'anthropic'
+  provider: 'openai' | 'anthropic' | 'openrouter'
 ): Promise<string | null> {
   // If we have a repo ID, try repo-level keys first
   if (repoId) {
@@ -187,6 +188,8 @@ export async function getApiKeyForRepo(
     return process.env.OPENAI_API_KEY || null;
   } else if (provider === 'anthropic') {
     return process.env.ANTHROPIC_API_KEY || null;
+  } else if (provider === 'openrouter') {
+    return process.env.OPENROUTER_API_KEY || null;
   }
   
   return null;
@@ -195,12 +198,12 @@ export async function getApiKeyForRepo(
 /**
  * Get any available API key for a repository
  * Prefers repo-level keys, then server-level keys
- * Prefers Anthropic (Claude Opus 4.5) over OpenAI (GPT 5.2)
+ * Prefers Anthropic, then OpenRouter, then OpenAI
  * Returns the provider and key
  */
 export async function getAnyApiKeyForRepo(
   repoId: string | null
-): Promise<{ provider: 'openai' | 'anthropic'; key: string } | null> {
+): Promise<{ provider: 'openai' | 'anthropic' | 'openrouter'; key: string } | null> {
   // If we have a repo ID, try repo-level keys first
   if (repoId) {
     try {
@@ -214,9 +217,12 @@ export async function getAnyApiKeyForRepo(
     }
   }
   
-  // Fall back to server-level keys - prefer Anthropic (Claude Opus 4.5)
+  // Fall back to server-level keys - prefer Anthropic, then OpenRouter, then OpenAI
   if (process.env.ANTHROPIC_API_KEY) {
     return { provider: 'anthropic', key: process.env.ANTHROPIC_API_KEY };
+  }
+  if (process.env.OPENROUTER_API_KEY) {
+    return { provider: 'openrouter', key: process.env.OPENROUTER_API_KEY };
   }
   if (process.env.OPENAI_API_KEY) {
     return { provider: 'openai', key: process.env.OPENAI_API_KEY };

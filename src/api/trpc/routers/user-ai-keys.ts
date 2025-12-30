@@ -11,7 +11,7 @@ import { router, protectedProcedure } from '../trpc';
 import { userAiKeyModel } from '../../../db/models';
 
 // Valid AI providers
-const aiProviderSchema = z.enum(['openai', 'anthropic', 'coderabbit']);
+const aiProviderSchema = z.enum(['openai', 'anthropic', 'coderabbit', 'openrouter']);
 
 export const userAiKeysRouter = router({
   /**
@@ -21,7 +21,8 @@ export const userAiKeysRouter = router({
     // Check server keys availability
     const hasServerKeys = !!(
       process.env.OPENAI_API_KEY || 
-      process.env.ANTHROPIC_API_KEY
+      process.env.ANTHROPIC_API_KEY ||
+      process.env.OPENROUTER_API_KEY
     );
     
     // Fetch user's keys
@@ -73,6 +74,14 @@ export const userAiKeysRouter = router({
         throw new TRPCError({
           code: 'BAD_REQUEST',
           message: 'Anthropic API keys should start with "sk-ant-"',
+        });
+      }
+      
+      // OpenRouter keys start with "sk-or-"
+      if (input.provider === 'openrouter' && !input.apiKey.startsWith('sk-or-')) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'OpenRouter API keys should start with "sk-or-"',
         });
       }
       
@@ -129,7 +138,8 @@ export const userAiKeysRouter = router({
     // Check if server has global keys
     const hasServerKeys = !!(
       process.env.OPENAI_API_KEY || 
-      process.env.ANTHROPIC_API_KEY
+      process.env.ANTHROPIC_API_KEY ||
+      process.env.OPENROUTER_API_KEY
     );
     
     return {

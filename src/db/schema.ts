@@ -1729,6 +1729,7 @@ export const aiProviderEnum = pgEnum('ai_provider', [
   'openai',
   'anthropic',
   'coderabbit',
+  'openrouter',
 ]);
 
 /**
@@ -1744,7 +1745,7 @@ export const repoAiKeys = pgTable('repo_ai_keys', {
     .notNull()
     .references(() => repositories.id, { onDelete: 'cascade' }),
   
-  // AI provider (openai, anthropic)
+  // AI provider (openai, anthropic, coderabbit, openrouter)
   provider: aiProviderEnum('provider').notNull(),
   
   // Encrypted API key (we store encrypted, never plain text)
@@ -1779,7 +1780,7 @@ export const userAiKeys = pgTable('user_ai_keys', {
     .notNull()
     .references(() => authUser.id, { onDelete: 'cascade' }),
   
-  // AI provider (openai, anthropic)
+  // AI provider (openai, anthropic, coderabbit, openrouter)
   provider: aiProviderEnum('provider').notNull(),
   
   // Encrypted API key (we store encrypted, never plain text)

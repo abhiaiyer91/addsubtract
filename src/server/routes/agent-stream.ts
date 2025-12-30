@@ -75,12 +75,12 @@ export function createAgentStreamRoutes() {
 
     // Determine API key and provider
     let apiKey: string | null = null;
-    let provider: 'openai' | 'anthropic' = (requestedProvider === 'openai' || requestedProvider === 'anthropic') 
+    let provider: 'openai' | 'anthropic' | 'openrouter' = (requestedProvider === 'openai' || requestedProvider === 'anthropic' || requestedProvider === 'openrouter') 
       ? requestedProvider 
       : 'anthropic';
 
     if (agentSession.repoId) {
-      if (requestedProvider && (requestedProvider === 'openai' || requestedProvider === 'anthropic')) {
+      if (requestedProvider && (requestedProvider === 'openai' || requestedProvider === 'anthropic' || requestedProvider === 'openrouter')) {
         apiKey = await repoAiKeyModel.getDecryptedKey(agentSession.repoId, requestedProvider);
       } else {
         const repoKey = await repoAiKeyModel.getAnyKey(agentSession.repoId);
@@ -96,9 +96,14 @@ export function createAgentStreamRoutes() {
         apiKey = process.env.ANTHROPIC_API_KEY;
       } else if (provider === 'openai' && process.env.OPENAI_API_KEY) {
         apiKey = process.env.OPENAI_API_KEY;
+      } else if (provider === 'openrouter' && process.env.OPENROUTER_API_KEY) {
+        apiKey = process.env.OPENROUTER_API_KEY;
       } else if (process.env.ANTHROPIC_API_KEY) {
         apiKey = process.env.ANTHROPIC_API_KEY;
         provider = 'anthropic';
+      } else if (process.env.OPENROUTER_API_KEY) {
+        apiKey = process.env.OPENROUTER_API_KEY;
+        provider = 'openrouter';
       } else if (process.env.OPENAI_API_KEY) {
         apiKey = process.env.OPENAI_API_KEY;
         provider = 'openai';
@@ -180,9 +185,14 @@ export function createAgentStreamRoutes() {
     // Set API key temporarily
     const originalAnthropicKey = process.env.ANTHROPIC_API_KEY;
     const originalOpenAIKey = process.env.OPENAI_API_KEY;
+    const originalOpenAIBaseUrl = process.env.OPENAI_BASE_URL;
     
     if (provider === 'anthropic') {
       process.env.ANTHROPIC_API_KEY = apiKey;
+    } else if (provider === 'openrouter') {
+      // OpenRouter uses OpenAI-compatible API with a different base URL
+      process.env.OPENAI_API_KEY = apiKey;
+      process.env.OPENAI_BASE_URL = 'https://openrouter.ai/api/v1';
     } else {
       process.env.OPENAI_API_KEY = apiKey;
     }
@@ -198,6 +208,11 @@ export function createAgentStreamRoutes() {
       } else {
         delete process.env.OPENAI_API_KEY;
       }
+      if (originalOpenAIBaseUrl !== undefined) {
+        process.env.OPENAI_BASE_URL = originalOpenAIBaseUrl;
+      } else {
+        delete process.env.OPENAI_BASE_URL;
+      }
     };
 
     // Stream the response
@@ -211,7 +226,11 @@ export function createAgentStreamRoutes() {
 
         // Get agent
         const sessionMode = (agentSession.mode === 'questions' ? 'pm' : agentSession.mode || 'pm') as AgentMode;
-        const modelId = provider === 'anthropic' ? 'anthropic/claude-sonnet-4-20250514' : 'openai/gpt-4o';
+        // Select model based on provider
+        // OpenRouter uses OpenAI-compatible format
+        const modelId = provider === 'anthropic' 
+          ? 'anthropic/claude-sonnet-4-20250514' 
+          : 'openai/gpt-4o';
 
         let agent: any;
         if (agentContext) {
