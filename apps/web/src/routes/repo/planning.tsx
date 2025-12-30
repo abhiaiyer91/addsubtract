@@ -28,6 +28,17 @@ import {
   Check,
   AtSign,
   File,
+  Target,
+  Shield,
+  Swords,
+  Flag,
+  Radio,
+  Crosshair,
+  Medal,
+  Users,
+  MapPin,
+  Compass,
+  Activity,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -50,43 +61,43 @@ import { cn } from '@/lib/utils';
 // Types
 // =============================================================================
 
-type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'skipped';
-type WorkflowPhase = 'idle' | 'analyzing' | 'planning' | 'executing' | 'reviewing' | 'completed' | 'failed';
+type OperativeStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'skipped';
+type MissionPhase = 'idle' | 'reconnaissance' | 'strategic_planning' | 'deploying' | 'debriefing' | 'mission_complete' | 'mission_failed';
 
-interface Subtask {
+interface Operative {
   id: string;
   title: string;
   description: string;
   priority: string;
   estimatedEffort?: string;
   targetFiles?: string[];
-  status: TaskStatus;
+  status: OperativeStatus;
   result?: string;
   error?: string;
   duration?: number;
   filesModified?: string[];
 }
 
-interface ParallelGroup {
+interface Squad {
   id: string;
   name: string;
   executionOrder: number;
-  subtasks: Subtask[];
+  subtasks: Operative[];
   isCompleted?: boolean;
   duration?: number;
 }
 
-interface ExecutionPlan {
+interface BattlePlan {
   id: string;
   version: number;
   originalTask: string;
   summary: string;
-  parallelGroups: ParallelGroup[];
+  parallelGroups: Squad[];
   estimatedTotalEffort: string;
   riskAssessment?: string;
 }
 
-interface ReviewResult {
+interface DebriefingReport {
   overallSuccess: boolean;
   completedTasks: number;
   failedTasks: number;
@@ -102,7 +113,7 @@ interface ReviewResult {
   summary: string;
 }
 
-interface ActivityLogEntry {
+interface CommandLogEntry {
   id: string;
   timestamp: Date;
   type: 'info' | 'success' | 'warning' | 'error' | 'phase' | 'task';
@@ -110,7 +121,7 @@ interface ActivityLogEntry {
   details?: string;
 }
 
-interface ProjectInfo {
+interface IntelReport {
   type: string;
   language: string;
   hasTests: boolean;
@@ -119,12 +130,12 @@ interface ProjectInfo {
 }
 
 // Step to phase mapping
-const stepToPhase: Record<string, WorkflowPhase> = {
-  'analyze-task': 'analyzing',
-  'create-plan': 'planning',
-  'execute-plan': 'executing',
-  'review-results': 'reviewing',
-  'aggregate-results': 'reviewing',
+const stepToPhase: Record<string, MissionPhase> = {
+  'analyze-task': 'reconnaissance',
+  'create-plan': 'strategic_planning',
+  'execute-plan': 'deploying',
+  'review-results': 'debriefing',
+  'aggregate-results': 'debriefing',
 };
 
 // Step to progress mapping
@@ -140,28 +151,28 @@ const stepToProgress: Record<string, number> = {
 // Status Configurations
 // =============================================================================
 
-const taskStatusConfig: Record<TaskStatus, { label: string; icon: typeof CheckCircle2; color: string }> = {
-  pending: { label: 'Pending', icon: Clock, color: 'text-muted-foreground' },
-  in_progress: { label: 'Running', icon: Loader2, color: 'text-blue-500' },
-  completed: { label: 'Done', icon: CheckCircle2, color: 'text-green-500' },
-  failed: { label: 'Failed', icon: XCircle, color: 'text-red-500' },
-  skipped: { label: 'Skipped', icon: Clock, color: 'text-yellow-500' },
+const operativeStatusConfig: Record<OperativeStatus, { label: string; icon: typeof CheckCircle2; color: string }> = {
+  pending: { label: 'Awaiting Orders', icon: Clock, color: 'text-muted-foreground' },
+  in_progress: { label: 'Engaged', icon: Loader2, color: 'text-amber-500' },
+  completed: { label: 'Mission Success', icon: CheckCircle2, color: 'text-green-500' },
+  failed: { label: 'Casualty', icon: XCircle, color: 'text-red-500' },
+  skipped: { label: 'Stood Down', icon: Clock, color: 'text-yellow-500' },
 };
 
-const phaseConfig: Record<WorkflowPhase, { 
+const phaseConfig: Record<MissionPhase, { 
   label: string; 
   description: string;
   icon: typeof Brain; 
   color: string; 
   bgColor: string;
 }> = {
-  idle: { label: 'Ready', description: 'Enter a task to begin', icon: Brain, color: 'text-muted-foreground', bgColor: 'bg-muted' },
-  analyzing: { label: 'Analyzing', description: 'Understanding your codebase...', icon: Search, color: 'text-purple-500', bgColor: 'bg-purple-500' },
-  planning: { label: 'Planning', description: 'Creating execution plan...', icon: Brain, color: 'text-indigo-500', bgColor: 'bg-indigo-500' },
-  executing: { label: 'Executing', description: 'Running subtasks...', icon: Zap, color: 'text-orange-500', bgColor: 'bg-orange-500' },
-  reviewing: { label: 'Reviewing', description: 'Validating results...', icon: Eye, color: 'text-cyan-500', bgColor: 'bg-cyan-500' },
-  completed: { label: 'Completed', description: 'All tasks finished', icon: CheckCircle2, color: 'text-green-500', bgColor: 'bg-green-500' },
-  failed: { label: 'Failed', description: 'Workflow encountered errors', icon: XCircle, color: 'text-red-500', bgColor: 'bg-red-500' },
+  idle: { label: 'Awaiting Orders', description: 'Define your mission objective', icon: Target, color: 'text-muted-foreground', bgColor: 'bg-muted' },
+  reconnaissance: { label: 'Reconnaissance', description: 'Gathering intelligence on target...', icon: Search, color: 'text-purple-500', bgColor: 'bg-purple-500' },
+  strategic_planning: { label: 'Strategic Planning', description: 'Formulating battle plan...', icon: Compass, color: 'text-indigo-500', bgColor: 'bg-indigo-500' },
+  deploying: { label: 'Deploying Forces', description: 'Operatives engaging targets...', icon: Swords, color: 'text-amber-500', bgColor: 'bg-amber-500' },
+  debriefing: { label: 'Debriefing', description: 'Analyzing mission results...', icon: Eye, color: 'text-cyan-500', bgColor: 'bg-cyan-500' },
+  mission_complete: { label: 'Mission Complete', description: 'All objectives achieved', icon: Medal, color: 'text-green-500', bgColor: 'bg-green-500' },
+  mission_failed: { label: 'Mission Failed', description: 'Objectives not met', icon: XCircle, color: 'text-red-500', bgColor: 'bg-red-500' },
 };
 
 // =============================================================================
@@ -349,7 +360,7 @@ function MentionTextarea({
         {/* Hint for @ mentions */}
         <div className="absolute bottom-2 right-2 flex items-center gap-1 text-xs text-muted-foreground pointer-events-none">
           <AtSign className="h-3 w-3" />
-          <span>to reference files</span>
+          <span>to reference targets</span>
         </div>
       </div>
 
@@ -363,11 +374,11 @@ function MentionTextarea({
           {filesLoading ? (
             <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Searching files...
+              Scanning targets...
             </div>
           ) : files.length === 0 ? (
             <div className="px-3 py-2 text-sm text-muted-foreground">
-              {mentionQuery ? `No files matching "${mentionQuery}"` : 'Type to search files...'}
+              {mentionQuery ? `No targets matching "${mentionQuery}"` : 'Type to identify targets...'}
             </div>
           ) : (
             <div className="py-1">
@@ -382,7 +393,7 @@ function MentionTextarea({
                       : 'hover:bg-muted'
                   )}
                 >
-                  <File className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <Crosshair className="h-4 w-4 text-muted-foreground shrink-0" />
                   <span className="font-mono truncate">{file}</span>
                 </button>
               ))}
@@ -395,30 +406,30 @@ function MentionTextarea({
 }
 
 // =============================================================================
-// Component: WorkflowHeader - Always visible task context
+// Component: MissionBriefing - Always visible mission context
 // =============================================================================
 
-function WorkflowHeader({ 
-  task, 
+function MissionBriefing({ 
+  objective, 
   phase, 
   progress,
-  onCancel,
+  onAbort,
   onRetry,
-  onNewTask,
+  onNewMission,
   startTime,
 }: { 
-  task: string;
-  phase: WorkflowPhase;
+  objective: string;
+  phase: MissionPhase;
   progress: number;
-  onCancel?: () => void;
+  onAbort?: () => void;
   onRetry?: () => void;
-  onNewTask?: () => void;
+  onNewMission?: () => void;
   startTime?: Date;
 }) {
   const config = phaseConfig[phase];
   const PhaseIcon = config.icon;
-  const isRunning = !['idle', 'completed', 'failed'].includes(phase);
-  const isComplete = phase === 'completed' || phase === 'failed';
+  const isActive = !['idle', 'mission_complete', 'mission_failed'].includes(phase);
+  const isComplete = phase === 'mission_complete' || phase === 'mission_failed';
   const [copied, setCopied] = useState(false);
   const [elapsed, setElapsed] = useState(0);
 
@@ -437,40 +448,41 @@ function WorkflowHeader({
     return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
   };
 
-  const copyTask = () => {
-    navigator.clipboard.writeText(task);
+  const copyObjective = () => {
+    navigator.clipboard.writeText(objective);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   return (
     <div className={cn(
-      'rounded-xl border-2 transition-all duration-300',
-      isRunning && 'border-blue-500/50 bg-blue-500/5',
-      phase === 'completed' && 'border-green-500/50 bg-green-500/5',
-      phase === 'failed' && 'border-red-500/50 bg-red-500/5',
+      'rounded-xl border-2 transition-all duration-300 overflow-hidden',
+      isActive && 'border-amber-500/50 bg-gradient-to-br from-amber-500/5 to-orange-500/5',
+      phase === 'mission_complete' && 'border-green-500/50 bg-gradient-to-br from-green-500/5 to-emerald-500/5',
+      phase === 'mission_failed' && 'border-red-500/50 bg-gradient-to-br from-red-500/5 to-rose-500/5',
       phase === 'idle' && 'border-border bg-card',
     )}>
-      {/* Task Display - Always Visible */}
+      {/* Mission Objective Display */}
       <div className="p-4 pb-3">
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-              <span>Task</span>
+              <Target className="h-3 w-3" />
+              <span className="uppercase tracking-wider font-semibold">Mission Objective</span>
               <button 
-                onClick={copyTask}
+                onClick={copyObjective}
                 className="hover:text-foreground transition-colors"
-                title="Copy task"
+                title="Copy objective"
               >
                 {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
               </button>
             </div>
-            <p className="text-sm font-medium leading-relaxed">{task}</p>
+            <p className="text-sm font-medium leading-relaxed">{objective}</p>
           </div>
-          {isRunning && onCancel && (
-            <Button variant="outline" size="sm" onClick={onCancel} className="shrink-0 gap-1.5">
+          {isActive && onAbort && (
+            <Button variant="destructive" size="sm" onClick={onAbort} className="shrink-0 gap-1.5">
               <Square className="h-3 w-3" />
-              Stop
+              Abort Mission
             </Button>
           )}
           {isComplete && (
@@ -478,12 +490,13 @@ function WorkflowHeader({
               {onRetry && (
                 <Button variant="default" size="sm" onClick={onRetry} className="gap-1.5">
                   <RefreshCw className="h-3.5 w-3.5" />
-                  Retry
+                  Retry Mission
                 </Button>
               )}
-              {onNewTask && (
-                <Button variant="outline" size="sm" onClick={onNewTask} className="gap-1.5">
-                  New Task
+              {onNewMission && (
+                <Button variant="outline" size="sm" onClick={onNewMission} className="gap-1.5">
+                  <Flag className="h-3.5 w-3.5" />
+                  New Mission
                 </Button>
               )}
             </div>
@@ -494,9 +507,9 @@ function WorkflowHeader({
       {/* Status Bar */}
       <div className={cn(
         'px-4 py-3 border-t flex items-center justify-between gap-4',
-        isRunning && 'bg-blue-500/5',
-        phase === 'completed' && 'bg-green-500/5',
-        phase === 'failed' && 'bg-red-500/5',
+        isActive && 'bg-amber-500/5',
+        phase === 'mission_complete' && 'bg-green-500/5',
+        phase === 'mission_failed' && 'bg-red-500/5',
       )}>
         {/* Current Phase */}
         <div className="flex items-center gap-3">
@@ -507,11 +520,11 @@ function WorkflowHeader({
             <PhaseIcon className={cn(
               'h-5 w-5',
               config.color,
-              isRunning && 'animate-pulse'
+              isActive && 'animate-pulse'
             )} />
           </div>
           <div>
-            <div className={cn('font-semibold', config.color)}>
+            <div className={cn('font-semibold uppercase tracking-wide text-sm', config.color)}>
               {config.label}
             </div>
             <div className="text-xs text-muted-foreground">
@@ -523,11 +536,11 @@ function WorkflowHeader({
         {/* Progress & Time */}
         <div className="flex items-center gap-4">
           {startTime && (
-            <div className="text-sm text-muted-foreground">
-              {formatTime(elapsed)}
+            <div className="text-sm text-muted-foreground font-mono">
+              T+{formatTime(elapsed)}
             </div>
           )}
-          {isRunning && (
+          {isActive && (
             <div className="flex items-center gap-2">
               <div className="w-32 h-2 bg-muted rounded-full overflow-hidden">
                 <div 
@@ -540,38 +553,44 @@ function WorkflowHeader({
               </span>
             </div>
           )}
-          {phase === 'completed' && (
-            <Badge className="bg-green-500 text-white">Complete</Badge>
+          {phase === 'mission_complete' && (
+            <Badge className="bg-green-500 text-white gap-1">
+              <Medal className="h-3 w-3" />
+              Victory
+            </Badge>
           )}
-          {phase === 'failed' && (
-            <Badge variant="destructive">Failed</Badge>
+          {phase === 'mission_failed' && (
+            <Badge variant="destructive" className="gap-1">
+              <XCircle className="h-3 w-3" />
+              Failed
+            </Badge>
           )}
         </div>
       </div>
 
       {/* Phase Progress Steps */}
-      {(isRunning || isComplete) && (
+      {(isActive || isComplete) && (
         <div className="px-4 py-3 border-t bg-muted/30">
           <div className="flex items-center justify-between">
-            {(['analyzing', 'planning', 'executing', 'reviewing'] as WorkflowPhase[]).map((p, index, arr) => {
+            {(['reconnaissance', 'strategic_planning', 'deploying', 'debriefing'] as MissionPhase[]).map((p, index, arr) => {
               const stepConfig = phaseConfig[p];
               const StepIcon = stepConfig.icon;
-              const currentIndex = ['analyzing', 'planning', 'executing', 'reviewing'].indexOf(phase);
+              const currentIndex = ['reconnaissance', 'strategic_planning', 'deploying', 'debriefing'].indexOf(phase);
               const stepIndex = index;
-              const isActive = p === phase;
-              const isPast = stepIndex < currentIndex || phase === 'completed';
-              const isFuture = stepIndex > currentIndex && phase !== 'completed';
+              const isActiveStep = p === phase;
+              const isPast = stepIndex < currentIndex || phase === 'mission_complete';
+              const isFuture = stepIndex > currentIndex && phase !== 'mission_complete';
 
               return (
                 <div key={p} className="flex items-center">
                   <div className={cn(
                     'flex items-center gap-2 px-3 py-1.5 rounded-full transition-all',
-                    isActive && `${stepConfig.bgColor}/20`,
+                    isActiveStep && `${stepConfig.bgColor}/20`,
                     isPast && 'bg-green-500/10',
                   )}>
                     <div className={cn(
                       'w-6 h-6 rounded-full flex items-center justify-center',
-                      isActive && stepConfig.bgColor,
+                      isActiveStep && stepConfig.bgColor,
                       isPast && 'bg-green-500',
                       isFuture && 'bg-muted',
                     )}>
@@ -580,14 +599,14 @@ function WorkflowHeader({
                       ) : (
                         <StepIcon className={cn(
                           'h-3.5 w-3.5',
-                          isActive && 'text-white',
+                          isActiveStep && 'text-white',
                           isFuture && 'text-muted-foreground',
                         )} />
                       )}
                     </div>
                     <span className={cn(
                       'text-sm font-medium',
-                      isActive && stepConfig.color,
+                      isActiveStep && stepConfig.color,
                       isPast && 'text-green-500',
                       isFuture && 'text-muted-foreground',
                     )}>
@@ -611,14 +630,14 @@ function WorkflowHeader({
 }
 
 // =============================================================================
-// Component: LiveActivityFeed - Real-time updates
+// Component: CommandLog - Real-time field communications
 // =============================================================================
 
-function LiveActivityFeed({ 
+function CommandLog({ 
   entries, 
   currentAction,
 }: { 
-  entries: ActivityLogEntry[];
+  entries: CommandLogEntry[];
   currentAction?: string;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -629,33 +648,36 @@ function LiveActivityFeed({
     }
   }, [entries, currentAction]);
 
-  const getIcon = (type: ActivityLogEntry['type']) => {
+  const getIcon = (type: CommandLogEntry['type']) => {
     switch (type) {
       case 'success': return <CheckCircle2 className="h-4 w-4 text-green-500" />;
       case 'warning': return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
       case 'error': return <XCircle className="h-4 w-4 text-red-500" />;
-      case 'phase': return <CircleDot className="h-4 w-4 text-blue-500" />;
-      case 'task': return <Zap className="h-4 w-4 text-orange-500" />;
-      default: return <Info className="h-4 w-4 text-muted-foreground" />;
+      case 'phase': return <Flag className="h-4 w-4 text-blue-500" />;
+      case 'task': return <Swords className="h-4 w-4 text-amber-500" />;
+      default: return <Radio className="h-4 w-4 text-muted-foreground" />;
     }
   };
 
   return (
     <div className="rounded-lg border bg-card overflow-hidden">
       <div className="px-4 py-2 border-b bg-muted/50 flex items-center justify-between">
-        <span className="text-sm font-medium">Live Activity</span>
+        <span className="text-sm font-semibold uppercase tracking-wider flex items-center gap-2">
+          <Radio className="h-4 w-4" />
+          Command Log
+        </span>
         {currentAction && (
-          <div className="flex items-center gap-2 text-sm text-blue-500">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          <div className="flex items-center gap-2 text-sm text-amber-500">
+            <Activity className="h-3.5 w-3.5 animate-pulse" />
             <span className="animate-pulse">{currentAction}</span>
           </div>
         )}
       </div>
       <ScrollArea ref={scrollRef} className="h-64">
-        <div className="p-3 space-y-2">
+        <div className="p-3 space-y-2 font-mono text-xs">
           {entries.length === 0 ? (
             <div className="text-muted-foreground text-center py-8 text-sm">
-              Waiting to start...
+              Awaiting transmissions...
             </div>
           ) : (
             entries.map((entry) => (
@@ -675,7 +697,7 @@ function LiveActivityFeed({
                     entry.type === 'error' && 'text-red-500',
                     entry.type === 'warning' && 'text-yellow-500',
                     entry.type === 'success' && 'text-green-600 dark:text-green-400',
-                    entry.type === 'phase' && 'text-blue-500 font-medium',
+                    entry.type === 'phase' && 'text-blue-500 font-semibold uppercase',
                   )}>
                     {entry.message}
                   </div>
@@ -685,7 +707,7 @@ function LiveActivityFeed({
                     </div>
                   )}
                 </div>
-                <div className="text-xs text-muted-foreground shrink-0">
+                <div className="text-xs text-muted-foreground shrink-0 tabular-nums">
                   {entry.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                 </div>
               </div>
@@ -698,23 +720,23 @@ function LiveActivityFeed({
 }
 
 // =============================================================================
-// Component: TaskCard
+// Component: OperativeCard
 // =============================================================================
 
-function TaskCard({ task, isExpanded, onToggle }: { 
-  task: Subtask; 
+function OperativeCard({ operative, isExpanded, onToggle }: { 
+  operative: Operative; 
   isExpanded: boolean;
   onToggle: () => void;
 }) {
-  const config = taskStatusConfig[task.status];
+  const config = operativeStatusConfig[operative.status];
   const StatusIcon = config.icon;
   
   return (
     <div className={cn(
       'border rounded-lg transition-all',
-      task.status === 'in_progress' && 'border-blue-500 bg-blue-500/5 shadow-sm',
-      task.status === 'completed' && 'border-green-500/50',
-      task.status === 'failed' && 'border-red-500/50 bg-red-500/5',
+      operative.status === 'in_progress' && 'border-amber-500 bg-amber-500/5 shadow-sm shadow-amber-500/20',
+      operative.status === 'completed' && 'border-green-500/50',
+      operative.status === 'failed' && 'border-red-500/50 bg-red-500/5',
     )}>
       <button
         onClick={onToggle}
@@ -723,19 +745,24 @@ function TaskCard({ task, isExpanded, onToggle }: {
         <StatusIcon className={cn(
           'h-5 w-5 shrink-0',
           config.color,
-          task.status === 'in_progress' && 'animate-spin'
+          operative.status === 'in_progress' && 'animate-spin'
         )} />
         <div className="flex-1 min-w-0">
-          <div className="font-medium truncate">{task.title}</div>
-          {task.status === 'in_progress' && (
-            <div className="text-xs text-blue-500 animate-pulse mt-0.5">
-              Executing...
+          <div className="font-medium truncate">{operative.title}</div>
+          {operative.status === 'in_progress' && (
+            <div className="text-xs text-amber-500 animate-pulse mt-0.5">
+              Engaging target...
             </div>
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <Badge variant="outline" className="text-xs">
-            {task.priority}
+          <Badge variant="outline" className={cn(
+            "text-xs",
+            operative.priority === 'high' && 'border-red-500/50 text-red-500',
+            operative.priority === 'medium' && 'border-amber-500/50 text-amber-500',
+            operative.priority === 'low' && 'border-green-500/50 text-green-500',
+          )}>
+            {operative.priority}
           </Badge>
           {isExpanded ? (
             <ChevronDown className="h-4 w-4 text-muted-foreground" />
@@ -747,39 +774,42 @@ function TaskCard({ task, isExpanded, onToggle }: {
       
       {isExpanded && (
         <div className="px-3 pb-3 pt-0 border-t space-y-3">
-          <p className="text-sm text-muted-foreground pt-3">{task.description}</p>
+          <p className="text-sm text-muted-foreground pt-3">{operative.description}</p>
           
-          {task.targetFiles && task.targetFiles.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {task.targetFiles.map((file) => (
-                <Badge key={file} variant="secondary" className="text-xs font-mono">
-                  <FileCode className="h-3 w-3 mr-1" />
-                  {file}
-                </Badge>
-              ))}
+          {operative.targetFiles && operative.targetFiles.length > 0 && (
+            <div>
+              <div className="text-xs text-muted-foreground mb-1.5 uppercase tracking-wider">Target Files</div>
+              <div className="flex flex-wrap gap-1.5">
+                {operative.targetFiles.map((file) => (
+                  <Badge key={file} variant="secondary" className="text-xs font-mono">
+                    <Crosshair className="h-3 w-3 mr-1" />
+                    {file}
+                  </Badge>
+                ))}
+              </div>
             </div>
           )}
           
-          {task.result && (
+          {operative.result && (
             <div className="p-2.5 rounded-lg bg-green-500/10 text-sm text-green-600 dark:text-green-400 border border-green-500/20">
-              <CheckCircle2 className="h-4 w-4 inline mr-2" />
-              {task.result}
+              <Medal className="h-4 w-4 inline mr-2" />
+              {operative.result}
             </div>
           )}
           
-          {task.error && (
+          {operative.error && (
             <div className="p-2.5 rounded-lg bg-red-500/10 text-sm text-red-600 dark:text-red-400 border border-red-500/20">
               <XCircle className="h-4 w-4 inline mr-2" />
-              {task.error}
+              {operative.error}
             </div>
           )}
           
           <div className="flex items-center gap-4 text-xs text-muted-foreground pt-1">
-            {task.filesModified && task.filesModified.length > 0 && (
-              <span>{task.filesModified.length} files modified</span>
+            {operative.filesModified && operative.filesModified.length > 0 && (
+              <span>{operative.filesModified.length} targets modified</span>
             )}
-            {task.duration !== undefined && (
-              <span>{(task.duration / 1000).toFixed(1)}s</span>
+            {operative.duration !== undefined && (
+              <span>Duration: {(operative.duration / 1000).toFixed(1)}s</span>
             )}
           </div>
         </div>
@@ -789,59 +819,62 @@ function TaskCard({ task, isExpanded, onToggle }: {
 }
 
 // =============================================================================
-// Component: ExecutionPlanView
+// Component: BattlePlanView
 // =============================================================================
 
-function ExecutionPlanView({ plan, expandedTasks, onToggleTask, phase }: {
-  plan: ExecutionPlan;
-  expandedTasks: Set<string>;
-  onToggleTask: (taskId: string) => void;
-  phase: WorkflowPhase;
+function BattlePlanView({ plan, expandedOperatives, onToggleOperative, phase }: {
+  plan: BattlePlan;
+  expandedOperatives: Set<string>;
+  onToggleOperative: (operativeId: string) => void;
+  phase: MissionPhase;
 }) {
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => 
+  const [expandedSquads, setExpandedSquads] = useState<Set<string>>(() => 
     new Set(plan.parallelGroups.map(g => g.id))
   );
 
-  const toggleGroup = (groupId: string) => {
-    setExpandedGroups(prev => {
+  const toggleSquad = (squadId: string) => {
+    setExpandedSquads(prev => {
       const next = new Set(prev);
-      if (next.has(groupId)) {
-        next.delete(groupId);
+      if (next.has(squadId)) {
+        next.delete(squadId);
       } else {
-        next.add(groupId);
+        next.add(squadId);
       }
       return next;
     });
   };
 
-  const totalTasks = plan.parallelGroups.reduce((sum, g) => sum + g.subtasks.length, 0);
-  const completedTasks = plan.parallelGroups.reduce(
+  const totalOperatives = plan.parallelGroups.reduce((sum, g) => sum + g.subtasks.length, 0);
+  const successfulOperatives = plan.parallelGroups.reduce(
     (sum, g) => sum + g.subtasks.filter(t => t.status === 'completed').length,
     0
   );
-  const failedTasks = plan.parallelGroups.reduce(
+  const casualtyOperatives = plan.parallelGroups.reduce(
     (sum, g) => sum + g.subtasks.filter(t => t.status === 'failed').length,
     0
   );
-  const runningTasks = plan.parallelGroups.reduce(
+  const engagedOperatives = plan.parallelGroups.reduce(
     (sum, g) => sum + g.subtasks.filter(t => t.status === 'in_progress').length,
     0
   );
 
   return (
     <div className="space-y-4">
-      {/* Plan Header */}
-      <div className="rounded-lg border bg-card">
-        <div className="p-4 border-b">
+      {/* Battle Plan Header */}
+      <div className="rounded-lg border bg-card overflow-hidden">
+        <div className="p-4 border-b bg-gradient-to-r from-indigo-500/10 to-purple-500/10">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h3 className="font-semibold">Execution Plan</h3>
+              <h3 className="font-bold text-lg flex items-center gap-2">
+                <Shield className="h-5 w-5 text-indigo-500" />
+                Battle Plan
+              </h3>
               <p className="text-sm text-muted-foreground mt-1">{plan.summary}</p>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <Badge variant="outline" className="gap-1">
-                <ListTodo className="h-3 w-3" />
-                {totalTasks} tasks
+                <Users className="h-3 w-3" />
+                {totalOperatives} operatives
               </Badge>
               <Badge variant="outline" className="gap-1">
                 <Clock className="h-3 w-3" />
@@ -851,35 +884,35 @@ function ExecutionPlanView({ plan, expandedTasks, onToggleTask, phase }: {
           </div>
         </div>
 
-        {/* Progress Bar */}
+        {/* Force Status Bar */}
         <div className="p-4 bg-muted/30">
           <div className="flex items-center justify-between mb-2 text-sm">
-            <span className="text-muted-foreground">Progress</span>
+            <span className="text-muted-foreground uppercase tracking-wider text-xs font-semibold">Force Status</span>
             <div className="flex items-center gap-3">
-              {runningTasks > 0 && (
-                <span className="text-blue-500 flex items-center gap-1">
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  {runningTasks} running
+              {engagedOperatives > 0 && (
+                <span className="text-amber-500 flex items-center gap-1">
+                  <Swords className="h-3 w-3 animate-pulse" />
+                  {engagedOperatives} engaged
                 </span>
               )}
-              <span className="text-green-500">{completedTasks} done</span>
-              {failedTasks > 0 && (
-                <span className="text-red-500">{failedTasks} failed</span>
+              <span className="text-green-500">{successfulOperatives} successful</span>
+              {casualtyOperatives > 0 && (
+                <span className="text-red-500">{casualtyOperatives} casualties</span>
               )}
             </div>
           </div>
           <div className="h-3 bg-muted rounded-full overflow-hidden flex">
             <div 
               className="bg-green-500 transition-all duration-300"
-              style={{ width: `${(completedTasks / totalTasks) * 100}%` }}
+              style={{ width: `${(successfulOperatives / totalOperatives) * 100}%` }}
             />
             <div 
-              className="bg-blue-500 animate-pulse transition-all duration-300"
-              style={{ width: `${(runningTasks / totalTasks) * 100}%` }}
+              className="bg-amber-500 animate-pulse transition-all duration-300"
+              style={{ width: `${(engagedOperatives / totalOperatives) * 100}%` }}
             />
             <div 
               className="bg-red-500 transition-all duration-300"
-              style={{ width: `${(failedTasks / totalTasks) * 100}%` }}
+              style={{ width: `${(casualtyOperatives / totalOperatives) * 100}%` }}
             />
           </div>
         </div>
@@ -889,32 +922,35 @@ function ExecutionPlanView({ plan, expandedTasks, onToggleTask, phase }: {
       {plan.riskAssessment && (
         <div className="p-3 rounded-lg border border-yellow-500/30 bg-yellow-500/10 flex items-start gap-2">
           <AlertTriangle className="h-4 w-4 text-yellow-500 mt-0.5 shrink-0" />
-          <p className="text-sm text-yellow-600 dark:text-yellow-400">{plan.riskAssessment}</p>
+          <div>
+            <div className="text-xs uppercase tracking-wider font-semibold text-yellow-600 dark:text-yellow-400 mb-1">Risk Assessment</div>
+            <p className="text-sm text-yellow-600 dark:text-yellow-400">{plan.riskAssessment}</p>
+          </div>
         </div>
       )}
 
-      {/* Parallel Groups */}
+      {/* Squads */}
       <div className="space-y-3">
         {plan.parallelGroups
           .sort((a, b) => a.executionOrder - b.executionOrder)
-          .map((group) => {
-            const groupCompleted = group.subtasks.filter(t => t.status === 'completed').length;
-            const groupFailed = group.subtasks.filter(t => t.status === 'failed').length;
-            const groupRunning = group.subtasks.filter(t => t.status === 'in_progress').length;
-            const isExpanded = expandedGroups.has(group.id);
-            const allDone = groupCompleted + groupFailed === group.subtasks.length;
+          .map((squad) => {
+            const squadSuccess = squad.subtasks.filter(t => t.status === 'completed').length;
+            const squadCasualties = squad.subtasks.filter(t => t.status === 'failed').length;
+            const squadEngaged = squad.subtasks.filter(t => t.status === 'in_progress').length;
+            const isExpanded = expandedSquads.has(squad.id);
+            const allDone = squadSuccess + squadCasualties === squad.subtasks.length;
             
             return (
               <Collapsible
-                key={group.id}
+                key={squad.id}
                 open={isExpanded}
-                onOpenChange={() => toggleGroup(group.id)}
+                onOpenChange={() => toggleSquad(squad.id)}
               >
                 <div className={cn(
                   'rounded-lg border bg-card overflow-hidden transition-all',
-                  groupRunning > 0 && 'border-blue-500 shadow-sm shadow-blue-500/20',
-                  allDone && groupFailed === 0 && 'border-green-500/50',
-                  allDone && groupFailed > 0 && 'border-red-500/50',
+                  squadEngaged > 0 && 'border-amber-500 shadow-sm shadow-amber-500/20',
+                  allDone && squadCasualties === 0 && 'border-green-500/50',
+                  allDone && squadCasualties > 0 && 'border-red-500/50',
                 )}>
                   <CollapsibleTrigger asChild>
                     <button className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors">
@@ -925,48 +961,48 @@ function ExecutionPlanView({ plan, expandedTasks, onToggleTask, phase }: {
                           <ChevronRight className="h-4 w-4 text-muted-foreground" />
                         )}
                         <div className={cn(
-                          'w-7 h-7 rounded-lg flex items-center justify-center text-sm font-bold',
-                          groupRunning > 0 && 'bg-blue-500 text-white',
-                          allDone && groupFailed === 0 && 'bg-green-500 text-white',
-                          allDone && groupFailed > 0 && 'bg-red-500 text-white',
-                          !groupRunning && !allDone && 'bg-muted text-muted-foreground',
+                          'w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold',
+                          squadEngaged > 0 && 'bg-amber-500 text-white',
+                          allDone && squadCasualties === 0 && 'bg-green-500 text-white',
+                          allDone && squadCasualties > 0 && 'bg-red-500 text-white',
+                          !squadEngaged && !allDone && 'bg-muted text-muted-foreground',
                         )}>
-                          {group.executionOrder}
+                          <Users className="h-4 w-4" />
                         </div>
                         <div className="text-left">
-                          <div className="font-medium">{group.name}</div>
-                          {groupRunning > 0 && (
-                            <div className="text-xs text-blue-500 animate-pulse">
-                              {groupRunning} task{groupRunning > 1 ? 's' : ''} running...
+                          <div className="font-semibold">Squad {squad.executionOrder}: {squad.name}</div>
+                          {squadEngaged > 0 && (
+                            <div className="text-xs text-amber-500 animate-pulse">
+                              {squadEngaged} operative{squadEngaged > 1 ? 's' : ''} engaged...
                             </div>
                           )}
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
                         <div className="text-sm text-muted-foreground">
-                          <span className={groupCompleted > 0 ? 'text-green-500' : ''}>{groupCompleted}</span>
-                          {groupFailed > 0 && (
-                            <span className="text-red-500">/{groupFailed}</span>
+                          <span className={squadSuccess > 0 ? 'text-green-500' : ''}>{squadSuccess}</span>
+                          {squadCasualties > 0 && (
+                            <span className="text-red-500">/{squadCasualties}</span>
                           )}
-                          <span>/{group.subtasks.length}</span>
+                          <span>/{squad.subtasks.length}</span>
                         </div>
-                        {allDone && groupFailed === 0 && (
-                          <CheckCircle2 className="h-5 w-5 text-green-500" />
+                        {allDone && squadCasualties === 0 && (
+                          <Medal className="h-5 w-5 text-green-500" />
                         )}
-                        {groupRunning > 0 && (
-                          <Loader2 className="h-5 w-5 text-blue-500 animate-spin" />
+                        {squadEngaged > 0 && (
+                          <Loader2 className="h-5 w-5 text-amber-500 animate-spin" />
                         )}
                       </div>
                     </button>
                   </CollapsibleTrigger>
                   <CollapsibleContent>
                     <div className="border-t p-3 space-y-2 bg-muted/20">
-                      {group.subtasks.map((subtask) => (
-                        <TaskCard
-                          key={subtask.id}
-                          task={subtask}
-                          isExpanded={expandedTasks.has(subtask.id)}
-                          onToggle={() => onToggleTask(subtask.id)}
+                      {squad.subtasks.map((operative) => (
+                        <OperativeCard
+                          key={operative.id}
+                          operative={operative}
+                          isExpanded={expandedOperatives.has(operative.id)}
+                          onToggle={() => onToggleOperative(operative.id)}
                         />
                       ))}
                     </div>
@@ -981,68 +1017,68 @@ function ExecutionPlanView({ plan, expandedTasks, onToggleTask, phase }: {
 }
 
 // =============================================================================
-// Component: ReviewView
+// Component: DebriefingView
 // =============================================================================
 
-function ReviewView({ review }: { review: ReviewResult }) {
+function DebriefingView({ report }: { report: DebriefingReport }) {
   return (
     <div className="space-y-4">
       {/* Overall Result */}
       <div className={cn(
         'p-6 rounded-xl border-2',
-        review.overallSuccess 
-          ? 'bg-green-500/10 border-green-500/50' 
-          : 'bg-red-500/10 border-red-500/50'
+        report.overallSuccess 
+          ? 'bg-gradient-to-br from-green-500/10 to-emerald-500/10 border-green-500/50' 
+          : 'bg-gradient-to-br from-red-500/10 to-rose-500/10 border-red-500/50'
       )}>
         <div className="flex items-center gap-3 mb-3">
-          {review.overallSuccess ? (
-            <div className="w-12 h-12 rounded-full bg-green-500 flex items-center justify-center">
-              <CheckCircle2 className="h-6 w-6 text-white" />
+          {report.overallSuccess ? (
+            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center shadow-lg shadow-green-500/30">
+              <Medal className="h-7 w-7 text-white" />
             </div>
           ) : (
-            <div className="w-12 h-12 rounded-full bg-red-500 flex items-center justify-center">
-              <XCircle className="h-6 w-6 text-white" />
+            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-red-500 to-rose-500 flex items-center justify-center shadow-lg shadow-red-500/30">
+              <XCircle className="h-7 w-7 text-white" />
             </div>
           )}
           <div>
             <h3 className={cn(
-              'text-lg font-semibold',
-              review.overallSuccess ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+              'text-xl font-bold uppercase tracking-wide',
+              report.overallSuccess ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
             )}>
-              {review.overallSuccess ? 'All tasks completed successfully!' : 'Some tasks failed'}
+              {report.overallSuccess ? 'Mission Accomplished!' : 'Mission Failed'}
             </h3>
-            <p className="text-sm text-muted-foreground">{review.summary}</p>
+            <p className="text-sm text-muted-foreground">{report.summary}</p>
           </div>
         </div>
         
-        <div className="flex gap-6 text-sm">
+        <div className="flex gap-6 text-sm pt-2 border-t border-current/10">
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-green-500" />
-            <span><strong>{review.completedTasks}</strong> completed</span>
+            <Medal className="h-4 w-4 text-green-500" />
+            <span><strong>{report.completedTasks}</strong> successful</span>
           </div>
-          {review.failedTasks > 0 && (
+          {report.failedTasks > 0 && (
             <div className="flex items-center gap-2">
               <XCircle className="h-4 w-4 text-red-500" />
-              <span><strong>{review.failedTasks}</strong> failed</span>
+              <span><strong>{report.failedTasks}</strong> casualties</span>
             </div>
           )}
-          {review.skippedTasks > 0 && (
+          {report.skippedTasks > 0 && (
             <div className="flex items-center gap-2">
               <Clock className="h-4 w-4 text-yellow-500" />
-              <span><strong>{review.skippedTasks}</strong> skipped</span>
+              <span><strong>{report.skippedTasks}</strong> stood down</span>
             </div>
           )}
         </div>
       </div>
 
       {/* Issues */}
-      {review.issues.length > 0 && (
+      {report.issues.length > 0 && (
         <div className="rounded-lg border bg-card">
           <div className="p-3 border-b bg-muted/50">
-            <h4 className="font-medium">Issues ({review.issues.length})</h4>
+            <h4 className="font-semibold uppercase tracking-wider text-sm">After Action Report ({report.issues.length} issues)</h4>
           </div>
           <div className="p-3 space-y-2">
-            {review.issues.map((issue, i) => (
+            {report.issues.map((issue, i) => (
               <div
                 key={i}
                 className={cn(
@@ -1061,7 +1097,7 @@ function ReviewView({ review }: { review: ReviewResult }) {
                 <p className="text-sm">{issue.issue}</p>
                 {issue.suggestion && (
                   <p className="text-xs text-muted-foreground mt-1">
-                    Suggestion: {issue.suggestion}
+                    Tactical suggestion: {issue.suggestion}
                   </p>
                 )}
               </div>
@@ -1071,15 +1107,15 @@ function ReviewView({ review }: { review: ReviewResult }) {
       )}
 
       {/* Replanning */}
-      {review.needsReplanning && review.replanningReason && (
-        <div className="p-4 rounded-lg border border-orange-500/30 bg-orange-500/10">
+      {report.needsReplanning && report.replanningReason && (
+        <div className="p-4 rounded-lg border border-amber-500/30 bg-amber-500/10">
           <div className="flex items-center gap-2 mb-2">
-            <RefreshCw className="h-5 w-5 text-orange-500" />
-            <span className="font-medium text-orange-600 dark:text-orange-400">
-              Re-planning recommended
+            <RefreshCw className="h-5 w-5 text-amber-500" />
+            <span className="font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wide">
+              Strategic Reassessment Required
             </span>
           </div>
-          <p className="text-sm text-muted-foreground">{review.replanningReason}</p>
+          <p className="text-sm text-muted-foreground">{report.replanningReason}</p>
         </div>
       )}
     </div>
@@ -1087,10 +1123,10 @@ function ReviewView({ review }: { review: ReviewResult }) {
 }
 
 // =============================================================================
-// Component: ResultsSummary
+// Component: MissionResults
 // =============================================================================
 
-function ResultsSummary({ 
+function MissionResults({ 
   branchCreated, 
   filesModified 
 }: { 
@@ -1101,12 +1137,15 @@ function ResultsSummary({
 
   return (
     <div className="rounded-lg border bg-card p-4">
-      <h3 className="font-semibold mb-3">Results</h3>
+      <h3 className="font-semibold mb-3 flex items-center gap-2">
+        <MapPin className="h-4 w-4" />
+        Mission Results
+      </h3>
       <div className="space-y-2">
         {branchCreated && (
           <div className="flex items-center gap-2 text-sm">
             <GitBranch className="h-4 w-4 text-muted-foreground" />
-            <span>Branch created:</span>
+            <span>Forward Operating Base:</span>
             <code className="px-2 py-0.5 rounded bg-muted font-mono text-xs">
               {branchCreated}
             </code>
@@ -1115,8 +1154,8 @@ function ResultsSummary({
         {filesModified.length > 0 && (
           <div className="text-sm">
             <div className="flex items-center gap-2 mb-2">
-              <FileCode className="h-4 w-4 text-muted-foreground" />
-              <span>{filesModified.length} files modified</span>
+              <Crosshair className="h-4 w-4 text-muted-foreground" />
+              <span>{filesModified.length} targets modified</span>
             </div>
             <div className="flex flex-wrap gap-1.5 pl-6">
               {filesModified.slice(0, 10).map((file) => (
@@ -1147,7 +1186,7 @@ export function PlanningPage() {
   const { data: session } = useSession();
   
   // Form state
-  const [task, setTask] = useState('');
+  const [missionObjective, setMissionObjective] = useState('');
   const [context, setContext] = useState('');
   const [dryRun, setDryRun] = useState(false);
   const [createBranch, setCreateBranch] = useState(true);
@@ -1157,20 +1196,20 @@ export function PlanningPage() {
   // Current run ID (either from URL or newly started)
   const [currentRunId, setCurrentRunId] = useState<string | null>(urlRunId || null);
   
-  // Workflow state
+  // Mission state
   const [isRunning, setIsRunning] = useState(false);
-  const [phase, setPhase] = useState<WorkflowPhase>('idle');
+  const [phase, setPhase] = useState<MissionPhase>('idle');
   const [progress, setProgress] = useState(0);
-  const [plan, setPlan] = useState<ExecutionPlan | null>(null);
-  const [review, setReview] = useState<ReviewResult | null>(null);
-  const [projectInfo, setProjectInfo] = useState<ProjectInfo | null>(null);
+  const [battlePlan, setBattlePlan] = useState<BattlePlan | null>(null);
+  const [debriefing, setDebriefing] = useState<DebriefingReport | null>(null);
+  const [intelReport, setIntelReport] = useState<IntelReport | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
-  const [activityLog, setActivityLog] = useState<ActivityLogEntry[]>([]);
+  const [expandedOperatives, setExpandedOperatives] = useState<Set<string>>(new Set());
+  const [commandLog, setCommandLog] = useState<CommandLogEntry[]>([]);
   const hasReceivedStartedRef = useRef(false);
   const [currentAction, setCurrentAction] = useState<string | undefined>();
   const [startTime, setStartTime] = useState<Date | undefined>();
-  const [submittedTask, setSubmittedTask] = useState('');
+  const [submittedObjective, setSubmittedObjective] = useState('');
   
   // Results state
   const [branchCreated, setBranchCreated] = useState<string | null>(null);
@@ -1189,9 +1228,9 @@ export function PlanningPage() {
     { enabled: !!repoData?.repo.id }
   ) as { data: { available: boolean; model: string; provider: string } | undefined };
 
-  // Fetch run history
+  // Fetch mission history
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: runHistory, refetch: refetchHistory } = (trpc as any).planning?.listRuns?.useQuery(
+  const { data: missionHistory, refetch: refetchHistory } = (trpc as any).planning?.listRuns?.useQuery(
     { repoId: repoData?.repo.id!, limit: 20 },
     { enabled: !!repoData?.repo.id }
   ) as { 
@@ -1218,9 +1257,9 @@ export function PlanningPage() {
       task: string;
       context?: string;
       status: string;
-      plan?: ExecutionPlan;
+      plan?: BattlePlan;
       groupResults?: Array<{ groupId: string; subtaskResults: Array<{ subtaskId: string; status: string; result?: string; error?: string }> }>;
-      review?: ReviewResult;
+      review?: DebriefingReport;
       error?: string;
       startedAt: string;
       completedAt?: string;
@@ -1232,13 +1271,13 @@ export function PlanningPage() {
     isLoading: boolean;
   };
 
-  // Activity log helper
+  // Command log helper
   const addLog = useCallback((
-    type: ActivityLogEntry['type'],
+    type: CommandLogEntry['type'],
     message: string,
     details?: string
   ) => {
-    setActivityLog(prev => [...prev, {
+    setCommandLog(prev => [...prev, {
       id: crypto.randomUUID(),
       timestamp: new Date(),
       type,
@@ -1247,16 +1286,16 @@ export function PlanningPage() {
     }]);
   }, []);
 
-  // Update subtask status
-  const updateSubtask = useCallback((subtaskId: string, updates: Partial<Subtask>) => {
-    setPlan(prev => {
+  // Update operative status
+  const updateOperative = useCallback((operativeId: string, updates: Partial<Operative>) => {
+    setBattlePlan(prev => {
       if (!prev) return null;
       return {
         ...prev,
-        parallelGroups: prev.parallelGroups.map(group => ({
-          ...group,
-          subtasks: group.subtasks.map(task =>
-            task.id === subtaskId ? { ...task, ...updates } : task
+        parallelGroups: prev.parallelGroups.map(squad => ({
+          ...squad,
+          subtasks: squad.subtasks.map(operative =>
+            operative.id === operativeId ? { ...operative, ...updates } : operative
           ),
         })),
       };
@@ -1266,32 +1305,30 @@ export function PlanningPage() {
   // Abort controller for cancellation
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Handle SSE events - defined before useEffect so it can be referenced
+  // Handle SSE events
   const handleStreamEvent = useCallback((event: { runId?: string; stepId?: string; result?: any; error?: string; totalDuration?: number }) => {
-    // Detect event type from the data structure
     const { stepId, result, error: eventError, totalDuration } = event;
     
-    // Started event - only process once per workflow run
+    // Started event - only process once per mission
     if (event.runId && !stepId && !totalDuration && !eventError) {
       if (hasReceivedStartedRef.current) {
-        return; // Skip duplicate started events
+        return;
       }
       hasReceivedStartedRef.current = true;
-      // Capture runId for URL navigation
       setCurrentRunId(event.runId);
-      addLog('phase', 'Workflow started');
-      setCurrentAction('Initializing...');
-      setPhase('analyzing');
+      addLog('phase', 'Mission initiated');
+      setCurrentAction('Deploying reconnaissance...');
+      setPhase('reconnaissance');
       setProgress(5);
       return;
     }
     
     // Complete event
     if (totalDuration !== undefined) {
-      setPhase('completed');
+      setPhase('mission_complete');
       setProgress(100);
       setCurrentAction(undefined);
-      addLog('success', 'Workflow completed successfully');
+      addLog('success', 'Mission accomplished - all objectives achieved');
       setIsRunning(false);
       return;
     }
@@ -1299,16 +1336,15 @@ export function PlanningPage() {
     // Error event
     if (eventError && !stepId) {
       setError(eventError);
-      setPhase('failed');
+      setPhase('mission_failed');
       setCurrentAction(undefined);
-      addLog('error', eventError);
+      addLog('error', `Mission compromised: ${eventError}`);
       setIsRunning(false);
       return;
     }
     
     // Step events
     if (stepId) {
-      // Check if it's a step-start (no result) or step-complete (has result)
       if (result === undefined && !eventError) {
         // step-start
         const newPhase = stepToPhase[stepId];
@@ -1316,11 +1352,11 @@ export function PlanningPage() {
           setPhase(newPhase);
           setProgress(stepToProgress[stepId] || 0);
           setCurrentAction(phaseConfig[newPhase]?.description);
-          addLog('phase', `${phaseConfig[newPhase]?.label}...`);
+          addLog('phase', phaseConfig[newPhase]?.label);
         }
       } else if (eventError) {
         // step-error
-        addLog('error', `Step failed: ${stepId}`, eventError);
+        addLog('error', `Operation failed: ${stepId}`, eventError);
         setCurrentAction(undefined);
       } else {
         // step-complete
@@ -1328,38 +1364,38 @@ export function PlanningPage() {
         
         if (stepId === 'analyze-task' && result) {
           if (result.projectInfo) {
-            setProjectInfo(result.projectInfo);
-            addLog('success', `Detected ${result.projectInfo.language} ${result.projectInfo.type} project`);
+            setIntelReport(result.projectInfo);
+            addLog('success', `Intel gathered: ${result.projectInfo.language} ${result.projectInfo.type} detected`);
           }
           if (result.relevantFiles?.length) {
-            addLog('info', `Found ${result.relevantFiles.length} relevant files`);
+            addLog('info', `${result.relevantFiles.length} strategic targets identified`);
           }
         }
         
         if (stepId === 'create-plan' && result?.plan) {
-          setPlan(result.plan);
-          const taskCount = result.plan.parallelGroups?.reduce(
-            (sum: number, g: ParallelGroup) => sum + g.subtasks.length, 0
+          setBattlePlan(result.plan);
+          const operativeCount = result.plan.parallelGroups?.reduce(
+            (sum: number, g: Squad) => sum + g.subtasks.length, 0
           ) || 0;
-          addLog('success', `Created plan with ${taskCount} subtasks in ${result.plan.parallelGroups?.length || 0} groups`);
+          addLog('success', `Battle plan formulated: ${operativeCount} operatives in ${result.plan.parallelGroups?.length || 0} squads`);
         }
         
         if (stepId === 'execute-plan' && result) {
           if (result.groupResults) {
-            for (const group of result.groupResults) {
-              for (const taskResult of group.subtaskResults) {
-                updateSubtask(taskResult.subtaskId, {
-                  status: taskResult.status,
-                  result: taskResult.result,
-                  error: taskResult.error,
-                  duration: taskResult.duration,
-                  filesModified: taskResult.filesModified,
+            for (const squad of result.groupResults) {
+              for (const opResult of squad.subtaskResults) {
+                updateOperative(opResult.subtaskId, {
+                  status: opResult.status,
+                  result: opResult.result,
+                  error: opResult.error,
+                  duration: opResult.duration,
+                  filesModified: opResult.filesModified,
                 });
                 
-                if (taskResult.status === 'completed') {
-                  addLog('success', `Completed: ${taskResult.subtaskId}`);
-                } else if (taskResult.status === 'failed') {
-                  addLog('error', `Failed: ${taskResult.subtaskId}`, taskResult.error);
+                if (opResult.status === 'completed') {
+                  addLog('success', `Operative ${opResult.subtaskId}: Target secured`);
+                } else if (opResult.status === 'failed') {
+                  addLog('error', `Operative ${opResult.subtaskId}: Casualty`, opResult.error);
                 }
               }
             }
@@ -1369,7 +1405,7 @@ export function PlanningPage() {
         }
         
         if (stepId === 'review-results' && result?.review) {
-          setReview(result.review);
+          setDebriefing(result.review);
           addLog(
             result.review.overallSuccess ? 'success' : 'warning',
             result.review.summary
@@ -1377,11 +1413,11 @@ export function PlanningPage() {
         }
       }
     }
-  }, [addLog, updateSubtask]);
+  }, [addLog, updateOperative]);
 
-  // Start streaming when workflow begins
+  // Start streaming when mission begins
   useEffect(() => {
-    if (!isRunning || !repoData?.repo.id || !submittedTask) {
+    if (!isRunning || !repoData?.repo.id || !submittedObjective) {
       return;
     }
 
@@ -1399,7 +1435,7 @@ export function PlanningPage() {
           credentials: 'include',
           body: JSON.stringify({
             repoId: repoData.repo.id,
-            task: submittedTask.trim(),
+            task: submittedObjective.trim(),
             context: context.trim() || undefined,
             dryRun,
             createBranch,
@@ -1433,7 +1469,6 @@ export function PlanningPage() {
 
           for (const line of lines) {
             if (line.startsWith('event: ')) {
-              // Event type line - we'll detect type from the data
               continue;
             }
             if (line.startsWith('data: ')) {
@@ -1449,14 +1484,13 @@ export function PlanningPage() {
         }
       } catch (err) {
         if ((err as Error).name === 'AbortError') {
-          // Cancelled by user
           return;
         }
         setError((err as Error).message);
-        setPhase('failed');
+        setPhase('mission_failed');
         setCurrentAction(undefined);
         setIsRunning(false);
-        addLog('error', `Connection error: ${(err as Error).message}`);
+        addLog('error', `Communications lost: ${(err as Error).message}`);
       }
     };
 
@@ -1466,45 +1500,41 @@ export function PlanningPage() {
       abortController.abort();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isRunning, repoData?.repo.id, submittedTask, handleStreamEvent]);
+  }, [isRunning, repoData?.repo.id, submittedObjective, handleStreamEvent]);
 
   // Load existing run data when navigating to a run URL
   useEffect(() => {
     if (!existingRun) return;
     
-    // Set state from existing run
-    setSubmittedTask(existingRun.task);
+    setSubmittedObjective(existingRun.task);
     setCurrentRunId(existingRun.id);
     setStartTime(new Date(existingRun.startedAt));
     
     if (existingRun.plan) {
-      setPlan(existingRun.plan);
+      setBattlePlan(existingRun.plan);
     }
     if (existingRun.review) {
-      setReview(existingRun.review);
+      setDebriefing(existingRun.review);
     }
     if (existingRun.error) {
       setError(existingRun.error);
     }
     
-    // Set phase based on status
-    const statusToPhase: Record<string, WorkflowPhase> = {
-      pending: 'analyzing',
-      planning: 'planning',
-      executing: 'executing',
-      reviewing: 'reviewing',
-      completed: 'completed',
-      failed: 'failed',
+    const statusToPhase: Record<string, MissionPhase> = {
+      pending: 'reconnaissance',
+      planning: 'strategic_planning',
+      executing: 'deploying',
+      reviewing: 'debriefing',
+      completed: 'mission_complete',
+      failed: 'mission_failed',
     };
     setPhase(statusToPhase[existingRun.status] || 'idle');
     
-    // If still running, set up observation via SSE
     if (['pending', 'planning', 'executing', 'reviewing'].includes(existingRun.status)) {
       setIsRunning(true);
-      setCurrentAction('Reconnecting...');
-      hasReceivedStartedRef.current = true; // Already started
+      setCurrentAction('Reconnecting to command...');
+      hasReceivedStartedRef.current = true;
       
-      // Connect to observe stream
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
       const abortController = new AbortController();
       abortControllerRef.current = abortController;
@@ -1517,7 +1547,7 @@ export function PlanningPage() {
           });
           
           if (!response.ok) {
-            throw new Error(`Failed to observe run: ${response.status}`);
+            throw new Error(`Failed to observe mission: ${response.status}`);
           }
           
           const reader = response.body?.getReader();
@@ -1547,7 +1577,7 @@ export function PlanningPage() {
           }
         } catch (err) {
           if ((err as Error).name !== 'AbortError') {
-            console.error('Observe stream error:', err);
+            console.error('Observation error:', err);
           }
         }
       };
@@ -1559,12 +1589,11 @@ export function PlanningPage() {
       };
     } else {
       setIsRunning(false);
-      // Set progress based on completion
       setProgress(existingRun.status === 'completed' ? 100 : 0);
     }
   }, [existingRun, handleStreamEvent]);
 
-  // Update URL when currentRunId changes (but not on initial load from URL)
+  // Update URL when currentRunId changes
   useEffect(() => {
     if (currentRunId && currentRunId !== urlRunId) {
       navigate(`/${owner}/${repo}/planning/${currentRunId}`, { replace: true });
@@ -1572,92 +1601,88 @@ export function PlanningPage() {
     }
   }, [currentRunId, urlRunId, owner, repo, navigate, refetchHistory]);
 
-  const handleStart = () => {
-    if (!task.trim() || !repoData?.repo.id) return;
+  const handleLaunchMission = () => {
+    if (!missionObjective.trim() || !repoData?.repo.id) return;
     
-    // Save the task and reset state
-    setSubmittedTask(task.trim());
+    setSubmittedObjective(missionObjective.trim());
     setIsRunning(true);
-    setPhase('analyzing');
+    setPhase('reconnaissance');
     setProgress(0);
-    setPlan(null);
-    setReview(null);
-    setProjectInfo(null);
+    setBattlePlan(null);
+    setDebriefing(null);
+    setIntelReport(null);
     setError(null);
-    setActivityLog([]);
+    setCommandLog([]);
     setBranchCreated(null);
     setFilesModified([]);
-    setExpandedTasks(new Set());
-    setCurrentAction('Starting workflow...');
+    setExpandedOperatives(new Set());
+    setCurrentAction('Initiating mission...');
     setStartTime(new Date());
-    hasReceivedStartedRef.current = false; // Reset for new workflow run
+    hasReceivedStartedRef.current = false;
     
-    addLog('phase', 'Initializing workflow...');
+    addLog('phase', 'Mission parameters received - deploying forces...');
   };
 
-  const handleCancel = () => {
-    // Abort the stream
+  const handleAbortMission = () => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
     }
     setIsRunning(false);
-    setPhase('failed');
+    setPhase('mission_failed');
     setCurrentAction(undefined);
-    addLog('warning', 'Workflow cancelled by user');
+    addLog('warning', 'Mission aborted by command');
   };
 
-  const handleRetry = () => {
-    if (!submittedTask.trim() || !repoData?.repo.id) return;
+  const handleRetryMission = () => {
+    if (!submittedObjective.trim() || !repoData?.repo.id) return;
     
-    // Reset workflow state but keep the task
     setIsRunning(true);
-    setPhase('analyzing');
+    setPhase('reconnaissance');
     setProgress(0);
-    setPlan(null);
-    setReview(null);
-    setProjectInfo(null);
+    setBattlePlan(null);
+    setDebriefing(null);
+    setIntelReport(null);
     setError(null);
-    setActivityLog([]);
+    setCommandLog([]);
     setBranchCreated(null);
     setFilesModified([]);
-    setExpandedTasks(new Set());
-    setCurrentAction('Retrying workflow...');
+    setExpandedOperatives(new Set());
+    setCurrentAction('Retrying mission...');
     setStartTime(new Date());
-    hasReceivedStartedRef.current = false; // Reset for retry
+    hasReceivedStartedRef.current = false;
     
-    addLog('phase', 'Retrying workflow...');
+    addLog('phase', 'Mission retry authorized...');
   };
 
-  const handleNewTask = () => {
-    setTask('');
-    setSubmittedTask('');
+  const handleNewMission = () => {
+    setMissionObjective('');
+    setSubmittedObjective('');
     setCurrentRunId(null);
     setIsRunning(false);
     setPhase('idle');
     setProgress(0);
-    setPlan(null);
-    setReview(null);
-    setProjectInfo(null);
+    setBattlePlan(null);
+    setDebriefing(null);
+    setIntelReport(null);
     setError(null);
-    setActivityLog([]);
+    setCommandLog([]);
     setBranchCreated(null);
     setFilesModified([]);
-    setExpandedTasks(new Set());
+    setExpandedOperatives(new Set());
     setCurrentAction(undefined);
     setStartTime(undefined);
-    hasReceivedStartedRef.current = false; // Reset for new task
-    // Navigate to base planning URL
+    hasReceivedStartedRef.current = false;
     navigate(`/${owner}/${repo}/planning`);
   };
 
-  const toggleTask = (taskId: string) => {
-    setExpandedTasks(prev => {
+  const toggleOperative = (operativeId: string) => {
+    setExpandedOperatives(prev => {
       const next = new Set(prev);
-      if (next.has(taskId)) {
-        next.delete(taskId);
+      if (next.has(operativeId)) {
+        next.delete(operativeId);
       } else {
-        next.add(taskId);
+        next.add(operativeId);
       }
       return next;
     });
@@ -1682,26 +1707,26 @@ export function PlanningPage() {
   }
 
   const isIdle = phase === 'idle';
-  const isComplete = phase === 'completed' || phase === 'failed';
-  const showWorkflow = isRunning || isComplete;
+  const isComplete = phase === 'mission_complete' || phase === 'mission_failed';
+  const showMission = isRunning || isComplete;
 
   return (
     <RepoLayout owner={owner!} repo={repo!} activeTab="planning">
       <div className="flex gap-6">
-        {/* Left Sidebar - Run History */}
+        {/* Left Sidebar - Mission Archives */}
         <div className="w-64 shrink-0 hidden lg:block">
           <div className="sticky top-4 space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-medium flex items-center gap-2">
+              <h3 className="text-sm font-semibold uppercase tracking-wider flex items-center gap-2">
                 <History className="h-4 w-4" />
-                Run History
+                Mission Archives
               </h3>
               {!isIdle && (
                 <Button 
                   variant="ghost" 
                   size="sm" 
                   className="h-7 px-2"
-                  onClick={handleNewTask}
+                  onClick={handleNewMission}
                 >
                   <Plus className="h-3.5 w-3.5" />
                 </Button>
@@ -1710,31 +1735,35 @@ export function PlanningPage() {
             
             <ScrollArea className="h-[calc(100vh-200px)]">
               <div className="space-y-1 pr-4">
-                {runHistory?.map((run) => (
+                {missionHistory?.map((mission) => (
                   <Link
-                    key={run.id}
-                    to={`/${owner}/${repo}/planning/${run.id}`}
+                    key={mission.id}
+                    to={`/${owner}/${repo}/planning/${mission.id}`}
                     className={cn(
                       'block p-3 rounded-lg border transition-colors hover:bg-accent',
-                      currentRunId === run.id && 'bg-accent border-primary'
+                      currentRunId === mission.id && 'bg-accent border-primary'
                     )}
                   >
                     <p className="text-sm font-medium line-clamp-2 mb-1">
-                      {run.task.length > 60 ? run.task.slice(0, 60) + '...' : run.task}
+                      {mission.task.length > 60 ? mission.task.slice(0, 60) + '...' : mission.task}
                     </p>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <Badge 
                         variant={
-                          run.status === 'completed' ? 'default' : 
-                          run.status === 'failed' ? 'destructive' : 
+                          mission.status === 'completed' ? 'default' : 
+                          mission.status === 'failed' ? 'destructive' : 
                           'secondary'
                         }
-                        className="text-[10px] px-1.5 py-0"
+                        className={cn(
+                          "text-[10px] px-1.5 py-0",
+                          mission.status === 'completed' && 'bg-green-500'
+                        )}
                       >
-                        {run.status}
+                        {mission.status === 'completed' ? 'Victory' : 
+                         mission.status === 'failed' ? 'Failed' : mission.status}
                       </Badge>
                       <span>
-                        {new Date(run.startedAt).toLocaleDateString(undefined, {
+                        {new Date(mission.startedAt).toLocaleDateString(undefined, {
                           month: 'short',
                           day: 'numeric',
                           hour: '2-digit',
@@ -1745,9 +1774,9 @@ export function PlanningPage() {
                   </Link>
                 ))}
                 
-                {(!runHistory || runHistory.length === 0) && (
+                {(!missionHistory || missionHistory.length === 0) && (
                   <p className="text-sm text-muted-foreground text-center py-8">
-                    No runs yet
+                    No missions logged
                   </p>
                 )}
               </div>
@@ -1762,23 +1791,23 @@ export function PlanningPage() {
             <div className="flex items-center gap-3">
               <div className={cn(
                 'p-2.5 rounded-xl transition-colors',
-                isRunning ? 'bg-blue-500/10' : 'bg-primary/10'
+                isRunning ? 'bg-amber-500/10' : 'bg-primary/10'
               )}>
-                <Brain className={cn(
+                <Target className={cn(
                   'h-6 w-6',
-                  isRunning ? 'text-blue-500 animate-pulse' : 'text-primary'
+                  isRunning ? 'text-amber-500 animate-pulse' : 'text-primary'
                 )} />
               </div>
               <div>
-                <h1 className="text-2xl font-bold">AI Planning</h1>
+                <h1 className="text-2xl font-bold uppercase tracking-wide">Command Center</h1>
                 <p className="text-sm text-muted-foreground">
-                  Break down complex tasks into parallel subtasks
+                  Deploy AI operatives to accomplish complex objectives
                 </p>
               </div>
             </div>
             {planningStatus?.available && (
               <Badge variant="outline" className="gap-1.5 py-1">
-                <Sparkles className="h-3.5 w-3.5" />
+                <Shield className="h-3.5 w-3.5" />
                 {planningStatus.provider}
               </Badge>
             )}
@@ -1790,10 +1819,10 @@ export function PlanningPage() {
               <AlertCircle className="h-5 w-5 text-yellow-500 shrink-0" />
               <div>
                 <p className="font-medium text-yellow-600 dark:text-yellow-400">
-                  AI not configured
+                  Command systems offline
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Add an API key in repository settings to use AI planning.
+                  Configure AI credentials in repository settings to activate command center.
                 </p>
               </div>
             </div>
@@ -1805,41 +1834,44 @@ export function PlanningPage() {
               <AlertCircle className="h-5 w-5 text-destructive shrink-0" />
               <div className="flex-1">
                 <p className="font-medium text-destructive">
-                  Run not found
+                  Mission record not found
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  This planning run may have expired or been deleted. Start a new task to continue.
+                  This mission log may have been archived or deleted. Launch a new mission to continue.
                 </p>
               </div>
-              <Button variant="outline" size="sm" onClick={handleNewTask}>
-                <Plus className="h-4 w-4 mr-1" />
-                New Task
+              <Button variant="outline" size="sm" onClick={handleNewMission}>
+                <Flag className="h-4 w-4 mr-1" />
+                New Mission
               </Button>
             </div>
           )}
 
-          {/* Workflow Header - Shows task & progress when running */}
-          {showWorkflow && submittedTask && (
-            <WorkflowHeader
-              task={submittedTask}
+          {/* Mission Briefing - Shows objective & progress when active */}
+          {showMission && submittedObjective && (
+            <MissionBriefing
+              objective={submittedObjective}
               phase={phase}
               progress={progress}
-              onCancel={isRunning ? handleCancel : undefined}
-              onRetry={isComplete ? handleRetry : undefined}
-              onNewTask={isComplete ? handleNewTask : undefined}
+              onAbort={isRunning ? handleAbortMission : undefined}
+              onRetry={isComplete ? handleRetryMission : undefined}
+              onNewMission={isComplete ? handleNewMission : undefined}
               startTime={startTime}
             />
           )}
 
-          {/* Task Input - Only shown when idle */}
+          {/* Mission Input - Only shown when idle */}
           {isIdle && (
-            <div className="space-y-4 p-6 rounded-xl border-2 border-dashed bg-card">
+            <div className="space-y-4 p-6 rounded-xl border-2 border-dashed bg-gradient-to-br from-card to-muted/20">
               <div className="space-y-2">
-                <label className="text-sm font-medium">What do you want to build?</label>
+                <label className="text-sm font-semibold uppercase tracking-wider flex items-center gap-2">
+                  <Target className="h-4 w-4" />
+                  Mission Objective
+                </label>
                 <MentionTextarea
-                  placeholder="Describe the task you want to accomplish... Use @ to reference files (e.g., 'Add user authentication with JWT tokens')"
-                  value={task}
-                  onChange={setTask}
+                  placeholder="Define your objective... Use @ to designate strategic targets (e.g., 'Implement secure authentication with JWT tokens')"
+                  value={missionObjective}
+                  onChange={setMissionObjective}
                   owner={owner!}
                   repo={repo!}
                   autoFocus
@@ -1847,9 +1879,9 @@ export function PlanningPage() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium text-muted-foreground">Additional context (optional)</label>
+                <label className="text-sm font-medium text-muted-foreground">Strategic context (optional)</label>
                 <MentionTextarea
-                  placeholder="Any additional requirements, constraints, or context... Use @ to reference specific files"
+                  placeholder="Additional intelligence, constraints, or tactical considerations... Use @ to reference specific targets"
                   value={context}
                   onChange={setContext}
                   owner={owner!}
@@ -1867,7 +1899,7 @@ export function PlanningPage() {
                     onCheckedChange={(checked) => setDryRun(checked as boolean)}
                   />
                   <label htmlFor="dryRun" className="text-sm cursor-pointer">
-                    Preview only (dry run)
+                    Simulation mode (dry run)
                   </label>
                 </div>
                 <div className="flex items-center gap-2">
@@ -1877,7 +1909,7 @@ export function PlanningPage() {
                     onCheckedChange={(checked) => setCreateBranch(checked as boolean)}
                   />
                   <label htmlFor="createBranch" className="text-sm cursor-pointer">
-                    Create feature branch
+                    Establish forward operating base (branch)
                   </label>
                 </div>
               </div>
@@ -1887,14 +1919,14 @@ export function PlanningPage() {
                 <CollapsibleTrigger asChild>
                   <Button variant="ghost" size="sm" className="gap-1.5 -ml-2 text-muted-foreground">
                     {showAdvanced ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                    Advanced options
+                    Advanced parameters
                   </Button>
                 </CollapsibleTrigger>
                 <CollapsibleContent className="pt-4">
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Custom branch name</label>
+                    <label className="text-sm font-medium">Custom base designation</label>
                     <Input
-                      placeholder="ai-planning/my-feature"
+                      placeholder="ops/mission-codename"
                       value={branchName}
                       onChange={(e) => setBranchName(e.target.value)}
                       disabled={!createBranch}
@@ -1903,16 +1935,16 @@ export function PlanningPage() {
                 </CollapsibleContent>
               </Collapsible>
 
-              {/* Start Button */}
+              {/* Launch Button */}
               <div className="pt-4">
                 <Button
-                  onClick={handleStart}
-                  disabled={!task.trim() || !planningStatus?.available}
+                  onClick={handleLaunchMission}
+                  disabled={!missionObjective.trim() || !planningStatus?.available}
                   size="lg"
-                  className="gap-2"
+                  className="gap-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg shadow-amber-500/25"
                 >
-                  <Play className="h-4 w-4" />
-                  Start Planning
+                  <Swords className="h-4 w-4" />
+                  Launch Mission
                 </Button>
               </div>
             </div>
@@ -1923,61 +1955,64 @@ export function PlanningPage() {
             <div className="flex items-start gap-3 p-4 rounded-xl bg-red-500/10 border border-red-500/30">
               <XCircle className="h-5 w-5 text-red-500 mt-0.5 shrink-0" />
               <div>
-                <p className="font-medium text-red-600 dark:text-red-400">
-                  {phase === 'failed' ? 'Workflow failed' : 'Error'}
+                <p className="font-semibold text-red-600 dark:text-red-400 uppercase tracking-wide">
+                  {phase === 'mission_failed' ? 'Mission Compromised' : 'Critical Error'}
                 </p>
                 <p className="text-sm text-muted-foreground mt-1">{error}</p>
               </div>
             </div>
           )}
 
-          {/* Main Content - Two columns when running */}
-          {showWorkflow && (
+          {/* Main Content - Two columns when mission is active */}
+          {showMission && (
             <div className="grid lg:grid-cols-5 gap-6">
-              {/* Left: Activity Feed */}
+              {/* Left: Command Log */}
               <div className="lg:col-span-2 space-y-4">
-                <LiveActivityFeed 
-                  entries={activityLog} 
+                <CommandLog 
+                  entries={commandLog} 
                   currentAction={isRunning ? currentAction : undefined}
                 />
                 
-                {/* Project Info */}
-                {projectInfo && (
+                {/* Intel Report */}
+                {intelReport && (
                   <div className="rounded-lg border bg-card p-4">
-                    <h3 className="text-sm font-medium mb-2">Project Detected</h3>
+                    <h3 className="text-sm font-semibold mb-2 flex items-center gap-2 uppercase tracking-wider">
+                      <Search className="h-4 w-4" />
+                      Intel Report
+                    </h3>
                     <div className="flex flex-wrap gap-2">
-                      <Badge variant="secondary">{projectInfo.language}</Badge>
-                      <Badge variant="secondary">{projectInfo.type}</Badge>
-                      {projectInfo.hasTests && <Badge variant="outline">Has Tests</Badge>}
-                      {projectInfo.hasLinting && <Badge variant="outline">Has Linting</Badge>}
+                      <Badge variant="secondary">{intelReport.language}</Badge>
+                      <Badge variant="secondary">{intelReport.type}</Badge>
+                      {intelReport.hasTests && <Badge variant="outline">Tests Detected</Badge>}
+                      {intelReport.hasLinting && <Badge variant="outline">Linting Active</Badge>}
                     </div>
                   </div>
                 )}
 
-                {/* Results Summary */}
+                {/* Mission Results */}
                 {isComplete && (
-                  <ResultsSummary 
+                  <MissionResults 
                     branchCreated={branchCreated} 
                     filesModified={filesModified} 
                   />
                 )}
               </div>
 
-              {/* Right: Plan/Review */}
+              {/* Right: Battle Plan / Debriefing */}
               <div className="lg:col-span-3">
-                {review ? (
-                  <ReviewView review={review} />
-                ) : plan ? (
-                  <ExecutionPlanView
-                    plan={plan}
-                    expandedTasks={expandedTasks}
-                    onToggleTask={toggleTask}
+                {debriefing ? (
+                  <DebriefingView report={debriefing} />
+                ) : battlePlan ? (
+                  <BattlePlanView
+                    plan={battlePlan}
+                    expandedOperatives={expandedOperatives}
+                    onToggleOperative={toggleOperative}
                     phase={phase}
                   />
                 ) : (
                   <div className="rounded-lg border bg-card p-12 text-center">
-                    <Brain className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50 animate-pulse" />
-                    <p className="text-muted-foreground">Creating execution plan...</p>
+                    <Compass className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50 animate-pulse" />
+                    <p className="text-muted-foreground">Formulating battle plan...</p>
                   </div>
                 )}
               </div>
@@ -1988,7 +2023,7 @@ export function PlanningPage() {
           {isIdle && !error && (
             <div className="text-center py-8 text-muted-foreground">
               <p className="text-sm">
-                The AI will analyze your codebase, create an execution plan, and run tasks in parallel.
+                The AI command system will analyze the battlefield, formulate a battle plan, and deploy operatives in coordinated squads.
               </p>
             </div>
           )}
