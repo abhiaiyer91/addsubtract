@@ -489,14 +489,30 @@ async function executeCommand(
             useCount: 0,
             stop: () => instance.stop(),
             runCommand: async (cmd: string, cmdArgs?: string[], _opts?: { signal?: AbortSignal }) => {
-              // Use positional arguments to get CommandFinished (not Command | CommandFinished)
+              // Vercel SDK expects executable and args separately
+              // Wrap in shell to support full command strings from terminal UI
+              const fullCmd = cmdArgs && cmdArgs.length > 0 ? `${cmd} ${cmdArgs.join(' ')}` : cmd;
+              
+              console.log('[Vercel Sandbox Pool] Executing command:', {
+                originalCmd: cmd,
+                originalArgs: cmdArgs,
+                fullCmd,
+              });
+              
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const result = await instance.runCommand(cmd, cmdArgs || []) as any;
+              const result = await instance.runCommand('/bin/sh', ['-c', fullCmd]) as any;
               // output() method gets stdout/stderr as strings
               const [stdoutStr, stderrStr] = await Promise.all([
                 result.output('stdout'),
                 result.output('stderr'),
               ]);
+              
+              console.log('[Vercel Sandbox Pool] Command result:', {
+                exitCode: result.exitCode,
+                stdoutLength: stdoutStr?.length ?? 0,
+                stderrLength: stderrStr?.length ?? 0,
+              });
+              
               return {
                 exitCode: result.exitCode as number,
                 stdout: stdoutStr as string,

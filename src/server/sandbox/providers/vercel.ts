@@ -184,11 +184,30 @@ class VercelSandboxSession extends BaseSandboxSession {
       let executable = '/bin/sh';
       let execArgs = ['-c', args && args.length > 0 ? `${command} ${args.join(' ')}` : command];
 
+      // Debug: Log command execution details
+      console.log('[VercelSandboxSession.exec] Executing command:', {
+        originalCommand: command,
+        originalArgs: args,
+        wrappedExecutable: executable,
+        wrappedArgs: execArgs,
+        timeout: options?.timeout,
+        cwd: options?.cwd,
+        sandboxId: this.sandbox.sandboxId,
+      });
+
       try {
         const result = await this.sandbox.runCommand({
           cmd: executable,
           args: execArgs,
           signal: controller.signal,
+        });
+
+        // Debug: Log command result
+        console.log('[VercelSandboxSession.exec] Command result:', {
+          exitCode: result.exitCode,
+          stdoutLength: result.stdout?.length ?? 0,
+          stderrLength: result.stderr?.length ?? 0,
+          stderrPreview: result.stderr?.substring(0, 200),
         });
 
         // Emit output to streams
@@ -211,6 +230,14 @@ class VercelSandboxSession extends BaseSandboxSession {
         }
       }
     } catch (error) {
+      const errorObj = error as any;
+      console.error('[VercelSandboxSession.exec] Error:', {
+        message: errorObj?.message,
+        code: errorObj?.code,
+        name: errorObj?.name,
+        command,
+        args,
+      });
       const errorMessage = error instanceof Error ? error.message : String(error);
       return {
         exitCode: 1,

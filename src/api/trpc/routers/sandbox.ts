@@ -589,20 +589,20 @@ export const sandboxRouter = router({
               });
 
               try {
-                // Vercel SDK requires command and args to be separate
-                // Parse command string if no args provided
-                let execCommand = input.command;
-                let execArgs = input.args || [];
+                // Vercel SDK expects executable and args separately
+                // Wrap in shell to support full command strings and shell features
+                const args = input.args || [];
+                const fullCmd = args.length > 0 ? `${input.command} ${args.join(' ')}` : input.command;
 
-                if (execArgs.length === 0 && input.command.includes(' ')) {
-                  const parsed = parseCommand(input.command);
-                  execCommand = parsed[0];
-                  execArgs = parsed.slice(1);
-                }
+                console.log('[Vercel Sandbox tRPC] Executing command:', {
+                  originalCommand: input.command,
+                  originalArgs: args,
+                  fullCmd,
+                });
 
                 let result = await sandbox.runCommand({
-                  cmd: execCommand,
-                  args: execArgs,
+                  cmd: '/bin/sh',
+                  args: ['-c', fullCmd],
                   signal: AbortSignal.timeout(input.timeout),
                 });
 
@@ -610,6 +610,12 @@ export const sandboxRouter = router({
                 if (!('stdout' in result)) {
                   result = await result.wait();
                 }
+
+                console.log('[Vercel Sandbox tRPC] Command result:', {
+                  exitCode: result.exitCode,
+                  stdoutLength: result.stdout?.length ?? 0,
+                  stderrLength: result.stderr?.length ?? 0,
+                });
 
                 return {
                   success: result.exitCode === 0,
