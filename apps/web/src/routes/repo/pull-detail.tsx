@@ -399,6 +399,37 @@ export function PullDetailPage() {
     [unresolveCommentMutation]
   );
 
+  // Process available reviewers from collaborators (includes owner)
+  // NOTE: This hook must be called before any early returns to follow React's rules of hooks
+  const availableReviewers = useMemo(() => {
+    const reviewersList: Array<{ id: string; username: string; avatarUrl?: string | null }> = [];
+    
+    // Add repo owner
+    if (repoData?.repo.owner) {
+      reviewersList.push({
+        id: repoData.repo.ownerId,
+        username: repoData.repo.owner.username,
+        avatarUrl: repoData.repo.owner.avatarUrl || null,
+      });
+    }
+    
+    // Add collaborators
+    if (collaborators) {
+      collaborators.forEach((collab: any) => {
+        // Don't add duplicates (owner might already be added)
+        if (!reviewersList.some((r) => r.id === collab.userId)) {
+          reviewersList.push({
+            id: collab.userId,
+            username: collab.user?.username || 'Unknown',
+            avatarUrl: collab.user?.avatarUrl || null,
+          });
+        }
+      });
+    }
+    
+    return reviewersList;
+  }, [repoData, collaborators]);
+
   const isLoading = repoLoading || prLoading;
 
   if (isLoading) {
@@ -472,36 +503,6 @@ export function PullDetailPage() {
       status: (latestReview?.state || 'pending') as 'pending' | 'approved' | 'changes_requested' | 'commented',
     };
   });
-
-  // Process available reviewers from collaborators (includes owner)
-  const availableReviewers = useMemo(() => {
-    const reviewersList: Array<{ id: string; username: string; avatarUrl?: string | null }> = [];
-    
-    // Add repo owner
-    if (repoData?.repo.owner) {
-      reviewersList.push({
-        id: repoData.repo.ownerId,
-        username: repoData.repo.owner.username,
-        avatarUrl: repoData.repo.owner.avatarUrl || null,
-      });
-    }
-    
-    // Add collaborators
-    if (collaborators) {
-      collaborators.forEach((collab: any) => {
-        // Don't add duplicates (owner might already be added)
-        if (!reviewersList.some((r) => r.id === collab.userId)) {
-          reviewersList.push({
-            id: collab.userId,
-            username: collab.user?.username || 'Unknown',
-            avatarUrl: collab.user?.avatarUrl || null,
-          });
-        }
-      });
-    }
-    
-    return reviewersList;
-  }, [repoData, collaborators]);
 
   // Review counts
   const approvedCount = reviews.filter((r) => r.state === 'approved').length;
