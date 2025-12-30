@@ -77,6 +77,13 @@ const AI_PROVIDERS = [
     prefix: 'sk-ant-',
   },
   { 
+    value: 'openrouter', 
+    label: 'OpenRouter', 
+    description: 'Any model',
+    placeholder: 'sk-or-...',
+    prefix: 'sk-or-',
+  },
+  { 
     value: 'openai', 
     label: 'OpenAI', 
     description: 'GPT-4',
@@ -323,7 +330,7 @@ export function AgentsSettingsPage() {
     }
 
     const providerConfig = AI_PROVIDERS.find(p => p.value === selectedProvider);
-    if (providerConfig && !apiKey.startsWith(providerConfig.prefix)) {
+    if (providerConfig && providerConfig.prefix && !apiKey.startsWith(providerConfig.prefix)) {
       setKeyError(`${providerConfig.label} API keys should start with "${providerConfig.prefix}"`);
       return;
     }

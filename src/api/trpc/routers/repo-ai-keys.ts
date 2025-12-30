@@ -11,7 +11,7 @@ import { router, protectedProcedure } from '../trpc';
 import { repoModel, repoAiKeyModel } from '../../../db/models';
 
 // Valid AI providers
-const aiProviderSchema = z.enum(['openai', 'anthropic', 'coderabbit']);
+const aiProviderSchema = z.enum(['openai', 'anthropic', 'coderabbit', 'openrouter']);
 
 /**
  * Helper to get repo by owner/name and verify ownership
@@ -72,7 +72,8 @@ export const repoAiKeysRouter = router({
       // Check server keys availability (doesn't require owner)
       const hasServerKeys = !!(
         process.env.OPENAI_API_KEY || 
-        process.env.ANTHROPIC_API_KEY
+        process.env.ANTHROPIC_API_KEY ||
+        process.env.OPENROUTER_API_KEY
       );
       
       // If not owner, return limited info
@@ -157,6 +158,14 @@ export const repoAiKeysRouter = router({
         });
       }
       
+      // OpenRouter keys start with "sk-or-"
+      if (input.provider === 'openrouter' && !input.apiKey.startsWith('sk-or-')) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'OpenRouter API keys should start with "sk-or-"',
+        });
+      }
+      
       // CodeRabbit keys don't have a specific prefix requirement
       // but should be non-empty (already validated by z.string().min(1))
       
@@ -227,7 +236,8 @@ export const repoAiKeysRouter = router({
       // Check if server has global keys
       const hasServerKeys = !!(
         process.env.OPENAI_API_KEY || 
-        process.env.ANTHROPIC_API_KEY
+        process.env.ANTHROPIC_API_KEY ||
+        process.env.OPENROUTER_API_KEY
       );
       
       return {

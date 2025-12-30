@@ -296,6 +296,10 @@ export const planningRouter = router({
         // Set the key temporarily
         if (repoKey.provider === 'anthropic') {
           process.env.ANTHROPIC_API_KEY = repoKey.key;
+        } else if (repoKey.provider === 'openrouter') {
+          // OpenRouter uses OpenAI-compatible API with a different base URL
+          process.env.OPENAI_API_KEY = repoKey.key;
+          process.env.OPENAI_BASE_URL = 'https://openrouter.ai/api/v1';
         } else {
           process.env.OPENAI_API_KEY = repoKey.key;
         }
@@ -794,6 +798,10 @@ export const planningRouter = router({
               
               if (repoKey.provider === 'anthropic') {
                 process.env.ANTHROPIC_API_KEY = repoKey.key;
+              } else if (repoKey.provider === 'openrouter') {
+                // OpenRouter uses OpenAI-compatible API with a different base URL
+                process.env.OPENAI_API_KEY = repoKey.key;
+                process.env.OPENAI_BASE_URL = 'https://openrouter.ai/api/v1';
               } else {
                 process.env.OPENAI_API_KEY = repoKey.key;
               }
@@ -902,6 +910,10 @@ export const planningRouter = router({
         
         if (repoKey.provider === 'anthropic') {
           process.env.ANTHROPIC_API_KEY = repoKey.key;
+        } else if (repoKey.provider === 'openrouter') {
+          // OpenRouter uses OpenAI-compatible API with a different base URL
+          process.env.OPENAI_API_KEY = repoKey.key;
+          process.env.OPENAI_BASE_URL = 'https://openrouter.ai/api/v1';
         } else {
           process.env.OPENAI_API_KEY = repoKey.key;
         }
