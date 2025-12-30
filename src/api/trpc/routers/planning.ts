@@ -70,6 +70,7 @@ interface PlanningRun {
   repoId: string;
   userId: string;
   task: string;
+  context?: string;
   status: PlanningStatus;
   plan?: ExecutionPlan;
   groupResults?: GroupResult[];
@@ -78,10 +79,47 @@ interface PlanningRun {
   error?: string;
   startedAt: Date;
   completedAt?: Date;
+  // Store events for replay/observation
+  events: PlanningStreamEvent[];
+  // EventEmitter-like subscribers for live updates
+  subscribers: Set<(event: PlanningStreamEvent) => void>;
+  // Configuration
+  dryRun: boolean;
+  createBranch: boolean;
+  branchName?: string;
+  autoCommit: boolean;
+  maxIterations: number;
+  maxParallelTasks: number;
 }
 
 // In-memory store for planning runs (could be moved to database)
 const planningRuns = new Map<string, PlanningRun>();
+
+/**
+ * Get a planning run by ID (for use by observe endpoint)
+ */
+export function getPlanningRun(runId: string): PlanningRun | undefined {
+  return planningRuns.get(runId);
+}
+
+/**
+ * Subscribe to planning run events (for use by observe endpoint)
+ * Returns an unsubscribe function
+ */
+export function subscribeToPlanningRun(
+  runId: string, 
+  callback: (event: PlanningStreamEvent) => void
+): () => void {
+  const run = planningRuns.get(runId);
+  if (!run) {
+    return () => {};
+  }
+  
+  run.subscribers.add(callback);
+  return () => {
+    run.subscribers.delete(callback);
+  };
+}
 
 /**
  * Planning router for multi-agent task planning
@@ -185,10 +223,32 @@ export const planningRouter = router({
         repoId: input.repoId,
         userId: ctx.user.id,
         task: input.task,
+        context: input.context,
         status: 'pending',
         startedAt: new Date(),
+        events: [],
+        subscribers: new Set(),
+        dryRun: input.dryRun,
+        createBranch: input.createBranch,
+        branchName: input.branchName,
+        autoCommit: input.autoCommit,
+        maxIterations: input.maxIterations,
+        maxParallelTasks: input.maxParallelTasks,
       };
       planningRuns.set(runId, run);
+
+      // Helper to emit events to run record and subscribers
+      const emitEvent = (event: PlanningStreamEvent) => {
+        run.events.push(event);
+        for (const subscriber of run.subscribers) {
+          try {
+            subscriber(event);
+          } catch (e) {
+            // Subscriber error, remove it
+            run.subscribers.delete(subscriber);
+          }
+        }
+      };
 
       // Build workflow input
       const workflowInput: MultiAgentPlanningInput = {
@@ -202,32 +262,88 @@ export const planningRouter = router({
         maxIterations: input.maxIterations,
         maxParallelTasks: input.maxParallelTasks,
         dryRun: input.dryRun,
-        verbose: false,
+        verbose: true,
         createBranch: input.createBranch,
         branchName: input.branchName,
         autoCommit: input.autoCommit,
       };
 
-      // Start workflow asynchronously
+      // Start workflow asynchronously with event streaming
+      const startTime = Date.now();
       (async () => {
         try {
           run.status = 'planning';
           
-          const result = await runMultiAgentPlanningWorkflow(workflowInput);
-          
-          run.status = result.success ? 'completed' : 'failed';
-          run.plan = result.finalPlan;
-          run.groupResults = result.groupResults;
-          run.review = result.review;
-          run.output = result;
-          run.completedAt = new Date();
-          
-          if (!result.success) {
-            run.error = result.error || result.summary;
+          // Emit started event
+          emitEvent({
+            type: 'started',
+            timestamp: new Date().toISOString(),
+            runId,
+            result: {
+              task: input.task,
+              repoName: repo.repo.name,
+              dryRun: input.dryRun,
+            },
+          });
+
+          // Stream workflow events
+          for await (const event of streamMultiAgentPlanningWorkflow(workflowInput)) {
+            const eventData = event as { type: string; stepId?: string; result?: unknown; error?: string };
+            
+            emitEvent({
+              type: eventData.type as PlanningStreamEventType,
+              timestamp: new Date().toISOString(),
+              runId,
+              stepId: eventData.stepId,
+              result: eventData.result,
+              error: eventData.error,
+            });
+
+            // Update run state based on step results
+            if (eventData.stepId === 'create-plan' && eventData.result) {
+              const planResult = eventData.result as { plan?: ExecutionPlan };
+              if (planResult.plan) {
+                run.plan = planResult.plan;
+              }
+            }
+            if (eventData.stepId === 'execute-plan' && eventData.result) {
+              const execResult = eventData.result as { groupResults?: GroupResult[] };
+              if (execResult.groupResults) {
+                run.groupResults = execResult.groupResults;
+              }
+              run.status = 'executing';
+            }
+            if (eventData.stepId === 'review-results' && eventData.result) {
+              const reviewResult = eventData.result as { review?: ReviewResult };
+              if (reviewResult.review) {
+                run.review = reviewResult.review;
+              }
+              run.status = 'reviewing';
+            }
           }
+
+          // Emit complete event
+          emitEvent({
+            type: 'complete',
+            timestamp: new Date().toISOString(),
+            runId,
+            result: { totalDuration: Date.now() - startTime },
+          });
+
+          run.status = 'completed';
+          run.completedAt = new Date();
         } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          
+          emitEvent({
+            type: 'error',
+            timestamp: new Date().toISOString(),
+            runId,
+            error: errorMessage,
+          });
+
           run.status = 'failed';
-          run.error = error instanceof Error ? error.message : 'Unknown error';
+          run.error = errorMessage;
           run.completedAt = new Date();
         }
       })();
@@ -266,6 +382,7 @@ export const planningRouter = router({
         id: run.id,
         repoId: run.repoId,
         task: run.task,
+        context: run.context,
         status: run.status,
         plan: run.plan,
         groupResults: run.groupResults,
@@ -276,6 +393,11 @@ export const planningRouter = router({
         duration: run.completedAt 
           ? run.completedAt.getTime() - run.startedAt.getTime()
           : Date.now() - run.startedAt.getTime(),
+        // Configuration
+        dryRun: run.dryRun,
+        createBranch: run.createBranch,
+        branchName: run.branchName,
+        autoCommit: run.autoCommit,
       };
     }),
 
@@ -307,6 +429,61 @@ export const planningRouter = router({
         completedAt: run.completedAt,
         error: run.error,
       }));
+    }),
+
+  /**
+   * Observe an existing planning run
+   * Replays stored events and subscribes to new events for live updates
+   */
+  observeStream: protectedProcedure
+    .input(z.object({ runId: z.string().uuid() }))
+    .subscription(({ input, ctx }) => {
+      return observable<PlanningStreamEvent>((emit) => {
+        const run = planningRuns.get(input.runId);
+        
+        if (!run) {
+          emit.error(new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Planning run not found',
+          }));
+          return;
+        }
+
+        // Verify ownership
+        if (run.userId !== ctx.user.id) {
+          emit.error(new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Not authorized to view this run',
+          }));
+          return;
+        }
+
+        // Replay all stored events
+        for (const event of run.events) {
+          emit.next(event);
+        }
+
+        // If already completed, we're done
+        if (run.status === 'completed' || run.status === 'failed') {
+          emit.complete();
+          return;
+        }
+
+        // Subscribe to new events
+        const subscriber = (event: PlanningStreamEvent) => {
+          emit.next(event);
+          // Complete when we receive complete or error event
+          if (event.type === 'complete' || event.type === 'error') {
+            emit.complete();
+          }
+        };
+        run.subscribers.add(subscriber);
+
+        // Cleanup on unsubscribe
+        return () => {
+          run.subscribers.delete(subscriber);
+        };
+      });
     }),
 
   /**

@@ -180,5 +180,82 @@ export function createPlanningStreamRoutes() {
     });
   });
 
+  // SSE endpoint to observe an existing planning run
+  // This connects to the in-memory run store and replays/streams events
+  app.get('/observe/:runId', async (c) => {
+    const auth = createAuth();
+
+    const session = await auth.api.getSession({
+      headers: c.req.raw.headers,
+    });
+
+    if (!session?.user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const runId = c.req.param('runId');
+    
+    // Import the planning runs store from the tRPC router
+    // Note: This is a bit of a hack - ideally we'd use a shared store
+    const { getPlanningRun, subscribeToPlanningRun } = await import('../../api/trpc/routers/planning');
+    
+    const run = getPlanningRun(runId);
+    if (!run) {
+      return c.json({ error: 'Run not found' }, 404);
+    }
+
+    // Verify ownership
+    if (run.userId !== session.user.id) {
+      return c.json({ error: 'Not authorized' }, 403);
+    }
+
+    return streamSSE(c, async (stream) => {
+      // Replay stored events
+      for (const event of run.events) {
+        await stream.writeSSE({
+          event: event.type,
+          data: JSON.stringify(event),
+        });
+      }
+
+      // If already completed, we're done
+      if (run.status === 'completed' || run.status === 'failed') {
+        return;
+      }
+
+      // Subscribe to new events
+      const unsubscribe = subscribeToPlanningRun(runId, async (event) => {
+        try {
+          await stream.writeSSE({
+            event: event.type,
+            data: JSON.stringify(event),
+          });
+        } catch {
+          // Stream closed
+          unsubscribe();
+        }
+      });
+
+      // Wait for completion or abort
+      await new Promise<void>((resolve) => {
+        const checkInterval = setInterval(() => {
+          const currentRun = getPlanningRun(runId);
+          if (!currentRun || currentRun.status === 'completed' || currentRun.status === 'failed') {
+            clearInterval(checkInterval);
+            unsubscribe();
+            resolve();
+          }
+        }, 1000);
+
+        // Clean up on client disconnect
+        c.req.raw.signal.addEventListener('abort', () => {
+          clearInterval(checkInterval);
+          unsubscribe();
+          resolve();
+        });
+      });
+    });
+  });
+
   return app;
 }

@@ -182,6 +182,7 @@ export function App() {
 
             {/* AI Planning */}
             <Route path="/:owner/:repo/planning" element={<PlanningPage />} />
+            <Route path="/:owner/:repo/planning/:runId" element={<PlanningPage />} />
 
             {/* Releases */}
             <Route path="/:owner/:repo/releases" element={<ReleasesPage />} />
