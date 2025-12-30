@@ -237,6 +237,21 @@ export interface CiRunCompletedEvent extends BaseEvent {
   };
 }
 
+// ============ RELEASE EVENTS ============
+
+export interface ReleasePublishedEvent extends BaseEvent {
+  type: 'release.published';
+  payload: {
+    releaseId: string;
+    releaseTag: string;
+    releaseName: string;
+    releaseBody: string;
+    repoId: string;
+    repoFullName: string;
+    isPrerelease: boolean;
+  };
+}
+
 // ============ MENTION EVENTS ============
 
 export interface MentionEvent extends BaseEvent {
@@ -344,6 +359,7 @@ export type AppEvent =
   | IssueReopenedEvent
   | IssueCommentedEvent
   | CiRunCompletedEvent
+  | ReleasePublishedEvent
   | MentionEvent
   | MergeQueueAddedEvent
   | MergeQueueProcessEvent

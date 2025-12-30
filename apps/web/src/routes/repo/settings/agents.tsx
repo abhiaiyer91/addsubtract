@@ -18,6 +18,13 @@ import {
   ChevronDown,
   ChevronUp,
   Sparkles,
+  Megaphone,
+  Twitter,
+  GitMerge,
+  Tag,
+  Copy,
+  X,
+  ExternalLink,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,6 +34,7 @@ import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Dialog,
   DialogContent,
@@ -51,6 +59,7 @@ import { SettingsLayout } from './layout';
 import { useSession } from '@/lib/auth-client';
 import { trpc } from '@/lib/trpc';
 import { formatDistanceToNow } from 'date-fns';
+import { formatRelativeTime } from '@/lib/utils';
 
 const AI_PROVIDERS = [
   { 
@@ -77,6 +86,23 @@ const DEFAULT_PROMPT = `Analyze incoming issues and:
 - For bugs, look for severity indicators
 - For features, consider if it's a small enhancement or major request`;
 
+type ContentStatus = 'pending' | 'approved' | 'posted' | 'rejected';
+
+interface MarketingContent {
+  id: string;
+  repoId: string;
+  sourceType: 'pr_merged' | 'release_published';
+  sourceId: string;
+  sourceRef: string;
+  tweet: string;
+  thread: string[] | null;
+  status: ContentStatus;
+  postedAt: Date | null;
+  postedUrl: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export function AgentsSettingsPage() {
   const { owner, repo } = useParams<{ owner: string; repo: string }>();
   const { data: session } = useSession();
@@ -94,7 +120,19 @@ export function AgentsSettingsPage() {
   const [prompt, setPrompt] = useState('');
   const [saveSuccess, setSaveSuccess] = useState(false);
 
+  // Marketing state
+  const [marketingTab, setMarketingTab] = useState<ContentStatus | 'all'>('pending');
+  const [editingContent, setEditingContent] = useState<MarketingContent | null>(null);
+  const [editedTweet, setEditedTweet] = useState('');
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
   const utils = trpc.useUtils();
+
+  // Repository query
+  const { data: repoData } = trpc.repos.get.useQuery(
+    { owner: owner!, repo: repo! },
+    { enabled: !!owner && !!repo }
+  );
 
   // AI Settings query
   const { data: aiSettings, isLoading: aiLoading } = trpc.repoAiKeys.getSettings.useQuery(
@@ -114,12 +152,25 @@ export function AgentsSettingsPage() {
     { enabled: !!triageSettings?.repoId && showHistory }
   );
 
+  // Marketing content query
+  const { data: marketingContent, isLoading: marketingLoading } = trpc.marketing.list.useQuery(
+    {
+      repoId: repoData?.repo.id!,
+      status: marketingTab === 'all' ? undefined : marketingTab,
+    },
+    { enabled: !!repoData?.repo.id }
+  );
+
+  const { data: pendingCount } = trpc.marketing.pendingCount.useQuery(
+    { repoId: repoData?.repo.id! },
+    { enabled: !!repoData?.repo.id }
+  );
+
   // AI Mutations
   const setKeyMutation = trpc.repoAiKeys.set.useMutation({
     onSuccess: () => {
       closeDialog();
       utils.repoAiKeys.getSettings.invalidate({ owner: owner!, repo: repo! });
-      // Also refresh triage config since aiAvailable depends on API keys
       utils.triageAgent.getConfig.invalidate({ owner: owner!, repo: repo! });
     },
     onError: (err: { message: string }) => {
@@ -130,7 +181,6 @@ export function AgentsSettingsPage() {
   const deleteKeyMutation = trpc.repoAiKeys.delete.useMutation({
     onSuccess: () => {
       utils.repoAiKeys.getSettings.invalidate({ owner: owner!, repo: repo! });
-      // Also refresh triage config since aiAvailable depends on API keys
       utils.triageAgent.getConfig.invalidate({ owner: owner!, repo: repo! });
     },
   });
@@ -147,6 +197,28 @@ export function AgentsSettingsPage() {
   const setEnabledMutation = trpc.triageAgent.setEnabled.useMutation({
     onSuccess: () => {
       utils.triageAgent.getConfig.invalidate({ owner: owner!, repo: repo! });
+    },
+  });
+
+  // Marketing Mutations
+  const updateStatusMutation = trpc.marketing.updateStatus.useMutation({
+    onSuccess: () => {
+      utils.marketing.list.invalidate({ repoId: repoData?.repo.id! });
+      utils.marketing.pendingCount.invalidate({ repoId: repoData?.repo.id! });
+    },
+  });
+
+  const updateContentMutation = trpc.marketing.updateContent.useMutation({
+    onSuccess: () => {
+      setEditingContent(null);
+      utils.marketing.list.invalidate({ repoId: repoData?.repo.id! });
+    },
+  });
+
+  const deleteContentMutation = trpc.marketing.delete.useMutation({
+    onSuccess: () => {
+      utils.marketing.list.invalidate({ repoId: repoData?.repo.id! });
+      utils.marketing.pendingCount.invalidate({ repoId: repoData?.repo.id! });
     },
   });
 
@@ -229,6 +301,44 @@ export function AgentsSettingsPage() {
     });
   };
 
+  // Marketing handlers
+  const handleApprove = (id: string) => {
+    updateStatusMutation.mutate({ id, status: 'approved' });
+  };
+
+  const handleReject = (id: string) => {
+    updateStatusMutation.mutate({ id, status: 'rejected' });
+  };
+
+  const handleMarkPosted = (id: string, url?: string) => {
+    updateStatusMutation.mutate({ id, status: 'posted', postedUrl: url });
+  };
+
+  const handleDeleteContent = (id: string) => {
+    if (confirm('Delete this content?')) {
+      deleteContentMutation.mutate({ id });
+    }
+  };
+
+  const handleEditContent = (item: MarketingContent) => {
+    setEditingContent(item);
+    setEditedTweet(item.tweet);
+  };
+
+  const handleSaveEdit = () => {
+    if (!editingContent) return;
+    updateContentMutation.mutate({
+      id: editingContent.id,
+      tweet: editedTweet,
+    });
+  };
+
+  const handleCopy = async (text: string, id: string) => {
+    await navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
   const isLoading = aiLoading || triageLoading;
 
   if (!authenticated) {
@@ -286,7 +396,7 @@ export function AgentsSettingsPage() {
 
   const { keys, availability } = aiSettings;
   const config = triageSettings.config;
-  const isEnabled = config?.enabled ?? false;
+  const isTriageEnabled = config?.enabled ?? false;
   const isMutating = setKeyMutation.isPending || updateConfigMutation.isPending || setEnabledMutation.isPending;
 
   return (
@@ -296,54 +406,63 @@ export function AgentsSettingsPage() {
           <div>
             <h2 className="text-2xl font-bold">Agents</h2>
             <p className="text-muted-foreground mt-1">
-              Configure AI API keys and automated agents for this repository.
+              Configure AI-powered automation for your repository.
             </p>
           </div>
 
           {/* ==================== API KEYS SECTION ==================== */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <Key className="h-5 w-5" />
-              <h3 className="text-lg font-semibold">API Keys</h3>
-            </div>
-
-            {/* Status Alert */}
-            {availability && (
-              <Alert variant={availability.available ? 'default' : 'destructive'}>
-                {availability.available ? (
-                  <>
-                    <Check className="h-4 w-4" />
-                    <AlertDescription>
-                      AI features are enabled
-                      {availability.source === 'repository' 
-                        ? ' using your repository API key.' 
-                        : ' using server-provided keys.'}
-                    </AlertDescription>
-                  </>
-                ) : (
-                  <>
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>
-                      AI features are not available. Add an API key below to enable them.
-                    </AlertDescription>
-                  </>
-                )}
-              </Alert>
-            )}
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle className="text-base">Configured Keys</CardTitle>
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-primary/10 rounded-lg">
+                  <Key className="h-5 w-5 text-primary" />
+                </div>
+                <div className="flex-1">
+                  <CardTitle>API Keys</CardTitle>
                   <CardDescription>
-                    Your API keys are encrypted and stored securely.
+                    Configure AI provider keys to enable agents
                   </CardDescription>
+                </div>
+                {availability?.available && (
+                  <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                    <Check className="h-3 w-3 mr-1" />
+                    Active
+                  </Badge>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {!availability?.available && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    Add an API key to enable AI agents.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  {keys && keys.length > 0 ? (
+                    <div className="flex items-center gap-2">
+                      {keys.map((key: { id: string; provider: string; keyHint: string }) => {
+                        const provider = AI_PROVIDERS.find(p => p.value === key.provider);
+                        return (
+                          <Badge key={key.id} variant="outline" className="gap-1">
+                            {provider?.label} <span className="text-muted-foreground">{key.keyHint}</span>
+                          </Badge>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No API keys configured</p>
+                  )}
                 </div>
                 <Dialog open={isDialogOpen} onOpenChange={(open) => !open && closeDialog()}>
                   <DialogTrigger asChild>
-                    <Button size="sm" className="gap-2" onClick={() => openDialog()}>
-                      <Key className="h-4 w-4" />
-                      Add API Key
+                    <Button variant="outline" size="sm" onClick={() => openDialog()}>
+                      <Key className="h-4 w-4 mr-2" />
+                      {keys && keys.length > 0 ? 'Manage Keys' : 'Add Key'}
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="sm:max-w-md">
@@ -351,7 +470,7 @@ export function AgentsSettingsPage() {
                       <DialogHeader>
                         <DialogTitle>Add API Key</DialogTitle>
                         <DialogDescription>
-                          Add an AI provider API key to enable AI features for this repository.
+                          Add an AI provider API key to enable agents.
                         </DialogDescription>
                       </DialogHeader>
                       <div className="space-y-4 py-4">
@@ -367,12 +486,7 @@ export function AgentsSettingsPage() {
                             <SelectContent>
                               {AI_PROVIDERS.map((provider) => (
                                 <SelectItem key={provider.value} value={provider.value}>
-                                  <div className="flex items-center gap-2">
-                                    <span>{provider.label}</span>
-                                    <span className="text-muted-foreground text-xs">
-                                      ({provider.description})
-                                    </span>
-                                  </div>
+                                  {provider.label} ({provider.description})
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -397,36 +511,34 @@ export function AgentsSettingsPage() {
                               className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
                               onClick={() => setShowKey(!showKey)}
                             >
-                              {showKey ? (
-                                <EyeOff className="h-4 w-4 text-muted-foreground" />
-                              ) : (
-                                <Eye className="h-4 w-4 text-muted-foreground" />
-                              )}
+                              {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                             </Button>
                           </div>
-                          <p className="text-xs text-muted-foreground">
-                            Get your API key from the{' '}
-                            {selectedProvider === 'openai' ? (
-                              <a 
-                                href="https://platform.openai.com/api-keys" 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="text-primary hover:underline"
-                              >
-                                OpenAI dashboard
-                              </a>
-                            ) : (
-                              <a 
-                                href="https://console.anthropic.com/settings/keys" 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="text-primary hover:underline"
-                              >
-                                Anthropic console
-                              </a>
-                            )}
-                          </p>
                         </div>
+
+                        {keys && keys.length > 0 && (
+                          <div className="space-y-2">
+                            <Label>Existing Keys</Label>
+                            <div className="space-y-2">
+                              {keys.map((key: { id: string; provider: string; keyHint: string }) => (
+                                <div key={key.id} className="flex items-center justify-between p-2 rounded-md bg-muted">
+                                  <span className="text-sm">
+                                    {AI_PROVIDERS.find(p => p.value === key.provider)?.label} ({key.keyHint})
+                                  </span>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-destructive hover:text-destructive"
+                                    onClick={() => handleDeleteKey(key.provider as Provider)}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
 
                         {keyError && (
                           <div className="p-3 rounded-md bg-destructive/10 text-destructive text-sm">
@@ -446,273 +558,232 @@ export function AgentsSettingsPage() {
                     </form>
                   </DialogContent>
                 </Dialog>
-              </CardHeader>
-              <CardContent>
-                {!keys || keys.length === 0 ? (
-                  <EmptyState
-                    icon={Sparkles}
-                    title="No API keys configured"
-                    description="Add an API key to enable AI-powered features like code review, chat, and automated agents."
-                  />
-                ) : (
-                  <div className="divide-y">
-                    {keys.map((key: { id: string; provider: string; keyHint: string }) => {
-                      const provider = AI_PROVIDERS.find(p => p.value === key.provider);
-                      return (
-                        <div key={key.id} className="py-4 first:pt-0 last:pb-0">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className="p-2 bg-muted rounded-md">
-                                <Key className="h-4 w-4 text-muted-foreground" />
-                              </div>
-                              <div>
-                                <div className="flex items-center gap-2">
-                                  <span className="font-medium">{provider?.label || key.provider}</span>
-                                  <Badge variant="secondary">{key.keyHint}</Badge>
-                                </div>
-                                <div className="text-sm text-muted-foreground">
-                                  {provider?.description}
-                                </div>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => openDialog(key.provider as Provider)}
-                              >
-                                Update
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                                onClick={() => handleDeleteKey(key.provider as Provider)}
-                                disabled={deleteKeyMutation.isPending}
-                              >
-                                {deleteKeyMutation.isPending ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <Trash2 className="h-4 w-4" />
-                                )}
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+              </div>
+            </CardContent>
+          </Card>
 
-          <Separator />
-
-          {/* ==================== TRIAGE AGENT SECTION ==================== */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <Bot className="h-5 w-5" />
-              <h3 className="text-lg font-semibold">Triage Agent</h3>
-            </div>
-
-            {/* AI Availability Alert */}
-            {!triageSettings.aiAvailable && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                  AI API keys must be configured above before enabling the triage agent.
-                </AlertDescription>
-              </Alert>
-            )}
-
-            {/* Enable/Disable Toggle */}
-            <Card>
+          {/* ==================== AGENTS GRID ==================== */}
+          <div className="grid gap-6 md:grid-cols-2">
+            {/* TRIAGE AGENT CARD */}
+            <Card className="flex flex-col">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 bg-primary/10 rounded-md">
-                      <Bot className="h-5 w-5 text-primary" />
+                    <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                      <Bot className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                     </div>
                     <div>
-                      <CardTitle className="text-base">Enable Triage Agent</CardTitle>
-                      <CardDescription>
-                        Automatically analyze and categorize new issues when they are created.
-                      </CardDescription>
+                      <CardTitle className="text-base">Triage Agent</CardTitle>
+                      <CardDescription>Auto-categorize new issues</CardDescription>
                     </div>
                   </div>
                   <Switch
-                    checked={isEnabled}
+                    checked={isTriageEnabled}
                     onCheckedChange={handleToggleEnabled}
                     disabled={!triageSettings.aiAvailable || setEnabledMutation.isPending}
                   />
                 </div>
               </CardHeader>
-            </Card>
+              <CardContent className="flex-1 space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Automatically labels, prioritizes, and assigns issues when they're created.
+                </p>
 
-            {/* Configuration Options */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Triage Actions</CardTitle>
-                <CardDescription>
-                  Choose what actions the triage agent should perform on new issues.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Tags className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <Label>Auto-assign labels</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Apply relevant labels based on issue content
-                      </p>
+                {isTriageEnabled && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="flex items-center gap-2">
+                        <Tags className="h-4 w-4 text-muted-foreground" />
+                        Auto-assign labels
+                      </span>
+                      <Switch
+                        checked={config?.autoAssignLabels ?? true}
+                        onCheckedChange={(checked) => handleToggleOption('autoAssignLabels', checked)}
+                        disabled={isMutating}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="flex items-center gap-2">
+                        <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+                        Auto-set priority
+                      </span>
+                      <Switch
+                        checked={config?.autoSetPriority ?? true}
+                        onCheckedChange={(checked) => handleToggleOption('autoSetPriority', checked)}
+                        disabled={isMutating}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="flex items-center gap-2">
+                        <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                        Add explanation comment
+                      </span>
+                      <Switch
+                        checked={config?.addTriageComment ?? true}
+                        onCheckedChange={(checked) => handleToggleOption('addTriageComment', checked)}
+                        disabled={isMutating}
+                      />
+                    </div>
+
+                    <Separator />
+
+                    <div className="space-y-2">
+                      <Label className="text-xs">Custom Instructions</Label>
+                      <Textarea
+                        placeholder={DEFAULT_PROMPT}
+                        value={prompt}
+                        onChange={(e) => setPrompt(e.target.value)}
+                        rows={3}
+                        className="text-xs"
+                      />
+                      <Button
+                        onClick={handleSavePrompt}
+                        disabled={updateConfigMutation.isPending}
+                        size="sm"
+                        variant="outline"
+                        className="w-full"
+                      >
+                        {updateConfigMutation.isPending ? (
+                          <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                        ) : saveSuccess ? (
+                          <Check className="mr-2 h-3 w-3" />
+                        ) : null}
+                        {saveSuccess ? 'Saved' : 'Save Instructions'}
+                      </Button>
                     </div>
                   </div>
-                  <Switch
-                    checked={config?.autoAssignLabels ?? true}
-                    onCheckedChange={(checked) => handleToggleOption('autoAssignLabels', checked)}
-                    disabled={!isEnabled || isMutating}
-                  />
-                </div>
+                )}
 
-                <Separator />
-
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <Label>Auto-set priority</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Set priority based on urgency and impact
-                      </p>
-                    </div>
-                  </div>
-                  <Switch
-                    checked={config?.autoSetPriority ?? true}
-                    onCheckedChange={(checked) => handleToggleOption('autoSetPriority', checked)}
-                    disabled={!isEnabled || isMutating}
-                  />
-                </div>
-
-                <Separator />
-
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <UserCheck className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <Label>Auto-assign users</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Assign issues to team members based on expertise
-                      </p>
-                    </div>
-                  </div>
-                  <Switch
-                    checked={config?.autoAssignUsers ?? false}
-                    onCheckedChange={(checked) => handleToggleOption('autoAssignUsers', checked)}
-                    disabled={!isEnabled || isMutating}
-                  />
-                </div>
-
-                <Separator />
-
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <MessageSquare className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <Label>Add triage comment</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Post a comment explaining triage decisions
-                      </p>
-                    </div>
-                  </div>
-                  <Switch
-                    checked={config?.addTriageComment ?? true}
-                    onCheckedChange={(checked) => handleToggleOption('addTriageComment', checked)}
-                    disabled={!isEnabled || isMutating}
-                  />
-                </div>
+                {!triageSettings.aiAvailable && (
+                  <Alert>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription className="text-xs">
+                      Add an API key above to enable this agent.
+                    </AlertDescription>
+                  </Alert>
+                )}
               </CardContent>
             </Card>
 
-            {/* Custom Prompt */}
-            <Card>
+            {/* MARKETING AGENT CARD */}
+            <Card className="flex flex-col">
               <CardHeader>
-                <CardTitle className="text-base">Custom Instructions</CardTitle>
-                <CardDescription>
-                  Provide custom instructions to guide how the agent triages issues.
-                  Leave empty to use the default behavior.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Textarea
-                  placeholder={DEFAULT_PROMPT}
-                  value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                  rows={6}
-                  disabled={!isEnabled}
-                  className="font-mono text-sm"
-                />
                 <div className="flex items-center justify-between">
-                  <p className="text-sm text-muted-foreground">
-                    Examples: team expertise, label naming conventions, priority criteria
-                  </p>
-                  <Button
-                    onClick={handleSavePrompt}
-                    disabled={!isEnabled || updateConfigMutation.isPending}
-                    size="sm"
-                  >
-                    {updateConfigMutation.isPending ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : saveSuccess ? (
-                      <Check className="mr-2 h-4 w-4" />
-                    ) : null}
-                    {saveSuccess ? 'Saved' : 'Save Instructions'}
-                  </Button>
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-pink-100 dark:bg-pink-900/30 rounded-lg">
+                      <Megaphone className="h-5 w-5 text-pink-600 dark:text-pink-400" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-base">Marketing Agent</CardTitle>
+                      <CardDescription>Generate social content</CardDescription>
+                    </div>
+                  </div>
+                  {pendingCount && pendingCount.count > 0 && (
+                    <Badge variant="secondary" className="bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
+                      {pendingCount.count} pending
+                    </Badge>
+                  )}
                 </div>
+              </CardHeader>
+              <CardContent className="flex-1 space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Auto-generates tweets when PRs are merged or releases are published.
+                </p>
+
+                {availability?.available ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Check className="h-4 w-4 text-green-600" />
+                      <span>Runs automatically on PR merge & release</span>
+                    </div>
+
+                    <Tabs value={marketingTab} onValueChange={(v) => setMarketingTab(v as typeof marketingTab)}>
+                      <TabsList className="w-full grid grid-cols-3">
+                        <TabsTrigger value="pending" className="text-xs">
+                          Pending
+                          {pendingCount && pendingCount.count > 0 && (
+                            <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">
+                              {pendingCount.count}
+                            </Badge>
+                          )}
+                        </TabsTrigger>
+                        <TabsTrigger value="approved" className="text-xs">Approved</TabsTrigger>
+                        <TabsTrigger value="posted" className="text-xs">Posted</TabsTrigger>
+                      </TabsList>
+
+                      <TabsContent value={marketingTab} className="mt-3">
+                        {marketingLoading ? (
+                          <div className="flex justify-center py-4">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          </div>
+                        ) : !marketingContent || marketingContent.length === 0 ? (
+                          <p className="text-xs text-muted-foreground text-center py-4">
+                            {marketingTab === 'pending' 
+                              ? 'No pending content. Merge a PR or publish a release!' 
+                              : `No ${marketingTab} content.`}
+                          </p>
+                        ) : (
+                          <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                            {marketingContent.slice(0, 5).map((item: MarketingContent) => (
+                              <MarketingContentRow
+                                key={item.id}
+                                item={item}
+                                onApprove={() => handleApprove(item.id)}
+                                onReject={() => handleReject(item.id)}
+                                onMarkPosted={(url) => handleMarkPosted(item.id, url)}
+                                onDelete={() => handleDeleteContent(item.id)}
+                                onEdit={() => handleEditContent(item)}
+                                onCopy={(text) => handleCopy(text, item.id)}
+                                isCopied={copiedId === item.id}
+                                isUpdating={updateStatusMutation.isPending}
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </TabsContent>
+                    </Tabs>
+                  </div>
+                ) : (
+                  <Alert>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription className="text-xs">
+                      Add an API key above to enable this agent.
+                    </AlertDescription>
+                  </Alert>
+                )}
               </CardContent>
             </Card>
+          </div>
 
-            {/* Recent Triage Runs */}
+          {/* Triage History (collapsible) */}
+          {isTriageEnabled && (
             <Card>
-              <CardHeader>
-                <button
-                  onClick={() => setShowHistory(!showHistory)}
-                  className="flex items-center justify-between w-full text-left"
-                >
+              <CardHeader className="cursor-pointer" onClick={() => setShowHistory(!showHistory)}>
+                <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <History className="h-4 w-4 text-muted-foreground" />
                     <div>
-                      <CardTitle className="text-base">Recent Triage History</CardTitle>
-                      <CardDescription>
-                        View recent triage agent activity
-                      </CardDescription>
+                      <CardTitle className="text-base">Triage History</CardTitle>
+                      <CardDescription>Recent agent activity</CardDescription>
                     </div>
                   </div>
-                  {showHistory ? (
-                    <ChevronUp className="h-4 w-4 text-muted-foreground" />
-                  ) : (
-                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                  )}
-                </button>
+                  {showHistory ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </div>
               </CardHeader>
               {showHistory && (
                 <CardContent>
                   {runsLoading ? (
-                    <div className="flex items-center justify-center py-4">
+                    <div className="flex justify-center py-4">
                       <Loader2 className="h-4 w-4 animate-spin" />
                     </div>
                   ) : !runs || runs.length === 0 ? (
                     <p className="text-sm text-muted-foreground text-center py-4">
-                      No triage runs yet. Create an issue to see the agent in action.
+                      No triage runs yet.
                     </p>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                       {runs.map((run) => (
-                        <div
-                          key={run.id}
-                          className="flex items-start justify-between p-3 rounded-md bg-muted/50"
-                        >
+                        <div key={run.id} className="flex items-start justify-between p-3 rounded-md bg-muted/50">
                           <div className="space-y-1">
                             <div className="flex items-center gap-2">
                               {run.success ? (
@@ -720,30 +791,14 @@ export function AgentsSettingsPage() {
                               ) : (
                                 <AlertCircle className="h-4 w-4 text-destructive" />
                               )}
-                              <span className="text-sm font-medium">
-                                Issue triaged
-                              </span>
+                              <span className="text-sm font-medium">Issue triaged</span>
                             </div>
                             {run.assignedLabels && run.assignedLabels.length > 0 && (
                               <div className="flex items-center gap-1 flex-wrap">
-                                <Tags className="h-3 w-3 text-muted-foreground" />
                                 {run.assignedLabels.map((label: string) => (
-                                  <Badge key={label} variant="secondary" className="text-xs">
-                                    {label}
-                                  </Badge>
+                                  <Badge key={label} variant="secondary" className="text-xs">{label}</Badge>
                                 ))}
                               </div>
-                            )}
-                            {run.assignedPriority && (
-                              <div className="flex items-center gap-1">
-                                <AlertTriangle className="h-3 w-3 text-muted-foreground" />
-                                <span className="text-xs text-muted-foreground">
-                                  Priority: {run.assignedPriority}
-                                </span>
-                              </div>
-                            )}
-                            {run.errorMessage && (
-                              <p className="text-xs text-destructive">{run.errorMessage}</p>
                             )}
                           </div>
                           <span className="text-xs text-muted-foreground">
@@ -756,29 +811,157 @@ export function AgentsSettingsPage() {
                 </CardContent>
               )}
             </Card>
-          </div>
-
-          {/* Info Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">About AI Agents</CardTitle>
-            </CardHeader>
-            <CardContent className="text-sm text-muted-foreground space-y-2">
-              <p>
-                AI API keys enable features like intelligent code review, the Agent assistant, 
-                and automated agents throughout your repository.
-              </p>
-              <p>
-                Your keys are encrypted at rest and are only used for AI requests made within 
-                this repository. Keys are never shared or exposed to other users.
-              </p>
-              <p>
-                You are responsible for any API usage charges from your AI provider.
-              </p>
-            </CardContent>
-          </Card>
+          )}
         </div>
+
+        {/* Edit Tweet Dialog */}
+        <Dialog open={!!editingContent} onOpenChange={() => setEditingContent(null)}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Edit Tweet</DialogTitle>
+              <DialogDescription>
+                Modify the generated content before posting.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <Textarea
+                value={editedTweet}
+                onChange={(e) => setEditedTweet(e.target.value)}
+                rows={4}
+                maxLength={280}
+                className="resize-none"
+              />
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>{editedTweet.length}/280</span>
+                {editedTweet.length > 280 && <span className="text-destructive">Too long!</span>}
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditingContent(null)}>Cancel</Button>
+              <Button onClick={handleSaveEdit} disabled={updateContentMutation.isPending || editedTweet.length > 280}>
+                {updateContentMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Save
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </SettingsLayout>
     </RepoLayout>
+  );
+}
+
+interface MarketingContentRowProps {
+  item: MarketingContent;
+  onApprove: () => void;
+  onReject: () => void;
+  onMarkPosted: (url?: string) => void;
+  onDelete: () => void;
+  onEdit: () => void;
+  onCopy: (text: string) => void;
+  isCopied: boolean;
+  isUpdating: boolean;
+}
+
+function MarketingContentRow({
+  item,
+  onApprove,
+  onReject,
+  onMarkPosted,
+  onDelete,
+  onEdit,
+  onCopy,
+  isCopied,
+  isUpdating,
+}: MarketingContentRowProps) {
+  const isPR = item.sourceType === 'pr_merged';
+
+  return (
+    <div className="p-3 rounded-lg border bg-card text-card-foreground">
+      <div className="flex items-start gap-2 mb-2">
+        {isPR ? (
+          <GitMerge className="h-4 w-4 text-purple-500 mt-0.5 flex-shrink-0" />
+        ) : (
+          <Tag className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+        )}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-xs font-medium">
+              {isPR ? `PR #${item.sourceRef}` : item.sourceRef}
+            </span>
+            <span className="text-xs text-muted-foreground">
+              {formatRelativeTime(item.createdAt)}
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground line-clamp-2">{item.tweet}</p>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-xs"
+            onClick={() => onCopy(item.tweet)}
+          >
+            {isCopied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+          </Button>
+          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={onEdit}>
+            Edit
+          </Button>
+        </div>
+
+        <div className="flex items-center gap-1">
+          {item.status === 'pending' && (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs text-destructive hover:text-destructive"
+                onClick={onReject}
+                disabled={isUpdating}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+              <Button
+                size="sm"
+                className="h-7 px-2 text-xs bg-green-600 hover:bg-green-700"
+                onClick={onApprove}
+                disabled={isUpdating}
+              >
+                <Check className="h-3 w-3 mr-1" />
+                Approve
+              </Button>
+            </>
+          )}
+
+          {item.status === 'approved' && (
+            <Button
+              size="sm"
+              className="h-7 px-2 text-xs"
+              onClick={() => {
+                const url = prompt('Posted URL (optional):');
+                onMarkPosted(url || undefined);
+              }}
+              disabled={isUpdating}
+            >
+              <Twitter className="h-3 w-3 mr-1" />
+              Posted
+            </Button>
+          )}
+
+          {(item.status === 'rejected' || item.status === 'posted') && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-xs text-destructive hover:text-destructive"
+              onClick={onDelete}
+            >
+              <Trash2 className="h-3 w-3" />
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
