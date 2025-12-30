@@ -2812,3 +2812,55 @@ export type NewUserGamificationRecord = typeof userGamification.$inferInsert;
 
 export type XpEvent = typeof xpEvents.$inferSelect;
 export type NewXpEvent = typeof xpEvents.$inferInsert;
+
+// ============ MCP SERVERS (Model Context Protocol) ============
+
+/**
+ * MCP Server configurations enabled for a repository's agent.
+ * Stores enabled MCP servers from Composio that the agent can use.
+ */
+export const repoMcpServers = pgTable('repo_mcp_servers', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  
+  /** Repository this MCP server is enabled for */
+  repoId: uuid('repo_id')
+    .notNull()
+    .references(() => repositories.id, { onDelete: 'cascade' }),
+  
+  /** Composio MCP server slug/identifier */
+  mcpSlug: text('mcp_slug').notNull(),
+  
+  /** Display name of the MCP server */
+  name: text('name').notNull(),
+  
+  /** Description of what the MCP server does */
+  description: text('description'),
+  
+  /** Icon URL for the MCP server */
+  iconUrl: text('icon_url'),
+  
+  /** Category/type of the MCP (e.g., 'productivity', 'development', 'data') */
+  category: text('category'),
+  
+  /** Whether this MCP is currently enabled */
+  enabled: boolean('enabled').notNull().default(true),
+  
+  /** Configuration JSON for the MCP (API keys, settings, etc.) - encrypted */
+  configEncrypted: text('config_encrypted'),
+  
+  /** User who enabled this MCP */
+  enabledById: text('enabled_by_id')
+    .notNull()
+    .references(() => authUser.id, { onDelete: 'cascade' }),
+  
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  repoIdx: index('idx_repo_mcp_servers_repo_id').on(table.repoId),
+  slugIdx: index('idx_repo_mcp_servers_slug').on(table.mcpSlug),
+  uniqueRepoMcp: unique('unique_repo_mcp').on(table.repoId, table.mcpSlug),
+}));
+
+// MCP Server types
+export type RepoMcpServer = typeof repoMcpServers.$inferSelect;
+export type NewRepoMcpServer = typeof repoMcpServers.$inferInsert;

@@ -202,6 +202,9 @@ export { marketingContentModel } from './marketing-content';
 // Marketing agent config model
 export { marketingAgentConfigModel } from './marketing-agent';
 
+// MCP Server model (Model Context Protocol integrations)
+export { mcpServerModel, type McpServerInfo } from './mcp-server';
+
 // Gamification models (XP, levels, achievements)
 export {
   gamificationModel,
