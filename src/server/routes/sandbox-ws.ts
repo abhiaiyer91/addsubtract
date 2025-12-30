@@ -1011,6 +1011,27 @@ async function createDockerPtySession(
 }
 
 /**
+ * Fallback PTY session state container
+ * Using an object to ensure state is shared by reference, not copied
+ */
+interface FallbackPtyState {
+  inputBuffer: string;
+  poolKey: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  pool: any;
+  onData: (data: string) => void;
+  provider: SandboxProvider;
+  options: {
+    apiKey?: string;
+    config: NonNullable<Awaited<ReturnType<typeof sandboxConfigModel.getConfig>>>;
+    repoId: string;
+    userId: string;
+    cols: number;
+    rows: number;
+  };
+}
+
+/**
  * Fallback PTY session using command execution
  * For providers that don't support native PTY
  */
@@ -1036,19 +1057,19 @@ async function createFallbackPtySession(
   const pool = getSandboxPool();
   const poolKey = `${provider}:${options.repoId}:${options.userId}`;
   
-  // We'll handle commands line by line
-  let inputBuffer = '';
+  // Use an object to ensure state is shared by reference
+  const state: FallbackPtyState = {
+    inputBuffer: '',
+    poolKey,
+    pool,
+    onData,
+    provider,
+    options,
+  };
 
   return {
     sandboxId: `fallback-${Date.now()}`,
-    sandbox: {
-      inputBuffer,
-      poolKey,
-      pool,
-      onData,
-      provider,
-      options,
-    },
+    sandbox: state,
     provider,
     cleanup: async () => {
       // Nothing to clean up for fallback
@@ -1070,45 +1091,70 @@ function isFallbackSession(session: PtySession): boolean {
 async function sendPtyInput(session: PtySession, data: string): Promise<void> {
   // Handle fallback mode first - this applies to any provider that fell back
   if (isFallbackSession(session)) {
-    const sandbox = session.sandbox;
-    sandbox.inputBuffer += data;
+    const state = session.sandbox as FallbackPtyState;
     
-    // Echo the input
-    sandbox.onData(data);
-    
-    // Check for Enter key
-    if (data === '\r' || data === '\n') {
-      const command = sandbox.inputBuffer.trim();
-      sandbox.inputBuffer = '';
-      sandbox.onData('\r\n');
-      
-      if (command) {
-        try {
-          const result = await executeCommand(sandbox.provider, {
-            apiKey: sandbox.options.apiKey,
-            command,
-            args: [],
-            timeout: 60000,
-            cwd: '/workspace',
-            config: sandbox.options.config,
-            repoId: sandbox.options.repoId,
-            userId: sandbox.options.userId,
-          });
-          
-          if (result.stdout) {
-            sandbox.onData(result.stdout.replace(/\n/g, '\r\n'));
+    // Handle special characters
+    for (const char of data) {
+      // Check for Enter key (carriage return or newline)
+      if (char === '\r' || char === '\n') {
+        const command = state.inputBuffer.trim();
+        state.inputBuffer = '';
+        state.onData('\r\n');
+        
+        if (command) {
+          try {
+            const result = await executeCommand(state.provider, {
+              apiKey: state.options.apiKey,
+              command,
+              args: [],
+              timeout: 60000,
+              cwd: '/workspace',
+              config: state.options.config,
+              repoId: state.options.repoId,
+              userId: state.options.userId,
+            });
+            
+            if (result.stdout) {
+              state.onData(result.stdout.replace(/\n/g, '\r\n'));
+            }
+            if (result.stderr) {
+              state.onData(`\x1b[31m${result.stderr.replace(/\n/g, '\r\n')}\x1b[0m`);
+            }
+            if (result.error) {
+              state.onData(`\x1b[31mError: ${result.error}\x1b[0m\r\n`);
+            }
+          } catch (error) {
+            state.onData(`\x1b[31mError: ${error instanceof Error ? error.message : 'Command failed'}\x1b[0m\r\n`);
           }
-          if (result.stderr) {
-            sandbox.onData(`\x1b[31m${result.stderr.replace(/\n/g, '\r\n')}\x1b[0m`);
-          }
-          if (result.error) {
-            sandbox.onData(`\x1b[31mError: ${result.error}\x1b[0m\r\n`);
-          }
-        } catch (error) {
-          sandbox.onData(`\x1b[31mError: ${error instanceof Error ? error.message : 'Command failed'}\x1b[0m\r\n`);
+        }
+        state.onData('$ ');
+      }
+      // Handle backspace (DEL character \x7f or backspace \x08)
+      else if (char === '\x7f' || char === '\x08') {
+        if (state.inputBuffer.length > 0) {
+          state.inputBuffer = state.inputBuffer.slice(0, -1);
+          // Send backspace sequence: move cursor back, write space, move cursor back
+          state.onData('\b \b');
         }
       }
-      sandbox.onData('$ ');
+      // Handle Ctrl+C
+      else if (char === '\x03') {
+        state.inputBuffer = '';
+        state.onData('^C\r\n$ ');
+      }
+      // Handle Ctrl+U (clear line)
+      else if (char === '\x15') {
+        // Clear the entire line visually
+        const clearCount = state.inputBuffer.length;
+        state.inputBuffer = '';
+        state.onData('\r$ ' + ' '.repeat(clearCount) + '\r$ ');
+      }
+      // Regular character
+      else {
+        state.inputBuffer += char;
+        // Echo the character
+        state.onData(char);
+      }
     }
     return;
   }
