@@ -11,6 +11,11 @@
  *   wit push --force-with-lease   # Safe force push
  *   wit push --tags               # Push all tags
  *   wit push --delete <branch>    # Delete remote branch
+ * 
+ * Dual-push (push to multiple remotes):
+ *   wit push --also <remote>      # Push to origin AND specified remote
+ *   wit push --all-remotes        # Push to ALL configured remotes
+ *   wit push origin --also github # Push to both origin and github remotes
  */
 
 import * as path from 'path';
@@ -52,6 +57,10 @@ export interface PushOptions {
   verbose?: boolean;
   all?: boolean;
   noVerify?: boolean;
+  /** Push to an additional remote after the primary push */
+  also?: string;
+  /** Push to all configured remotes */
+  allRemotes?: boolean;
 }
 
 /**
@@ -66,11 +75,19 @@ export interface PushRefResult {
 }
 
 /**
- * Push result
+ * Push result for a single remote
  */
 export interface PushResult {
   remote: string;
   refs: PushRefResult[];
+}
+
+/**
+ * Push result for multiple remotes (dual-push)
+ */
+export interface MultiPushResult {
+  results: PushResult[];
+  allSucceeded: boolean;
 }
 
 /**
@@ -694,36 +711,21 @@ function pushTags(
 }
 
 /**
- * Push to remote (async version)
+ * Push to a single remote (internal helper)
  */
-export async function pushAsync(
-  remoteName?: string,
-  branchName?: string,
-  options: PushOptions = {}
+async function pushToSingleRemoteAsync(
+  repo: Repository,
+  remoteManager: RemoteManager,
+  remoteName: string,
+  branchName: string | undefined,
+  currentBranch: string | null,
+  options: PushOptions
 ): Promise<PushResult> {
-  const repo = Repository.find();
-  const remoteManager = new RemoteManager(repo.gitDir);
-
-  // Get current branch
-  const currentBranch = repo.refs.getCurrentBranch();
-  if (!currentBranch && !branchName && !options.all && !options.tags) {
-    throw new TsgitError(
-      'You are not currently on a branch',
-      ErrorCode.DETACHED_HEAD,
-      [
-        'wit checkout <branch>    # Switch to a branch first',
-        'wit push origin <branch> # Or specify a branch to push',
-      ]
-    );
-  }
-
-  // Determine remote
-  const remote = remoteName || 'origin';
-  const remoteConfig = remoteManager.get(remote);
+  const remoteConfig = remoteManager.get(remoteName);
 
   if (!remoteConfig) {
     throw new TsgitError(
-      `No such remote: '${remote}'`,
+      `No such remote: '${remoteName}'`,
       ErrorCode.REF_NOT_FOUND,
       [
         'wit remote add origin <url>    # Add origin remote',
@@ -763,26 +765,157 @@ export async function pushAsync(
 
   if (exists(remoteConfig.url) || remoteConfig.url.startsWith('/') || remoteConfig.url.startsWith('./')) {
     // Local push
-    result = pushToLocal(repo, remoteManager, remote, remoteConfig.url, refs, options);
+    result = pushToLocal(repo, remoteManager, remoteName, remoteConfig.url, refs, options);
   } else {
     // Network push
-    result = await pushToRemoteAsync(repo, remoteManager, remote, remoteConfig.url, refs, options);
+    result = await pushToRemoteAsync(repo, remoteManager, remoteName, remoteConfig.url, refs, options);
   }
 
   // Push tags if requested
   if (options.tags) {
-    const tagResults = pushTags(repo, remote, remoteConfig.url, options);
+    const tagResults = pushTags(repo, remoteName, remoteConfig.url, options);
     result.refs.push(...tagResults);
   }
 
-  // Set upstream if requested
+  // Set upstream if requested (only for primary remote)
   if (options.setUpstream && result.refs.some(r => r.status === 'pushed' || r.status === 'new')) {
     const branch = branchName || currentBranch!;
-    remoteManager.setTrackingBranch(branch, remote, branch);
-    console.log(colors.dim(`Branch '${branch}' set up to track remote branch '${branch}' from '${remote}'.`));
+    remoteManager.setTrackingBranch(branch, remoteName, branch);
+    console.log(colors.dim(`Branch '${branch}' set up to track remote branch '${branch}' from '${remoteName}'.`));
   }
 
   return result;
+}
+
+/**
+ * Push to remote (async version)
+ * 
+ * Supports dual-push with --also <remote> or --all-remotes flags
+ */
+export async function pushAsync(
+  remoteName?: string,
+  branchName?: string,
+  options: PushOptions = {}
+): Promise<PushResult> {
+  const repo = Repository.find();
+  const remoteManager = new RemoteManager(repo.gitDir);
+
+  // Get current branch
+  const currentBranch = repo.refs.getCurrentBranch();
+  if (!currentBranch && !branchName && !options.all && !options.tags) {
+    throw new TsgitError(
+      'You are not currently on a branch',
+      ErrorCode.DETACHED_HEAD,
+      [
+        'wit checkout <branch>    # Switch to a branch first',
+        'wit push origin <branch> # Or specify a branch to push',
+      ]
+    );
+  }
+
+  // Determine primary remote
+  const primaryRemote = remoteName || 'origin';
+
+  // Push to primary remote
+  const result = await pushToSingleRemoteAsync(
+    repo,
+    remoteManager,
+    primaryRemote,
+    branchName,
+    currentBranch,
+    options
+  );
+
+  return result;
+}
+
+/**
+ * Push to multiple remotes (async version)
+ * 
+ * Use this when you want to push to multiple remotes (dual-push)
+ */
+export async function pushMultiAsync(
+  remoteName?: string,
+  branchName?: string,
+  options: PushOptions = {}
+): Promise<MultiPushResult> {
+  const repo = Repository.find();
+  const remoteManager = new RemoteManager(repo.gitDir);
+
+  // Get current branch
+  const currentBranch = repo.refs.getCurrentBranch();
+  if (!currentBranch && !branchName && !options.all && !options.tags) {
+    throw new TsgitError(
+      'You are not currently on a branch',
+      ErrorCode.DETACHED_HEAD,
+      [
+        'wit checkout <branch>    # Switch to a branch first',
+        'wit push origin <branch> # Or specify a branch to push',
+      ]
+    );
+  }
+
+  // Determine which remotes to push to
+  const primaryRemote = remoteName || 'origin';
+  const remotesToPush: string[] = [primaryRemote];
+
+  if (options.allRemotes) {
+    // Push to all configured remotes
+    const allRemotes = remoteManager.list();
+    for (const remote of allRemotes) {
+      if (!remotesToPush.includes(remote.name)) {
+        remotesToPush.push(remote.name);
+      }
+    }
+  } else if (options.also) {
+    // Push to the specified additional remote
+    if (!remotesToPush.includes(options.also)) {
+      remotesToPush.push(options.also);
+    }
+  }
+
+  // Push to all specified remotes
+  const results: PushResult[] = [];
+  let allSucceeded = true;
+
+  for (const remote of remotesToPush) {
+    try {
+      // Only set upstream for the primary remote
+      const remoteOptions = { 
+        ...options, 
+        setUpstream: remote === primaryRemote ? options.setUpstream : false 
+      };
+      
+      const result = await pushToSingleRemoteAsync(
+        repo,
+        remoteManager,
+        remote,
+        branchName,
+        currentBranch,
+        remoteOptions
+      );
+      
+      results.push(result);
+      
+      // Check if this push had any failures
+      if (result.refs.some(r => r.status === 'rejected')) {
+        allSucceeded = false;
+      }
+    } catch (error) {
+      allSucceeded = false;
+      // Create a failed result for this remote
+      results.push({
+        remote,
+        refs: [{
+          ref: branchName || currentBranch || 'unknown',
+          status: 'rejected',
+          message: error instanceof Error ? error.message : 'Push failed',
+        }],
+      });
+    }
+  }
+
+  return { results, allSucceeded };
 }
 
 /**
@@ -875,6 +1008,19 @@ async function handlePushAsync(args: string[]): Promise<void> {
       options.all = true;
     } else if (arg === '--no-verify') {
       options.noVerify = true;
+    } else if (arg === '--also') {
+      // --also <remote> - push to an additional remote
+      if (i + 1 < args.length && !args[i + 1].startsWith('-')) {
+        options.also = args[++i];
+      } else {
+        throw new TsgitError(
+          '--also requires a remote name',
+          ErrorCode.INVALID_ARGUMENT,
+          ['Usage: wit push --also <remote>', 'Example: wit push origin main --also github']
+        );
+      }
+    } else if (arg === '--all-remotes') {
+      options.allRemotes = true;
     } else if (!arg.startsWith('-')) {
       positional.push(arg);
     }
@@ -901,31 +1047,73 @@ async function handlePushAsync(args: string[]): Promise<void> {
     }
   }
 
-  const result = await pushAsync(remoteName, branchName, options);
+  // Check if we need multi-remote push
+  if (options.also || options.allRemotes) {
+    const multiResult = await pushMultiAsync(remoteName, branchName, options);
+    
+    // Format output for each remote
+    let totalPushed = 0;
+    let totalNew = 0;
+    let totalDeleted = 0;
+    let totalRejected = 0;
 
-  // Format output
-  console.log(colors.dim(`To ${result.remote}`));
-  formatPushResults(result, options.verbose || false);
+    for (const result of multiResult.results) {
+      console.log(colors.dim(`\nTo ${result.remote}`));
+      formatPushResults(result, options.verbose || false);
 
-  // Summary
-  const pushed = result.refs.filter(r => r.status === 'pushed').length;
-  const newRefs = result.refs.filter(r => r.status === 'new').length;
-  const deleted = result.refs.filter(r => r.status === 'deleted').length;
-  const rejected = result.refs.filter(r => r.status === 'rejected').length;
+      totalPushed += result.refs.filter(r => r.status === 'pushed').length;
+      totalNew += result.refs.filter(r => r.status === 'new').length;
+      totalDeleted += result.refs.filter(r => r.status === 'deleted').length;
+      totalRejected += result.refs.filter(r => r.status === 'rejected').length;
+    }
 
-  if (pushed > 0 || newRefs > 0 || deleted > 0) {
-    const parts: string[] = [];
-    if (pushed > 0) parts.push(`${pushed} updated`);
-    if (newRefs > 0) parts.push(`${newRefs} new`);
-    if (deleted > 0) parts.push(`${deleted} deleted`);
+    // Summary
+    console.log();
+    if (totalPushed > 0 || totalNew > 0 || totalDeleted > 0) {
+      const parts: string[] = [];
+      if (totalPushed > 0) parts.push(`${totalPushed} updated`);
+      if (totalNew > 0) parts.push(`${totalNew} new`);
+      if (totalDeleted > 0) parts.push(`${totalDeleted} deleted`);
 
-    console.log(colors.green('✓') + ` Push complete: ${parts.join(', ')}`);
-  } else if (rejected === 0) {
-    console.log(colors.dim('Everything up-to-date'));
-  }
+      console.log(
+        colors.green('✓') + 
+        ` Pushed to ${multiResult.results.length} remote(s): ${parts.join(', ')}`
+      );
+    } else if (totalRejected === 0) {
+      console.log(colors.dim('Everything up-to-date on all remotes'));
+    }
 
-  if (rejected > 0) {
-    process.exit(1);
+    if (totalRejected > 0) {
+      process.exit(1);
+    }
+  } else {
+    // Single remote push
+    const result = await pushAsync(remoteName, branchName, options);
+
+    // Format output
+    console.log(colors.dim(`To ${result.remote}`));
+    formatPushResults(result, options.verbose || false);
+
+    // Summary
+    const pushed = result.refs.filter(r => r.status === 'pushed').length;
+    const newRefs = result.refs.filter(r => r.status === 'new').length;
+    const deleted = result.refs.filter(r => r.status === 'deleted').length;
+    const rejected = result.refs.filter(r => r.status === 'rejected').length;
+
+    if (pushed > 0 || newRefs > 0 || deleted > 0) {
+      const parts: string[] = [];
+      if (pushed > 0) parts.push(`${pushed} updated`);
+      if (newRefs > 0) parts.push(`${newRefs} new`);
+      if (deleted > 0) parts.push(`${deleted} deleted`);
+
+      console.log(colors.green('✓') + ` Push complete: ${parts.join(', ')}`);
+    } else if (rejected === 0) {
+      console.log(colors.dim('Everything up-to-date'));
+    }
+
+    if (rejected > 0) {
+      process.exit(1);
+    }
   }
 }
 
