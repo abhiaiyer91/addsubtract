@@ -135,7 +135,7 @@ export async function getPlanningRunFromStorage(runId: string, userId: string): 
 
     const mastraRun = await workflowsStore.getWorkflowRunById({
       runId,
-      workflowName: 'multiAgentPlanning',
+      workflowName: 'multi-agent-planning',
     });
 
     if (!mastraRun) {
@@ -509,7 +509,7 @@ export const planningRouter = router({
         if (workflowsStore) {
           const mastraRun = await workflowsStore.getWorkflowRunById({
             runId: input.runId,
-            workflowName: 'multiAgentPlanning',
+            workflowName: 'multi-agent-planning',
           });
 
           if (mastraRun) {
@@ -632,7 +632,7 @@ export const planningRouter = router({
         
         if (workflowsStore) {
           const { runs: mastraRuns } = await workflowsStore.listWorkflowRuns({
-            workflowName: 'multiAgentPlanning',
+            workflowName: 'multi-agent-planning',
             resourceId: input.repoId,
             perPage: input.limit,
             page: 0,
