@@ -28,6 +28,24 @@ import {
   Check,
   AtSign,
   File,
+  Target,
+  Users,
+  Gem,
+  Lock,
+  Unlock,
+  Star,
+  Flame,
+  Coffee,
+  ThumbsUp,
+  PartyPopper,
+  Rocket,
+  Glasses,
+  KeyRound,
+  Vault,
+  Briefcase,
+  UserCheck,
+  Wrench,
+  Award,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -50,43 +68,43 @@ import { cn } from '@/lib/utils';
 // Types
 // =============================================================================
 
-type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'skipped';
-type WorkflowPhase = 'idle' | 'analyzing' | 'planning' | 'executing' | 'reviewing' | 'completed' | 'failed';
+type CrewMemberStatus = 'waiting' | 'on_it' | 'nailed_it' | 'hit_a_snag' | 'sat_out';
+type HeistPhase = 'chilling' | 'casing' | 'scheming' | 'making_moves' | 'wrapping_up' | 'pulled_it_off' | 'got_caught';
 
-interface Subtask {
+interface CrewMember {
   id: string;
   title: string;
   description: string;
   priority: string;
   estimatedEffort?: string;
   targetFiles?: string[];
-  status: TaskStatus;
+  status: CrewMemberStatus;
   result?: string;
   error?: string;
   duration?: number;
   filesModified?: string[];
 }
 
-interface ParallelGroup {
+interface Crew {
   id: string;
   name: string;
   executionOrder: number;
-  subtasks: Subtask[];
+  subtasks: CrewMember[];
   isCompleted?: boolean;
   duration?: number;
 }
 
-interface ExecutionPlan {
+interface GamePlan {
   id: string;
   version: number;
   originalTask: string;
   summary: string;
-  parallelGroups: ParallelGroup[];
+  parallelGroups: Crew[];
   estimatedTotalEffort: string;
   riskAssessment?: string;
 }
 
-interface ReviewResult {
+interface Debrief {
   overallSuccess: boolean;
   completedTasks: number;
   failedTasks: number;
@@ -102,7 +120,7 @@ interface ReviewResult {
   summary: string;
 }
 
-interface ActivityLogEntry {
+interface FeedEntry {
   id: string;
   timestamp: Date;
   type: 'info' | 'success' | 'warning' | 'error' | 'phase' | 'task';
@@ -110,7 +128,7 @@ interface ActivityLogEntry {
   details?: string;
 }
 
-interface ProjectInfo {
+interface IntelReport {
   type: string;
   language: string;
   hasTests: boolean;
@@ -119,12 +137,12 @@ interface ProjectInfo {
 }
 
 // Step to phase mapping
-const stepToPhase: Record<string, WorkflowPhase> = {
-  'analyze-task': 'analyzing',
-  'create-plan': 'planning',
-  'execute-plan': 'executing',
-  'review-results': 'reviewing',
-  'aggregate-results': 'reviewing',
+const stepToPhase: Record<string, HeistPhase> = {
+  'analyze-task': 'casing',
+  'create-plan': 'scheming',
+  'execute-plan': 'making_moves',
+  'review-results': 'wrapping_up',
+  'aggregate-results': 'wrapping_up',
 };
 
 // Step to progress mapping
@@ -140,28 +158,28 @@ const stepToProgress: Record<string, number> = {
 // Status Configurations
 // =============================================================================
 
-const taskStatusConfig: Record<TaskStatus, { label: string; icon: typeof CheckCircle2; color: string }> = {
-  pending: { label: 'Pending', icon: Clock, color: 'text-muted-foreground' },
-  in_progress: { label: 'Running', icon: Loader2, color: 'text-blue-500' },
-  completed: { label: 'Done', icon: CheckCircle2, color: 'text-green-500' },
-  failed: { label: 'Failed', icon: XCircle, color: 'text-red-500' },
-  skipped: { label: 'Skipped', icon: Clock, color: 'text-yellow-500' },
+const crewStatusConfig: Record<CrewMemberStatus, { label: string; icon: typeof CheckCircle2; color: string }> = {
+  waiting: { label: 'Ready to roll', icon: Coffee, color: 'text-muted-foreground' },
+  on_it: { label: 'On it', icon: Loader2, color: 'text-violet-500' },
+  nailed_it: { label: 'Nailed it', icon: CheckCircle2, color: 'text-green-500' },
+  hit_a_snag: { label: 'Hit a snag', icon: XCircle, color: 'text-red-500' },
+  sat_out: { label: 'Sat this one out', icon: Coffee, color: 'text-yellow-500' },
 };
 
-const phaseConfig: Record<WorkflowPhase, { 
+const phaseConfig: Record<HeistPhase, { 
   label: string; 
   description: string;
   icon: typeof Brain; 
   color: string; 
   bgColor: string;
 }> = {
-  idle: { label: 'Ready', description: 'Enter a task to begin', icon: Brain, color: 'text-muted-foreground', bgColor: 'bg-muted' },
-  analyzing: { label: 'Analyzing', description: 'Understanding your codebase...', icon: Search, color: 'text-purple-500', bgColor: 'bg-purple-500' },
-  planning: { label: 'Planning', description: 'Creating execution plan...', icon: Brain, color: 'text-indigo-500', bgColor: 'bg-indigo-500' },
-  executing: { label: 'Executing', description: 'Running subtasks...', icon: Zap, color: 'text-orange-500', bgColor: 'bg-orange-500' },
-  reviewing: { label: 'Reviewing', description: 'Validating results...', icon: Eye, color: 'text-cyan-500', bgColor: 'bg-cyan-500' },
-  completed: { label: 'Completed', description: 'All tasks finished', icon: CheckCircle2, color: 'text-green-500', bgColor: 'bg-green-500' },
-  failed: { label: 'Failed', description: 'Workflow encountered errors', icon: XCircle, color: 'text-red-500', bgColor: 'bg-red-500' },
+  chilling: { label: 'Ready When You Are', description: 'What\'s the job, boss?', icon: Coffee, color: 'text-muted-foreground', bgColor: 'bg-muted' },
+  casing: { label: 'Casing the Joint', description: 'Scoping out the codebase...', icon: Search, color: 'text-purple-500', bgColor: 'bg-purple-500' },
+  scheming: { label: 'Cooking Up a Plan', description: 'The crew\'s putting heads together...', icon: Brain, color: 'text-indigo-500', bgColor: 'bg-indigo-500' },
+  making_moves: { label: 'Making Moves', description: 'The crew\'s in action...', icon: Zap, color: 'text-violet-500', bgColor: 'bg-violet-500' },
+  wrapping_up: { label: 'Checking the Loot', description: 'Making sure we got everything...', icon: Eye, color: 'text-cyan-500', bgColor: 'bg-cyan-500' },
+  pulled_it_off: { label: 'Clean Getaway', description: 'Job\'s done. We\'re legends.', icon: PartyPopper, color: 'text-green-500', bgColor: 'bg-green-500' },
+  got_caught: { label: 'Things Got Messy', description: 'We hit some trouble', icon: AlertCircle, color: 'text-red-500', bgColor: 'bg-red-500' },
 };
 
 // =============================================================================
@@ -349,7 +367,7 @@ function MentionTextarea({
         {/* Hint for @ mentions */}
         <div className="absolute bottom-2 right-2 flex items-center gap-1 text-xs text-muted-foreground pointer-events-none">
           <AtSign className="h-3 w-3" />
-          <span>to reference files</span>
+          <span>to tag files</span>
         </div>
       </div>
 
@@ -363,11 +381,11 @@ function MentionTextarea({
           {filesLoading ? (
             <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Searching files...
+              Looking around...
             </div>
           ) : files.length === 0 ? (
             <div className="px-3 py-2 text-sm text-muted-foreground">
-              {mentionQuery ? `No files matching "${mentionQuery}"` : 'Type to search files...'}
+              {mentionQuery ? `Nothing matching "${mentionQuery}"` : 'Start typing to find files...'}
             </div>
           ) : (
             <div className="py-1">
@@ -382,7 +400,7 @@ function MentionTextarea({
                       : 'hover:bg-muted'
                   )}
                 >
-                  <File className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <FileCode className="h-4 w-4 text-muted-foreground shrink-0" />
                   <span className="font-mono truncate">{file}</span>
                 </button>
               ))}
@@ -395,30 +413,30 @@ function MentionTextarea({
 }
 
 // =============================================================================
-// Component: WorkflowHeader - Always visible task context
+// Component: JobBriefing - Always visible job context
 // =============================================================================
 
-function WorkflowHeader({ 
-  task, 
+function JobBriefing({ 
+  theJob, 
   phase, 
   progress,
-  onCancel,
+  onAbort,
   onRetry,
-  onNewTask,
+  onNewJob,
   startTime,
 }: { 
-  task: string;
-  phase: WorkflowPhase;
+  theJob: string;
+  phase: HeistPhase;
   progress: number;
-  onCancel?: () => void;
+  onAbort?: () => void;
   onRetry?: () => void;
-  onNewTask?: () => void;
+  onNewJob?: () => void;
   startTime?: Date;
 }) {
   const config = phaseConfig[phase];
   const PhaseIcon = config.icon;
-  const isRunning = !['idle', 'completed', 'failed'].includes(phase);
-  const isComplete = phase === 'completed' || phase === 'failed';
+  const isActive = !['chilling', 'pulled_it_off', 'got_caught'].includes(phase);
+  const isComplete = phase === 'pulled_it_off' || phase === 'got_caught';
   const [copied, setCopied] = useState(false);
   const [elapsed, setElapsed] = useState(0);
 
@@ -437,40 +455,41 @@ function WorkflowHeader({
     return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
   };
 
-  const copyTask = () => {
-    navigator.clipboard.writeText(task);
+  const copyJob = () => {
+    navigator.clipboard.writeText(theJob);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   return (
     <div className={cn(
-      'rounded-xl border-2 transition-all duration-300',
-      isRunning && 'border-blue-500/50 bg-blue-500/5',
-      phase === 'completed' && 'border-green-500/50 bg-green-500/5',
-      phase === 'failed' && 'border-red-500/50 bg-red-500/5',
-      phase === 'idle' && 'border-border bg-card',
+      'rounded-xl border-2 transition-all duration-300 overflow-hidden',
+      isActive && 'border-violet-500/50 bg-gradient-to-br from-violet-500/5 to-purple-500/5',
+      phase === 'pulled_it_off' && 'border-green-500/50 bg-gradient-to-br from-green-500/5 to-emerald-500/5',
+      phase === 'got_caught' && 'border-red-500/50 bg-gradient-to-br from-red-500/5 to-rose-500/5',
+      phase === 'chilling' && 'border-border bg-card',
     )}>
-      {/* Task Display - Always Visible */}
+      {/* The Job Display */}
       <div className="p-4 pb-3">
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-              <span>Task</span>
+              <Gem className="h-3 w-3" />
+              <span className="font-medium">The Job</span>
               <button 
-                onClick={copyTask}
+                onClick={copyJob}
                 className="hover:text-foreground transition-colors"
-                title="Copy task"
+                title="Copy"
               >
                 {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
               </button>
             </div>
-            <p className="text-sm font-medium leading-relaxed">{task}</p>
+            <p className="text-sm font-medium leading-relaxed">{theJob}</p>
           </div>
-          {isRunning && onCancel && (
-            <Button variant="outline" size="sm" onClick={onCancel} className="shrink-0 gap-1.5">
+          {isActive && onAbort && (
+            <Button variant="destructive" size="sm" onClick={onAbort} className="shrink-0 gap-1.5">
               <Square className="h-3 w-3" />
-              Stop
+              Call It Off
             </Button>
           )}
           {isComplete && (
@@ -478,12 +497,13 @@ function WorkflowHeader({
               {onRetry && (
                 <Button variant="default" size="sm" onClick={onRetry} className="gap-1.5">
                   <RefreshCw className="h-3.5 w-3.5" />
-                  Retry
+                  Run It Back
                 </Button>
               )}
-              {onNewTask && (
-                <Button variant="outline" size="sm" onClick={onNewTask} className="gap-1.5">
-                  New Task
+              {onNewJob && (
+                <Button variant="outline" size="sm" onClick={onNewJob} className="gap-1.5">
+                  <Plus className="h-3.5 w-3.5" />
+                  New Job
                 </Button>
               )}
             </div>
@@ -494,9 +514,9 @@ function WorkflowHeader({
       {/* Status Bar */}
       <div className={cn(
         'px-4 py-3 border-t flex items-center justify-between gap-4',
-        isRunning && 'bg-blue-500/5',
-        phase === 'completed' && 'bg-green-500/5',
-        phase === 'failed' && 'bg-red-500/5',
+        isActive && 'bg-violet-500/5',
+        phase === 'pulled_it_off' && 'bg-green-500/5',
+        phase === 'got_caught' && 'bg-red-500/5',
       )}>
         {/* Current Phase */}
         <div className="flex items-center gap-3">
@@ -507,7 +527,7 @@ function WorkflowHeader({
             <PhaseIcon className={cn(
               'h-5 w-5',
               config.color,
-              isRunning && 'animate-pulse'
+              isActive && 'animate-pulse'
             )} />
           </div>
           <div>
@@ -523,11 +543,11 @@ function WorkflowHeader({
         {/* Progress & Time */}
         <div className="flex items-center gap-4">
           {startTime && (
-            <div className="text-sm text-muted-foreground">
+            <div className="text-sm text-muted-foreground font-mono">
               {formatTime(elapsed)}
             </div>
           )}
-          {isRunning && (
+          {isActive && (
             <div className="flex items-center gap-2">
               <div className="w-32 h-2 bg-muted rounded-full overflow-hidden">
                 <div 
@@ -540,38 +560,44 @@ function WorkflowHeader({
               </span>
             </div>
           )}
-          {phase === 'completed' && (
-            <Badge className="bg-green-500 text-white">Complete</Badge>
+          {phase === 'pulled_it_off' && (
+            <Badge className="bg-green-500 text-white gap-1">
+              <PartyPopper className="h-3 w-3" />
+              Scored!
+            </Badge>
           )}
-          {phase === 'failed' && (
-            <Badge variant="destructive">Failed</Badge>
+          {phase === 'got_caught' && (
+            <Badge variant="destructive" className="gap-1">
+              <AlertCircle className="h-3 w-3" />
+              Busted
+            </Badge>
           )}
         </div>
       </div>
 
       {/* Phase Progress Steps */}
-      {(isRunning || isComplete) && (
+      {(isActive || isComplete) && (
         <div className="px-4 py-3 border-t bg-muted/30">
           <div className="flex items-center justify-between">
-            {(['analyzing', 'planning', 'executing', 'reviewing'] as WorkflowPhase[]).map((p, index, arr) => {
+            {(['casing', 'scheming', 'making_moves', 'wrapping_up'] as HeistPhase[]).map((p, index, arr) => {
               const stepConfig = phaseConfig[p];
               const StepIcon = stepConfig.icon;
-              const currentIndex = ['analyzing', 'planning', 'executing', 'reviewing'].indexOf(phase);
+              const currentIndex = ['casing', 'scheming', 'making_moves', 'wrapping_up'].indexOf(phase);
               const stepIndex = index;
-              const isActive = p === phase;
-              const isPast = stepIndex < currentIndex || phase === 'completed';
-              const isFuture = stepIndex > currentIndex && phase !== 'completed';
+              const isActiveStep = p === phase;
+              const isPast = stepIndex < currentIndex || phase === 'pulled_it_off';
+              const isFuture = stepIndex > currentIndex && phase !== 'pulled_it_off';
 
               return (
                 <div key={p} className="flex items-center">
                   <div className={cn(
                     'flex items-center gap-2 px-3 py-1.5 rounded-full transition-all',
-                    isActive && `${stepConfig.bgColor}/20`,
+                    isActiveStep && `${stepConfig.bgColor}/20`,
                     isPast && 'bg-green-500/10',
                   )}>
                     <div className={cn(
                       'w-6 h-6 rounded-full flex items-center justify-center',
-                      isActive && stepConfig.bgColor,
+                      isActiveStep && stepConfig.bgColor,
                       isPast && 'bg-green-500',
                       isFuture && 'bg-muted',
                     )}>
@@ -580,14 +606,14 @@ function WorkflowHeader({
                       ) : (
                         <StepIcon className={cn(
                           'h-3.5 w-3.5',
-                          isActive && 'text-white',
+                          isActiveStep && 'text-white',
                           isFuture && 'text-muted-foreground',
                         )} />
                       )}
                     </div>
                     <span className={cn(
                       'text-sm font-medium',
-                      isActive && stepConfig.color,
+                      isActiveStep && stepConfig.color,
                       isPast && 'text-green-500',
                       isFuture && 'text-muted-foreground',
                     )}>
@@ -611,14 +637,14 @@ function WorkflowHeader({
 }
 
 // =============================================================================
-// Component: LiveActivityFeed - Real-time updates
+// Component: CrewFeed - Real-time crew updates
 // =============================================================================
 
-function LiveActivityFeed({ 
+function CrewFeed({ 
   entries, 
   currentAction,
 }: { 
-  entries: ActivityLogEntry[];
+  entries: FeedEntry[];
   currentAction?: string;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -629,13 +655,13 @@ function LiveActivityFeed({
     }
   }, [entries, currentAction]);
 
-  const getIcon = (type: ActivityLogEntry['type']) => {
+  const getIcon = (type: FeedEntry['type']) => {
     switch (type) {
-      case 'success': return <CheckCircle2 className="h-4 w-4 text-green-500" />;
+      case 'success': return <ThumbsUp className="h-4 w-4 text-green-500" />;
       case 'warning': return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
       case 'error': return <XCircle className="h-4 w-4 text-red-500" />;
-      case 'phase': return <CircleDot className="h-4 w-4 text-blue-500" />;
-      case 'task': return <Zap className="h-4 w-4 text-orange-500" />;
+      case 'phase': return <Flame className="h-4 w-4 text-violet-500" />;
+      case 'task': return <Zap className="h-4 w-4 text-amber-500" />;
       default: return <Info className="h-4 w-4 text-muted-foreground" />;
     }
   };
@@ -643,9 +669,12 @@ function LiveActivityFeed({
   return (
     <div className="rounded-lg border bg-card overflow-hidden">
       <div className="px-4 py-2 border-b bg-muted/50 flex items-center justify-between">
-        <span className="text-sm font-medium">Live Activity</span>
+        <span className="text-sm font-medium flex items-center gap-2">
+          <Users className="h-4 w-4" />
+          Crew Chat
+        </span>
         {currentAction && (
-          <div className="flex items-center gap-2 text-sm text-blue-500">
+          <div className="flex items-center gap-2 text-sm text-violet-500">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
             <span className="animate-pulse">{currentAction}</span>
           </div>
@@ -655,7 +684,7 @@ function LiveActivityFeed({
         <div className="p-3 space-y-2">
           {entries.length === 0 ? (
             <div className="text-muted-foreground text-center py-8 text-sm">
-              Waiting to start...
+              Waiting for the crew to check in...
             </div>
           ) : (
             entries.map((entry) => (
@@ -665,7 +694,7 @@ function LiveActivityFeed({
                   'flex items-start gap-3 p-2 rounded-lg transition-colors',
                   entry.type === 'error' && 'bg-red-500/10',
                   entry.type === 'success' && 'bg-green-500/5',
-                  entry.type === 'phase' && 'bg-blue-500/5',
+                  entry.type === 'phase' && 'bg-violet-500/5',
                 )}
               >
                 <div className="mt-0.5 shrink-0">{getIcon(entry.type)}</div>
@@ -675,7 +704,7 @@ function LiveActivityFeed({
                     entry.type === 'error' && 'text-red-500',
                     entry.type === 'warning' && 'text-yellow-500',
                     entry.type === 'success' && 'text-green-600 dark:text-green-400',
-                    entry.type === 'phase' && 'text-blue-500 font-medium',
+                    entry.type === 'phase' && 'text-violet-500 font-medium',
                   )}>
                     {entry.message}
                   </div>
@@ -685,7 +714,7 @@ function LiveActivityFeed({
                     </div>
                   )}
                 </div>
-                <div className="text-xs text-muted-foreground shrink-0">
+                <div className="text-xs text-muted-foreground shrink-0 tabular-nums">
                   {entry.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                 </div>
               </div>
@@ -698,23 +727,31 @@ function LiveActivityFeed({
 }
 
 // =============================================================================
-// Component: TaskCard
+// Component: HomieCard
 // =============================================================================
 
-function TaskCard({ task, isExpanded, onToggle }: { 
-  task: Subtask; 
+function HomieCard({ homie, isExpanded, onToggle }: { 
+  homie: CrewMember; 
   isExpanded: boolean;
   onToggle: () => void;
 }) {
-  const config = taskStatusConfig[task.status];
+  const statusMap: Record<string, CrewMemberStatus> = {
+    pending: 'waiting',
+    in_progress: 'on_it',
+    completed: 'nailed_it',
+    failed: 'hit_a_snag',
+    skipped: 'sat_out',
+  };
+  const status = statusMap[homie.status] || homie.status as CrewMemberStatus;
+  const config = crewStatusConfig[status];
   const StatusIcon = config.icon;
   
   return (
     <div className={cn(
       'border rounded-lg transition-all',
-      task.status === 'in_progress' && 'border-blue-500 bg-blue-500/5 shadow-sm',
-      task.status === 'completed' && 'border-green-500/50',
-      task.status === 'failed' && 'border-red-500/50 bg-red-500/5',
+      status === 'on_it' && 'border-violet-500 bg-violet-500/5 shadow-sm shadow-violet-500/20',
+      status === 'nailed_it' && 'border-green-500/50',
+      status === 'hit_a_snag' && 'border-red-500/50 bg-red-500/5',
     )}>
       <button
         onClick={onToggle}
@@ -723,19 +760,24 @@ function TaskCard({ task, isExpanded, onToggle }: {
         <StatusIcon className={cn(
           'h-5 w-5 shrink-0',
           config.color,
-          task.status === 'in_progress' && 'animate-spin'
+          status === 'on_it' && 'animate-spin'
         )} />
         <div className="flex-1 min-w-0">
-          <div className="font-medium truncate">{task.title}</div>
-          {task.status === 'in_progress' && (
-            <div className="text-xs text-blue-500 animate-pulse mt-0.5">
-              Executing...
+          <div className="font-medium truncate">{homie.title}</div>
+          {status === 'on_it' && (
+            <div className="text-xs text-violet-500 animate-pulse mt-0.5">
+              Working their magic...
             </div>
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <Badge variant="outline" className="text-xs">
-            {task.priority}
+          <Badge variant="outline" className={cn(
+            "text-xs",
+            homie.priority === 'high' && 'border-red-500/50 text-red-500',
+            homie.priority === 'medium' && 'border-amber-500/50 text-amber-500',
+            homie.priority === 'low' && 'border-green-500/50 text-green-500',
+          )}>
+            {homie.priority}
           </Badge>
           {isExpanded ? (
             <ChevronDown className="h-4 w-4 text-muted-foreground" />
@@ -747,39 +789,42 @@ function TaskCard({ task, isExpanded, onToggle }: {
       
       {isExpanded && (
         <div className="px-3 pb-3 pt-0 border-t space-y-3">
-          <p className="text-sm text-muted-foreground pt-3">{task.description}</p>
+          <p className="text-sm text-muted-foreground pt-3">{homie.description}</p>
           
-          {task.targetFiles && task.targetFiles.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {task.targetFiles.map((file) => (
-                <Badge key={file} variant="secondary" className="text-xs font-mono">
-                  <FileCode className="h-3 w-3 mr-1" />
-                  {file}
-                </Badge>
-              ))}
+          {homie.targetFiles && homie.targetFiles.length > 0 && (
+            <div>
+              <div className="text-xs text-muted-foreground mb-1.5">Target files</div>
+              <div className="flex flex-wrap gap-1.5">
+                {homie.targetFiles.map((file) => (
+                  <Badge key={file} variant="secondary" className="text-xs font-mono">
+                    <FileCode className="h-3 w-3 mr-1" />
+                    {file}
+                  </Badge>
+                ))}
+              </div>
             </div>
           )}
           
-          {task.result && (
+          {homie.result && (
             <div className="p-2.5 rounded-lg bg-green-500/10 text-sm text-green-600 dark:text-green-400 border border-green-500/20">
-              <CheckCircle2 className="h-4 w-4 inline mr-2" />
-              {task.result}
+              <ThumbsUp className="h-4 w-4 inline mr-2" />
+              {homie.result}
             </div>
           )}
           
-          {task.error && (
+          {homie.error && (
             <div className="p-2.5 rounded-lg bg-red-500/10 text-sm text-red-600 dark:text-red-400 border border-red-500/20">
               <XCircle className="h-4 w-4 inline mr-2" />
-              {task.error}
+              {homie.error}
             </div>
           )}
           
           <div className="flex items-center gap-4 text-xs text-muted-foreground pt-1">
-            {task.filesModified && task.filesModified.length > 0 && (
-              <span>{task.filesModified.length} files modified</span>
+            {homie.filesModified && homie.filesModified.length > 0 && (
+              <span>{homie.filesModified.length} files touched</span>
             )}
-            {task.duration !== undefined && (
-              <span>{(task.duration / 1000).toFixed(1)}s</span>
+            {homie.duration !== undefined && (
+              <span>Took {(homie.duration / 1000).toFixed(1)}s</span>
             )}
           </div>
         </div>
@@ -789,97 +834,100 @@ function TaskCard({ task, isExpanded, onToggle }: {
 }
 
 // =============================================================================
-// Component: ExecutionPlanView
+// Component: GamePlanView
 // =============================================================================
 
-function ExecutionPlanView({ plan, expandedTasks, onToggleTask, phase }: {
-  plan: ExecutionPlan;
-  expandedTasks: Set<string>;
-  onToggleTask: (taskId: string) => void;
-  phase: WorkflowPhase;
+function GamePlanView({ plan, expandedHomies, onToggleHomie, phase }: {
+  plan: GamePlan;
+  expandedHomies: Set<string>;
+  onToggleHomie: (homieId: string) => void;
+  phase: HeistPhase;
 }) {
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => 
+  const [expandedCrews, setExpandedCrews] = useState<Set<string>>(() => 
     new Set(plan.parallelGroups.map(g => g.id))
   );
 
-  const toggleGroup = (groupId: string) => {
-    setExpandedGroups(prev => {
+  const toggleCrew = (crewId: string) => {
+    setExpandedCrews(prev => {
       const next = new Set(prev);
-      if (next.has(groupId)) {
-        next.delete(groupId);
+      if (next.has(crewId)) {
+        next.delete(crewId);
       } else {
-        next.add(groupId);
+        next.add(crewId);
       }
       return next;
     });
   };
 
-  const totalTasks = plan.parallelGroups.reduce((sum, g) => sum + g.subtasks.length, 0);
-  const completedTasks = plan.parallelGroups.reduce(
+  const totalHomies = plan.parallelGroups.reduce((sum, g) => sum + g.subtasks.length, 0);
+  const homiesWhoNailedIt = plan.parallelGroups.reduce(
     (sum, g) => sum + g.subtasks.filter(t => t.status === 'completed').length,
     0
   );
-  const failedTasks = plan.parallelGroups.reduce(
+  const homiesWhoHitSnags = plan.parallelGroups.reduce(
     (sum, g) => sum + g.subtasks.filter(t => t.status === 'failed').length,
     0
   );
-  const runningTasks = plan.parallelGroups.reduce(
+  const homiesOnIt = plan.parallelGroups.reduce(
     (sum, g) => sum + g.subtasks.filter(t => t.status === 'in_progress').length,
     0
   );
 
   return (
     <div className="space-y-4">
-      {/* Plan Header */}
-      <div className="rounded-lg border bg-card">
-        <div className="p-4 border-b">
+      {/* Game Plan Header */}
+      <div className="rounded-lg border bg-card overflow-hidden">
+        <div className="p-4 border-b bg-gradient-to-r from-violet-500/10 to-purple-500/10">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h3 className="font-semibold">Execution Plan</h3>
+              <h3 className="font-bold text-lg flex items-center gap-2">
+                <Briefcase className="h-5 w-5 text-violet-500" />
+                The Game Plan
+              </h3>
               <p className="text-sm text-muted-foreground mt-1">{plan.summary}</p>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <Badge variant="outline" className="gap-1">
-                <ListTodo className="h-3 w-3" />
-                {totalTasks} tasks
+                <Users className="h-3 w-3" />
+                {totalHomies} homies
               </Badge>
               <Badge variant="outline" className="gap-1">
                 <Clock className="h-3 w-3" />
-                {plan.estimatedTotalEffort}
+                ~{plan.estimatedTotalEffort}
               </Badge>
             </div>
           </div>
         </div>
 
-        {/* Progress Bar */}
+        {/* Crew Status Bar */}
         <div className="p-4 bg-muted/30">
           <div className="flex items-center justify-between mb-2 text-sm">
-            <span className="text-muted-foreground">Progress</span>
+            <span className="text-muted-foreground text-xs font-medium">Crew Status</span>
             <div className="flex items-center gap-3">
-              {runningTasks > 0 && (
-                <span className="text-blue-500 flex items-center gap-1">
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  {runningTasks} running
+              {homiesOnIt > 0 && (
+                <span className="text-violet-500 flex items-center gap-1">
+                  <Zap className="h-3 w-3 animate-pulse" />
+                  {homiesOnIt} making moves
                 </span>
               )}
-              <span className="text-green-500">{completedTasks} done</span>
-              {failedTasks > 0 && (
-                <span className="text-red-500">{failedTasks} failed</span>
+              <span className="text-green-500">{homiesWhoNailedIt} crushed it</span>
+              {homiesWhoHitSnags > 0 && (
+                <span className="text-red-500">{homiesWhoHitSnags} hit snags</span>
               )}
             </div>
           </div>
           <div className="h-3 bg-muted rounded-full overflow-hidden flex">
             <div 
               className="bg-green-500 transition-all duration-300"
-              style={{ width: `${(completedTasks / totalTasks) * 100}%` }}
+              style={{ width: `${(homiesWhoNailedIt / totalHomies) * 100}%` }}
             />
             <div 
-              className="bg-blue-500 animate-pulse transition-all duration-300"
-              style={{ width: `${(runningTasks / totalTasks) * 100}%` }}
+              className="bg-violet-500 animate-pulse transition-all duration-300"
+              style={{ width: `${(homiesOnIt / totalHomies) * 100}%` }}
             />
             <div 
               className="bg-red-500 transition-all duration-300"
-              style={{ width: `${(failedTasks / totalTasks) * 100}%` }}
+              style={{ width: `${(homiesWhoHitSnags / totalHomies) * 100}%` }}
             />
           </div>
         </div>
@@ -889,32 +937,35 @@ function ExecutionPlanView({ plan, expandedTasks, onToggleTask, phase }: {
       {plan.riskAssessment && (
         <div className="p-3 rounded-lg border border-yellow-500/30 bg-yellow-500/10 flex items-start gap-2">
           <AlertTriangle className="h-4 w-4 text-yellow-500 mt-0.5 shrink-0" />
-          <p className="text-sm text-yellow-600 dark:text-yellow-400">{plan.riskAssessment}</p>
+          <div>
+            <div className="text-xs font-medium text-yellow-600 dark:text-yellow-400 mb-1">Heads up</div>
+            <p className="text-sm text-yellow-600 dark:text-yellow-400">{plan.riskAssessment}</p>
+          </div>
         </div>
       )}
 
-      {/* Parallel Groups */}
+      {/* Crews */}
       <div className="space-y-3">
         {plan.parallelGroups
           .sort((a, b) => a.executionOrder - b.executionOrder)
-          .map((group) => {
-            const groupCompleted = group.subtasks.filter(t => t.status === 'completed').length;
-            const groupFailed = group.subtasks.filter(t => t.status === 'failed').length;
-            const groupRunning = group.subtasks.filter(t => t.status === 'in_progress').length;
-            const isExpanded = expandedGroups.has(group.id);
-            const allDone = groupCompleted + groupFailed === group.subtasks.length;
+          .map((crew) => {
+            const crewNailedIt = crew.subtasks.filter(t => t.status === 'completed').length;
+            const crewHitSnags = crew.subtasks.filter(t => t.status === 'failed').length;
+            const crewOnIt = crew.subtasks.filter(t => t.status === 'in_progress').length;
+            const isExpanded = expandedCrews.has(crew.id);
+            const allDone = crewNailedIt + crewHitSnags === crew.subtasks.length;
             
             return (
               <Collapsible
-                key={group.id}
+                key={crew.id}
                 open={isExpanded}
-                onOpenChange={() => toggleGroup(group.id)}
+                onOpenChange={() => toggleCrew(crew.id)}
               >
                 <div className={cn(
                   'rounded-lg border bg-card overflow-hidden transition-all',
-                  groupRunning > 0 && 'border-blue-500 shadow-sm shadow-blue-500/20',
-                  allDone && groupFailed === 0 && 'border-green-500/50',
-                  allDone && groupFailed > 0 && 'border-red-500/50',
+                  crewOnIt > 0 && 'border-violet-500 shadow-sm shadow-violet-500/20',
+                  allDone && crewHitSnags === 0 && 'border-green-500/50',
+                  allDone && crewHitSnags > 0 && 'border-red-500/50',
                 )}>
                   <CollapsibleTrigger asChild>
                     <button className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors">
@@ -925,48 +976,48 @@ function ExecutionPlanView({ plan, expandedTasks, onToggleTask, phase }: {
                           <ChevronRight className="h-4 w-4 text-muted-foreground" />
                         )}
                         <div className={cn(
-                          'w-7 h-7 rounded-lg flex items-center justify-center text-sm font-bold',
-                          groupRunning > 0 && 'bg-blue-500 text-white',
-                          allDone && groupFailed === 0 && 'bg-green-500 text-white',
-                          allDone && groupFailed > 0 && 'bg-red-500 text-white',
-                          !groupRunning && !allDone && 'bg-muted text-muted-foreground',
+                          'w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold',
+                          crewOnIt > 0 && 'bg-violet-500 text-white',
+                          allDone && crewHitSnags === 0 && 'bg-green-500 text-white',
+                          allDone && crewHitSnags > 0 && 'bg-red-500 text-white',
+                          !crewOnIt && !allDone && 'bg-muted text-muted-foreground',
                         )}>
-                          {group.executionOrder}
+                          {crew.executionOrder}
                         </div>
                         <div className="text-left">
-                          <div className="font-medium">{group.name}</div>
-                          {groupRunning > 0 && (
-                            <div className="text-xs text-blue-500 animate-pulse">
-                              {groupRunning} task{groupRunning > 1 ? 's' : ''} running...
+                          <div className="font-semibold">{crew.name}</div>
+                          {crewOnIt > 0 && (
+                            <div className="text-xs text-violet-500 animate-pulse">
+                              {crewOnIt} homie{crewOnIt > 1 ? 's' : ''} doing their thing...
                             </div>
                           )}
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
                         <div className="text-sm text-muted-foreground">
-                          <span className={groupCompleted > 0 ? 'text-green-500' : ''}>{groupCompleted}</span>
-                          {groupFailed > 0 && (
-                            <span className="text-red-500">/{groupFailed}</span>
+                          <span className={crewNailedIt > 0 ? 'text-green-500' : ''}>{crewNailedIt}</span>
+                          {crewHitSnags > 0 && (
+                            <span className="text-red-500">/{crewHitSnags}</span>
                           )}
-                          <span>/{group.subtasks.length}</span>
+                          <span>/{crew.subtasks.length}</span>
                         </div>
-                        {allDone && groupFailed === 0 && (
-                          <CheckCircle2 className="h-5 w-5 text-green-500" />
+                        {allDone && crewHitSnags === 0 && (
+                          <Star className="h-5 w-5 text-green-500" />
                         )}
-                        {groupRunning > 0 && (
-                          <Loader2 className="h-5 w-5 text-blue-500 animate-spin" />
+                        {crewOnIt > 0 && (
+                          <Loader2 className="h-5 w-5 text-violet-500 animate-spin" />
                         )}
                       </div>
                     </button>
                   </CollapsibleTrigger>
                   <CollapsibleContent>
                     <div className="border-t p-3 space-y-2 bg-muted/20">
-                      {group.subtasks.map((subtask) => (
-                        <TaskCard
-                          key={subtask.id}
-                          task={subtask}
-                          isExpanded={expandedTasks.has(subtask.id)}
-                          onToggle={() => onToggleTask(subtask.id)}
+                      {crew.subtasks.map((homie) => (
+                        <HomieCard
+                          key={homie.id}
+                          homie={homie}
+                          isExpanded={expandedHomies.has(homie.id)}
+                          onToggle={() => onToggleHomie(homie.id)}
                         />
                       ))}
                     </div>
@@ -981,68 +1032,68 @@ function ExecutionPlanView({ plan, expandedTasks, onToggleTask, phase }: {
 }
 
 // =============================================================================
-// Component: ReviewView
+// Component: DebriefView
 // =============================================================================
 
-function ReviewView({ review }: { review: ReviewResult }) {
+function DebriefView({ report }: { report: Debrief }) {
   return (
     <div className="space-y-4">
       {/* Overall Result */}
       <div className={cn(
         'p-6 rounded-xl border-2',
-        review.overallSuccess 
-          ? 'bg-green-500/10 border-green-500/50' 
-          : 'bg-red-500/10 border-red-500/50'
+        report.overallSuccess 
+          ? 'bg-gradient-to-br from-green-500/10 to-emerald-500/10 border-green-500/50' 
+          : 'bg-gradient-to-br from-red-500/10 to-rose-500/10 border-red-500/50'
       )}>
         <div className="flex items-center gap-3 mb-3">
-          {review.overallSuccess ? (
-            <div className="w-12 h-12 rounded-full bg-green-500 flex items-center justify-center">
-              <CheckCircle2 className="h-6 w-6 text-white" />
+          {report.overallSuccess ? (
+            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center shadow-lg shadow-green-500/30">
+              <PartyPopper className="h-7 w-7 text-white" />
             </div>
           ) : (
-            <div className="w-12 h-12 rounded-full bg-red-500 flex items-center justify-center">
-              <XCircle className="h-6 w-6 text-white" />
+            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-red-500 to-rose-500 flex items-center justify-center shadow-lg shadow-red-500/30">
+              <AlertCircle className="h-7 w-7 text-white" />
             </div>
           )}
           <div>
             <h3 className={cn(
-              'text-lg font-semibold',
-              review.overallSuccess ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+              'text-xl font-bold',
+              report.overallSuccess ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
             )}>
-              {review.overallSuccess ? 'All tasks completed successfully!' : 'Some tasks failed'}
+              {report.overallSuccess ? 'We pulled it off! 🎉' : 'We hit some bumps'}
             </h3>
-            <p className="text-sm text-muted-foreground">{review.summary}</p>
+            <p className="text-sm text-muted-foreground">{report.summary}</p>
           </div>
         </div>
         
-        <div className="flex gap-6 text-sm">
+        <div className="flex gap-6 text-sm pt-2 border-t border-current/10">
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-green-500" />
-            <span><strong>{review.completedTasks}</strong> completed</span>
+            <ThumbsUp className="h-4 w-4 text-green-500" />
+            <span><strong>{report.completedTasks}</strong> nailed it</span>
           </div>
-          {review.failedTasks > 0 && (
+          {report.failedTasks > 0 && (
             <div className="flex items-center gap-2">
               <XCircle className="h-4 w-4 text-red-500" />
-              <span><strong>{review.failedTasks}</strong> failed</span>
+              <span><strong>{report.failedTasks}</strong> hit snags</span>
             </div>
           )}
-          {review.skippedTasks > 0 && (
+          {report.skippedTasks > 0 && (
             <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-yellow-500" />
-              <span><strong>{review.skippedTasks}</strong> skipped</span>
+              <Coffee className="h-4 w-4 text-yellow-500" />
+              <span><strong>{report.skippedTasks}</strong> sat out</span>
             </div>
           )}
         </div>
       </div>
 
       {/* Issues */}
-      {review.issues.length > 0 && (
+      {report.issues.length > 0 && (
         <div className="rounded-lg border bg-card">
           <div className="p-3 border-b bg-muted/50">
-            <h4 className="font-medium">Issues ({review.issues.length})</h4>
+            <h4 className="font-semibold text-sm">Things to know ({report.issues.length})</h4>
           </div>
           <div className="p-3 space-y-2">
-            {review.issues.map((issue, i) => (
+            {report.issues.map((issue, i) => (
               <div
                 key={i}
                 className={cn(
@@ -1061,7 +1112,7 @@ function ReviewView({ review }: { review: ReviewResult }) {
                 <p className="text-sm">{issue.issue}</p>
                 {issue.suggestion && (
                   <p className="text-xs text-muted-foreground mt-1">
-                    Suggestion: {issue.suggestion}
+                    💡 {issue.suggestion}
                   </p>
                 )}
               </div>
@@ -1071,15 +1122,15 @@ function ReviewView({ review }: { review: ReviewResult }) {
       )}
 
       {/* Replanning */}
-      {review.needsReplanning && review.replanningReason && (
-        <div className="p-4 rounded-lg border border-orange-500/30 bg-orange-500/10">
+      {report.needsReplanning && report.replanningReason && (
+        <div className="p-4 rounded-lg border border-amber-500/30 bg-amber-500/10">
           <div className="flex items-center gap-2 mb-2">
-            <RefreshCw className="h-5 w-5 text-orange-500" />
-            <span className="font-medium text-orange-600 dark:text-orange-400">
-              Re-planning recommended
+            <RefreshCw className="h-5 w-5 text-amber-500" />
+            <span className="font-semibold text-amber-600 dark:text-amber-400">
+              Might wanna take another crack at this
             </span>
           </div>
-          <p className="text-sm text-muted-foreground">{review.replanningReason}</p>
+          <p className="text-sm text-muted-foreground">{report.replanningReason}</p>
         </div>
       )}
     </div>
@@ -1087,10 +1138,10 @@ function ReviewView({ review }: { review: ReviewResult }) {
 }
 
 // =============================================================================
-// Component: ResultsSummary
+// Component: LootSummary
 // =============================================================================
 
-function ResultsSummary({ 
+function LootSummary({ 
   branchCreated, 
   filesModified 
 }: { 
@@ -1101,12 +1152,15 @@ function ResultsSummary({
 
   return (
     <div className="rounded-lg border bg-card p-4">
-      <h3 className="font-semibold mb-3">Results</h3>
+      <h3 className="font-semibold mb-3 flex items-center gap-2">
+        <Gem className="h-4 w-4 text-violet-500" />
+        The Loot
+      </h3>
       <div className="space-y-2">
         {branchCreated && (
           <div className="flex items-center gap-2 text-sm">
             <GitBranch className="h-4 w-4 text-muted-foreground" />
-            <span>Branch created:</span>
+            <span>Stashed on:</span>
             <code className="px-2 py-0.5 rounded bg-muted font-mono text-xs">
               {branchCreated}
             </code>
@@ -1116,7 +1170,7 @@ function ResultsSummary({
           <div className="text-sm">
             <div className="flex items-center gap-2 mb-2">
               <FileCode className="h-4 w-4 text-muted-foreground" />
-              <span>{filesModified.length} files modified</span>
+              <span>{filesModified.length} files touched</span>
             </div>
             <div className="flex flex-wrap gap-1.5 pl-6">
               {filesModified.slice(0, 10).map((file) => (
@@ -1147,7 +1201,7 @@ export function PlanningPage() {
   const { data: session } = useSession();
   
   // Form state
-  const [task, setTask] = useState('');
+  const [theJob, setTheJob] = useState('');
   const [context, setContext] = useState('');
   const [dryRun, setDryRun] = useState(false);
   const [createBranch, setCreateBranch] = useState(true);
@@ -1157,20 +1211,20 @@ export function PlanningPage() {
   // Current run ID (either from URL or newly started)
   const [currentRunId, setCurrentRunId] = useState<string | null>(urlRunId || null);
   
-  // Workflow state
+  // Heist state
   const [isRunning, setIsRunning] = useState(false);
-  const [phase, setPhase] = useState<WorkflowPhase>('idle');
+  const [phase, setPhase] = useState<HeistPhase>('chilling');
   const [progress, setProgress] = useState(0);
-  const [plan, setPlan] = useState<ExecutionPlan | null>(null);
-  const [review, setReview] = useState<ReviewResult | null>(null);
-  const [projectInfo, setProjectInfo] = useState<ProjectInfo | null>(null);
+  const [gamePlan, setGamePlan] = useState<GamePlan | null>(null);
+  const [debrief, setDebrief] = useState<Debrief | null>(null);
+  const [intelReport, setIntelReport] = useState<IntelReport | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
-  const [activityLog, setActivityLog] = useState<ActivityLogEntry[]>([]);
+  const [expandedHomies, setExpandedHomies] = useState<Set<string>>(new Set());
+  const [crewFeed, setCrewFeed] = useState<FeedEntry[]>([]);
   const hasReceivedStartedRef = useRef(false);
   const [currentAction, setCurrentAction] = useState<string | undefined>();
   const [startTime, setStartTime] = useState<Date | undefined>();
-  const [submittedTask, setSubmittedTask] = useState('');
+  const [submittedJob, setSubmittedJob] = useState('');
   
   // Results state
   const [branchCreated, setBranchCreated] = useState<string | null>(null);
@@ -1189,9 +1243,9 @@ export function PlanningPage() {
     { enabled: !!repoData?.repo.id }
   ) as { data: { available: boolean; model: string; provider: string } | undefined };
 
-  // Fetch run history
+  // Fetch job history
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: runHistory, refetch: refetchHistory } = (trpc as any).planning?.listRuns?.useQuery(
+  const { data: jobHistory, refetch: refetchHistory } = (trpc as any).planning?.listRuns?.useQuery(
     { repoId: repoData?.repo.id!, limit: 20 },
     { enabled: !!repoData?.repo.id }
   ) as { 
@@ -1218,9 +1272,9 @@ export function PlanningPage() {
       task: string;
       context?: string;
       status: string;
-      plan?: ExecutionPlan;
+      plan?: GamePlan;
       groupResults?: Array<{ groupId: string; subtaskResults: Array<{ subtaskId: string; status: string; result?: string; error?: string }> }>;
-      review?: ReviewResult;
+      review?: Debrief;
       error?: string;
       startedAt: string;
       completedAt?: string;
@@ -1232,13 +1286,13 @@ export function PlanningPage() {
     isLoading: boolean;
   };
 
-  // Activity log helper
-  const addLog = useCallback((
-    type: ActivityLogEntry['type'],
+  // Feed helper
+  const addToFeed = useCallback((
+    type: FeedEntry['type'],
     message: string,
     details?: string
   ) => {
-    setActivityLog(prev => [...prev, {
+    setCrewFeed(prev => [...prev, {
       id: crypto.randomUUID(),
       timestamp: new Date(),
       type,
@@ -1247,16 +1301,16 @@ export function PlanningPage() {
     }]);
   }, []);
 
-  // Update subtask status
-  const updateSubtask = useCallback((subtaskId: string, updates: Partial<Subtask>) => {
-    setPlan(prev => {
+  // Update homie status
+  const updateHomie = useCallback((homieId: string, updates: Partial<CrewMember>) => {
+    setGamePlan(prev => {
       if (!prev) return null;
       return {
         ...prev,
-        parallelGroups: prev.parallelGroups.map(group => ({
-          ...group,
-          subtasks: group.subtasks.map(task =>
-            task.id === subtaskId ? { ...task, ...updates } : task
+        parallelGroups: prev.parallelGroups.map(crew => ({
+          ...crew,
+          subtasks: crew.subtasks.map(homie =>
+            homie.id === homieId ? { ...homie, ...updates } : homie
           ),
         })),
       };
@@ -1266,32 +1320,30 @@ export function PlanningPage() {
   // Abort controller for cancellation
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Handle SSE events - defined before useEffect so it can be referenced
+  // Handle SSE events
   const handleStreamEvent = useCallback((event: { runId?: string; stepId?: string; result?: any; error?: string; totalDuration?: number }) => {
-    // Detect event type from the data structure
     const { stepId, result, error: eventError, totalDuration } = event;
     
-    // Started event - only process once per workflow run
+    // Started event - only process once per job
     if (event.runId && !stepId && !totalDuration && !eventError) {
       if (hasReceivedStartedRef.current) {
-        return; // Skip duplicate started events
+        return;
       }
       hasReceivedStartedRef.current = true;
-      // Capture runId for URL navigation
       setCurrentRunId(event.runId);
-      addLog('phase', 'Workflow started');
-      setCurrentAction('Initializing...');
-      setPhase('analyzing');
+      addToFeed('phase', 'Alright crew, we\'re in 🎯');
+      setCurrentAction('Getting the lay of the land...');
+      setPhase('casing');
       setProgress(5);
       return;
     }
     
     // Complete event
     if (totalDuration !== undefined) {
-      setPhase('completed');
+      setPhase('pulled_it_off');
       setProgress(100);
       setCurrentAction(undefined);
-      addLog('success', 'Workflow completed successfully');
+      addToFeed('success', 'Clean getaway! Job\'s done 🎉');
       setIsRunning(false);
       return;
     }
@@ -1299,16 +1351,15 @@ export function PlanningPage() {
     // Error event
     if (eventError && !stepId) {
       setError(eventError);
-      setPhase('failed');
+      setPhase('got_caught');
       setCurrentAction(undefined);
-      addLog('error', eventError);
+      addToFeed('error', `Aw man, we hit a wall: ${eventError}`);
       setIsRunning(false);
       return;
     }
     
     // Step events
     if (stepId) {
-      // Check if it's a step-start (no result) or step-complete (has result)
       if (result === undefined && !eventError) {
         // step-start
         const newPhase = stepToPhase[stepId];
@@ -1316,11 +1367,11 @@ export function PlanningPage() {
           setPhase(newPhase);
           setProgress(stepToProgress[stepId] || 0);
           setCurrentAction(phaseConfig[newPhase]?.description);
-          addLog('phase', `${phaseConfig[newPhase]?.label}...`);
+          addToFeed('phase', phaseConfig[newPhase]?.label);
         }
       } else if (eventError) {
         // step-error
-        addLog('error', `Step failed: ${stepId}`, eventError);
+        addToFeed('error', `Ran into trouble at ${stepId}`, eventError);
         setCurrentAction(undefined);
       } else {
         // step-complete
@@ -1328,38 +1379,38 @@ export function PlanningPage() {
         
         if (stepId === 'analyze-task' && result) {
           if (result.projectInfo) {
-            setProjectInfo(result.projectInfo);
-            addLog('success', `Detected ${result.projectInfo.language} ${result.projectInfo.type} project`);
+            setIntelReport(result.projectInfo);
+            addToFeed('success', `Scoped it out: ${result.projectInfo.language} ${result.projectInfo.type}`);
           }
           if (result.relevantFiles?.length) {
-            addLog('info', `Found ${result.relevantFiles.length} relevant files`);
+            addToFeed('info', `Found ${result.relevantFiles.length} files we need to hit`);
           }
         }
         
         if (stepId === 'create-plan' && result?.plan) {
-          setPlan(result.plan);
-          const taskCount = result.plan.parallelGroups?.reduce(
-            (sum: number, g: ParallelGroup) => sum + g.subtasks.length, 0
+          setGamePlan(result.plan);
+          const homieCount = result.plan.parallelGroups?.reduce(
+            (sum: number, g: Crew) => sum + g.subtasks.length, 0
           ) || 0;
-          addLog('success', `Created plan with ${taskCount} subtasks in ${result.plan.parallelGroups?.length || 0} groups`);
+          addToFeed('success', `Game plan ready: ${homieCount} homies across ${result.plan.parallelGroups?.length || 0} crews`);
         }
         
         if (stepId === 'execute-plan' && result) {
           if (result.groupResults) {
-            for (const group of result.groupResults) {
-              for (const taskResult of group.subtaskResults) {
-                updateSubtask(taskResult.subtaskId, {
-                  status: taskResult.status,
-                  result: taskResult.result,
-                  error: taskResult.error,
-                  duration: taskResult.duration,
-                  filesModified: taskResult.filesModified,
+            for (const crew of result.groupResults) {
+              for (const homieResult of crew.subtaskResults) {
+                updateHomie(homieResult.subtaskId, {
+                  status: homieResult.status,
+                  result: homieResult.result,
+                  error: homieResult.error,
+                  duration: homieResult.duration,
+                  filesModified: homieResult.filesModified,
                 });
                 
-                if (taskResult.status === 'completed') {
-                  addLog('success', `Completed: ${taskResult.subtaskId}`);
-                } else if (taskResult.status === 'failed') {
-                  addLog('error', `Failed: ${taskResult.subtaskId}`, taskResult.error);
+                if (homieResult.status === 'completed') {
+                  addToFeed('success', `${homieResult.subtaskId} came through! ✨`);
+                } else if (homieResult.status === 'failed') {
+                  addToFeed('error', `${homieResult.subtaskId} hit a snag`, homieResult.error);
                 }
               }
             }
@@ -1369,19 +1420,19 @@ export function PlanningPage() {
         }
         
         if (stepId === 'review-results' && result?.review) {
-          setReview(result.review);
-          addLog(
+          setDebrief(result.review);
+          addToFeed(
             result.review.overallSuccess ? 'success' : 'warning',
             result.review.summary
           );
         }
       }
     }
-  }, [addLog, updateSubtask]);
+  }, [addToFeed, updateHomie]);
 
-  // Start streaming when workflow begins
+  // Start streaming when job begins
   useEffect(() => {
-    if (!isRunning || !repoData?.repo.id || !submittedTask) {
+    if (!isRunning || !repoData?.repo.id || !submittedJob) {
       return;
     }
 
@@ -1399,7 +1450,7 @@ export function PlanningPage() {
           credentials: 'include',
           body: JSON.stringify({
             repoId: repoData.repo.id,
-            task: submittedTask.trim(),
+            task: submittedJob.trim(),
             context: context.trim() || undefined,
             dryRun,
             createBranch,
@@ -1433,7 +1484,6 @@ export function PlanningPage() {
 
           for (const line of lines) {
             if (line.startsWith('event: ')) {
-              // Event type line - we'll detect type from the data
               continue;
             }
             if (line.startsWith('data: ')) {
@@ -1449,14 +1499,13 @@ export function PlanningPage() {
         }
       } catch (err) {
         if ((err as Error).name === 'AbortError') {
-          // Cancelled by user
           return;
         }
         setError((err as Error).message);
-        setPhase('failed');
+        setPhase('got_caught');
         setCurrentAction(undefined);
         setIsRunning(false);
-        addLog('error', `Connection error: ${(err as Error).message}`);
+        addToFeed('error', `Lost connection: ${(err as Error).message}`);
       }
     };
 
@@ -1466,45 +1515,41 @@ export function PlanningPage() {
       abortController.abort();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isRunning, repoData?.repo.id, submittedTask, handleStreamEvent]);
+  }, [isRunning, repoData?.repo.id, submittedJob, handleStreamEvent]);
 
   // Load existing run data when navigating to a run URL
   useEffect(() => {
     if (!existingRun) return;
     
-    // Set state from existing run
-    setSubmittedTask(existingRun.task);
+    setSubmittedJob(existingRun.task);
     setCurrentRunId(existingRun.id);
     setStartTime(new Date(existingRun.startedAt));
     
     if (existingRun.plan) {
-      setPlan(existingRun.plan);
+      setGamePlan(existingRun.plan);
     }
     if (existingRun.review) {
-      setReview(existingRun.review);
+      setDebrief(existingRun.review);
     }
     if (existingRun.error) {
       setError(existingRun.error);
     }
     
-    // Set phase based on status
-    const statusToPhase: Record<string, WorkflowPhase> = {
-      pending: 'analyzing',
-      planning: 'planning',
-      executing: 'executing',
-      reviewing: 'reviewing',
-      completed: 'completed',
-      failed: 'failed',
+    const statusToPhase: Record<string, HeistPhase> = {
+      pending: 'casing',
+      planning: 'scheming',
+      executing: 'making_moves',
+      reviewing: 'wrapping_up',
+      completed: 'pulled_it_off',
+      failed: 'got_caught',
     };
-    setPhase(statusToPhase[existingRun.status] || 'idle');
+    setPhase(statusToPhase[existingRun.status] || 'chilling');
     
-    // If still running, set up observation via SSE
     if (['pending', 'planning', 'executing', 'reviewing'].includes(existingRun.status)) {
       setIsRunning(true);
-      setCurrentAction('Reconnecting...');
-      hasReceivedStartedRef.current = true; // Already started
+      setCurrentAction('Catching up with the crew...');
+      hasReceivedStartedRef.current = true;
       
-      // Connect to observe stream
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
       const abortController = new AbortController();
       abortControllerRef.current = abortController;
@@ -1517,7 +1562,7 @@ export function PlanningPage() {
           });
           
           if (!response.ok) {
-            throw new Error(`Failed to observe run: ${response.status}`);
+            throw new Error(`Couldn't catch up: ${response.status}`);
           }
           
           const reader = response.body?.getReader();
@@ -1547,7 +1592,7 @@ export function PlanningPage() {
           }
         } catch (err) {
           if ((err as Error).name !== 'AbortError') {
-            console.error('Observe stream error:', err);
+            console.error('Stream error:', err);
           }
         }
       };
@@ -1559,12 +1604,11 @@ export function PlanningPage() {
       };
     } else {
       setIsRunning(false);
-      // Set progress based on completion
       setProgress(existingRun.status === 'completed' ? 100 : 0);
     }
   }, [existingRun, handleStreamEvent]);
 
-  // Update URL when currentRunId changes (but not on initial load from URL)
+  // Update URL when currentRunId changes
   useEffect(() => {
     if (currentRunId && currentRunId !== urlRunId) {
       navigate(`/${owner}/${repo}/planning/${currentRunId}`, { replace: true });
@@ -1572,92 +1616,88 @@ export function PlanningPage() {
     }
   }, [currentRunId, urlRunId, owner, repo, navigate, refetchHistory]);
 
-  const handleStart = () => {
-    if (!task.trim() || !repoData?.repo.id) return;
+  const handleStartJob = () => {
+    if (!theJob.trim() || !repoData?.repo.id) return;
     
-    // Save the task and reset state
-    setSubmittedTask(task.trim());
+    setSubmittedJob(theJob.trim());
     setIsRunning(true);
-    setPhase('analyzing');
+    setPhase('casing');
     setProgress(0);
-    setPlan(null);
-    setReview(null);
-    setProjectInfo(null);
+    setGamePlan(null);
+    setDebrief(null);
+    setIntelReport(null);
     setError(null);
-    setActivityLog([]);
+    setCrewFeed([]);
     setBranchCreated(null);
     setFilesModified([]);
-    setExpandedTasks(new Set());
-    setCurrentAction('Starting workflow...');
+    setExpandedHomies(new Set());
+    setCurrentAction('Rallying the crew...');
     setStartTime(new Date());
-    hasReceivedStartedRef.current = false; // Reset for new workflow run
+    hasReceivedStartedRef.current = false;
     
-    addLog('phase', 'Initializing workflow...');
+    addToFeed('phase', 'Let\'s get this bread 🍞');
   };
 
-  const handleCancel = () => {
-    // Abort the stream
+  const handleAbortJob = () => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
     }
     setIsRunning(false);
-    setPhase('failed');
+    setPhase('got_caught');
     setCurrentAction(undefined);
-    addLog('warning', 'Workflow cancelled by user');
+    addToFeed('warning', 'Job called off. We\'ll get \'em next time.');
   };
 
-  const handleRetry = () => {
-    if (!submittedTask.trim() || !repoData?.repo.id) return;
+  const handleRetryJob = () => {
+    if (!submittedJob.trim() || !repoData?.repo.id) return;
     
-    // Reset workflow state but keep the task
     setIsRunning(true);
-    setPhase('analyzing');
+    setPhase('casing');
     setProgress(0);
-    setPlan(null);
-    setReview(null);
-    setProjectInfo(null);
+    setGamePlan(null);
+    setDebrief(null);
+    setIntelReport(null);
     setError(null);
-    setActivityLog([]);
+    setCrewFeed([]);
     setBranchCreated(null);
     setFilesModified([]);
-    setExpandedTasks(new Set());
-    setCurrentAction('Retrying workflow...');
+    setExpandedHomies(new Set());
+    setCurrentAction('Getting the crew back together...');
     setStartTime(new Date());
-    hasReceivedStartedRef.current = false; // Reset for retry
+    hasReceivedStartedRef.current = false;
     
-    addLog('phase', 'Retrying workflow...');
+    addToFeed('phase', 'Round two, let\'s go! 💪');
   };
 
-  const handleNewTask = () => {
-    setTask('');
-    setSubmittedTask('');
+  const handleNewJob = () => {
+    setTheJob('');
+    setSubmittedJob('');
     setCurrentRunId(null);
     setIsRunning(false);
-    setPhase('idle');
+    setPhase('chilling');
     setProgress(0);
-    setPlan(null);
-    setReview(null);
-    setProjectInfo(null);
+    setGamePlan(null);
+    setDebrief(null);
+    setIntelReport(null);
     setError(null);
-    setActivityLog([]);
+    setCrewFeed([]);
     setBranchCreated(null);
     setFilesModified([]);
-    setExpandedTasks(new Set());
+    setExpandedHomies(new Set());
     setCurrentAction(undefined);
     setStartTime(undefined);
-    hasReceivedStartedRef.current = false; // Reset for new task
-    // Navigate to base planning URL
+    hasReceivedStartedRef.current = false;
     navigate(`/${owner}/${repo}/planning`);
   };
 
-  const toggleTask = (taskId: string) => {
-    setExpandedTasks(prev => {
+  const toggleHomie = (homieId: string) => {
+    setExpandedHomies(prev => {
       const next = new Set(prev);
-      if (next.has(taskId)) {
-        next.delete(taskId);
+      if (next.has(homieId)) {
+        next.delete(homieId);
       } else {
-        next.add(taskId);
+        next.add(homieId);
       }
       return next;
     });
@@ -1681,27 +1721,27 @@ export function PlanningPage() {
     );
   }
 
-  const isIdle = phase === 'idle';
-  const isComplete = phase === 'completed' || phase === 'failed';
-  const showWorkflow = isRunning || isComplete;
+  const isChilling = phase === 'chilling';
+  const isComplete = phase === 'pulled_it_off' || phase === 'got_caught';
+  const showJob = isRunning || isComplete;
 
   return (
     <RepoLayout owner={owner!} repo={repo!} activeTab="planning">
       <div className="flex gap-6">
-        {/* Left Sidebar - Run History */}
+        {/* Left Sidebar - Past Jobs */}
         <div className="w-64 shrink-0 hidden lg:block">
           <div className="sticky top-4 space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-medium flex items-center gap-2">
                 <History className="h-4 w-4" />
-                Run History
+                Past Jobs
               </h3>
-              {!isIdle && (
+              {!isChilling && (
                 <Button 
                   variant="ghost" 
                   size="sm" 
                   className="h-7 px-2"
-                  onClick={handleNewTask}
+                  onClick={handleNewJob}
                 >
                   <Plus className="h-3.5 w-3.5" />
                 </Button>
@@ -1710,31 +1750,35 @@ export function PlanningPage() {
             
             <ScrollArea className="h-[calc(100vh-200px)]">
               <div className="space-y-1 pr-4">
-                {runHistory?.map((run) => (
+                {jobHistory?.map((job) => (
                   <Link
-                    key={run.id}
-                    to={`/${owner}/${repo}/planning/${run.id}`}
+                    key={job.id}
+                    to={`/${owner}/${repo}/planning/${job.id}`}
                     className={cn(
                       'block p-3 rounded-lg border transition-colors hover:bg-accent',
-                      currentRunId === run.id && 'bg-accent border-primary'
+                      currentRunId === job.id && 'bg-accent border-primary'
                     )}
                   >
                     <p className="text-sm font-medium line-clamp-2 mb-1">
-                      {run.task.length > 60 ? run.task.slice(0, 60) + '...' : run.task}
+                      {job.task.length > 60 ? job.task.slice(0, 60) + '...' : job.task}
                     </p>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <Badge 
                         variant={
-                          run.status === 'completed' ? 'default' : 
-                          run.status === 'failed' ? 'destructive' : 
+                          job.status === 'completed' ? 'default' : 
+                          job.status === 'failed' ? 'destructive' : 
                           'secondary'
                         }
-                        className="text-[10px] px-1.5 py-0"
+                        className={cn(
+                          "text-[10px] px-1.5 py-0",
+                          job.status === 'completed' && 'bg-green-500'
+                        )}
                       >
-                        {run.status}
+                        {job.status === 'completed' ? 'Scored' : 
+                         job.status === 'failed' ? 'Busted' : job.status}
                       </Badge>
                       <span>
-                        {new Date(run.startedAt).toLocaleDateString(undefined, {
+                        {new Date(job.startedAt).toLocaleDateString(undefined, {
                           month: 'short',
                           day: 'numeric',
                           hour: '2-digit',
@@ -1745,9 +1789,9 @@ export function PlanningPage() {
                   </Link>
                 ))}
                 
-                {(!runHistory || runHistory.length === 0) && (
+                {(!jobHistory || jobHistory.length === 0) && (
                   <p className="text-sm text-muted-foreground text-center py-8">
-                    No runs yet
+                    No jobs yet
                   </p>
                 )}
               </div>
@@ -1762,17 +1806,17 @@ export function PlanningPage() {
             <div className="flex items-center gap-3">
               <div className={cn(
                 'p-2.5 rounded-xl transition-colors',
-                isRunning ? 'bg-blue-500/10' : 'bg-primary/10'
+                isRunning ? 'bg-violet-500/10' : 'bg-primary/10'
               )}>
-                <Brain className={cn(
+                <Glasses className={cn(
                   'h-6 w-6',
-                  isRunning ? 'text-blue-500 animate-pulse' : 'text-primary'
+                  isRunning ? 'text-violet-500 animate-pulse' : 'text-primary'
                 )} />
               </div>
               <div>
-                <h1 className="text-2xl font-bold">AI Planning</h1>
+                <h1 className="text-2xl font-bold">The Crew</h1>
                 <p className="text-sm text-muted-foreground">
-                  Break down complex tasks into parallel subtasks
+                  Your AI homies ready to make moves
                 </p>
               </div>
             </div>
@@ -1790,10 +1834,10 @@ export function PlanningPage() {
               <AlertCircle className="h-5 w-5 text-yellow-500 shrink-0" />
               <div>
                 <p className="font-medium text-yellow-600 dark:text-yellow-400">
-                  AI not configured
+                  Crew's not ready yet
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Add an API key in repository settings to use AI planning.
+                  Hook up an API key in settings to get the crew online.
                 </p>
               </div>
             </div>
@@ -1805,41 +1849,44 @@ export function PlanningPage() {
               <AlertCircle className="h-5 w-5 text-destructive shrink-0" />
               <div className="flex-1">
                 <p className="font-medium text-destructive">
-                  Run not found
+                  Can't find that job
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  This planning run may have expired or been deleted. Start a new task to continue.
+                  Might've been cleaned up. Start a fresh one?
                 </p>
               </div>
-              <Button variant="outline" size="sm" onClick={handleNewTask}>
+              <Button variant="outline" size="sm" onClick={handleNewJob}>
                 <Plus className="h-4 w-4 mr-1" />
-                New Task
+                New Job
               </Button>
             </div>
           )}
 
-          {/* Workflow Header - Shows task & progress when running */}
-          {showWorkflow && submittedTask && (
-            <WorkflowHeader
-              task={submittedTask}
+          {/* Job Briefing - Shows the job & progress when active */}
+          {showJob && submittedJob && (
+            <JobBriefing
+              theJob={submittedJob}
               phase={phase}
               progress={progress}
-              onCancel={isRunning ? handleCancel : undefined}
-              onRetry={isComplete ? handleRetry : undefined}
-              onNewTask={isComplete ? handleNewTask : undefined}
+              onAbort={isRunning ? handleAbortJob : undefined}
+              onRetry={isComplete ? handleRetryJob : undefined}
+              onNewJob={isComplete ? handleNewJob : undefined}
               startTime={startTime}
             />
           )}
 
-          {/* Task Input - Only shown when idle */}
-          {isIdle && (
-            <div className="space-y-4 p-6 rounded-xl border-2 border-dashed bg-card">
+          {/* Job Input - Only shown when chilling */}
+          {isChilling && (
+            <div className="space-y-4 p-6 rounded-xl border-2 border-dashed bg-gradient-to-br from-card to-muted/20">
               <div className="space-y-2">
-                <label className="text-sm font-medium">What do you want to build?</label>
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <Gem className="h-4 w-4 text-violet-500" />
+                  What's the job?
+                </label>
                 <MentionTextarea
-                  placeholder="Describe the task you want to accomplish... Use @ to reference files (e.g., 'Add user authentication with JWT tokens')"
-                  value={task}
-                  onChange={setTask}
+                  placeholder="Tell the crew what we're doing... Use @ to point at specific files (e.g., 'Add JWT auth to the login flow')"
+                  value={theJob}
+                  onChange={setTheJob}
                   owner={owner!}
                   repo={repo!}
                   autoFocus
@@ -1847,9 +1894,9 @@ export function PlanningPage() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium text-muted-foreground">Additional context (optional)</label>
+                <label className="text-sm font-medium text-muted-foreground">Extra context (optional)</label>
                 <MentionTextarea
-                  placeholder="Any additional requirements, constraints, or context... Use @ to reference specific files"
+                  placeholder="Anything else the crew should know? Use @ to reference files"
                   value={context}
                   onChange={setContext}
                   owner={owner!}
@@ -1867,7 +1914,7 @@ export function PlanningPage() {
                     onCheckedChange={(checked) => setDryRun(checked as boolean)}
                   />
                   <label htmlFor="dryRun" className="text-sm cursor-pointer">
-                    Preview only (dry run)
+                    Just scope it out (dry run)
                   </label>
                 </div>
                 <div className="flex items-center gap-2">
@@ -1877,7 +1924,7 @@ export function PlanningPage() {
                     onCheckedChange={(checked) => setCreateBranch(checked as boolean)}
                   />
                   <label htmlFor="createBranch" className="text-sm cursor-pointer">
-                    Create feature branch
+                    Work on a separate branch
                   </label>
                 </div>
               </div>
@@ -1887,14 +1934,14 @@ export function PlanningPage() {
                 <CollapsibleTrigger asChild>
                   <Button variant="ghost" size="sm" className="gap-1.5 -ml-2 text-muted-foreground">
                     {showAdvanced ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                    Advanced options
+                    More options
                   </Button>
                 </CollapsibleTrigger>
                 <CollapsibleContent className="pt-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Custom branch name</label>
                     <Input
-                      placeholder="ai-planning/my-feature"
+                      placeholder="feature/cool-stuff"
                       value={branchName}
                       onChange={(e) => setBranchName(e.target.value)}
                       disabled={!createBranch}
@@ -1906,13 +1953,13 @@ export function PlanningPage() {
               {/* Start Button */}
               <div className="pt-4">
                 <Button
-                  onClick={handleStart}
-                  disabled={!task.trim() || !planningStatus?.available}
+                  onClick={handleStartJob}
+                  disabled={!theJob.trim() || !planningStatus?.available}
                   size="lg"
-                  className="gap-2"
+                  className="gap-2 bg-gradient-to-r from-violet-500 to-purple-500 hover:from-violet-600 hover:to-purple-600 text-white shadow-lg shadow-violet-500/25"
                 >
-                  <Play className="h-4 w-4" />
-                  Start Planning
+                  <Rocket className="h-4 w-4" />
+                  Let's Go
                 </Button>
               </div>
             </div>
@@ -1923,61 +1970,64 @@ export function PlanningPage() {
             <div className="flex items-start gap-3 p-4 rounded-xl bg-red-500/10 border border-red-500/30">
               <XCircle className="h-5 w-5 text-red-500 mt-0.5 shrink-0" />
               <div>
-                <p className="font-medium text-red-600 dark:text-red-400">
-                  {phase === 'failed' ? 'Workflow failed' : 'Error'}
+                <p className="font-semibold text-red-600 dark:text-red-400">
+                  {phase === 'got_caught' ? 'Things went sideways' : 'Uh oh'}
                 </p>
                 <p className="text-sm text-muted-foreground mt-1">{error}</p>
               </div>
             </div>
           )}
 
-          {/* Main Content - Two columns when running */}
-          {showWorkflow && (
+          {/* Main Content - Two columns when job is active */}
+          {showJob && (
             <div className="grid lg:grid-cols-5 gap-6">
-              {/* Left: Activity Feed */}
+              {/* Left: Crew Feed */}
               <div className="lg:col-span-2 space-y-4">
-                <LiveActivityFeed 
-                  entries={activityLog} 
+                <CrewFeed 
+                  entries={crewFeed} 
                   currentAction={isRunning ? currentAction : undefined}
                 />
                 
-                {/* Project Info */}
-                {projectInfo && (
+                {/* Intel Report */}
+                {intelReport && (
                   <div className="rounded-lg border bg-card p-4">
-                    <h3 className="text-sm font-medium mb-2">Project Detected</h3>
+                    <h3 className="text-sm font-medium mb-2 flex items-center gap-2">
+                      <Search className="h-4 w-4" />
+                      What we found
+                    </h3>
                     <div className="flex flex-wrap gap-2">
-                      <Badge variant="secondary">{projectInfo.language}</Badge>
-                      <Badge variant="secondary">{projectInfo.type}</Badge>
-                      {projectInfo.hasTests && <Badge variant="outline">Has Tests</Badge>}
-                      {projectInfo.hasLinting && <Badge variant="outline">Has Linting</Badge>}
+                      <Badge variant="secondary">{intelReport.language}</Badge>
+                      <Badge variant="secondary">{intelReport.type}</Badge>
+                      {intelReport.hasTests && <Badge variant="outline">Has tests</Badge>}
+                      {intelReport.hasLinting && <Badge variant="outline">Has linting</Badge>}
                     </div>
                   </div>
                 )}
 
-                {/* Results Summary */}
+                {/* Loot Summary */}
                 {isComplete && (
-                  <ResultsSummary 
+                  <LootSummary 
                     branchCreated={branchCreated} 
                     filesModified={filesModified} 
                   />
                 )}
               </div>
 
-              {/* Right: Plan/Review */}
+              {/* Right: Game Plan / Debrief */}
               <div className="lg:col-span-3">
-                {review ? (
-                  <ReviewView review={review} />
-                ) : plan ? (
-                  <ExecutionPlanView
-                    plan={plan}
-                    expandedTasks={expandedTasks}
-                    onToggleTask={toggleTask}
+                {debrief ? (
+                  <DebriefView report={debrief} />
+                ) : gamePlan ? (
+                  <GamePlanView
+                    plan={gamePlan}
+                    expandedHomies={expandedHomies}
+                    onToggleHomie={toggleHomie}
                     phase={phase}
                   />
                 ) : (
                   <div className="rounded-lg border bg-card p-12 text-center">
                     <Brain className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50 animate-pulse" />
-                    <p className="text-muted-foreground">Creating execution plan...</p>
+                    <p className="text-muted-foreground">Cooking up a plan...</p>
                   </div>
                 )}
               </div>
@@ -1985,10 +2035,10 @@ export function PlanningPage() {
           )}
 
           {/* Empty State */}
-          {isIdle && !error && (
+          {isChilling && !error && (
             <div className="text-center py-8 text-muted-foreground">
               <p className="text-sm">
-                The AI will analyze your codebase, create an execution plan, and run tasks in parallel.
+                The crew will scope out the codebase, put together a game plan, and get to work.
               </p>
             </div>
           )}
