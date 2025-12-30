@@ -242,21 +242,26 @@ export function AiChat({
             </div>
           ) : (
             /* Suggested questions */
-            <div className="space-y-2">
-              <p className="text-xs text-muted-foreground">Suggested questions:</p>
-              <div className="flex flex-wrap gap-2">
+            <div className="space-y-3">
+              <p className="text-xs text-muted-foreground font-medium">Suggested questions</p>
+              <div className="grid grid-cols-2 gap-2">
                 {suggestedQuestions.map((suggestion, idx) => (
-                  <Button
+                  <button
                     key={idx}
-                    variant="outline"
-                    size="sm"
-                    className="h-7 text-xs gap-1"
                     onClick={() => handleSend(suggestion.query)}
                     disabled={!onSendMessage || isSending}
+                    className={cn(
+                      "flex items-center gap-2 p-2.5 rounded-lg text-left text-xs",
+                      "bg-muted/50 hover:bg-muted border border-transparent hover:border-border",
+                      "transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed",
+                      "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1"
+                    )}
                   >
-                    {suggestion.icon}
-                    {suggestion.label}
-                  </Button>
+                    <span className="shrink-0 p-1.5 rounded-md bg-primary/10 text-primary">
+                      {suggestion.icon}
+                    </span>
+                    <span className="text-foreground font-medium">{suggestion.label}</span>
+                  </button>
                 ))}
               </div>
             </div>
