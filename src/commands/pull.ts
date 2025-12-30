@@ -354,7 +354,7 @@ function performRebase(
   const isFastForward = canFastForward(repo, headHash, targetHash);
   
   if (isFastForward) {
-    return performFastForward(repo, headHash, targetHash, currentBranch);
+    return performFastForward(repo, headHash, targetHash, _currentBranch);
   }
 
   // Otherwise, explain what would happen

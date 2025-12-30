@@ -295,7 +295,7 @@ function handleShow(manager: StackManager, args: string[]): void {
     console.log(`  ${colors.dim(node.commit)} ${colors.dim(node.message.slice(0, 50))}`);
     
     // Draw connector
-    if (!isFirst) {
+    if (i !== 0) {
       console.log('  │');
     }
   }

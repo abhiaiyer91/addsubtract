@@ -514,6 +514,7 @@ async function readPackFile(
     let byte = packData[offset++];
     const objType = (byte >> 4) & 7;
     // size and shift track variable-length encoding
+    let size = byte & 0x0f;
     let shift = 4;
 
     while (byte & 0x80) {
@@ -713,6 +714,7 @@ function applyDelta(base: Buffer, delta: Buffer): Buffer {
   let offset = 0;
 
   // Read source size (variable length) - used for validation
+  let sourceSize = 0;
   let shift = 0;
   let byte: number;
   do {

@@ -370,6 +370,7 @@ export class CredentialManager {
       });
 
       let stdout = '';
+      let stderr = '';
       // stderr captured but not used - child errors handled via exit code
       let resolved = false;
 
