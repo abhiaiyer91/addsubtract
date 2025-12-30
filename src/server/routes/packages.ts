@@ -24,7 +24,7 @@ import {
 } from '../../db/models/packages';
 import { tokenModel, hasScope } from '../../db/models/tokens';
 import { userModel } from '../../db/models/user';
-import { PackageStorage, createPackageStorage } from '../storage/packages';
+import { createPackageStorage } from '../storage/packages';
 import { authMiddleware } from '../middleware/auth';
 import { eventBus } from '../../events';
 import { repoModel } from '../../db/models/repository';
@@ -533,7 +533,6 @@ export function createPackageRoutes(baseUrl: string): Hono {
 
     // Get or create the package
     const pkg = await packageModel.getByName(scope, name);
-    const isNewPackage = !pkg;
 
     if (pkg) {
       // Check if user can publish to existing package

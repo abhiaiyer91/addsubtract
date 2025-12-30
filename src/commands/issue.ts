@@ -1118,7 +1118,7 @@ async function handleIssueDuplicate(args: string[]): Promise<void> {
 /**
  * List triage items
  */
-async function handleIssueTriage(args: string[]): Promise<void> {
+async function handleIssueTriage(_args: string[]): Promise<void> {
   const repo = Repository.find();
   const api = getApiClient();
   const remoteUrl = getRemoteUrl(repo);
@@ -1345,7 +1345,7 @@ async function handleIssueStages(args: string[]): Promise<void> {
       if (stage.isSystem) badges.push(colors.dim('system'));
 
       const badgeStr = badges.length > 0 ? ` [${badges.join(', ')}]` : '';
-      const colorHex = `#${stage.color}`;
+      // colorHex available as `#${stage.color}` for future UI use
       
       console.log(`  ${stage.icon} ${colors.bold(stage.name)} ${colors.dim(`(${stage.key})`)}${badgeStr}`);
       if (stage.description) {
@@ -1450,6 +1450,6 @@ async function handleIssueStage(args: string[]): Promise<void> {
   const remoteUrl = getRemoteUrl(repo);
   const { owner, repo: repoName } = parseOwnerRepo(remoteUrl);
 
-  const issue = await api.issues.updateStage(owner, repoName, issueNumber, stageKey);
+  await api.issues.updateStage(owner, repoName, issueNumber, stageKey);
   console.log(colors.green('✓') + ` Moved issue #${issueNumber} to stage "${stageKey}"`);
 }

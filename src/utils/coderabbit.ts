@@ -372,6 +372,7 @@ export async function reviewFiles(
 /**
  * Parse JSON output from CodeRabbit CLI
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function parseJsonReviewOutput(output: string): CodeRabbitReviewResult {
   try {
     const data = JSON.parse(output);

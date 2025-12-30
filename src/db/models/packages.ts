@@ -18,10 +18,7 @@ import {
   type PackageVersion,
   type NewPackageVersion,
   type PackageDistTag,
-  type NewPackageDistTag,
   type PackageMaintainer,
-  type NewPackageMaintainer,
-  type PackageVisibility,
 } from '../schema';
 
 /**

@@ -11,7 +11,7 @@
  *   wit merge-queue config                Configure merge queue settings
  */
 
-import { getApiClient, ApiError, getServerUrl } from '../api/client';
+import { getApiClient, ApiError } from '../api/client';
 import { Repository } from '../core/repository';
 import { parseRemoteUrl } from '../core/protocol';
 import { TsgitError, ErrorCode } from '../core/errors';

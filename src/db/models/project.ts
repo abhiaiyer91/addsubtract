@@ -8,7 +8,6 @@ import {
   type Project,
   type NewProject,
   type ProjectMember,
-  type NewProjectMember,
   type ProjectUpdate,
   type NewProjectUpdate,
   type ProjectStatus,

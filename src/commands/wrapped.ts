@@ -12,7 +12,6 @@
 
 import { TsgitError, ErrorCode } from '../core/errors';
 import { wrappedModel, type WrappedData } from '../db/models/wrapped';
-import { createClient } from '../api/trpc';
 import { colors } from '../utils/colors';
 
 // Month names for display

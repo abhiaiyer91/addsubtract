@@ -15,9 +15,6 @@ import * as fs from 'fs';
 import { Repository } from '../core/repository';
 import { TsgitError, ErrorCode } from '../core/errors';
 import {
-  exists,
-  walkDir,
-  isDirectory,
   loadIgnorePatterns,
   matchesIgnorePattern
 } from '../utils/fs';

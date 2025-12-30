@@ -20,7 +20,7 @@
 import * as path from 'path';
 import * as fs from 'fs';
 import { spawn } from 'child_process';
-import { exists, readFile, writeFile, mkdirp, readFileText, readDir, isDirectory } from '../utils/fs';
+import { exists, writeFile, mkdirp, readFileText, readDir } from '../utils/fs';
 import { TsgitError, ErrorCode } from './errors';
 import { FileMode } from './types';
 

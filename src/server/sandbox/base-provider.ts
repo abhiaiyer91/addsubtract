@@ -15,9 +15,8 @@ import type {
   SandboxStats,
   SandboxInfo,
   CommandResult,
-  PTYConfig,
 } from './types';
-import { DEFAULT_PTY_CONFIG, DEFAULT_RESOURCE_LIMITS } from './types';
+import { DEFAULT_RESOURCE_LIMITS } from './types';
 
 /**
  * Abstract base class for sandbox sessions
@@ -65,7 +64,7 @@ export abstract class BaseSandboxSession
   abstract getInfo(): Promise<SandboxInfo>;
 
   // Optional methods with default implementations
-  async runCode?(code: string, language?: string): Promise<CommandResult> {
+  async runCode?(_code: string, _language?: string): Promise<CommandResult> {
     throw new Error('Code execution not supported by this provider');
   }
 

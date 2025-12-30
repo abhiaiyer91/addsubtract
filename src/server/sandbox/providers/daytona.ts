@@ -345,7 +345,7 @@ export class DaytonaProvider extends BaseSandboxProvider {
       this.daytonaClient = new Daytona({
         apiKey: this.daytonaConfig.options?.apiKey,
       });
-    } catch (error) {
+    } catch {
       throw new Error(
         'Daytona SDK not installed. Install with: npm install @daytonaio/sdk'
       );

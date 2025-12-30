@@ -596,8 +596,8 @@ async function handlePrReview(args: string[]): Promise<void> {
   }
 
   const repo = Repository.find();
-  const remoteUrl = getRemoteUrl(repo);
-  const { owner, repo: repoName } = parseOwnerRepo(remoteUrl);
+  void getRemoteUrl(repo);
+  // owner and repoName available from parseOwnerRepo(remoteUrl) if needed for remote API calls
 
   console.log(`\n🐰 Reviewing PR #${prNumber} with CodeRabbit...\n`);
 

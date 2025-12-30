@@ -5,7 +5,7 @@
  * for users. Aggregates data from activities, PRs, issues, and repositories.
  */
 
-import { eq, and, desc, sql, gte, lte, count, inArray } from 'drizzle-orm';
+import { eq, and, desc, sql, gte, lte, count } from 'drizzle-orm';
 import { getDb } from '../index';
 import {
   activities,
@@ -15,7 +15,6 @@ import {
   prReviews,
   issueComments,
   prComments,
-  type Repository,
 } from '../schema';
 import { user } from '../auth-schema';
 
@@ -551,7 +550,7 @@ export const userStatsModel = {
 
     // Calculate current streak
     let currentStreak = 0;
-    const currentDate = new Date(today);
+    // currentDate tracks iteration through days for streak calculation
 
     // Check if there's a contribution today or yesterday (allow 1 day gap)
     const todayStr = today.toISOString().split('T')[0];

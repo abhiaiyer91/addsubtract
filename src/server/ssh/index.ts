@@ -7,16 +7,13 @@
 
 import { EventEmitter } from 'events';
 import * as crypto from 'crypto';
-import * as path from 'path';
 import {
   SSHServerOptions,
   SSHSession,
-  SSHAuthContext,
   ParsedGitCommand,
   SSHKeyStore,
   InMemoryKeyStore,
   SSHServerStats,
-  SSHServerEvents,
   KeyVerificationResult,
 } from './types';
 import { GitCommandHandler } from './git-commands';
@@ -83,7 +80,7 @@ async function loadSSH2(): Promise<typeof ssh2> {
       // Dynamic import to avoid build-time errors when ssh2 is not installed
       const moduleName = 'ssh2';
       ssh2 = await (eval(`import('${moduleName}')`) as Promise<typeof ssh2>);
-    } catch (e) {
+    } catch {
       throw new Error(
         'ssh2 module is required for SSH server functionality. Install it with: npm install ssh2'
       );
@@ -250,7 +247,7 @@ export class SSHServer extends EventEmitter {
       clearTimeout(timeout);
       this.emit('authenticated', session);
 
-      client.on('session', (accept: () => SSH2Session, reject: () => void) => {
+      client.on('session', (accept: () => SSH2Session, _reject: () => void) => {
         this.handleSession(accept(), session);
       });
     });

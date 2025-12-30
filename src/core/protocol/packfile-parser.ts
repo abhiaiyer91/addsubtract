@@ -2,7 +2,6 @@ import * as zlib from 'zlib';
 import * as crypto from 'crypto';
 import { ObjectType } from '../types';
 import {
-  PackObject,
   PackHeader,
   PackObjectType,
   packTypeToObjectType,

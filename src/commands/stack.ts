@@ -16,7 +16,7 @@
  */
 
 import { Repository } from '../core/repository';
-import { StackManager, StackMetadata, StackNode } from '../core/stack';
+import { StackManager } from '../core/stack';
 import { TsgitError } from '../core/errors';
 import { colors } from '../utils/colors';
 
@@ -268,8 +268,7 @@ function handleShow(manager: StackManager, args: string[]): void {
   // Draw the stack visualization
   for (let i = nodes.length - 1; i >= 0; i--) {
     const node = nodes[i];
-    const isLast = i === nodes.length - 1;
-    const isFirst = i === 0;
+    // isLast and isFirst available: i === nodes.length - 1, i === 0
     
     // Branch line
     const prefix = node.isCurrent ? colors.green('') : ' ';

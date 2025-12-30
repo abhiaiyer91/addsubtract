@@ -13,7 +13,7 @@
 
 import * as path from 'path';
 import * as crypto from 'crypto';
-import { exists, readFile, writeFile, mkdirp } from '../utils/fs';
+import { exists, readFile, writeFile } from '../utils/fs';
 import { TsgitError, ErrorCode } from './errors';
 
 /**

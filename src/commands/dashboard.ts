@@ -21,7 +21,6 @@ import {
   type InboxPullRequest,
   type DashboardRepo,
   type ActivityFeedItem,
-  type DashboardSummary,
   type ContributionStats,
 } from '../api/client';
 import { colors } from '../utils/colors';

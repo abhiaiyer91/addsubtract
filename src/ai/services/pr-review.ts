@@ -426,7 +426,7 @@ export async function runAIReview(prId: string): Promise<AIReviewResult | null> 
     const files = getChangedFiles(diskPath, pr.baseSha, pr.headSha);
 
     let result: AIReviewResult;
-    let usedCodeRabbit = false;
+    // track CodeRabbit usage if needed in future
 
     // Check for CodeRabbit API key (repo-level or server-level)
     const codeRabbitKey = await repoAiKeyModel.getCodeRabbitKey(pr.repoId);
@@ -442,7 +442,6 @@ export async function runAIReview(prId: string): Promise<AIReviewResult | null> 
       
       if (crResult.success) {
         result = convertCodeRabbitResult(crResult);
-        usedCodeRabbit = true;
         console.log(`[AI Review] CodeRabbit found ${result.issues.length} issues, score: ${result.score}/10`);
       } else {
         console.warn('[AI Review] CodeRabbit review failed, falling back to built-in analyzer:', crResult.error);

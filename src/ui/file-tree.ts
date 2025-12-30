@@ -173,7 +173,7 @@ export function buildFileTree(repo: Repository): TreeNode {
   
   try {
     buildTreeRecursive(repo.workDir, root, '', statusMap, excludeDirs);
-  } catch (error) {
+  } catch {
     // Handle errors gracefully
   }
 

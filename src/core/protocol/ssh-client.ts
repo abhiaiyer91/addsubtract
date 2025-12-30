@@ -20,9 +20,8 @@ import {
   pktFlush,
   parsePktLines,
   SideBandChannel,
-  NULL_HASH,
 } from './types';
-import { parseRefAdvertisement, serializeCapabilities } from './refs-discovery';
+import { parseRefAdvertisement } from './refs-discovery';
 
 // Type definitions for ssh2 client
 interface SSH2ClientConfig {
@@ -63,7 +62,7 @@ async function loadSSH2Client(): Promise<typeof ssh2Client> {
       const moduleName = 'ssh2';
       const ssh2 = await (eval(`import('${moduleName}')`) as Promise<{ Client: new () => SSH2Client }>);
       ssh2Client = { Client: ssh2.Client };
-    } catch (e) {
+    } catch {
       throw new Error(
         'ssh2 module is required for SSH client functionality. Install it with: npm install ssh2'
       );
@@ -235,7 +234,7 @@ export class SSHGitClient {
           if (this.auth.passphrase) {
             config.passphrase = this.auth.passphrase;
           }
-        } catch (err) {
+        } catch {
           // Key file not readable, continue without it
         }
       }

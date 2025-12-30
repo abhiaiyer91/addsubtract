@@ -19,7 +19,7 @@ import { Refs } from '../core/refs';
 import { Author } from '../core/types';
 import { VirtualFS } from './virtual-fs';
 import { BareRepository } from '../server/storage/repos';
-import { exists, mkdirp, writeFile } from '../utils/fs';
+import { exists, mkdirp } from '../utils/fs';
 import { getStorage, type StorageBackend } from '../core/storage';
 import type { FileEntry, FileStatus, CommitInfo } from './types';
 
@@ -123,7 +123,7 @@ export class VirtualRepositoryManager {
   /**
    * List sessions for a specific repository
    */
-  listSessionsForRepo(repoPath: string): VirtualSession[] {
+  listSessionsForRepo(_repoPath: string): VirtualSession[] {
     // Note: This is a simplified implementation
     // In production, we'd track repoPath per session
     return this.listSessions();
@@ -158,7 +158,7 @@ export class VirtualRepository {
 
   private currentBranch: string = 'main';
 
-  constructor(repoPath: string, options: VirtualRepositoryOptions = {}) {
+  constructor(repoPath: string, _options: VirtualRepositoryOptions = {}) {
     this.repoPath = path.resolve(repoPath);
 
     // For bare repos, the repoPath IS the git directory

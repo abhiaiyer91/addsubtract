@@ -18,7 +18,7 @@ import { issueRelationModel } from '../../../db/models/issue-relations';
 import { issueActivityModel } from '../../../db/models/issue-activity';
 import { issueTemplateModel } from '../../../db/models/issue-template';
 import { issueViewModel } from '../../../db/models/issue-view';
-import { eventBus, extractMentions } from '../../../events';
+import { eventBus } from '../../../events';
 
 // Zod schemas for issue enums
 const issueStatusSchema = z.enum(['triage', 'backlog', 'todo', 'in_progress', 'in_review', 'done', 'canceled']);

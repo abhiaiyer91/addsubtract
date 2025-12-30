@@ -343,7 +343,7 @@ export class SandboxPool extends EventEmitter {
     // Stop all sandboxes
     const stopPromises: Promise<void>[] = [];
 
-    for (const [key, entries] of this.pool) {
+    for (const entries of this.pool.values()) {
       for (const entry of entries) {
         if (entry.idleTimer) {
           clearTimeout(entry.idleTimer);

@@ -259,7 +259,7 @@ export class InMemoryKeyStore implements SSHKeyStore {
     }
   }
   
-  async checkAccess(userId: string, _repoPath: string, _operation: 'read' | 'write'): Promise<AccessCheckResult> {
+  async checkAccess(_userId: string, _repoPath: string, _operation: 'read' | 'write'): Promise<AccessCheckResult> {
     // Default implementation: allow all access for authenticated users
     // Override this for more sophisticated access control
     return {

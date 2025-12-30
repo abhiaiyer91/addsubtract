@@ -8,10 +8,8 @@
  * Uses wit's TypeScript API for all git operations.
  */
 
-import * as path from 'path';
-import * as fs from 'fs';
 import { BareRepository } from './repos';
-import { exists, mkdirp } from '../../utils/fs';
+import { exists } from '../../utils/fs';
 import { Commit, Tree, Blob } from '../../core/object';
 import { Author, TreeEntry } from '../../core/types';
 import { diff } from '../../core/diff';
@@ -383,11 +381,7 @@ function mergeFileContents(
   sourceContent: string,
   targetContent: string
 ): { merged: string; hasConflicts: boolean } {
-  // Simple line-based merge
-  const baseLines = baseContent.split('\n');
-  const sourceLines = sourceContent.split('\n');
-  const targetLines = targetContent.split('\n');
-  
+  // Simple line-based merge  
   const sourceDiff = diff(baseContent, sourceContent);
   const targetDiff = diff(baseContent, targetContent);
   

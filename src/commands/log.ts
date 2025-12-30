@@ -1,5 +1,4 @@
 import { Repository } from '../core/repository';
-import { Commit } from '../core/object';
 import { colors } from '../utils/colors';
 
 export function log(ref: string = 'HEAD', options: { oneline?: boolean; n?: number } = {}): void {

@@ -14,12 +14,10 @@ import {
   mergeQueueConfigModel,
   mergeQueueEntryModel,
   mergeQueueBatchModel,
-  mergeQueueHistoryModel,
 } from '../../db/models/merge-queue';
 import { prModel, repoModel } from '../../db/models';
 import { createMergeQueueManager, type PRAnalysis } from '../../core/merge-queue';
 import { mergePullRequest } from '../../server/storage/merge';
-import * as path from 'path';
 
 /**
  * Merge Queue Handler class
@@ -185,7 +183,7 @@ class MergeQueueHandler {
   private async processOptimistic(
     diskPath: string,
     entries: any[],
-    config: any
+    _config: any
   ): Promise<void> {
     // Create batch
     const prOrder = entries.map(e => e.prId);
@@ -319,7 +317,7 @@ class MergeQueueHandler {
    * Handle CI completion to continue merge queue processing
    */
   async handleCIComplete(event: CiRunCompletedEvent): Promise<void> {
-    const { repoId, prId, conclusion } = event.payload;
+    const { prId, conclusion } = event.payload;
 
     if (!prId) return;
 

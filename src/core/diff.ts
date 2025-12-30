@@ -83,7 +83,7 @@ function computeLCS(a: string[], b: string[]): number[][] {
  * Build diff from LCS table
  */
 function buildDiffFromLCS(oldLines: string[], newLines: string[], dp: number[][]): DiffLine[] {
-  const result: DiffLine[] = [];
+  // result array built via changes
   let i = oldLines.length;
   let j = newLines.length;
 

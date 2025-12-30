@@ -7,8 +7,8 @@
 import * as path from 'path';
 import { Repository } from '../core/repository';
 import { Journal, StateSnapshot } from '../core/journal';
-import { TsgitError, Errors, ErrorCode } from '../core/errors';
-import { exists, writeFile, mkdirp } from '../utils/fs';
+import { TsgitError, ErrorCode } from '../core/errors';
+import { writeFile, mkdirp } from '../utils/fs';
 
 /**
  * Options for restore command

@@ -140,7 +140,7 @@ export function createRepoRoutes(): Hono {
       try {
         // Move the repository directory
         fs.renameSync(oldAbsolutePath, newAbsolutePath);
-      } catch (moveError) {
+      } catch {
         // If rename fails (cross-device), try copy + delete
         try {
           fs.cpSync(oldAbsolutePath, newAbsolutePath, { recursive: true });

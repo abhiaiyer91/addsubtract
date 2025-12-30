@@ -8,7 +8,6 @@ import {
   canMigrateGitRepo, 
   getMigrationStats,
   MigrationProgress,
-  MigrationResult 
 } from '../core/git-migration';
 import { HashAlgorithm } from '../utils/hash';
 import { CHUNK_THRESHOLD } from '../core/large-file';

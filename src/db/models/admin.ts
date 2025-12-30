@@ -8,7 +8,7 @@
  * - Feature flags
  */
 
-import { eq, sql, desc, and, gte, lte, count, sum, like, or, isNull } from 'drizzle-orm';
+import { eq, sql, desc, and, gte, lte, count, like, or } from 'drizzle-orm';
 import { getDb } from '..';
 import { nanoid } from 'nanoid';
 import { user } from '../auth-schema';
@@ -16,7 +16,6 @@ import {
   adminAuditLogs, 
   systemSettings, 
   featureFlags, 
-  systemMetricsSnapshots,
   loginAttempts,
 } from '../admin-schema';
 import { 

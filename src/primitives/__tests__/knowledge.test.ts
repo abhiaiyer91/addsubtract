@@ -252,11 +252,9 @@ describe('Knowledge', () => {
     it('should not auto-commit when disabled', async () => {
       const noAutoCommit = new Knowledge(tempDir, { autoCommit: false });
 
-      // Get initial commit count
-      let commitCount = 0;
+      // Get initial commit count - verify log access works
       try {
-        const logs = noAutoCommit['repo'].log('HEAD', 100);
-        commitCount = logs.length;
+        void noAutoCommit['repo'].log('HEAD', 100);
       } catch {
         // No commits yet
       }
@@ -264,10 +262,8 @@ describe('Knowledge', () => {
       await noAutoCommit.set('key', 'value');
 
       // Commit count should not have increased (beyond potential initial commit)
-      let newCommitCount = 0;
       try {
-        const logs = noAutoCommit['repo'].log('HEAD', 100);
-        newCommitCount = logs.length;
+        void noAutoCommit['repo'].log('HEAD', 100);
       } catch {
         // No commits
       }

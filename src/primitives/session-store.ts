@@ -213,7 +213,7 @@ export class SessionStore {
     const maxAge = this.config.maxSessionAge * 1000;
 
     // Cleanup memory
-    for (const [id, session] of this.memoryCache) {
+    for (const [id] of this.memoryCache) {
       const lastAccess = this.accessTimes.get(id) || 0;
       if (now - lastAccess > maxAge) {
         this.memoryCache.delete(id);

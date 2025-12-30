@@ -654,7 +654,7 @@ export class TsgitTUI {
       }
 
       this.statusText.content = content;
-    } catch (error) {
+    } catch {
       this.statusText.content = 'Error loading status';
       this.statusText.fg = COLORS.error;
     }
@@ -702,7 +702,7 @@ export class TsgitTUI {
       }
 
       this.filesSelect.options = this.files;
-    } catch (error) {
+    } catch {
       this.filesSelect.options = [{ name: 'Error loading files', description: '' }];
     }
   }
@@ -739,7 +739,7 @@ export class TsgitTUI {
       }
 
       this.logSelect.options = this.commits;
-    } catch (error) {
+    } catch {
       this.logSelect.options = [{ name: 'No commits yet', description: '' }];
     }
   }
@@ -838,7 +838,7 @@ export class TsgitTUI {
       }
 
       return { hunks: createHunks(diff(oldContent, newContent)), isBinary: false, isNew: false, isDeleted: false };
-    } catch (error) {
+    } catch {
       return null;
     }
   }
@@ -925,7 +925,7 @@ export class TsgitTUI {
 
       this.diffText.content = content;
       this.diffText.fg = COLORS.white;
-    } catch (error) {
+    } catch {
       this.diffText.content = 'Error loading commit';
       this.diffText.fg = COLORS.error;
     }
@@ -1031,7 +1031,7 @@ export class TsgitTUI {
       this.modalContainer.title = ' Branches (Esc to close) ';
       this.showModal('branches');
       this.branchSelect.focus();
-    } catch (error) {
+    } catch {
       this.showMessage('Error loading branches');
     }
   }

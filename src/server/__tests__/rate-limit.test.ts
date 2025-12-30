@@ -13,7 +13,6 @@ import {
   rateLimitForEndpoint,
   setRateLimitStore,
   getRateLimitStore,
-  RateLimitStore,
 } from '../middleware/rate-limit';
 
 // Mock Hono Context

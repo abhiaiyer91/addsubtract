@@ -14,7 +14,6 @@
  */
 
 import * as https from 'https';
-import * as path from 'path';
 import { getGitHubToken } from './github';
 
 /**

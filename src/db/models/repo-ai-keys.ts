@@ -11,8 +11,6 @@ import { getDb } from '../index';
 import {
   repoAiKeys,
   repositories,
-  type RepoAiKey,
-  type NewRepoAiKey,
   type AiProvider,
 } from '../schema';
 
@@ -20,7 +18,7 @@ import {
 const ALGORITHM = 'aes-256-gcm';
 const KEY_LENGTH = 32;
 const IV_LENGTH = 16;
-const AUTH_TAG_LENGTH = 16;
+// AUTH_TAG_LENGTH = 16 used implicitly by GCM mode
 
 /**
  * Get encryption key from environment

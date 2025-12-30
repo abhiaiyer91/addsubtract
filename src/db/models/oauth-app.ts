@@ -14,7 +14,6 @@ import {
   oauthAuthorizationCodes,
   oauthAccessTokens,
   oauthRefreshTokens,
-  oauthAppWebhooks,
   type OAuthApp,
   type OAuthAppScope,
   type OAuthAuthorization,

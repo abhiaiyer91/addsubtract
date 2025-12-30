@@ -139,7 +139,7 @@ class E2BSandboxSession extends BaseSandboxSession {
     }
   }
 
-  async runCode(code: string, language?: string): Promise<CommandResult> {
+  async runCode(code: string, _language?: string): Promise<CommandResult> {
     const interpreter = this.sandbox as E2BCodeInterpreter;
     if (!interpreter.notebook?.execCell) {
       throw new Error('Code interpreter not available. Use a code interpreter template.');
@@ -286,7 +286,7 @@ export class E2BProvider extends BaseSandboxProvider {
       try {
         // Fall back to base SDK
         this.e2bModule = await import('e2b');
-      } catch (error) {
+      } catch {
         throw new Error(
           'E2B SDK not installed. Install with: npm install @e2b/code-interpreter or npm install e2b'
         );

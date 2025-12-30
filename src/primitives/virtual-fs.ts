@@ -17,7 +17,7 @@
 
 import * as path from 'path';
 import { ObjectStore } from '../core/object-store';
-import { Tree, Commit, Blob } from '../core/object';
+import { Tree, Commit } from '../core/object';
 import { Refs } from '../core/refs';
 import { Author, TreeEntry } from '../core/types';
 import type { FileEntry, FileStatus, FileStat, CommitInfo } from './types';

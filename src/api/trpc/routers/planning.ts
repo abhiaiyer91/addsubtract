@@ -343,7 +343,7 @@ export const planningRouter = router({
         for (const subscriber of run.subscribers) {
           try {
             subscriber(event);
-          } catch (e) {
+          } catch {
             // Subscriber error, remove it
             run.subscribers.delete(subscriber);
           }

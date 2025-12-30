@@ -55,7 +55,7 @@ export function serializeCapabilities(caps: Capabilities): string {
  * Parse smart HTTP ref advertisement response
  * Format: Each line is "{hash} {refname}\0{capabilities}" or "{hash} {refname}"
  */
-export function parseRefAdvertisement(data: Buffer, service?: string): RefAdvertisement {
+export function parseRefAdvertisement(data: Buffer, _service?: string): RefAdvertisement {
   const { lines } = parsePktLines(data);
   const refs: RefInfo[] = [];
   let capabilities: Capabilities = {};

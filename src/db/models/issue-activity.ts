@@ -1,4 +1,4 @@
-import { eq, and, desc, inArray } from 'drizzle-orm';
+import { eq, desc } from 'drizzle-orm';
 import { getDb } from '../index';
 import {
   issueActivities,

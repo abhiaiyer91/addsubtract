@@ -95,7 +95,7 @@ class EventBus {
     );
 
     // Log any errors
-    results.forEach((result, index) => {
+    results.forEach((result) => {
       if (result.status === 'rejected') {
         console.error(
           `[EventBus] Handler error for ${type}:`,

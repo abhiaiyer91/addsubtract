@@ -136,7 +136,7 @@ export function createAgentStreamRoutes() {
           },
         });
       }
-    } catch (error) {
+    } catch {
       console.log('[agent-stream] Creating new Mastra thread for session');
       await memory.saveThread({
         thread: {

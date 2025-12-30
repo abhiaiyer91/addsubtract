@@ -15,7 +15,7 @@ import { Repository } from '../core/repository';
 import { RemoteManager } from '../core/remote';
 import { Refs } from '../core/refs';
 import { TsgitError, ErrorCode } from '../core/errors';
-import { exists, mkdirp, writeFile } from '../utils/fs';
+import { exists, mkdirp } from '../utils/fs';
 import {
   SmartHttpClient,
   normalizeRepoUrl,
@@ -86,13 +86,13 @@ export function parseRepoUrl(url: string): { protocol: string; host: string; pat
 function cloneLocal(sourcePath: string, destPath: string, options: CloneOptions): Repository {
   // Check for source repository - support both .wit and bare repos
   let sourceGitDir = path.join(sourcePath, '.wit');
-  let isBareSource = false;
+  // isBareSource detection handled inline
   
   if (!exists(sourceGitDir)) {
     // Check if it's a bare repository (objects dir directly in path)
     if (exists(path.join(sourcePath, 'objects'))) {
       sourceGitDir = sourcePath;
-      isBareSource = true;
+      // isBareSource = true; // detected but not currently used
     } else {
       throw new TsgitError(
         `repository '${sourcePath}' does not exist`,

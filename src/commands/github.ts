@@ -12,7 +12,6 @@
 
 import { TsgitError, ErrorCode } from '../core/errors';
 import {
-  GitHubManager,
   getGitHubManager,
   loadGitHubCredentials,
   getGitHubToken,

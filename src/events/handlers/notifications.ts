@@ -107,6 +107,7 @@ async function getActorName(actorId: string): Promise<string | undefined> {
 export function registerNotificationHandlers(): void {
   // PR Review Requested
   eventBus.on('pr.review_requested', async (event: PrReviewRequestedEvent) => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { prId, prNumber, prTitle, repoId, repoFullName, reviewerId, authorId: _authorId } = event.payload;
     
     // Persist the review request to the database (for inbox feature)
