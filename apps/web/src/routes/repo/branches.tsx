@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { GitBranch, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -8,16 +9,60 @@ import { BranchListSkeleton } from '@/components/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useSession } from '@/lib/auth-client';
 import { trpc } from '@/lib/trpc';
+import { toastSuccess, toastError } from '@/components/ui/use-toast';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 export function BranchesPage() {
   const { owner, repo } = useParams<{ owner: string; repo: string }>();
   const { data: session } = useSession();
   const authenticated = !!session?.user;
+  const [branchToDelete, setBranchToDelete] = useState<string | null>(null);
+
+  const utils = trpc.useUtils();
 
   const { data: branches, isLoading, error } = trpc.repos.getBranches.useQuery(
     { owner: owner!, repo: repo! },
     { enabled: !!owner && !!repo }
   );
+
+  const deleteBranchMutation = trpc.repos.deleteBranch.useMutation({
+    onSuccess: (data) => {
+      toastSuccess({
+        title: 'Branch deleted',
+        description: `Branch '${data.name}' has been deleted.`,
+      });
+      utils.repos.getBranches.invalidate({ owner: owner!, repo: repo! });
+      setBranchToDelete(null);
+    },
+    onError: (error) => {
+      toastError({
+        title: 'Failed to delete branch',
+        description: error.message,
+      });
+      setBranchToDelete(null);
+    },
+  });
+
+  const handleDeleteBranch = () => {
+    if (!branchToDelete) return;
+    deleteBranchMutation.mutate({
+      owner: owner!,
+      repo: repo!,
+      name: branchToDelete,
+    });
+  };
+
+  // Find the default branch name
+  const defaultBranch = branches?.find(b => b.isDefault)?.name || 'main';
 
   return (
     <RepoLayout owner={owner!} repo={repo!}>
@@ -81,13 +126,20 @@ export function BranchesPage() {
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <Link to={`/${owner}/${repo}/compare/${branch.name}`}>
-                      <Button variant="outline" size="sm">
-                        Compare
-                      </Button>
-                    </Link>
+                    {!branch.isDefault && (
+                      <Link to={`/${owner}/${repo}/pulls/new?source=${encodeURIComponent(branch.name)}&target=${encodeURIComponent(defaultBranch)}`}>
+                        <Button variant="outline" size="sm">
+                          Compare
+                        </Button>
+                      </Link>
+                    )}
                     {authenticated && !branch.isDefault && (
-                      <Button variant="ghost" size="sm" className="text-destructive">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => setBranchToDelete(branch.name)}
+                      >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     )}
@@ -98,6 +150,27 @@ export function BranchesPage() {
           ))}
         </div>
       )}
+
+      <AlertDialog open={!!branchToDelete} onOpenChange={(open) => !open && setBranchToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete branch</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the branch <code className="font-mono bg-muted px-1 rounded">{branchToDelete}</code>? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteBranch}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteBranchMutation.isPending}
+            >
+              {deleteBranchMutation.isPending ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </RepoLayout>
   );
 }
