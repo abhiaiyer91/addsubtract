@@ -51,7 +51,6 @@ New to wit? Here are some beginner-friendly ways to contribute:
 
 | Task | Files | Description |
 |------|-------|-------------|
-| Improve error messages | `src/commands/*.ts` | Add helpful suggestions to error messages |
 | Add JSDoc comments | `src/core/*.ts` | Document public functions |
 | Fix typos in docs | `docs/**/*.mdx` | Fix typos or improve clarity |
 | Add test cases | `src/__tests__/*.test.ts` | Add edge case tests to existing commands |
@@ -67,9 +66,6 @@ New to wit? Here are some beginner-friendly ways to contribute:
 ### Starter Prompts for Your AI
 
 Copy-paste these prompts to get started:
-
-**Improve error message:**
-> "In `src/commands/checkout.ts`, improve the error message when a branch doesn't exist. Add helpful suggestions like `wit branch` to list branches. Follow the TsgitError pattern used in other commands."
 
 **Add a test:**
 > "Add a test case to `src/__tests__/stash.test.ts` that tests stashing when there are no changes. Look at existing tests for the pattern."
