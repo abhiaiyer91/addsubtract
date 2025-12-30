@@ -246,10 +246,44 @@ wit push --force-with-lease
 | `--all` | Push all branches |
 | `-n, --dry-run` | Show what would be pushed without pushing |
 | `-v, --verbose` | Be more verbose |
+| `--also <remote>` | Also push to an additional remote (dual-push) |
+| `--all-remotes` | Push to all configured remotes |
 
 <Warning>
 **Force Push Warning**: Using `--force` can overwrite remote history and cause problems for collaborators. Prefer `--force-with-lease` which checks that the remote hasn't changed before pushing.
 </Warning>
+
+### Dual-Push (Multiple Remotes)
+
+Push to multiple remotes simultaneously. This is useful when you want to keep both a wit server and GitHub (or another Git host) in sync:
+
+```bash
+# Push to origin and also to github remote
+wit push --also github
+
+# Push to a specific remote and also another
+wit push origin main --also github
+
+# Push to ALL configured remotes
+wit push --all-remotes
+```
+
+<Tip>
+**Use Case**: If you're using wit as your primary version control but need to sync with GitHub for CI/CD or deployment providers (Vercel, Netlify, etc.), dual-push keeps both remotes in sync with a single command.
+</Tip>
+
+Example workflow:
+```bash
+# Set up remotes
+wit remote add origin git@wit-server:user/repo.git
+wit remote add github git@github.com:user/repo.git
+
+# Push to both with one command
+wit push origin main --also github
+
+# Or push to all remotes
+wit push --all-remotes
+```
 
 ### Push Rejections
 
