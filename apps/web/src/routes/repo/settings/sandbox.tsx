@@ -144,6 +144,7 @@ export function SandboxSettingsPage() {
   const [daytonaAutoStop, setDaytonaAutoStop] = useState(15);
   const [dockerImage, setDockerImage] = useState('wit-sandbox:latest');
   const [vercelProjectId, setVercelProjectId] = useState('');
+  const [vercelTeamId, setVercelTeamId] = useState('');
   const [vercelRuntime, setVercelRuntime] = useState<'node22' | 'python3.13'>('node22');
 
   const utils = trpc.useUtils();
@@ -171,6 +172,7 @@ export function SandboxSettingsPage() {
       setDaytonaAutoStop(settings.daytonaAutoStop ?? 15);
       setDockerImage(settings.dockerImage ?? 'wit-sandbox:latest');
       setVercelProjectId(settings.vercelProjectId ?? '');
+      setVercelTeamId(settings.vercelTeamId ?? '');
       setVercelRuntime(settings.vercelRuntime ?? 'node22');
     }
   }, [settings]);
@@ -226,6 +228,7 @@ export function SandboxSettingsPage() {
         daytonaAutoStop,
         dockerImage,
         vercelProjectId: vercelProjectId || undefined,
+        vercelTeamId: vercelTeamId || undefined,
         vercelRuntime,
       },
     });
@@ -645,6 +648,28 @@ export function SandboxSettingsPage() {
                       Vercel dashboard
                     </a>{' '}
                     under Project Settings.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="vercelTeamId">Team ID</Label>
+                  <Input
+                    id="vercelTeamId"
+                    placeholder="team_xxxxx"
+                    value={vercelTeamId}
+                    onChange={(e) => setVercelTeamId(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Your Vercel Team ID. Required when using a personal access token. Find it in your{' '}
+                    <a
+                      href="https://vercel.com/account"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline"
+                    >
+                      Vercel account settings
+                    </a>{' '}
+                    under Team Settings &gt; General.
                   </p>
                 </div>
 

@@ -35,6 +35,7 @@ export interface SandboxConfig {
   daytonaAutoStop: number;
   dockerImage: string;
   vercelProjectId: string | null;
+  vercelTeamId: string | null;
   vercelRuntime: string | null;
   updatedById: string;
   createdAt: Date;
@@ -150,6 +151,7 @@ export function getDefaultConfig(repoId: string, userId: string): Omit<SandboxCo
     daytonaAutoStop: 15,
     dockerImage: 'wit-sandbox:latest',
     vercelProjectId: null,
+    vercelTeamId: null,
     vercelRuntime: 'node22',
     updatedById: userId,
   };
@@ -187,6 +189,7 @@ export const sandboxConfigModel = {
       daytonaAutoStop: config.daytonaAutoStop,
       dockerImage: config.dockerImage,
       vercelProjectId: config.vercelProjectId,
+      vercelTeamId: config.vercelTeamId,
       vercelRuntime: config.vercelRuntime,
       updatedById: config.updatedById,
       createdAt: config.createdAt,
@@ -234,6 +237,7 @@ export const sandboxConfigModel = {
         daytonaAutoStop: updated.daytonaAutoStop,
         dockerImage: updated.dockerImage,
         vercelProjectId: updated.vercelProjectId,
+        vercelTeamId: updated.vercelTeamId,
         vercelRuntime: updated.vercelRuntime,
         updatedById: updated.updatedById,
         createdAt: updated.createdAt,
@@ -267,6 +271,7 @@ export const sandboxConfigModel = {
       daytonaAutoStop: created.daytonaAutoStop,
       dockerImage: created.dockerImage,
       vercelProjectId: created.vercelProjectId,
+      vercelTeamId: created.vercelTeamId,
       vercelRuntime: created.vercelRuntime,
       updatedById: created.updatedById,
       createdAt: created.createdAt,

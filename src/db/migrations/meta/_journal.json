@@ -99,6 +99,13 @@
       "when": 1767024500000,
       "tag": "0013_add_vercel_sandbox_provider",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1767024600000,
+      "tag": "0014_add_vercel_team_id",
+      "breakpoints": true
     }
   ]
 }

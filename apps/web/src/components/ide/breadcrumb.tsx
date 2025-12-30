@@ -37,9 +37,9 @@ export function Breadcrumb({ path, onNavigate }: BreadcrumbProps) {
         );
       })}
       {directories.length > 0 && (
-        <ChevronRight className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+        <ChevronRight className="h-3 w-3 text-muted-foreground flex-shrink-0 mx-1" />
       )}
-      <div className="flex items-center gap-1 flex-shrink-0">
+      <div className="flex items-center gap-1.5 flex-shrink-0">
         <File className="h-3 w-3 text-muted-foreground" />
         <span className="font-medium text-foreground">{fileName}</span>
       </div>
