@@ -537,6 +537,18 @@ export function PullDetailPage() {
     await reopenMutation.mutateAsync({ prId: prData.id });
   };
 
+  const handleReadyForReview = async () => {
+    if (!prData?.id) return;
+    await updateMutation.mutateAsync({
+      prId: prData.id,
+      isDraft: false,
+    });
+    toastSuccess({
+      title: 'Pull request ready for review',
+      description: 'The draft has been marked as ready for review.',
+    });
+  };
+
   const handleComment = async () => {
     if (!comment.trim() || !prData?.id) return;
     addCommentMutation.mutate({
@@ -702,6 +714,7 @@ export function PullDetailPage() {
                 onMerge={pr.state === 'open' && !pr.isDraft ? handleMerge : undefined}
                 onClose={pr.state === 'open' ? handleClose : undefined}
                 onReopen={pr.state === 'closed' ? handleReopen : undefined}
+                onReadyForReview={pr.state === 'open' && pr.isDraft ? handleReadyForReview : undefined}
                 stackName={pr.stack?.name}
                 stackPosition={pr.stack?.branches.findIndex((b) => b.pr?.id === pr.id)}
                 stackTotal={pr.stack?.branches.length}

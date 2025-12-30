@@ -40,6 +40,7 @@ Commands:
   merge <number>  Merge a pull request
   close <number>  Close a pull request
   reopen <number> Reopen a closed pull request
+  ready <number>  Mark a draft PR as ready for review
   review <number> Review a pull request with CodeRabbit AI
   review-status   Show CodeRabbit configuration status
 
@@ -48,19 +49,24 @@ Options:
   --json          Output review results in JSON format
   --verbose       Show detailed review output
   --configure     Configure CodeRabbit API key
+  --draft         Create PR as draft (for create command)
+  --method        Merge method: merge, squash, rebase (for merge command)
 
 Examples:
   wit pr create                     Create PR from current branch to main
   wit pr create -b develop          Create PR targeting develop branch
   wit pr create -t "Add feature"    Create PR with title
+  wit pr create --draft             Create a draft PR
   wit pr list                       List open PRs
   wit pr list --state closed        List closed PRs
   wit pr list --state all           List all PRs
   wit pr view 123                   View PR #123
   wit pr checkout 123               Fetch and checkout PR #123
   wit pr merge 123                  Merge PR #123
+  wit pr merge 123 --method squash  Squash merge PR #123
   wit pr close 123                  Close PR #123
   wit pr reopen 123                 Reopen PR #123
+  wit pr ready 123                  Mark draft PR #123 as ready for review
   wit pr review 123                 AI review of PR #123 using CodeRabbit
   wit pr review 123 --json          Output review as JSON
   wit pr review --configure         Configure CodeRabbit API key
@@ -149,6 +155,9 @@ export async function handlePr(args: string[]): Promise<void> {
         break;
       case 'reopen':
         await handlePrReopen(args.slice(1));
+        break;
+      case 'ready':
+        await handlePrReady(args.slice(1));
         break;
       case 'review':
         await handlePrReview(args.slice(1));
@@ -293,9 +302,15 @@ async function handlePrCreate(args: string[]): Promise<void> {
   // Get body if provided
   const body = flags.body as string | undefined;
 
-  console.log(`Creating pull request...`);
+  // Check if creating as draft
+  const isDraft = Boolean(flags.draft);
+
+  console.log(`Creating ${isDraft ? 'draft ' : ''}pull request...`);
   console.log(`  ${colors.cyan(currentBranch)} → ${colors.cyan(targetBranch)}`);
   console.log(`  ${colors.bold(title)}`);
+  if (isDraft) {
+    console.log(`  ${colors.yellow('[DRAFT]')}`);
+  }
   console.log();
 
   const pr = await api.pulls.create(owner, repoName, {
@@ -305,10 +320,14 @@ async function handlePrCreate(args: string[]): Promise<void> {
     targetBranch,
     headSha: headRef,
     baseSha: baseRef,
+    isDraft,
   });
 
-  console.log(colors.green('✓') + ` Created pull request #${pr.number}`);
+  console.log(colors.green('✓') + ` Created ${isDraft ? 'draft ' : ''}pull request #${pr.number}`);
   console.log(`  ${colors.dim(`${getServerUrl()}/${owner}/${repoName}/pulls/${pr.number}`)}`);
+  if (isDraft) {
+    console.log(`  ${colors.dim('Use `wit pr ready ' + pr.number + '` when ready for review')}`);
+  }
 }
 
 /**
@@ -573,6 +592,50 @@ async function handlePrReopen(args: string[]): Promise<void> {
 
   await api.pulls.reopen(owner, repoName, prNumber);
   console.log(colors.green('✓') + ` Reopened PR #${prNumber}`);
+}
+
+/**
+ * Mark a draft pull request as ready for review
+ */
+async function handlePrReady(args: string[]): Promise<void> {
+  const { positional } = parseArgs(args);
+  const prNumber = parseInt(positional[0], 10);
+
+  if (isNaN(prNumber)) {
+    throw new TsgitError(
+      'PR number required to mark as ready',
+      ErrorCode.INVALID_ARGUMENT,
+      [
+        'wit pr ready 123    # Mark draft PR #123 as ready for review',
+        'wit pr list         # List all PRs to find the number',
+      ]
+    );
+  }
+
+  const repo = Repository.find();
+  const api = getApiClient();
+
+  const remoteUrl = getRemoteUrl(repo);
+  const { owner, repo: repoName } = parseOwnerRepo(remoteUrl);
+
+  // Get PR to check if it's a draft
+  const pr = await api.pulls.get(owner, repoName, prNumber);
+
+  if (pr.state !== 'open') {
+    throw new TsgitError(
+      `PR #${prNumber} is not open (state: ${pr.state})`,
+      ErrorCode.OPERATION_FAILED,
+      ['Only open PRs can be marked as ready']
+    );
+  }
+
+  if (!pr.isDraft) {
+    console.log(colors.yellow('!') + ` PR #${prNumber} is already ready for review`);
+    return;
+  }
+
+  await api.pulls.ready(owner, repoName, prNumber);
+  console.log(colors.green('✓') + ` Marked PR #${prNumber} as ready for review`);
 }
 
 /**
