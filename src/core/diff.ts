@@ -588,17 +588,10 @@ export function isBinary(content: Buffer): boolean {
   return false;
 }
 
-/**
- * Color codes for terminal output
- */
-export const colors = {
-  red: (s: string) => `\x1b[31m${s}\x1b[0m`,
-  green: (s: string) => `\x1b[32m${s}\x1b[0m`,
-  cyan: (s: string) => `\x1b[36m${s}\x1b[0m`,
-  yellow: (s: string) => `\x1b[33m${s}\x1b[0m`,
-  bold: (s: string) => `\x1b[1m${s}\x1b[0m`,
-  reset: '\x1b[0m',
-};
+// Import colors from utils
+import { colors as importedColors } from '../utils/colors';
+// Re-export for backwards compatibility
+export const colors = importedColors;
 
 /**
  * Format diff with colors for terminal

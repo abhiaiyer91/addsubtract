@@ -13,20 +13,7 @@
 import { TsgitError, ErrorCode } from '../core/errors';
 import { wrappedModel, type WrappedData } from '../db/models/wrapped';
 import { createClient } from '../api/trpc';
-
-const colors = {
-  green: (s: string) => `\x1b[32m${s}\x1b[0m`,
-  yellow: (s: string) => `\x1b[33m${s}\x1b[0m`,
-  cyan: (s: string) => `\x1b[36m${s}\x1b[0m`,
-  red: (s: string) => `\x1b[31m${s}\x1b[0m`,
-  blue: (s: string) => `\x1b[34m${s}\x1b[0m`,
-  magenta: (s: string) => `\x1b[35m${s}\x1b[0m`,
-  dim: (s: string) => `\x1b[2m${s}\x1b[0m`,
-  bold: (s: string) => `\x1b[1m${s}\x1b[0m`,
-  bgBlue: (s: string) => `\x1b[44m${s}\x1b[0m`,
-  bgMagenta: (s: string) => `\x1b[45m${s}\x1b[0m`,
-  bgCyan: (s: string) => `\x1b[46m${s}\x1b[0m`,
-};
+import { colors } from '../utils/colors';
 
 // Month names for display
 const MONTH_NAMES = [

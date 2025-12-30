@@ -7,13 +7,7 @@ import { Repository } from '../core/repository';
 import { MergeManager, MergeOptions, formatMergeResult, formatConflict } from '../core/merge';
 import { TsgitError, ErrorCode, Errors } from '../core/errors';
 import { HookManager } from '../core/hooks';
-
-const colors = {
-  red: (s: string) => `\x1b[31m${s}\x1b[0m`,
-  yellow: (s: string) => `\x1b[33m${s}\x1b[0m`,
-  cyan: (s: string) => `\x1b[36m${s}\x1b[0m`,
-  dim: (s: string) => `\x1b[2m${s}\x1b[0m`,
-};
+import { colors } from '../utils/colors';
 
 /**
  * Extended merge options with hook support

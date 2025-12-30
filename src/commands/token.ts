@@ -15,16 +15,7 @@ import * as crypto from 'crypto';
 import { initDatabase, getDb } from '../db';
 import { personalAccessTokens, type PersonalAccessToken } from '../db/schema';
 import { eq, and } from 'drizzle-orm';
-
-const colors = {
-  green: (s: string) => `\x1b[32m${s}\x1b[0m`,
-  yellow: (s: string) => `\x1b[33m${s}\x1b[0m`,
-  cyan: (s: string) => `\x1b[36m${s}\x1b[0m`,
-  red: (s: string) => `\x1b[31m${s}\x1b[0m`,
-  dim: (s: string) => `\x1b[2m${s}\x1b[0m`,
-  bold: (s: string) => `\x1b[1m${s}\x1b[0m`,
-  bgYellow: (s: string) => `\x1b[43m\x1b[30m${s}\x1b[0m`,
-};
+import { colors } from '../utils/colors';
 
 /**
  * Available token scopes

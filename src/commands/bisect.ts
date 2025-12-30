@@ -17,15 +17,7 @@ import { Repository } from '../core/repository';
 import { TsgitError, ErrorCode } from '../core/errors';
 import { exists, readFile, writeFile, mkdirp } from '../utils/fs';
 import { parseRevision } from './reset';
-
-const colors = {
-  green: (s: string) => `\x1b[32m${s}\x1b[0m`,
-  yellow: (s: string) => `\x1b[33m${s}\x1b[0m`,
-  cyan: (s: string) => `\x1b[36m${s}\x1b[0m`,
-  red: (s: string) => `\x1b[31m${s}\x1b[0m`,
-  dim: (s: string) => `\x1b[2m${s}\x1b[0m`,
-  bold: (s: string) => `\x1b[1m${s}\x1b[0m`,
-};
+import { colors } from '../utils/colors';
 
 /**
  * Bisect state stored in .wit/BISECT_STATE.json
