@@ -479,6 +479,8 @@ Not grep. Understanding.
 
 We're building the best IDE and coding agent ever. Here's what's done:
 
+**Phase 1: Polish & Delight** ✅
+
 | Feature | Status | Description |
 |---------|--------|-------------|
 | **Inline AI (⌘K)** | ✅ | AI code edits right in the editor |
@@ -493,6 +495,26 @@ We're building the best IDE and coding agent ever. Here's what's done:
 | **Keyboard Shortcuts** | ✅ | 60+ shortcuts with ? panel |
 | **Smart Chat Input** | ✅ | Commands, mentions, context |
 | **Editor Context** | ✅ | Agent knows what you're viewing |
+
+**Phase 2: Intelligence** ✅
+
+| Feature | Status | Description |
+|---------|--------|-------------|
+| **Multi-File Refactoring** | ✅ | Refactor across files with preview & rollback |
+| **AI Test Generation** | ✅ | Generate tests with framework detection |
+| **Git Integration Panel** | ✅ | Full git workflow: staging, commits, branches |
+| **AI Command Palette** | ✅ | Universal ⌘K with AI, files, git modes |
+| **AI Code Search** | ✅ | Semantic search with natural language |
+| **Unified AI Actions** | ✅ | Trigger AI from anywhere in the IDE |
+
+**Phase 3: Mastery** (In Progress)
+
+| Feature | Status | Description |
+|---------|--------|-------------|
+| **Autonomous Bug Fixing** | 🔄 | AI detects and fixes issues automatically |
+| **PR Review with Inline Suggestions** | 🔄 | AI reviews with one-click apply |
+| **Collaborative Editing with AI** | 📋 | Multiple users + AI editing together |
+| **Voice Commands** | 📋 | Voice-driven coding |
 
 > 💡 See [IDE & Agent Vision](./docs/IDE_AND_AGENT_VISION.mdx) for the full roadmap to IDE greatness.
 
