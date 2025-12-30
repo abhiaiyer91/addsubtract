@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     ca-certificates \
     wget \
+    unzip \
     && rm -rf /var/lib/apt/lists/*
 
 # Install CodeRabbit CLI for AI code reviews
