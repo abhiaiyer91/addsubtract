@@ -33,6 +33,12 @@ export function NewReleasePage() {
     { enabled: !!owner && !!repo }
   );
 
+  // Check if user has write permission (owner or collaborator with write access)
+  const { data: permissionData, isLoading: permissionLoading } = trpc.collaborators.checkPermission.useQuery(
+    { repoId: repoData?.repo.id!, permission: 'write' },
+    { enabled: !!repoData?.repo.id && authenticated }
+  );
+
   // Fetch existing tags for comparison dropdown
   const { data: tagsData } = trpc.repos.getTags.useQuery(
     { owner: owner!, repo: repo! },
@@ -142,7 +148,7 @@ export function NewReleasePage() {
     );
   }
 
-  if (repoLoading) {
+  if (repoLoading || permissionLoading) {
     return (
       <RepoLayout owner={owner!} repo={repo!}>
         <Loading text="Loading..." />
@@ -155,6 +161,16 @@ export function NewReleasePage() {
       <RepoLayout owner={owner!} repo={repo!}>
         <div className="text-center py-12">
           <p className="text-muted-foreground">Repository not found.</p>
+        </div>
+      </RepoLayout>
+    );
+  }
+
+  if (!permissionData?.hasPermission) {
+    return (
+      <RepoLayout owner={owner!} repo={repo!}>
+        <div className="text-center py-12">
+          <p className="text-muted-foreground">You don't have permission to create releases in this repository.</p>
         </div>
       </RepoLayout>
     );

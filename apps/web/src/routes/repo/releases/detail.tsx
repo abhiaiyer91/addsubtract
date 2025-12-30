@@ -33,6 +33,14 @@ export function ReleaseDetailPage() {
     { enabled: !!release?.id }
   );
 
+  // Check if user has write permission (owner or collaborator with write access)
+  const { data: permissionData } = trpc.collaborators.checkPermission.useQuery(
+    { repoId: repoData?.repo.id!, permission: 'write' },
+    { enabled: !!repoData?.repo.id && authenticated }
+  );
+
+  const canWrite = permissionData?.hasPermission ?? false;
+
   const publishRelease = trpc.releases.publish.useMutation({
     onSuccess: () => {
       utils.releases.getByTag.invalidate({ repoId: repoData?.repo.id!, tagName: tag! });
@@ -81,8 +89,6 @@ export function ReleaseDetailPage() {
       </RepoLayout>
     );
   }
-
-  const isOwner = session?.user?.id === repoData.repo.ownerId;
 
   const formatFileSize = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`;
@@ -145,7 +151,7 @@ export function ReleaseDetailPage() {
                 </div>
               </div>
 
-              {authenticated && isOwner && (
+              {authenticated && canWrite && (
                 <div className="flex items-center gap-2">
                   {release.isDraft && (
                     <Button
