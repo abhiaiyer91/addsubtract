@@ -17,6 +17,45 @@ import {
   type SandboxProvider,
 } from '../../../db/models';
 
+/**
+ * Parse a command string into command and arguments
+ * Handles quoted strings properly
+ */
+function parseCommand(cmd: string): string[] {
+  const parts: string[] = [];
+  let current = '';
+  let inQuote = false;
+  let quoteChar = '';
+
+  for (let i = 0; i < cmd.length; i++) {
+    const char = cmd[i];
+
+    if (inQuote) {
+      if (char === quoteChar) {
+        inQuote = false;
+      } else {
+        current += char;
+      }
+    } else if (char === '"' || char === "'") {
+      inQuote = true;
+      quoteChar = char;
+    } else if (char === ' ') {
+      if (current) {
+        parts.push(current);
+        current = '';
+      }
+    } else {
+      current += char;
+    }
+  }
+
+  if (current) {
+    parts.push(current);
+  }
+
+  return parts;
+}
+
 // Schema definitions
 const sandboxProviderSchema = z.enum(['e2b', 'daytona', 'docker', 'vercel']);
 const networkModeSchema = z.enum(['none', 'restricted', 'full']);
@@ -550,7 +589,18 @@ export const sandboxRouter = router({
               });
 
               try {
-                const result = await sandbox.runCommand(input.command, input.args || [], {
+                // Vercel SDK requires command and args to be separate
+                // Parse command string if no args provided
+                let execCommand = input.command;
+                let execArgs = input.args || [];
+
+                if (execArgs.length === 0 && input.command.includes(' ')) {
+                  const parsed = parseCommand(input.command);
+                  execCommand = parsed[0];
+                  execArgs = parsed.slice(1);
+                }
+
+                const result = await sandbox.runCommand(execCommand, execArgs, {
                   signal: AbortSignal.timeout(input.timeout),
                 });
 
