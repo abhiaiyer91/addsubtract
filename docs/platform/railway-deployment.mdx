@@ -44,7 +44,20 @@ railway login
 
 [![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/template/wit)
 
-### Option 2: Manual Setup
+### Option 2: Using wit CLI
+
+```bash
+# Run pre-deployment checks
+wit deploy check
+
+# Initialize deployment configuration
+wit deploy init
+
+# Deploy to Railway
+wit deploy railway
+```
+
+### Option 3: Manual Setup
 
 ```bash
 # Clone the repo
@@ -384,8 +397,31 @@ Response:
 {
   "status": "ok",
   "version": "2.0.0",
-  "database": { "connected": true, "latency": 5 }
+  "database": { "connected": true, "latency": 5 },
+  "features": {
+    "redis": true,
+    "ai": true,
+    "objectStorage": false,
+    "vectorSearch": false
+  }
 }
+```
+
+### Metrics Endpoint
+
+wit exposes Prometheus-compatible metrics at `/metrics`:
+
+```bash
+curl https://your-domain.railway.app/metrics
+```
+
+Sample output:
+```
+# TYPE http_requests_total counter
+http_requests_total{method="GET",path="/health"} 1250
+# TYPE db_health_check_latency_ms histogram
+db_health_check_latency_ms_count 1250
+db_health_check_latency_ms_avg 4.2
 ```
 
 ### Logs

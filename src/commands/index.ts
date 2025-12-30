@@ -123,6 +123,9 @@ export { handleWrapped } from './wrapped';
 // Repository management (transfer, etc.)
 export { handleRepo, REPO_HELP } from './repo';
 
+// Deploy command
+export { handleDeploy } from './deploy';
+
 // Collaborator management
 export {
   handleCollaborator,

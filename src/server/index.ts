@@ -16,8 +16,13 @@ dotenv.config({ path: path.join(__dirname, '../../.env') }); // Try project root
 import { Hono } from 'hono';
 import { serve, ServerType } from '@hono/node-server';
 import { createNodeWebSocket } from '@hono/node-ws';
-import { logger } from 'hono/logger';
+import { logger as honoLogger } from 'hono/logger';
 import { cors } from 'hono/cors';
+
+// Internal modules
+import { loadConfig, printConfigSummary, getCorsOrigins, features } from './config';
+import { logger, requestLogger, metricsHandler, metrics } from './logger';
+import { initRedisRateLimiting, closeAllRedis } from './redis';
 import { trpcServer } from '@hono/trpc-server';
 import { createGitRoutes } from './routes/git';
 import { createIssueRoutes } from './routes/issues';
@@ -100,27 +105,33 @@ export function createApp(repoManager: RepoManager, options: { verbose?: boolean
   // Create WebSocket support
   const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app });
 
-  // Add logger middleware if verbose
+  // Add structured request logging
+  app.use('*', requestLogger({
+    skip: (c) => c.req.path === '/health' || c.req.path === '/metrics',
+  }));
+
+  // Add verbose hono logger if requested
   if (options.verbose) {
-    app.use('*', logger());
+    app.use('*', honoLogger());
   }
 
-  // Enable CORS for web clients
-  // In production, set CORS_ORIGINS env var (comma-separated list)
-  const corsOrigins = process.env.CORS_ORIGINS 
-    ? process.env.CORS_ORIGINS.split(',').map(o => o.trim())
-    : ['http://localhost:5173', 'http://localhost:3000'];
+  // Enable CORS for web clients using config
+  const corsOrigins = getCorsOrigins();
   
   app.use('*', cors({
-    origin: corsOrigins,
+    origin: corsOrigins.length > 0 ? corsOrigins : '*',
     allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowHeaders: ['Content-Type', 'Authorization'],
+    allowHeaders: ['Content-Type', 'Authorization', 'X-Trace-Id'],
     credentials: true,
   }));
 
   // Health check endpoint
   app.get('/health', async (c) => {
     const dbStatus = await dbHealthCheck();
+    
+    // Update metrics
+    metrics.set('health_status', dbStatus.ok ? 1 : 0);
+    metrics.observe('db_health_check_latency_ms', dbStatus.latency);
     
     return c.json({
       status: dbStatus.ok ? 'ok' : 'degraded',
@@ -130,8 +141,17 @@ export function createApp(repoManager: RepoManager, options: { verbose?: boolean
         connected: dbStatus.ok,
         latency: dbStatus.latency,
       },
+      features: {
+        redis: features.hasRedis(),
+        ai: features.hasAI(),
+        objectStorage: features.hasObjectStorage(),
+        vectorSearch: features.hasVectorSearch(),
+      },
     });
   });
+
+  // Metrics endpoint for monitoring
+  app.get('/metrics', metricsHandler);
 
   // List repositories endpoint
   app.get('/repos', (c) => {
@@ -229,12 +249,23 @@ export function createApp(repoManager: RepoManager, options: { verbose?: boolean
 export function startServer(options: ServerOptions): WitServer {
   const { port, reposDir, verbose = false, host = '0.0.0.0' } = options;
 
+  // Load and validate configuration
+  try {
+    loadConfig();
+    if (verbose) {
+      printConfigSummary();
+    }
+  } catch (error) {
+    logger.error('Configuration error', { error: (error as Error).message });
+    // Continue with defaults in development
+  }
+
   // Initialize database if DATABASE_URL is set
   const databaseUrl = process.env.DATABASE_URL;
   if (databaseUrl) {
     try {
       initDatabase(databaseUrl);
-      console.log('✓ Database connected');
+      logger.info('Database connected');
       
       // Register event handlers for notifications, CI, triage, merge queue, and marketing
       registerNotificationHandlers();
@@ -242,13 +273,25 @@ export function startServer(options: ServerOptions): WitServer {
       registerTriageHandlers();
       registerMergeQueueHandlers();
       registerMarketingHandlers();
-      console.log('✓ Event handlers registered');
+      logger.info('Event handlers registered');
     } catch (error) {
-      console.error('✗ Database connection failed:', error instanceof Error ? error.message : error);
-      console.warn('⚠ Running without database');
+      logger.error('Database connection failed', { error: (error as Error).message });
+      logger.warn('Running without database');
     }
   } else {
-    console.warn('⚠ DATABASE_URL not set - running without database');
+    logger.warn('DATABASE_URL not set - running without database');
+  }
+
+  // Initialize Redis for rate limiting and caching
+  const redisUrl = process.env.REDIS_URL;
+  if (redisUrl) {
+    initRedisRateLimiting(redisUrl).then(() => {
+      logger.info('Redis rate limiting enabled');
+    }).catch((error) => {
+      logger.warn('Redis initialization failed, using in-memory rate limiting', { error: (error as Error).message });
+    });
+  } else {
+    logger.info('REDIS_URL not set - using in-memory rate limiting');
   }
 
   // Resolve repos directory
@@ -321,22 +364,29 @@ export function startServer(options: ServerOptions): WitServer {
     sshServer,
     keyManager,
     stop: async () => {
+      logger.info('Shutting down server...');
       const promises: Promise<void>[] = [];
       
       promises.push(new Promise<void>((resolve) => {
         server.close(() => {
-          console.log('[server] HTTP server stopped');
+          logger.info('HTTP server stopped');
           resolve();
         });
       }));
 
       if (sshServer) {
         promises.push(sshServer.stop().then(() => {
-          console.log('[server] SSH server stopped');
+          logger.info('SSH server stopped');
         }));
       }
 
+      // Close Redis connections
+      promises.push(closeAllRedis().then(() => {
+        logger.info('Redis connections closed');
+      }).catch(() => {}));
+
       await Promise.all(promises);
+      logger.info('Server shutdown complete');
     },
   };
 }

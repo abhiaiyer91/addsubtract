@@ -1,31 +1,72 @@
-# Nixpacks configuration for Railway
+# =============================================================================
+# Nixpacks Configuration for wit Server
+# =============================================================================
+# This configures the build and runtime environment for Railway deployments.
 # See: https://nixpacks.com/docs/configuration/file
 
-# Providers to use
 providers = ["node"]
 
+# =============================================================================
+# Setup Phase - Install system dependencies
+# =============================================================================
 [phases.setup]
-# Node.js 22+ required for wit
-nixPkgs = ["nodejs_22", "openssl"]
-# Git is needed for repository operations
-aptPkgs = ["git", "openssh-client"]
-
-[phases.install]
-# Use ci for reproducible installs
-cmds = ["npm ci"]
-
-[phases.build]
-# Build TypeScript and run migrations
-cmds = [
-  "npm run build",
-  "npm run db:migrate || echo 'Migration skipped (no DATABASE_URL)'"
+nixPkgs = [
+  "nodejs_22",    # Node.js 22 LTS
+  "openssl",      # For crypto operations
+  "cacert",       # SSL certificates
+]
+aptPkgs = [
+  "git",              # For git operations
+  "openssh-client",   # For SSH key generation
 ]
 
-[start]
-cmd = "node dist/server/index.js"
+# =============================================================================
+# Install Phase - Install npm dependencies
+# =============================================================================
+[phases.install]
+cmds = ["npm ci --prefer-offline"]
+cacheDirectories = ["/root/.npm"]
 
+# =============================================================================
+# Build Phase - Compile TypeScript and run migrations
+# =============================================================================
+[phases.build]
+cmds = [
+  # Build the application
+  "npm run build",
+  
+  # Run database migrations if DATABASE_URL is set
+  # Uses db:push for Drizzle ORM
+  "if [ -n \"$DATABASE_URL\" ]; then npm run db:push; else echo 'Skipping migrations (no DATABASE_URL)'; fi"
+]
+
+# Cache the TypeScript build output and node_modules
+cacheDirectories = [
+  "node_modules/.cache",
+  ".turbo",
+]
+
+# =============================================================================
+# Start Phase - Run the server
+# =============================================================================
+[start]
+cmd = "node dist/cli.js serve --port $PORT --repos /data/repos"
+
+# =============================================================================
+# Environment Variables
+# =============================================================================
 [variables]
-# Increase Node.js memory for large operations
-NODE_OPTIONS = "--max-old-space-size=2048"
-# Increase thread pool for I/O operations
+# Increase Node.js memory limit for large repos
+NODE_OPTIONS = "--max-old-space-size=2048 --enable-source-maps"
+
+# Increase libuv thread pool for better async I/O
 UV_THREADPOOL_SIZE = "16"
+
+# Use production mode
+NODE_ENV = "production"
+
+# Disable npm update notifier
+NPM_CONFIG_UPDATE_NOTIFIER = "false"
+
+# Enable npm prefer-offline for faster installs
+NPM_CONFIG_PREFER_OFFLINE = "true"
