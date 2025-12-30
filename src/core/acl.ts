@@ -476,4 +476,16 @@ export function logSecurityEvent(event: {
   }));
 }
 
+/**
+ * Check if a user can access a repository (simplified helper for API routes)
+ * Returns a simple result with allowed/denied status
+ */
+export async function checkRepoAccess(
+  repoId: string,
+  userId: string | undefined,
+  requiredLevel: RepoPermission
+): Promise<AccessCheckResult> {
+  return ACL.canAccessRepo(repoId, requiredLevel, { userId });
+}
+
 export default ACL;
