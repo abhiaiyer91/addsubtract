@@ -4,15 +4,59 @@ import { GitObject, Blob, Tree, Commit, Tag } from './object';
 import { createObjectBuffer, parseObjectBuffer, hashObject } from '../utils/hash';
 import { compress, decompress } from '../utils/compression';
 import { exists, readFile, writeFile, mkdirp, readDir } from '../utils/fs';
+import { PackfileParser, ParsedObject } from './protocol/packfile-parser';
 
 /**
  * Object store manages reading and writing Git objects to disk
  */
 export class ObjectStore {
   private objectsDir: string;
+  private packCache: Map<string, ParsedObject> | null = null;
+  private packCacheLoaded = false;
 
   constructor(private gitDir: string) {
     this.objectsDir = path.join(gitDir, 'objects');
+  }
+
+  /**
+   * Load all objects from packfiles into cache
+   */
+  private loadPackfiles(): void {
+    if (this.packCacheLoaded) return;
+    this.packCacheLoaded = true;
+    this.packCache = new Map();
+
+    const packDir = path.join(this.objectsDir, 'pack');
+    if (!exists(packDir)) return;
+
+    const packFiles = readDir(packDir).filter(f => f.endsWith('.pack'));
+    
+    for (const packFile of packFiles) {
+      try {
+        const packPath = path.join(packDir, packFile);
+        const packData = readFile(packPath);
+        const parser = new PackfileParser(packData);
+        const parsed = parser.parse();
+        
+        for (const obj of parsed.objects) {
+          this.packCache.set(obj.hash, obj);
+        }
+      } catch (error) {
+        console.error(`[ObjectStore] Failed to parse packfile ${packFile}:`, error);
+      }
+    }
+  }
+
+  /**
+   * Try to read an object from packfiles
+   */
+  private readFromPack(hash: string): { type: ObjectType; content: Buffer } | null {
+    this.loadPackfiles();
+    
+    const obj = this.packCache?.get(hash);
+    if (!obj) return null;
+    
+    return { type: obj.type, content: obj.data };
   }
 
   /**
@@ -25,10 +69,14 @@ export class ObjectStore {
   }
 
   /**
-   * Check if an object exists
+   * Check if an object exists (in loose objects or packfiles)
    */
   hasObject(hash: string): boolean {
-    return exists(this.getObjectPath(hash));
+    if (exists(this.getObjectPath(hash))) return true;
+    
+    // Check packfiles
+    this.loadPackfiles();
+    return this.packCache?.has(hash) ?? false;
   }
 
   /**
@@ -84,37 +132,49 @@ export class ObjectStore {
   }
 
   /**
-   * Read a Git object from the store
+   * Read a Git object from the store (loose objects or packfiles)
    */
   readObject(hash: string): GitObject {
     const objectPath = this.getObjectPath(hash);
 
-    if (!exists(objectPath)) {
-      throw new Error(`Object not found: ${hash}`);
+    // Try loose object first
+    if (exists(objectPath)) {
+      const compressed = readFile(objectPath);
+      const data = decompress(compressed);
+      const { type, content } = parseObjectBuffer(data);
+      return this.deserialize(type as ObjectType, content);
     }
 
-    const compressed = readFile(objectPath);
-    const data = decompress(compressed);
-    const { type, content } = parseObjectBuffer(data);
+    // Fall back to packfiles
+    const packed = this.readFromPack(hash);
+    if (packed) {
+      return this.deserialize(packed.type, packed.content);
+    }
 
-    return this.deserialize(type as ObjectType, content);
+    throw new Error(`Object not found: ${hash}`);
   }
 
   /**
-   * Read raw object data (type and content)
+   * Read raw object data (type and content) from loose objects or packfiles
    */
   readRawObject(hash: string): { type: ObjectType; content: Buffer } {
     const objectPath = this.getObjectPath(hash);
 
-    if (!exists(objectPath)) {
-      throw new Error(`Object not found: ${hash}`);
+    // Try loose object first
+    if (exists(objectPath)) {
+      const compressed = readFile(objectPath);
+      const data = decompress(compressed);
+      const { type, content } = parseObjectBuffer(data);
+      return { type: type as ObjectType, content };
     }
 
-    const compressed = readFile(objectPath);
-    const data = decompress(compressed);
-    const { type, content } = parseObjectBuffer(data);
+    // Fall back to packfiles
+    const packed = this.readFromPack(hash);
+    if (packed) {
+      return packed;
+    }
 
-    return { type: type as ObjectType, content };
+    throw new Error(`Object not found: ${hash}`);
   }
 
   /**
