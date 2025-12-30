@@ -5,7 +5,7 @@
  * Reviews are triggered asynchronously when PRs are created or updated.
  */
 
-import { prModel, prReviewModel, prCommentModel, repoModel, userModel, repoAiKeyModel } from '../../db/models';
+import { prModel, repoModel, repoAiKeyModel } from '../../db/models';
 import { resolveDiskPath, BareRepository } from '../../server/storage/repos';
 import { exists } from '../../utils/fs';
 import { diff, createHunks, formatUnifiedDiff, FileDiff } from '../../core/diff';
@@ -344,109 +344,6 @@ function analyzeDiff(diff: string, files: string[]): AIReviewResult {
 }
 
 /**
- * Format review result as markdown for PR comment
- */
-function formatReviewAsMarkdown(result: AIReviewResult): string {
-  const lines: string[] = [];
-
-  // Header with approval status
-  if (result.approved) {
-    lines.push('## AI Review: Approved');
-  } else {
-    lines.push('## AI Review: Changes Requested');
-  }
-
-  lines.push('');
-  lines.push(result.summary);
-  lines.push('');
-  lines.push(`**Score:** ${result.score}/10`);
-  lines.push('');
-
-  // Security concerns (most important)
-  if (result.securityConcerns.length > 0) {
-    lines.push('### Security Concerns');
-    lines.push('');
-    for (const concern of result.securityConcerns) {
-      lines.push(`- ${concern}`);
-    }
-    lines.push('');
-  }
-
-  // Issues grouped by severity
-  const errors = result.issues.filter(i => i.severity === 'error');
-  const warnings = result.issues.filter(i => i.severity === 'warning');
-  const infos = result.issues.filter(i => i.severity === 'info');
-
-  if (errors.length > 0) {
-    lines.push('### Errors');
-    lines.push('');
-    for (const issue of errors) {
-      lines.push(`- **${issue.file}${issue.line ? `:${issue.line}` : ''}**: ${issue.message}`);
-      if (issue.suggestion) {
-        lines.push(`  - *Suggestion:* ${issue.suggestion}`);
-      }
-    }
-    lines.push('');
-  }
-
-  if (warnings.length > 0) {
-    lines.push('### Warnings');
-    lines.push('');
-    for (const issue of warnings) {
-      lines.push(`- **${issue.file}${issue.line ? `:${issue.line}` : ''}**: ${issue.message}`);
-      if (issue.suggestion) {
-        lines.push(`  - *Suggestion:* ${issue.suggestion}`);
-      }
-    }
-    lines.push('');
-  }
-
-  if (infos.length > 0) {
-    lines.push('### Suggestions');
-    lines.push('');
-    for (const issue of infos) {
-      lines.push(`- **${issue.file}${issue.line ? `:${issue.line}` : ''}**: ${issue.message}`);
-      if (issue.suggestion) {
-        lines.push(`  - *Suggestion:* ${issue.suggestion}`);
-      }
-    }
-    lines.push('');
-  }
-
-  // General suggestions
-  if (result.suggestions.length > 0) {
-    lines.push('### General Recommendations');
-    lines.push('');
-    for (const suggestion of result.suggestions) {
-      lines.push(`- ${suggestion}`);
-    }
-    lines.push('');
-  }
-
-  lines.push('---');
-  lines.push('*This review was generated automatically by wit AI.*');
-
-  return lines.join('\n');
-}
-
-/**
- * Get or create the AI bot user
- * Returns null if no bot user exists and we can't create reviews
- */
-async function getAIBotUser(): Promise<{ id: string } | null> {
-  // Try to find existing bot user
-  const botUser = await userModel.findByUsername('wit-bot');
-  if (botUser) {
-    return { id: botUser.id };
-  }
-
-  // For now, return null - the bot user should be created during setup/seeding
-  // In production, you'd want to auto-create this user
-  console.warn('[AI Review] No wit-bot user found. AI reviews will be stored as comments instead.');
-  return null;
-}
-
-/**
  * Convert CodeRabbit result to our AIReviewResult format
  */
 function convertCodeRabbitResult(crResult: CodeRabbitReviewResult): AIReviewResult {
@@ -485,98 +382,12 @@ function convertCodeRabbitResult(crResult: CodeRabbitReviewResult): AIReviewResu
 }
 
 /**
- * Format CodeRabbit review result as markdown
- */
-function formatCodeRabbitReviewAsMarkdown(result: AIReviewResult, isCodeRabbit: boolean): string {
-  const lines: string[] = [];
-
-  // Header with approval status
-  if (result.approved) {
-    lines.push('## AI Review: Approved');
-  } else {
-    lines.push('## AI Review: Changes Requested');
-  }
-
-  lines.push('');
-  lines.push(result.summary);
-  lines.push('');
-  lines.push(`**Score:** ${result.score}/10`);
-  lines.push('');
-
-  // Security concerns (most important)
-  if (result.securityConcerns.length > 0) {
-    lines.push('### Security Concerns');
-    lines.push('');
-    for (const concern of result.securityConcerns) {
-      lines.push(`- ${concern}`);
-    }
-    lines.push('');
-  }
-
-  // Issues grouped by severity
-  const errors = result.issues.filter(i => i.severity === 'error');
-  const warnings = result.issues.filter(i => i.severity === 'warning');
-  const infos = result.issues.filter(i => i.severity === 'info');
-
-  if (errors.length > 0) {
-    lines.push('### Errors');
-    lines.push('');
-    for (const issue of errors) {
-      lines.push(`- **${issue.file}${issue.line ? `:${issue.line}` : ''}**: ${issue.message}`);
-      if (issue.suggestion) {
-        lines.push(`  - *Suggestion:* ${issue.suggestion}`);
-      }
-    }
-    lines.push('');
-  }
-
-  if (warnings.length > 0) {
-    lines.push('### Warnings');
-    lines.push('');
-    for (const issue of warnings) {
-      lines.push(`- **${issue.file}${issue.line ? `:${issue.line}` : ''}**: ${issue.message}`);
-      if (issue.suggestion) {
-        lines.push(`  - *Suggestion:* ${issue.suggestion}`);
-      }
-    }
-    lines.push('');
-  }
-
-  if (infos.length > 0) {
-    lines.push('### Suggestions');
-    lines.push('');
-    for (const issue of infos) {
-      lines.push(`- **${issue.file}${issue.line ? `:${issue.line}` : ''}**: ${issue.message}`);
-      if (issue.suggestion) {
-        lines.push(`  - *Suggestion:* ${issue.suggestion}`);
-      }
-    }
-    lines.push('');
-  }
-
-  // General suggestions
-  if (result.suggestions.length > 0) {
-    lines.push('### General Recommendations');
-    lines.push('');
-    for (const suggestion of result.suggestions) {
-      lines.push(`- ${suggestion}`);
-    }
-    lines.push('');
-  }
-
-  lines.push('---');
-  lines.push(isCodeRabbit ? '*Powered by CodeRabbit AI*' : '*This review was generated automatically by wit AI.*');
-
-  return lines.join('\n');
-}
-
-/**
  * Run an AI review on a pull request
  * 
  * This function:
  * 1. Tries CodeRabbit first if available
  * 2. Falls back to built-in analyzer
- * 3. Creates a PR review with the findings
+ * 3. Returns the review result (no longer posts comments)
  */
 export async function runAIReview(prId: string): Promise<AIReviewResult | null> {
   try {
@@ -648,38 +459,6 @@ export async function runAIReview(prId: string): Promise<AIReviewResult | null> 
     }
 
     console.log(`[AI Review] Found ${result.issues.length} issues, score: ${result.score}/10`);
-
-    // Try to create a PR review
-    const botUser = await getAIBotUser();
-    const reviewBody = usedCodeRabbit 
-      ? formatCodeRabbitReviewAsMarkdown(result, true)
-      : formatReviewAsMarkdown(result);
-    
-    if (botUser) {
-      // Create as a proper PR review
-      const reviewState = result.approved ? 'approved' : 'changes_requested';
-      
-      await prReviewModel.create({
-        prId: pr.id,
-        userId: botUser.id,
-        state: reviewState as 'approved' | 'changes_requested' | 'commented',
-        body: reviewBody,
-        commitSha: pr.headSha,
-      });
-
-      console.log(`[AI Review] Created review for PR #${pr.number}`);
-    } else {
-      // Fall back to creating a comment
-      // We need a user to create a comment, so we'll use the PR author
-      // This isn't ideal but works as a fallback
-      await prCommentModel.create({
-        prId: pr.id,
-        userId: pr.authorId, // Use author as fallback - not ideal
-        body: reviewBody,
-      });
-
-      console.log(`[AI Review] Created comment for PR #${pr.number} (no bot user)`);
-    }
 
     return result;
   } catch (error) {
