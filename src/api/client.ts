@@ -339,6 +339,25 @@ export class ApiClient {
     }): Promise<Repository> => {
       return this.request('POST', '/api/repos', data);
     },
+
+    /**
+     * Transfer a repository to a new owner (user or organization)
+     */
+    transfer: async (
+      owner: string,
+      repo: string,
+      data: {
+        newOwner: string;
+        newOwnerType: 'user' | 'organization';
+      }
+    ): Promise<{
+      success: boolean;
+      repo: Repository;
+      previousOwner: string;
+      newOwner: string;
+    }> => {
+      return this.request('POST', `/api/repos/${owner}/${repo}/transfer`, data);
+    },
   };
 
   // ============================================================================

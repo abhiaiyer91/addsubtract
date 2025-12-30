@@ -104,6 +104,8 @@ import {
   handleJournal,
   // Wrapped (Monthly activity insights)
   handleWrapped,
+  // Repository management
+  handleRepo,
 } from './commands';
 import { handleHooks } from './core/hooks';
 import { handleSubmodule } from './core/submodule';
@@ -295,6 +297,10 @@ CI/CD:
   ci runs               Show recent workflow runs (requires server)
   ci view <run-id>      View workflow run details (requires server)
 
+Repository Management:
+  repo transfer <owner/repo> <new-owner>  Transfer repo to user or org
+  repo transfer ... --org                 Transfer to an organization
+
 Merge Queue:
   merge-queue add       Add PR to merge queue (auto-queued merging)
   merge-queue remove    Remove PR from queue
@@ -485,6 +491,8 @@ const COMMANDS = [
   'merge-queue',
   // Wrapped
   'wrapped',
+  // Repository management
+  'repo',
   'help',
 ];
 
@@ -1183,6 +1191,18 @@ function main(): void {
       // Wrapped (Monthly activity insights)
       case 'wrapped':
         handleWrapped(args.slice(args.indexOf('wrapped') + 1)).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
+          }
+          process.exit(1);
+        });
+        return;
+
+      // Repository management (transfer, etc.)
+      case 'repo':
+        handleRepo(args.slice(args.indexOf('repo') + 1)).catch((error: Error) => {
           if (error instanceof TsgitError) {
             console.error((error as TsgitError).format());
           } else {

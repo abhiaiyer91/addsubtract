@@ -35,6 +35,11 @@ export function RepoSettingsPage() {
   const [error, setError] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [transferDialogOpen, setTransferDialogOpen] = useState(false);
+  const [transferNewOwner, setTransferNewOwner] = useState('');
+  const [transferToOrg, setTransferToOrg] = useState(false);
+  const [transferConfirmText, setTransferConfirmText] = useState('');
+  const [transferError, setTransferError] = useState<string | null>(null);
 
   const utils = trpc.useUtils();
 
@@ -86,6 +91,16 @@ export function RepoSettingsPage() {
     },
   });
 
+  const transferRepo = trpc.repos.transfer.useMutation({
+    onSuccess: () => {
+      // Navigate to the new location
+      navigate(`/${transferNewOwner}/${repo}`);
+    },
+    onError: (err) => {
+      setTransferError(err.message);
+    },
+  });
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -108,6 +123,26 @@ export function RepoSettingsPage() {
     deleteRepo.mutate({ repoId: repoData.repo.id });
     setDeleteDialogOpen(false);
     setDeleteConfirmText('');
+  };
+
+  const handleTransfer = () => {
+    if (!repoData?.repo.id) return;
+    if (transferConfirmText !== repo) return;
+    if (!transferNewOwner.trim()) return;
+
+    setTransferError(null);
+    transferRepo.mutate({
+      repoId: repoData.repo.id,
+      newOwner: transferNewOwner.trim(),
+      toOrg: transferToOrg,
+    });
+  };
+
+  const resetTransferDialog = () => {
+    setTransferNewOwner('');
+    setTransferToOrg(false);
+    setTransferConfirmText('');
+    setTransferError(null);
   };
 
   if (!authenticated) {
@@ -258,7 +293,96 @@ export function RepoSettingsPage() {
                 Irreversible and destructive actions.
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between p-4 border border-destructive/50 rounded-lg">
+                <div>
+                  <div className="font-medium">Transfer ownership</div>
+                  <p className="text-sm text-muted-foreground">
+                    Transfer this repository to another user or organization.
+                  </p>
+                </div>
+                <AlertDialog open={transferDialogOpen} onOpenChange={(open) => {
+                  setTransferDialogOpen(open);
+                  if (!open) resetTransferDialog();
+                }}>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="destructive"
+                      disabled={transferRepo.isPending}
+                    >
+                      {transferRepo.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Transfer
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Transfer repository</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Transfer <strong>{owner}/{repo}</strong> to a new owner. You will lose admin access
+                        unless the new owner adds you as a collaborator.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <div className="space-y-4 py-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="transfer-owner">New owner</Label>
+                        <Input
+                          id="transfer-owner"
+                          value={transferNewOwner}
+                          onChange={(e) => setTransferNewOwner(e.target.value)}
+                          placeholder="username or organization"
+                        />
+                      </div>
+                      <div className="space-y-3">
+                        <Label>Owner type</Label>
+                        <RadioGroup
+                          value={transferToOrg ? 'org' : 'user'}
+                          onValueChange={(value) => setTransferToOrg(value === 'org')}
+                          className="space-y-2"
+                        >
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <RadioGroupItem value="user" />
+                            <span className="text-sm">User</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <RadioGroupItem value="org" />
+                            <span className="text-sm">Organization</span>
+                          </label>
+                        </RadioGroup>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="confirm-transfer" className="text-sm text-muted-foreground">
+                          Type <strong>{repo}</strong> to confirm
+                        </Label>
+                        <Input
+                          id="confirm-transfer"
+                          value={transferConfirmText}
+                          onChange={(e) => setTransferConfirmText(e.target.value)}
+                          placeholder={repo}
+                        />
+                      </div>
+                      {transferError && (
+                        <div className="p-3 rounded-md bg-destructive/10 text-destructive text-sm">
+                          {transferError}
+                        </div>
+                      )}
+                    </div>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel onClick={resetTransferDialog}>
+                        Cancel
+                      </AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={handleTransfer}
+                        disabled={transferConfirmText !== repo || !transferNewOwner.trim() || transferRepo.isPending}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        {transferRepo.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Transfer repository
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+
               <div className="flex items-center justify-between p-4 border border-destructive/50 rounded-lg">
                 <div>
                   <div className="font-medium">Delete this repository</div>

@@ -1173,6 +1173,24 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
     seeAlso: ['clone', 'push', 'fetch'],
   },
 
+  // ============ Repository Management ============
+  repo: {
+    name: 'repo',
+    summary: 'Repository management commands (transfer, etc.)',
+    usage: 'wit repo <subcommand> [options]',
+    description: 'Manage repositories including transferring ownership between users and organizations.',
+    options: [
+      { flag: 'transfer <owner/repo> <new-owner>', description: 'Transfer repository to another user or org' },
+      { flag: '--org', description: 'Transfer to an organization (default: user)' },
+    ],
+    examples: [
+      { command: 'wit repo transfer alice/myrepo bob', description: 'Transfer repo to another user' },
+      { command: 'wit repo transfer alice/myrepo acme-corp --org', description: 'Transfer repo to an organization' },
+      { command: 'wit repo transfer myorg/project other-org --org', description: 'Transfer between organizations' },
+    ],
+    seeAlso: ['collaborator', 'github'],
+  },
+
   // ============ Code Review ============
   review: {
     name: 'review',

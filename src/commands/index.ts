@@ -119,6 +119,9 @@ export { handleJournal, JOURNAL_HELP } from './journal';
 // Wrapped - Monthly activity insights (Spotify Wrapped-style)
 export { handleWrapped } from './wrapped';
 
+// Repository management (transfer, etc.)
+export { handleRepo, REPO_HELP } from './repo';
+
 // Collaborator management
 export {
   handleCollaborator,

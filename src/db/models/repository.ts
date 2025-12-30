@@ -346,6 +346,30 @@ export const repoModel = {
   },
 
   /**
+   * Transfer a repository to a new owner (user or organization)
+   * Updates the ownerId, ownerType, and diskPath
+   */
+  async transfer(
+    id: string,
+    newOwnerId: string,
+    newOwnerType: 'user' | 'organization',
+    newDiskPath: string
+  ): Promise<Repository | undefined> {
+    const db = getDb();
+    const [repo] = await db
+      .update(repositories)
+      .set({
+        ownerId: newOwnerId,
+        ownerType: newOwnerType,
+        diskPath: newDiskPath,
+        updatedAt: new Date(),
+      })
+      .where(eq(repositories.id, id))
+      .returning();
+    return repo;
+  },
+
+  /**
    * Recalculate open issues and PRs counts from actual data
    */
   async recalculateCounts(id: string): Promise<{ openIssuesCount: number; openPrsCount: number }> {
