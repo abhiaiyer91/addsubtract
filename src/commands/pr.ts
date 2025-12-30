@@ -21,8 +21,7 @@ import {
   getCodeRabbitStatus,
   getCodeRabbitApiKey,
   saveCodeRabbitApiKey,
-  reviewPullRequest,
-  reviewDiff,
+  reviewRepo,
   formatReviewResult,
   CodeRabbitConfig,
 } from '../utils/coderabbit';
@@ -602,12 +601,14 @@ async function handlePrReview(args: string[]): Promise<void> {
 
   console.log(`\n🐰 Reviewing PR #${prNumber} with CodeRabbit...\n`);
 
+  // The CodeRabbit CLI works on local repos, not GitHub PRs directly
+  // For now, fall back to local review which uses the current branch
   const config: CodeRabbitConfig = {
-    verbose: !!flags.verbose,
-    format: flags.json ? 'json' : 'text',
+    cwd: repo.workDir,
+    baseBranch: 'main', // TODO: Get actual base branch from PR
   };
 
-  const result = await reviewPullRequest(owner, repoName, prNumber, config);
+  const result = await reviewRepo(repo.workDir, config);
 
   if (flags.json) {
     console.log(JSON.stringify(result, null, 2));
@@ -637,75 +638,12 @@ async function handleLocalReview(flags: Record<string, string | boolean>): Promi
 
   console.log(`\n🐰 Reviewing ${filesToReview.length} changed file(s) with CodeRabbit...\n`);
 
-  // Generate diff content
-  let diffContent = '';
-  const fs = await import('fs');
-  const path = await import('path');
-  const { diff: computeDiff, createHunks } = await import('../core/diff.js');
-
-  for (const file of filesToReview) {
-    try {
-      let oldContent = '';
-      const entry = repo.index.get(file);
-      if (entry) {
-        try {
-          const blob = repo.objects.readBlob(entry.hash);
-          oldContent = blob.content.toString('utf8');
-        } catch {
-          // No previous version
-        }
-      }
-
-      const fullPath = path.join(repo.workDir, file);
-      let newContent = '';
-      try {
-        newContent = fs.readFileSync(fullPath, 'utf8');
-      } catch {
-        // File might be deleted
-      }
-
-      const diffResult = computeDiff(oldContent, newContent);
-      const hunks = createHunks(diffResult, 3);
-
-      if (hunks.length > 0) {
-        diffContent += `diff --git a/${file} b/${file}\n`;
-        diffContent += `--- a/${file}\n`;
-        diffContent += `+++ b/${file}\n`;
-
-        for (const hunk of hunks) {
-          diffContent += `@@ -${hunk.oldStart},${hunk.oldCount} +${hunk.newStart},${hunk.newCount} @@\n`;
-
-          for (const line of hunk.lines) {
-            switch (line.type) {
-              case 'add':
-                diffContent += `+${line.content}\n`;
-                break;
-              case 'remove':
-                diffContent += `-${line.content}\n`;
-                break;
-              case 'context':
-                diffContent += ` ${line.content}\n`;
-                break;
-            }
-          }
-        }
-      }
-    } catch {
-      // Skip files we can't diff
-    }
-  }
-
-  if (!diffContent) {
-    console.log('No meaningful changes to review.');
-    return;
-  }
-
+  // CodeRabbit CLI works directly on git repos
   const config: CodeRabbitConfig = {
-    verbose: !!flags.verbose,
-    format: flags.json ? 'json' : 'text',
+    cwd: repo.workDir,
   };
 
-  const result = await reviewDiff(diffContent, config);
+  const result = await reviewRepo(repo.workDir, config);
 
   if (flags.json) {
     console.log(JSON.stringify(result, null, 2));

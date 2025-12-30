@@ -1,8 +1,7 @@
 /**
  * CodeRabbit CLI Integration for wit
  *
- * Provides integration with CodeRabbit CLI (@coderabbitai/coderabbit)
- * for AI-powered code reviews on pull requests.
+ * Provides integration with CodeRabbit CLI for AI-powered code reviews on pull requests.
  *
  * CodeRabbit is an AI code reviewer that provides:
  * - High-quality code reviews for PRs
@@ -11,10 +10,11 @@
  * - Best practices recommendations
  *
  * Installation:
- *   npm install -g @coderabbitai/coderabbit
+ *   curl -fsSL https://cli.coderabbit.ai/install.sh | sh
  *
  * Authentication:
- *   Set CODERABBIT_API_KEY environment variable
+ *   Run: coderabbit auth login
+ *   Or set CODERABBIT_API_KEY environment variable
  */
 
 import { spawn, SpawnOptions } from 'child_process';
@@ -32,10 +32,16 @@ export interface CodeRabbitConfig {
   apiKey?: string;
   /** Path to coderabbit executable */
   cliPath?: string;
-  /** Enable verbose output */
-  verbose?: boolean;
-  /** Output format */
-  format?: 'text' | 'json' | 'markdown';
+  /** Output in plain text format (non-interactive) */
+  plain?: boolean;
+  /** Show only AI agent prompts (implies plain) */
+  promptOnly?: boolean;
+  /** Working directory path */
+  cwd?: string;
+  /** Base branch for comparison */
+  baseBranch?: string;
+  /** Base commit for comparison */
+  baseCommit?: string;
 }
 
 export interface CodeRabbitReviewResult {
@@ -158,11 +164,10 @@ export async function findCodeRabbitCli(): Promise<string | null> {
   const possiblePaths = [
     'coderabbit',
     'cr',
-    // npm global installations
-    path.join(os.homedir(), '.npm-global', 'bin', 'coderabbit'),
-    path.join(os.homedir(), 'node_modules', '.bin', 'coderabbit'),
-    // npx path
-    'npx @coderabbitai/coderabbit',
+    // Official CLI installation paths (curl -fsSL https://cli.coderabbit.ai/install.sh | sh)
+    path.join(os.homedir(), '.local', 'bin', 'coderabbit'),
+    '/usr/local/bin/coderabbit',
+    '/root/.local/bin/coderabbit', // Docker root user
   ];
 
   for (const cmdPath of possiblePaths) {
@@ -218,11 +223,40 @@ export async function getCodeRabbitStatus(): Promise<CodeRabbitStatus> {
 
 /**
  * Review a pull request using CodeRabbit CLI
+ * @deprecated The CodeRabbit CLI doesn't support GitHub PR URLs directly. Use reviewRepo() with baseCommit instead.
  */
 export async function reviewPullRequest(
-  owner: string,
-  repo: string,
-  prNumber: number,
+  _owner: string,
+  _repo: string,
+  _prNumber: number,
+  config: CodeRabbitConfig = {}
+): Promise<CodeRabbitReviewResult> {
+  // The CLI doesn't support --pr flag or GitHub PR URLs
+  // Use reviewRepo() with the repo path and baseCommit instead
+  if (config.cwd && config.baseCommit) {
+    return reviewRepo(config.cwd, config);
+  }
+  
+  return {
+    success: false,
+    issues: [],
+    suggestions: [],
+    error: 'CodeRabbit CLI does not support GitHub PR URLs. Use reviewRepo() with a local repo path and baseCommit.',
+  };
+}
+
+/**
+ * Review changes in a git repository using CodeRabbit CLI
+ * 
+ * The CLI works directly on git repos with options:
+ *   --plain           Output in plain text format (non-interactive)
+ *   --prompt-only     Show only AI agent prompts (implies --plain)
+ *   --base <branch>   Base branch for comparison
+ *   --base-commit <commit>  Base commit for comparison
+ *   --cwd <path>      Working directory path
+ */
+export async function reviewRepo(
+  repoPath: string,
   config: CodeRabbitConfig = {}
 ): Promise<CodeRabbitReviewResult> {
   const status = await getCodeRabbitStatus();
@@ -233,7 +267,7 @@ export async function reviewPullRequest(
       issues: [],
       suggestions: [],
       error:
-        'CodeRabbit CLI is not installed. Install with: npm install -g @coderabbitai/coderabbit',
+        'CodeRabbit CLI is not installed. Install with: curl -fsSL https://cli.coderabbit.ai/install.sh | sh',
     };
   }
 
@@ -244,19 +278,21 @@ export async function reviewPullRequest(
       issues: [],
       suggestions: [],
       error:
-        'CodeRabbit API key not configured. Set CODERABBIT_API_KEY environment variable or run: wit pr review --configure',
+        'CodeRabbit API key not configured. Set CODERABBIT_API_KEY environment variable or run: coderabbit auth login',
     };
   }
 
   const cliPath = config.cliPath || status.cliPath!;
-  const args = ['review', `${owner}/${repo}`, '--pr', String(prNumber)];
+  const args = ['review', '--plain']; // Always use plain for programmatic parsing
 
-  if (config.format === 'json') {
-    args.push('--format', 'json');
+  if (config.baseCommit) {
+    args.push('--base-commit', config.baseCommit);
+  } else if (config.baseBranch) {
+    args.push('--base', config.baseBranch);
   }
 
-  if (config.verbose) {
-    args.push('--verbose');
+  if (config.cwd || repoPath) {
+    args.push('--cwd', config.cwd || repoPath);
   }
 
   try {
@@ -271,11 +307,6 @@ export async function reviewPullRequest(
         rawOutput: result.stderr || result.stdout,
         error: `CodeRabbit review failed: ${result.stderr || 'Unknown error'}`,
       };
-    }
-
-    // Parse the output
-    if (config.format === 'json') {
-      return parseJsonReviewOutput(result.stdout);
     }
 
     return parseTextReviewOutput(result.stdout);
@@ -291,162 +322,47 @@ export async function reviewPullRequest(
 
 /**
  * Review local changes (diff) using CodeRabbit CLI
+ * @deprecated Use reviewRepo instead - CLI works on git repos directly
  */
 export async function reviewDiff(
-  diffContent: string,
+  _diffContent: string,
   config: CodeRabbitConfig = {}
 ): Promise<CodeRabbitReviewResult> {
-  const status = await getCodeRabbitStatus();
-
-  if (!status.installed) {
-    return {
-      success: false,
-      issues: [],
-      suggestions: [],
-      error:
-        'CodeRabbit CLI is not installed. Install with: npm install -g @coderabbitai/coderabbit',
-    };
+  // The CodeRabbit CLI doesn't support direct diff file input
+  // It works on git repositories directly
+  // If cwd is provided, use reviewRepo, otherwise return error
+  if (config.cwd) {
+    return reviewRepo(config.cwd, config);
   }
-
-  const apiKey = config.apiKey || getCodeRabbitApiKey();
-  if (!apiKey) {
-    return {
-      success: false,
-      issues: [],
-      suggestions: [],
-      error:
-        'CodeRabbit API key not configured. Set CODERABBIT_API_KEY environment variable.',
-    };
-  }
-
-  // Write diff to temp file
-  const tempDir = os.tmpdir();
-  const diffFile = path.join(tempDir, `wit-review-${Date.now()}.diff`);
-  fs.writeFileSync(diffFile, diffContent);
-
-  const cliPath = config.cliPath || status.cliPath!;
-  const args = ['review', '--diff', diffFile];
-
-  if (config.format === 'json') {
-    args.push('--format', 'json');
-  }
-
-  if (config.verbose) {
-    args.push('--verbose');
-  }
-
-  try {
-    const env = { ...process.env, CODERABBIT_API_KEY: apiKey };
-    const result = await runCommand(cliPath, args, { env });
-
-    // Clean up temp file
-    try {
-      fs.unlinkSync(diffFile);
-    } catch {
-      // Ignore cleanup errors
-    }
-
-    if (result.exitCode !== 0) {
-      return {
-        success: false,
-        issues: [],
-        suggestions: [],
-        rawOutput: result.stderr || result.stdout,
-        error: `CodeRabbit review failed: ${result.stderr || 'Unknown error'}`,
-      };
-    }
-
-    if (config.format === 'json') {
-      return parseJsonReviewOutput(result.stdout);
-    }
-
-    return parseTextReviewOutput(result.stdout);
-  } catch (error) {
-    // Clean up temp file on error
-    try {
-      fs.unlinkSync(diffFile);
-    } catch {
-      // Ignore
-    }
-
-    return {
-      success: false,
-      issues: [],
-      suggestions: [],
-      error: `Failed to run CodeRabbit: ${error instanceof Error ? error.message : 'Unknown error'}`,
-    };
-  }
+  
+  return {
+    success: false,
+    issues: [],
+    suggestions: [],
+    error: 'CodeRabbit CLI requires a git repository path. Use reviewRepo() instead or provide cwd in config.',
+  };
 }
 
 /**
  * Review specific files using CodeRabbit CLI
+ * @deprecated The CodeRabbit CLI doesn't support file-specific reviews. Use reviewRepo() instead.
  */
 export async function reviewFiles(
-  files: string[],
+  _files: string[],
   baseBranch: string = 'main',
   config: CodeRabbitConfig = {}
 ): Promise<CodeRabbitReviewResult> {
-  const status = await getCodeRabbitStatus();
-
-  if (!status.installed) {
-    return {
-      success: false,
-      issues: [],
-      suggestions: [],
-      error:
-        'CodeRabbit CLI is not installed. Install with: npm install -g @coderabbitai/coderabbit',
-    };
+  // The CLI doesn't support --files flag, review the whole repo with base branch
+  if (config.cwd) {
+    return reviewRepo(config.cwd, { ...config, baseBranch });
   }
-
-  const apiKey = config.apiKey || getCodeRabbitApiKey();
-  if (!apiKey) {
-    return {
-      success: false,
-      issues: [],
-      suggestions: [],
-      error:
-        'CodeRabbit API key not configured. Set CODERABBIT_API_KEY environment variable.',
-    };
-  }
-
-  const cliPath = config.cliPath || status.cliPath!;
-  const args = ['review', '--files', ...files, '--base', baseBranch];
-
-  if (config.format === 'json') {
-    args.push('--format', 'json');
-  }
-
-  if (config.verbose) {
-    args.push('--verbose');
-  }
-
-  try {
-    const env = { ...process.env, CODERABBIT_API_KEY: apiKey };
-    const result = await runCommand(cliPath, args, { env });
-
-    if (result.exitCode !== 0) {
-      return {
-        success: false,
-        issues: [],
-        suggestions: [],
-        rawOutput: result.stderr || result.stdout,
-        error: `CodeRabbit review failed: ${result.stderr || 'Unknown error'}`,
-      };
-    }
-
-    if (config.format === 'json') {
-      return parseJsonReviewOutput(result.stdout);
-    }
-
-    return parseTextReviewOutput(result.stdout);
-  } catch (error) {
-    return {
-      success: false,
-      issues: [],
-      suggestions: [],
-      error: `Failed to run CodeRabbit: ${error instanceof Error ? error.message : 'Unknown error'}`,
-    };
-  }
+  
+  return {
+    success: false,
+    issues: [],
+    suggestions: [],
+    error: 'CodeRabbit CLI requires a git repository path. Use reviewRepo() instead.',
+  };
 }
 
 // ============================================================================
