@@ -364,7 +364,7 @@ export function PrSidebar({
               <Badge
                 key={label.id}
                 variant="outline"
-                className="group gap-1 pr-1"
+                className="group gap-1"
                 style={{
                   backgroundColor: `#${label.color}20`,
                   borderColor: `#${label.color}`,
