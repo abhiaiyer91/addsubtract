@@ -489,12 +489,16 @@ async function executeCommand(
             stop: () => instance.stop(),
             runCommand: async (cmd: string, cmdArgs?: string[], _opts?: { signal?: AbortSignal }) => {
               // Vercel SDK expects an object with cmd/args, not positional arguments
-              const result = await instance.runCommand({
+              let result = await instance.runCommand({
                 cmd,
                 args: cmdArgs || [],
               });
+              // Handle Command vs CommandFinished - wait for completion if needed
+              if (!('stdout' in result)) {
+                result = await result.wait();
+              }
               return {
-                exitCode: result.exitCode,
+                exitCode: result.exitCode ?? 0,
                 stdout: result.stdout,
                 stderr: result.stderr,
               };
