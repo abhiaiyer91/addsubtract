@@ -49,6 +49,7 @@ import { SandboxSettingsPage } from './routes/repo/settings/sandbox';
 import { PackageSettingsPage } from './routes/repo/settings/package';
 import { StorageSettingsPage } from './routes/repo/settings/storage';
 import { PackagePage } from './routes/repo/package';
+import { SentinelPage } from './routes/repo/sentinel';
 import { ReleasesPage } from './routes/repo/releases';
 import { NewReleasePage } from './routes/repo/releases/new';
 import { ReleaseDetailPage } from './routes/repo/releases/detail';
@@ -206,6 +207,9 @@ export function App() {
             <Route path="/:owner/:repo/journal" element={<JournalPage />} />
             <Route path="/:owner/:repo/journal/new" element={<NewJournalPage />} />
             <Route path="/:owner/:repo/journal/:slug" element={<JournalPageDetail />} />
+
+            {/* Sentinel */}
+            <Route path="/:owner/:repo/sentinel" element={<SentinelPage />} />
 
             {/* Repository settings */}
             <Route path="/:owner/:repo/settings" element={<RepoSettingsPage />} />

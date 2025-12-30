@@ -36,6 +36,7 @@ import { createSandboxRoutes, createSandboxWsRoutes } from './routes/sandbox-ws'
 import { createRepoRoutes } from './routes/repos';
 import { createPullRoutes } from './routes/pulls';
 import { createPublicApiV1 } from './routes/public-api';
+import { createSentinelRoutes } from './routes/sentinel';
 import { createStorageRoutes } from './routes/storage';
 import { RepoManager } from './storage/repos';
 import { StorageAwareRepoManager } from '../storage';
@@ -50,7 +51,7 @@ import { SSHServer, generateHostKey, SSHServerOptions } from './ssh';
 import { SSHKeyManager, FileBasedAccessControl } from './ssh/keys';
 import { Repository } from '../core/repository';
 import { createAuth } from '../lib/auth';
-import { registerNotificationHandlers, registerCIHandlers, registerTriageHandlers, registerMergeQueueHandlers, registerMarketingHandlers } from '../events';
+import { registerNotificationHandlers, registerCIHandlers, registerTriageHandlers, registerMergeQueueHandlers, registerMarketingHandlers, registerSentinelHandlers } from '../events';
 
 /**
  * Server configuration options
@@ -210,12 +211,14 @@ export function createApp(repoManager: AnyRepoManager, options: { verbose?: bool
   const oauthRoutes = createOAuthRoutes();
   const sandboxRoutes = createSandboxRoutes();
   const sandboxWsRoutes = createSandboxWsRoutes(upgradeWebSocket);
+  const sentinelRoutes = createSentinelRoutes();
   
   app.route('/api/repos', repoRoutes);
   app.route('/api/repos', issueRoutes);
   app.route('/api/repos', projectRoutes);
   app.route('/api/repos', cycleRoutes);
   app.route('/api/repos', pullRoutes);
+  app.route('/api/repos', sentinelRoutes);
   app.route('/api/agent', agentStreamRoutes);
   app.route('/api/planning', planningStreamRoutes);
   app.route('/api/sandbox', sandboxRoutes);
@@ -278,12 +281,13 @@ export function startServer(options: ServerOptions): WitServer {
       initDatabase(databaseUrl);
       logger.info('Database connected');
       
-      // Register event handlers for notifications, CI, triage, merge queue, and marketing
+      // Register event handlers for notifications, CI, triage, merge queue, marketing, and sentinel
       registerNotificationHandlers();
       registerCIHandlers();
       registerTriageHandlers();
       registerMergeQueueHandlers();
       registerMarketingHandlers();
+      registerSentinelHandlers();
       logger.info('Event handlers registered');
     } catch (error) {
       logger.error('Database connection failed', { error: (error as Error).message });

@@ -352,6 +352,40 @@ export interface PackageUnpublishedEvent extends BaseEvent {
   };
 }
 
+// ============ SENTINEL EVENTS ============
+
+export interface SentinelScanRequestedEvent extends BaseEvent {
+  type: 'sentinel.scan_requested';
+  payload: {
+    repoId: string;
+    repoFullName: string;
+    branch: string;
+    isScheduled: boolean;
+  };
+}
+
+export interface SentinelScanCompletedEvent extends BaseEvent {
+  type: 'sentinel.scan_completed';
+  payload: {
+    scanId: string;
+    repoId: string;
+    repoFullName: string;
+    healthScore: number;
+    findingsCount: number;
+    criticalCount: number;
+    highCount: number;
+  };
+}
+
+export interface SentinelScheduledScanEvent extends BaseEvent {
+  type: 'sentinel.scheduled_scan';
+  payload: {
+    repoId: string;
+    repoFullName: string;
+    branch: string;
+  };
+}
+
 // ============ UNION TYPE ============
 
 export type AppEvent =
@@ -381,7 +415,10 @@ export type AppEvent =
   | MergeQueueFailedEvent
   | PackagePublishedEvent
   | PackageDeprecatedEvent
-  | PackageUnpublishedEvent;
+  | PackageUnpublishedEvent
+  | SentinelScanRequestedEvent
+  | SentinelScanCompletedEvent
+  | SentinelScheduledScanEvent;
 
 export type EventType = AppEvent['type'];
 

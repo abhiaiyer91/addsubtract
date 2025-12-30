@@ -222,3 +222,13 @@ export {
   getAchievementKeyForMilestone,
   type AchievementDefinition,
 } from './achievement-definitions';
+
+// Sentinel models (code scanning)
+export {
+  sentinelConfigModel,
+  sentinelScanModel,
+  sentinelFindingModel,
+  type FindingFilters,
+  type FindingStats,
+  type ScanWithStats,
+} from './sentinel';

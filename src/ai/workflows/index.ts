@@ -49,3 +49,10 @@ export {
   type GroupResult,
   type ReviewResult,
 } from './multi-agent-planning.workflow.js';
+
+// Sentinel Code Scanning Workflow
+export {
+  sentinelWorkflow,
+  type SentinelWorkflowInput,
+  type SentinelWorkflowOutput,
+} from './sentinel.workflow.js';
