@@ -264,35 +264,12 @@ export function PullDetailPage() {
     },
   });
 
-  const isLoading = repoLoading || prLoading;
-
-  if (isLoading) {
-    return (
-      <RepoLayout owner={owner!} repo={repo!}>
-        <Loading text="Loading pull request..." />
-      </RepoLayout>
-    );
-  }
-
-  if (!prData) {
-    return (
-      <RepoLayout owner={owner!} repo={repo!}>
-        <div className="text-center py-12">
-          <h2 className="text-2xl font-bold mb-2">Pull request not found</h2>
-          <p className="text-muted-foreground">
-            Pull request #{prNumber} could not be found in this repository.
-          </p>
-        </div>
-      </RepoLayout>
-    );
-  }
-
-  const pr = prData;
   const reviews = reviewsData || [];
   const comments = commentsData || [];
   const reviewers = reviewersData || [];
 
   // Transform diff data to match DiffFile type
+  // NOTE: All hooks must be called before any early returns to follow React's rules of hooks
   const diff: DiffFile[] = useMemo(() => (diffData?.files || []).map((file) => ({
     path: file.newPath,
     oldPath: file.oldPath !== file.newPath ? file.oldPath : undefined,
@@ -407,6 +384,31 @@ export function PullDetailPage() {
     },
     [unresolveCommentMutation]
   );
+
+  const isLoading = repoLoading || prLoading;
+
+  if (isLoading) {
+    return (
+      <RepoLayout owner={owner!} repo={repo!}>
+        <Loading text="Loading pull request..." />
+      </RepoLayout>
+    );
+  }
+
+  if (!prData) {
+    return (
+      <RepoLayout owner={owner!} repo={repo!}>
+        <div className="text-center py-12">
+          <h2 className="text-2xl font-bold mb-2">Pull request not found</h2>
+          <p className="text-muted-foreground">
+            Pull request #{prNumber} could not be found in this repository.
+          </p>
+        </div>
+      </RepoLayout>
+    );
+  }
+
+  const pr = prData;
 
   const commits = commitsData?.commits || [];
 
