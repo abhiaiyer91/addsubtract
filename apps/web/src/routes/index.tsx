@@ -97,6 +97,19 @@ function LandingView() {
         <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:64px_64px]" />
         
         <div className="container relative z-10 max-w-5xl mx-auto px-6">
+          {/* AI-led project badge */}
+          <div className="flex justify-center mb-6 animate-fade-up" style={{ animationDelay: '50ms' }}>
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-violet-500/10 via-purple-500/10 to-fuchsia-500/10 border border-violet-500/20 hover:border-violet-500/40 transition-all duration-300">
+              <div className="flex items-center justify-center w-5 h-5 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500">
+                <Sparkles className="h-3 w-3 text-white" />
+              </div>
+              <span className="text-xs font-medium bg-gradient-to-r from-violet-400 via-purple-400 to-fuchsia-400 bg-clip-text text-transparent">
+                AI-ideated & AI-led project
+              </span>
+              <div className="w-1.5 h-1.5 rounded-full bg-violet-500 animate-pulse" />
+            </div>
+          </div>
+          
           {/* Main headline */}
           <h1 className="text-4xl md:text-6xl font-bold tracking-tight text-center mb-4 animate-fade-up" style={{ animationDelay: '100ms' }}>
             <span className="text-zinc-100">Git, reimagined in</span>
@@ -462,7 +475,31 @@ function LandingView() {
             </p>
           </div>
           
+          {/* AI-led callout */}
+          <div className="mb-8 p-4 rounded-xl bg-gradient-to-r from-violet-500/5 via-purple-500/5 to-fuchsia-500/5 border border-violet-500/20">
+            <div className="flex items-center gap-4">
+              <div className="p-3 rounded-xl bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20">
+                <Bot className="h-6 w-6 text-violet-400" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-zinc-100 mb-1 flex items-center gap-2">
+                  Built by AI, for developers
+                  <span className="px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-400 text-[10px] font-medium">Our Vision</span>
+                </h3>
+                <p className="text-xs text-zinc-400 leading-relaxed">
+                  This project is AI-ideated and AI-led — from architecture decisions to code implementation. 
+                  We're pioneering what's possible when AI and human creativity work together.
+                </p>
+              </div>
+            </div>
+          </div>
+          
           <div className="grid md:grid-cols-3 gap-6">
+            <ReasonCard
+              icon={<Sparkles className="h-4 w-4" />}
+              title="AI-first development"
+              description="Designed and built with AI from day one. The future of software creation."
+            />
             <ReasonCard
               icon={<Command className="h-4 w-4" />}
               title="Keyboard-first"
