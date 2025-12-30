@@ -921,8 +921,13 @@ export const reposRouter = router({
         // Resolve the ref to a commit
         let refToResolve = input.ref;
         
+        // Log available refs for debugging
+        const allBranches = bareRepo.refs.listBranches();
+        console.log(`[repos.getTree] Attempting to resolve ref '${refToResolve}', available branches: ${allBranches.join(', ') || '(none)'}`);
+        
         // If ref is HEAD and it doesn't resolve, try the repo's default branch
         let commitHash = bareRepo.refs.resolve(refToResolve);
+        console.log(`[repos.getTree] Direct resolve of '${refToResolve}': ${commitHash || '(not found)'}`);
         
         if (!commitHash && refToResolve === 'HEAD') {
           // Try the repo's configured default branch
