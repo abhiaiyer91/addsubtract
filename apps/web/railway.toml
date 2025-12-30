@@ -1,0 +1,10 @@
+# Railway configuration for wit web UI
+# This overrides root config for the web service
+
+[build]
+builder = "dockerfile"
+dockerfilePath = "apps/web/Dockerfile"
+
+[deploy]
+healthcheckPath = "/"
+healthcheckTimeout = 30
