@@ -158,6 +158,7 @@ export function createAuth() {
     advanced: {
       crossSubDomainCookies: {
         enabled: isProduction,
+        domain: process.env.COOKIE_DOMAIN || '.wit.sh', // Root domain for cross-subdomain cookies
       },
       defaultCookieAttributes: {
         secure: isProduction,
