@@ -127,6 +127,13 @@
       "when": 1767024900000,
       "tag": "0017_add_coderabbit_provider",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1767025000000,
+      "tag": "0018_performance_indexes",
+      "breakpoints": true
     }
   ]
 }
