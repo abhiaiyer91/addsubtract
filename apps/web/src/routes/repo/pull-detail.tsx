@@ -7,8 +7,6 @@ import {
   MessageSquare,
   FileCode,
   GitCommit,
-  Bot,
-  RefreshCw,
   Loader2,
   Edit3,
   AlertTriangle,
@@ -27,6 +25,7 @@ import { PrSidebar } from '@/components/pr/pr-sidebar';
 import { StackViewer } from '@/components/pr/stack-viewer';
 import { ReviewButton } from '@/components/pr/review-button';
 import { AiChat } from '@/components/pr/ai-chat';
+import { AiReviewCard } from '@/components/pr/ai-review-card';
 import { BranchStatus } from '@/components/pr/branch-status';
 import { KeyboardShortcutsDialog, KeyboardShortcutsButton } from '@/components/pr/keyboard-shortcuts-dialog';
 import { MergeQueueCard } from '@/components/pr/merge-queue-card';
@@ -742,54 +741,6 @@ export function PullDetailPage() {
                           />
                         )}
 
-                        {/* AI Review Card */}
-                        <Card>
-                          <div className="flex items-center justify-between px-4 py-3 bg-muted/30 border-b">
-                            <div className="flex items-center gap-2">
-                              <Bot className="h-5 w-5 text-primary" />
-                              <span className="font-medium text-sm">AI Review</span>
-                              {aiReviewData?.state && (
-                                <Badge variant={aiReviewData.state === 'approved' ? 'success' : 'warning'} className="text-xs">
-                                  {aiReviewData.state === 'approved' ? 'Approved' : 'Changes'}
-                                </Badge>
-                              )}
-                            </div>
-                            {authenticated && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 touch-target"
-                                onClick={() => triggerReviewMutation.mutate({ prId: prData!.id })}
-                                disabled={triggerReviewMutation.isPending}
-                              >
-                                {triggerReviewMutation.isPending ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <RefreshCw className="h-4 w-4" />
-                                )}
-                              </Button>
-                            )}
-                          </div>
-                          <CardContent className="p-3">
-                            {aiReviewLoading ? (
-                              <div className="flex items-center justify-center py-4">
-                                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                              </div>
-                            ) : aiReviewData?.body ? (
-                              <div className="text-sm prose prose-sm dark:prose-invert max-w-none">
-                                <Markdown content={aiReviewData.body.slice(0, 300) + (aiReviewData.body.length > 300 ? '...' : '')} />
-                              </div>
-                            ) : (
-                              <div className="text-center py-4 text-muted-foreground">
-                                <Bot className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                                <p className="text-xs">
-                                  {authenticated ? 'Tap refresh to run AI review' : 'Sign in to run AI review'}
-                                </p>
-                              </div>
-                            )}
-                          </CardContent>
-                        </Card>
-
                         {/* AI Chat */}
                         <AiChat
                           prNumber={pr.number}
@@ -878,6 +829,15 @@ export function PullDetailPage() {
                   )}
                 </CardContent>
               </Card>
+
+              {/* AI Review Card */}
+              <AiReviewCard
+                data={aiReviewData}
+                isLoading={aiReviewLoading}
+                onRefresh={() => triggerReviewMutation.mutate({ prId: prData!.id })}
+                isRefreshing={triggerReviewMutation.isPending}
+                authenticated={authenticated}
+              />
 
               {/* Timeline */}
               {timeline.length > 0 && <PrTimeline events={timeline} />}
@@ -1048,54 +1008,6 @@ export function PullDetailPage() {
               repo={repo!}
             />
           )}
-
-          {/* AI Review Card */}
-          <Card>
-            <div className="flex items-center justify-between px-4 py-3 bg-muted/30 border-b">
-              <div className="flex items-center gap-2">
-                <Bot className="h-5 w-5 text-primary" />
-                <span className="font-medium text-sm">AI Review</span>
-                {aiReviewData?.state && (
-                  <Badge variant={aiReviewData.state === 'approved' ? 'success' : 'warning'} className="text-xs">
-                    {aiReviewData.state === 'approved' ? 'Approved' : 'Changes'}
-                  </Badge>
-                )}
-              </div>
-              {authenticated && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7"
-                  onClick={() => triggerReviewMutation.mutate({ prId: prData!.id })}
-                  disabled={triggerReviewMutation.isPending}
-                >
-                  {triggerReviewMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <RefreshCw className="h-4 w-4" />
-                  )}
-                </Button>
-              )}
-            </div>
-            <CardContent className="p-3">
-              {aiReviewLoading ? (
-                <div className="flex items-center justify-center py-4">
-                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                </div>
-              ) : aiReviewData?.body ? (
-                <div className="text-sm prose prose-sm dark:prose-invert max-w-none">
-                  <Markdown content={aiReviewData.body.slice(0, 300) + (aiReviewData.body.length > 300 ? '...' : '')} />
-                </div>
-              ) : (
-                <div className="text-center py-4 text-muted-foreground">
-                  <Bot className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-xs">
-                    {authenticated ? 'Click refresh to run AI review' : 'Sign in to run AI review'}
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
 
           {/* AI Chat */}
           <AiChat

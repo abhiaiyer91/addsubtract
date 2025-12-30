@@ -25,6 +25,8 @@ import {
   Copy,
   X,
   ExternalLink,
+  Rabbit,
+  FileSearch,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -75,6 +77,13 @@ const AI_PROVIDERS = [
     description: 'GPT-4',
     placeholder: 'sk-...',
     prefix: 'sk-',
+  },
+  { 
+    value: 'coderabbit', 
+    label: 'CodeRabbit', 
+    description: 'AI Code Review',
+    placeholder: 'cr-...',
+    prefix: '',
   },
 ] as const;
 
@@ -778,6 +787,95 @@ export function AgentsSettingsPage() {
               </CardContent>
             </Card>
           </div>
+
+          {/* CodeRabbit AI Review Card */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
+                    <Rabbit className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base">CodeRabbit</CardTitle>
+                    <CardDescription>AI-powered code review</CardDescription>
+                  </div>
+                </div>
+                {keys?.some((k: { provider: string }) => k.provider === 'coderabbit') && (
+                  <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                    <Check className="h-3 w-3 mr-1" />
+                    Configured
+                  </Badge>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                CodeRabbit provides AI-powered code reviews for pull requests, detecting bugs, security issues, and suggesting improvements.
+              </p>
+
+              {keys?.some((k: { provider: string }) => k.provider === 'coderabbit') ? (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Check className="h-4 w-4 text-green-600" />
+                    <span>Runs automatically on PR creation and updates</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <FileSearch className="h-4 w-4 text-muted-foreground" />
+                    <span>Reviews code for bugs, security, and best practices</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openDialog('coderabbit')}
+                    >
+                      <Key className="h-4 w-4 mr-2" />
+                      Update Key
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => handleDeleteKey('coderabbit')}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Remove
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <Alert>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription className="text-xs">
+                      Add a CodeRabbit API key to enable AI code reviews.
+                    </AlertDescription>
+                  </Alert>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openDialog('coderabbit')}
+                    >
+                      <Key className="h-4 w-4 mr-2" />
+                      Add API Key
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      asChild
+                    >
+                      <a href="https://coderabbit.ai" target="_blank" rel="noopener noreferrer">
+                        Get API Key
+                        <ExternalLink className="h-4 w-4 ml-2" />
+                      </a>
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Triage History (collapsible) */}
           {isTriageEnabled && (

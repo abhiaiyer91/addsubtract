@@ -5,10 +5,15 @@
  * Reviews are triggered asynchronously when PRs are created or updated.
  */
 
-import { prModel, prReviewModel, prCommentModel, repoModel, userModel } from '../../db/models';
+import { prModel, prReviewModel, prCommentModel, repoModel, userModel, repoAiKeyModel } from '../../db/models';
 import { resolveDiskPath, BareRepository } from '../../server/storage/repos';
 import { exists } from '../../utils/fs';
 import { diff, createHunks, formatUnifiedDiff, FileDiff } from '../../core/diff';
+import {
+  reviewDiff as codeRabbitReviewDiff,
+  getCodeRabbitStatus,
+  type CodeRabbitReviewResult,
+} from '../../utils/coderabbit';
 
 /**
  * AI Review result
@@ -442,11 +447,135 @@ async function getAIBotUser(): Promise<{ id: string } | null> {
 }
 
 /**
+ * Convert CodeRabbit result to our AIReviewResult format
+ */
+function convertCodeRabbitResult(crResult: CodeRabbitReviewResult): AIReviewResult {
+  const issues: AIReviewIssue[] = crResult.issues.map(issue => ({
+    severity: issue.severity === 'critical' ? 'error' : 
+              issue.severity === 'high' ? 'error' :
+              issue.severity === 'medium' ? 'warning' : 'info',
+    file: issue.file,
+    line: issue.line,
+    message: issue.message,
+    suggestion: issue.suggestion,
+    category: issue.category as AIReviewIssue['category'],
+  }));
+
+  const errorCount = issues.filter(i => i.severity === 'error').length;
+  const warningCount = issues.filter(i => i.severity === 'warning').length;
+  
+  // Calculate score based on issues
+  let score = 10;
+  score -= errorCount * 2;
+  score -= warningCount * 0.5;
+  score = Math.max(1, Math.min(10, Math.round(score)));
+
+  const approved = errorCount === 0 && warningCount <= 2;
+
+  return {
+    summary: crResult.summary || 'Review completed',
+    approved,
+    score,
+    issues,
+    suggestions: crResult.suggestions.map(s => s.message),
+    securityConcerns: issues
+      .filter(i => i.category === 'security' || i.message.toLowerCase().includes('security'))
+      .map(i => `${i.file}${i.line ? `:${i.line}` : ''}: ${i.message}`),
+  };
+}
+
+/**
+ * Format CodeRabbit review result as markdown
+ */
+function formatCodeRabbitReviewAsMarkdown(result: AIReviewResult, isCodeRabbit: boolean): string {
+  const lines: string[] = [];
+
+  // Header with approval status
+  if (result.approved) {
+    lines.push('## AI Review: Approved');
+  } else {
+    lines.push('## AI Review: Changes Requested');
+  }
+
+  lines.push('');
+  lines.push(result.summary);
+  lines.push('');
+  lines.push(`**Score:** ${result.score}/10`);
+  lines.push('');
+
+  // Security concerns (most important)
+  if (result.securityConcerns.length > 0) {
+    lines.push('### Security Concerns');
+    lines.push('');
+    for (const concern of result.securityConcerns) {
+      lines.push(`- ${concern}`);
+    }
+    lines.push('');
+  }
+
+  // Issues grouped by severity
+  const errors = result.issues.filter(i => i.severity === 'error');
+  const warnings = result.issues.filter(i => i.severity === 'warning');
+  const infos = result.issues.filter(i => i.severity === 'info');
+
+  if (errors.length > 0) {
+    lines.push('### Errors');
+    lines.push('');
+    for (const issue of errors) {
+      lines.push(`- **${issue.file}${issue.line ? `:${issue.line}` : ''}**: ${issue.message}`);
+      if (issue.suggestion) {
+        lines.push(`  - *Suggestion:* ${issue.suggestion}`);
+      }
+    }
+    lines.push('');
+  }
+
+  if (warnings.length > 0) {
+    lines.push('### Warnings');
+    lines.push('');
+    for (const issue of warnings) {
+      lines.push(`- **${issue.file}${issue.line ? `:${issue.line}` : ''}**: ${issue.message}`);
+      if (issue.suggestion) {
+        lines.push(`  - *Suggestion:* ${issue.suggestion}`);
+      }
+    }
+    lines.push('');
+  }
+
+  if (infos.length > 0) {
+    lines.push('### Suggestions');
+    lines.push('');
+    for (const issue of infos) {
+      lines.push(`- **${issue.file}${issue.line ? `:${issue.line}` : ''}**: ${issue.message}`);
+      if (issue.suggestion) {
+        lines.push(`  - *Suggestion:* ${issue.suggestion}`);
+      }
+    }
+    lines.push('');
+  }
+
+  // General suggestions
+  if (result.suggestions.length > 0) {
+    lines.push('### General Recommendations');
+    lines.push('');
+    for (const suggestion of result.suggestions) {
+      lines.push(`- ${suggestion}`);
+    }
+    lines.push('');
+  }
+
+  lines.push('---');
+  lines.push(isCodeRabbit ? '*Powered by CodeRabbit AI*' : '*This review was generated automatically by wit AI.*');
+
+  return lines.join('\n');
+}
+
+/**
  * Run an AI review on a pull request
  * 
  * This function:
- * 1. Gets the diff between base and head
- * 2. Analyzes the diff for issues
+ * 1. Tries CodeRabbit first if available
+ * 2. Falls back to built-in analyzer
  * 3. Creates a PR review with the findings
  */
 export async function runAIReview(prId: string): Promise<AIReviewResult | null> {
@@ -476,8 +605,8 @@ export async function runAIReview(prId: string): Promise<AIReviewResult | null> 
     console.log(`[AI Review] Running review for PR #${pr.number} in ${repo.name}`);
 
     // Get diff
-    const diff = getDiff(diskPath, pr.baseSha, pr.headSha);
-    if (!diff) {
+    const diffContent = getDiff(diskPath, pr.baseSha, pr.headSha);
+    if (!diffContent) {
       console.log('[AI Review] No diff found');
       return null;
     }
@@ -485,13 +614,46 @@ export async function runAIReview(prId: string): Promise<AIReviewResult | null> 
     // Get changed files
     const files = getChangedFiles(diskPath, pr.baseSha, pr.headSha);
 
-    // Analyze
-    const result = analyzeDiff(diff, files);
+    let result: AIReviewResult;
+    let usedCodeRabbit = false;
+
+    // Check for CodeRabbit API key (repo-level or server-level)
+    const codeRabbitKey = await repoAiKeyModel.getCodeRabbitKey(pr.repoId);
+    const crStatus = await getCodeRabbitStatus();
+    
+    // Try CodeRabbit if we have an API key
+    if (codeRabbitKey && crStatus.installed) {
+      console.log('[AI Review] Using CodeRabbit for review');
+      const crResult = await codeRabbitReviewDiff(diffContent, { 
+        format: 'json',
+        apiKey: codeRabbitKey,
+      });
+      
+      if (crResult.success) {
+        result = convertCodeRabbitResult(crResult);
+        usedCodeRabbit = true;
+        console.log(`[AI Review] CodeRabbit found ${result.issues.length} issues, score: ${result.score}/10`);
+      } else {
+        console.warn('[AI Review] CodeRabbit review failed, falling back to built-in analyzer:', crResult.error);
+        result = analyzeDiff(diffContent, files);
+      }
+    } else {
+      // Fall back to built-in analyzer
+      if (!crStatus.installed) {
+        console.log('[AI Review] CodeRabbit CLI not installed, using built-in analyzer');
+      } else if (!codeRabbitKey) {
+        console.log('[AI Review] CodeRabbit API key not configured, using built-in analyzer');
+      }
+      result = analyzeDiff(diffContent, files);
+    }
 
     console.log(`[AI Review] Found ${result.issues.length} issues, score: ${result.score}/10`);
 
     // Try to create a PR review
     const botUser = await getAIBotUser();
+    const reviewBody = usedCodeRabbit 
+      ? formatCodeRabbitReviewAsMarkdown(result, true)
+      : formatReviewAsMarkdown(result);
     
     if (botUser) {
       // Create as a proper PR review
@@ -501,7 +663,7 @@ export async function runAIReview(prId: string): Promise<AIReviewResult | null> 
         prId: pr.id,
         userId: botUser.id,
         state: reviewState as 'approved' | 'changes_requested' | 'commented',
-        body: formatReviewAsMarkdown(result),
+        body: reviewBody,
         commitSha: pr.headSha,
       });
 
@@ -513,7 +675,7 @@ export async function runAIReview(prId: string): Promise<AIReviewResult | null> 
       await prCommentModel.create({
         prId: pr.id,
         userId: pr.authorId, // Use author as fallback - not ideal
-        body: formatReviewAsMarkdown(result),
+        body: reviewBody,
       });
 
       console.log(`[AI Review] Created comment for PR #${pr.number} (no bot user)`);

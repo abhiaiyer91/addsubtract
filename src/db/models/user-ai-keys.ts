@@ -209,10 +209,11 @@ export const userAiKeyModel = {
   },
 
   /**
-   * Get any available API key for a user
+   * Get any available LLM API key for a user
    * Prefers Anthropic, then OpenAI
+   * Note: Does not return CodeRabbit keys as they are not LLM providers
    */
-  async getAnyKey(userId: string): Promise<{ provider: AiProvider; key: string } | null> {
+  async getAnyKey(userId: string): Promise<{ provider: 'openai' | 'anthropic'; key: string } | null> {
     // Try Anthropic first
     const anthropicKey = await this.getDecryptedKey(userId, 'anthropic');
     if (anthropicKey) {
