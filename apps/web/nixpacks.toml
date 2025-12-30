@@ -1,0 +1,16 @@
+# Nixpacks configuration for wit web UI
+# See: https://nixpacks.com/docs/configuration/file
+
+providers = ["node"]
+
+[phases.setup]
+nixPkgs = ["nodejs_22"]
+
+[phases.install]
+cmds = ["npm ci"]
+
+[phases.build]
+cmds = ["npm run build"]
+
+[start]
+cmd = "npm run preview -- --host 0.0.0.0 --port ${PORT:-4173}"

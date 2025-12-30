@@ -1,0 +1,545 @@
+---
+title: "Railway Deployment"
+description: "Deploy wit to Railway with PostgreSQL, Redis, and all services"
+---
+
+# Deploying wit to Railway
+
+This guide walks you through deploying the complete wit platform on [Railway](https://railway.app), including the API server, web UI, PostgreSQL, and Redis.
+
+---
+
+## Overview
+
+Railway deployment includes:
+
+| Service | Purpose |
+|---------|---------|
+| **wit-server** | API server (Git HTTP, tRPC, REST) |
+| **wit-web** | React web UI |
+| **PostgreSQL** | Database for users, repos, issues, PRs |
+| **Redis** | Rate limiting, caching, sessions |
+
+---
+
+## Prerequisites
+
+1. [Railway account](https://railway.app) (free tier available)
+2. [Railway CLI](https://docs.railway.app/develop/cli) installed
+3. GitHub repository with wit code
+
+```bash
+# Install Railway CLI
+npm install -g @railway/cli
+
+# Login to Railway
+railway login
+```
+
+---
+
+## Quick Deploy
+
+### Option 1: One-Click Deploy
+
+[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/template/wit)
+
+### Option 2: Manual Setup
+
+```bash
+# Clone the repo
+git clone https://github.com/your-org/wit.git
+cd wit
+
+# Initialize Railway project
+railway init
+
+# Link to your project
+railway link
+```
+
+---
+
+## Step-by-Step Deployment
+
+### 1. Create Railway Project
+
+```bash
+# Create a new project
+railway init --name wit-platform
+```
+
+Or via the Railway dashboard:
+1. Go to [railway.app/new](https://railway.app/new)
+2. Click "Empty Project"
+3. Name it "wit-platform"
+
+---
+
+### 2. Add PostgreSQL
+
+```bash
+# Add PostgreSQL to your project
+railway add --plugin postgresql
+```
+
+Or in the dashboard:
+1. Click "New" → "Database" → "PostgreSQL"
+2. Railway automatically provisions the database
+
+The `DATABASE_URL` environment variable is automatically added.
+
+---
+
+### 3. Add Redis
+
+```bash
+# Add Redis to your project
+railway add --plugin redis
+```
+
+Or in the dashboard:
+1. Click "New" → "Database" → "Redis"
+2. Railway automatically provisions Redis
+
+The `REDIS_URL` environment variable is automatically added.
+
+---
+
+### 4. Deploy the API Server
+
+Create a new service from your GitHub repo:
+
+1. Click "New" → "GitHub Repo"
+2. Select your wit repository
+3. Configure the service:
+
+**Service Settings:**
+- **Name:** `wit-server`
+- **Root Directory:** `/` (project root)
+- **Build Command:** `npm install && npm run build`
+- **Start Command:** `npm run serve`
+
+**Environment Variables:**
+
+```bash
+# Required
+DATABASE_URL=${{Postgres.DATABASE_URL}}
+REDIS_URL=${{Redis.REDIS_URL}}
+NODE_ENV=production
+PORT=3000
+
+# Authentication
+JWT_SECRET=<generate-a-secure-secret>
+BETTER_AUTH_SECRET=<generate-a-secure-secret>
+BETTER_AUTH_URL=https://wit-server-production.up.railway.app
+
+# Optional: AI Features
+OPENAI_API_KEY=<your-openai-key>
+ANTHROPIC_API_KEY=<your-anthropic-key>
+
+# Optional: GitHub OAuth
+GITHUB_CLIENT_ID=<your-github-client-id>
+GITHUB_CLIENT_SECRET=<your-github-client-secret>
+
+# CORS (update with your web UI domain)
+CORS_ORIGINS=https://wit-web-production.up.railway.app
+```
+
+---
+
+### 5. Deploy the Web UI
+
+Create another service for the web app:
+
+1. Click "New" → "GitHub Repo"
+2. Select the same repository
+3. Configure:
+
+**Service Settings:**
+- **Name:** `wit-web`
+- **Root Directory:** `apps/web`
+- **Build Command:** `npm install && npm run build`
+- **Start Command:** `npm run preview -- --host 0.0.0.0 --port $PORT`
+
+**Environment Variables:**
+
+```bash
+VITE_API_URL=https://wit-server-production.up.railway.app/trpc
+VITE_BASE_URL=https://wit-server-production.up.railway.app
+NODE_ENV=production
+```
+
+---
+
+### 6. Configure Networking
+
+#### Custom Domains
+
+1. Go to each service's Settings
+2. Click "Generate Domain" or add custom domain
+3. Update CORS settings in wit-server with the web domain
+
+#### Internal Networking
+
+Railway services can communicate via internal URLs:
+- `wit-server.railway.internal:3000`
+- `wit-web.railway.internal:5173`
+
+---
+
+## Configuration Files
+
+### railway.json (Project Config)
+
+Create this file in your repository root:
+
+```json
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "build": {
+    "builder": "NIXPACKS"
+  },
+  "deploy": {
+    "numReplicas": 1,
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 10
+  }
+}
+```
+
+### railway.toml (Service-specific)
+
+For the API server, create `railway.toml`:
+
+```toml
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "npm run serve"
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 5
+```
+
+For the web app, create `apps/web/railway.toml`:
+
+```toml
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "npm run preview -- --host 0.0.0.0 --port $PORT"
+```
+
+---
+
+## Nixpacks Configuration
+
+Railway uses Nixpacks to build your app. Create `nixpacks.toml`:
+
+```toml
+[phases.setup]
+nixPkgs = ["nodejs_22", "npm"]
+
+[phases.install]
+cmds = ["npm ci"]
+
+[phases.build]
+cmds = ["npm run build"]
+
+[start]
+cmd = "npm run serve"
+```
+
+---
+
+## Environment Variables Reference
+
+### Required Variables
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `DATABASE_URL` | PostgreSQL connection string | Auto-set by Railway |
+| `REDIS_URL` | Redis connection string | Auto-set by Railway |
+| `JWT_SECRET` | Secret for JWT tokens | `openssl rand -base64 32` |
+| `BETTER_AUTH_SECRET` | Auth library secret | `openssl rand -base64 32` |
+| `BETTER_AUTH_URL` | Public URL of API server | `https://your-domain.up.railway.app` |
+| `NODE_ENV` | Environment mode | `production` |
+
+### Optional Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `PORT` | Server port | `3000` |
+| `CORS_ORIGINS` | Allowed origins (comma-separated) | `*` |
+| `OPENAI_API_KEY` | OpenAI API key for AI features | - |
+| `ANTHROPIC_API_KEY` | Anthropic API key | - |
+| `GITHUB_CLIENT_ID` | GitHub OAuth app ID | - |
+| `GITHUB_CLIENT_SECRET` | GitHub OAuth secret | - |
+| `REPOS_DIR` | Repository storage path | `/app/repos` |
+
+---
+
+## Persistent Storage
+
+Railway provides ephemeral storage by default. For persistent repository storage, you have several options:
+
+### Option 1: Railway Volumes (Recommended)
+
+```bash
+# Add a volume to your service
+railway volume add --mount /app/repos
+```
+
+Or in dashboard:
+1. Go to wit-server service
+2. Click "Variables" → "Add Volume"
+3. Mount path: `/app/repos`
+4. Size: Start with 10GB, scale as needed
+
+### Option 2: External Object Storage
+
+For production with many repositories, use external S3-compatible storage:
+
+**Cloudflare R2:**
+```bash
+S3_BUCKET=wit-repos
+S3_ENDPOINT=https://your-account.r2.cloudflarestorage.com
+AWS_ACCESS_KEY_ID=your-r2-access-key
+AWS_SECRET_ACCESS_KEY=your-r2-secret-key
+AWS_REGION=auto
+```
+
+**AWS S3:**
+```bash
+S3_BUCKET=wit-repos
+AWS_ACCESS_KEY_ID=your-aws-key
+AWS_SECRET_ACCESS_KEY=your-aws-secret
+AWS_REGION=us-east-1
+```
+
+---
+
+## Database Migrations
+
+Migrations run automatically on deploy. To run manually:
+
+```bash
+# SSH into the service
+railway run npm run db:migrate
+```
+
+Or add to your build command:
+```bash
+npm install && npm run build && npm run db:migrate
+```
+
+---
+
+## Scaling
+
+### Horizontal Scaling
+
+Railway Pro supports multiple replicas:
+
+```json
+{
+  "deploy": {
+    "numReplicas": 3
+  }
+}
+```
+
+Or in dashboard: Service Settings → Replicas
+
+### Vertical Scaling
+
+Adjust resources in Service Settings:
+- **Memory:** 512MB - 32GB
+- **CPU:** 0.5 - 8 vCPU
+
+Recommended for production:
+- **wit-server:** 2GB RAM, 1 vCPU
+- **wit-web:** 512MB RAM, 0.5 vCPU
+- **PostgreSQL:** 1GB RAM (Railway Pro)
+- **Redis:** 256MB RAM
+
+---
+
+## Monitoring
+
+### Health Checks
+
+The API server exposes `/health`:
+
+```bash
+curl https://your-domain.up.railway.app/health
+```
+
+Response:
+```json
+{
+  "status": "ok",
+  "version": "2.0.0",
+  "database": { "connected": true, "latency": 5 }
+}
+```
+
+### Logs
+
+View logs in Railway dashboard or CLI:
+
+```bash
+# Stream logs
+railway logs -f
+
+# View specific service
+railway logs --service wit-server
+```
+
+### Metrics
+
+Railway provides built-in metrics:
+- CPU usage
+- Memory usage
+- Network I/O
+- Request count
+
+Access via dashboard: Service → Metrics tab
+
+---
+
+## CI/CD Pipeline
+
+### Automatic Deploys
+
+Railway automatically deploys on push to your connected branch.
+
+Configure in dashboard:
+1. Service Settings → Source
+2. Set "Deploy on Push" to your branch
+
+### GitHub Actions Integration
+
+```yaml
+# .github/workflows/deploy.yml
+name: Deploy to Railway
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+      
+      - name: Deploy
+        run: railway up --service wit-server
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+```
+
+---
+
+## Troubleshooting
+
+### Build Failures
+
+**Node.js version mismatch:**
+Add to `package.json`:
+```json
+{
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}
+```
+
+**Memory issues during build:**
+Increase build memory in Service Settings.
+
+### Connection Issues
+
+**Database connection refused:**
+- Check `DATABASE_URL` is correctly set
+- Verify PostgreSQL service is running
+- Check internal networking
+
+**Redis connection failed:**
+- Verify `REDIS_URL` is set
+- Check Redis service status
+
+### Performance Issues
+
+**Slow responses:**
+- Enable Redis caching
+- Check database query performance
+- Increase service resources
+
+**Out of memory:**
+- Increase memory allocation
+- Enable swap in nixpacks.toml:
+```toml
+[phases.setup]
+nixPkgs = ["nodejs_22"]
+aptPkgs = ["swapspace"]
+```
+
+---
+
+## Production Checklist
+
+Before going live:
+
+- [ ] Set strong `JWT_SECRET` and `BETTER_AUTH_SECRET`
+- [ ] Configure custom domain with SSL
+- [ ] Set up GitHub OAuth for authentication
+- [ ] Enable persistent volume for repos
+- [ ] Configure CORS for web domain
+- [ ] Set up monitoring alerts
+- [ ] Enable automatic backups (PostgreSQL)
+- [ ] Test health endpoint
+- [ ] Configure rate limiting (Redis)
+- [ ] Review resource allocation
+
+---
+
+## Cost Estimation
+
+### Railway Pricing (as of 2024)
+
+| Plan | Price | Best For |
+|------|-------|----------|
+| Hobby | $5/mo + usage | Personal projects |
+| Pro | $20/mo + usage | Production |
+| Enterprise | Custom | Large scale |
+
+**Estimated monthly costs for wit:**
+
+| Usage Level | Services | Est. Cost |
+|-------------|----------|-----------|
+| Light (1K repos) | 1 server, Postgres, Redis | ~$20-30/mo |
+| Medium (10K repos) | 2 replicas, larger DB | ~$50-100/mo |
+| Heavy (100K repos) | 5 replicas, dedicated DB | ~$200-500/mo |
+
+---
+
+## Next Steps
+
+After deployment:
+
+1. **Create admin user** via the web UI
+2. **Configure GitHub import** for migrating existing repos
+3. **Set up webhooks** for integrations
+4. **Enable AI features** with API keys
+5. **Configure SSH access** for git clone over SSH
+
+For scaling beyond Railway's limits, see [scaling-investigation](/architecture/scaling-investigation).

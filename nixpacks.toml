@@ -1,0 +1,31 @@
+# Nixpacks configuration for Railway
+# See: https://nixpacks.com/docs/configuration/file
+
+# Providers to use
+providers = ["node"]
+
+[phases.setup]
+# Node.js 22+ required for wit
+nixPkgs = ["nodejs_22", "openssl"]
+# Git is needed for repository operations
+aptPkgs = ["git", "openssh-client"]
+
+[phases.install]
+# Use ci for reproducible installs
+cmds = ["npm ci"]
+
+[phases.build]
+# Build TypeScript and run migrations
+cmds = [
+  "npm run build",
+  "npm run db:migrate || echo 'Migration skipped (no DATABASE_URL)'"
+]
+
+[start]
+cmd = "node dist/server/index.js"
+
+[variables]
+# Increase Node.js memory for large operations
+NODE_OPTIONS = "--max-old-space-size=2048"
+# Increase thread pool for I/O operations
+UV_THREADPOOL_SIZE = "16"
