@@ -411,7 +411,7 @@ interface ActionLibraryProps {
 export function ActionLibrary({ onAddAction, className }: ActionLibraryProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState<string>('all');
-  const { addNode, updateNode } = useWorkflowStore();
+  const { addNode, updateNode, getNextNodePosition, selectedNodeId } = useWorkflowStore();
 
   const filteredTemplates = ACTION_TEMPLATES.filter((template) => {
     const matchesSearch = 
@@ -428,8 +428,15 @@ export function ActionLibrary({ onAddAction, className }: ActionLibraryProps) {
   });
 
   const handleAddAction = (template: ActionTemplate) => {
-    // Add a new step node with the template config
-    const nodeId = addNode('step', { x: 300, y: 200 });
+    // Use smart positioning - adds after selected node or last node in chain
+    const position = getNextNodePosition(selectedNodeId || undefined);
+    
+    // Add a new step node with auto-connect
+    const nodeId = addNode('step', position, { 
+      autoConnect: true, 
+      afterNodeId: selectedNodeId || undefined 
+    });
+    
     updateNode(nodeId, {
       name: template.name,
       description: template.description,
@@ -545,14 +552,21 @@ function ActionCard({ template, onAdd }: ActionCardProps) {
 // =============================================================================
 
 export function QuickActionsBar() {
-  const { addNode, updateNode } = useWorkflowStore();
+  const { addNode, updateNode, getNextNodePosition, selectedNodeId } = useWorkflowStore();
 
   const quickActions = ACTION_TEMPLATES.filter((t) => 
     ['checkout', 'setup-node', 'npm-install', 'npm-test'].includes(t.id)
   );
 
   const handleQuickAdd = (template: ActionTemplate) => {
-    const nodeId = addNode('step', { x: 300, y: 200 });
+    // Use smart positioning - adds after selected node or last node in chain
+    const position = getNextNodePosition(selectedNodeId || undefined);
+    
+    const nodeId = addNode('step', position, { 
+      autoConnect: true, 
+      afterNodeId: selectedNodeId || undefined 
+    });
+    
     updateNode(nodeId, {
       name: template.name,
       description: template.description,

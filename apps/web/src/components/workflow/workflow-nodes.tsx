@@ -5,7 +5,7 @@
  * Includes: TriggerNode, StepNode, ParallelNode, MapNode, ConditionNode
  */
 
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import {
   Play,
@@ -19,9 +19,12 @@ import {
   GitPullRequest,
   Upload,
   Calendar,
+  Plus,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { useWorkflowStore } from '@/lib/workflow-store';
 import type { 
   WorkflowNode, 
   TriggerConfig, 
@@ -36,6 +39,7 @@ import type {
 // =============================================================================
 
 interface BaseNodeProps {
+  nodeId: string;
   selected: boolean;
   icon: React.ReactNode;
   title: string;
@@ -45,9 +49,11 @@ interface BaseNodeProps {
   hasInput?: boolean;
   hasOutput?: boolean;
   badges?: Array<{ label: string; variant?: 'default' | 'secondary' | 'outline' }>;
+  showAddButton?: boolean;
 }
 
 function BaseNode({ 
+  nodeId,
   selected, 
   icon, 
   title, 
@@ -57,14 +63,25 @@ function BaseNode({
   hasInput = true, 
   hasOutput = true,
   badges,
+  showAddButton = true,
 }: BaseNodeProps) {
+  const [isHovered, setIsHovered] = useState(false);
+  const { addNodeAfter } = useWorkflowStore();
+
+  const handleAddStepAfter = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    addNodeAfter(nodeId, 'step');
+  };
+
   return (
     <div
       className={cn(
-        'min-w-[180px] max-w-[280px] rounded-lg border-2 bg-card shadow-md transition-all',
+        'min-w-[180px] max-w-[280px] rounded-lg border-2 bg-card shadow-md transition-all relative',
         selected ? 'border-primary shadow-lg ring-2 ring-primary/20' : 'border-border',
         'hover:shadow-lg'
       )}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
       {/* Input handle */}
       {hasInput && (
@@ -107,6 +124,18 @@ function BaseNode({
           position={Position.Right}
           className="!w-3 !h-3 !bg-primary !border-2 !border-background"
         />
+      )}
+
+      {/* Add Step After button - shows on hover */}
+      {showAddButton && hasOutput && isHovered && (
+        <Button
+          size="sm"
+          className="absolute -right-16 top-1/2 -translate-y-1/2 h-7 w-7 p-0 rounded-full shadow-lg z-10"
+          onClick={handleAddStepAfter}
+          title="Add step after"
+        >
+          <Plus className="h-4 w-4" />
+        </Button>
       )}
     </div>
   );
@@ -156,6 +185,7 @@ export const TriggerNode = memo(({ data, selected }: NodeProps<TriggerNodeData>)
 
   return (
     <BaseNode
+      nodeId={data.node.id}
       selected={selected}
       icon={getTriggerIcon()}
       title={data.node.name}
@@ -232,6 +262,7 @@ export const StepNode = memo(({ data, selected }: NodeProps<StepNodeData>) => {
 
   return (
     <BaseNode
+      nodeId={data.node.id}
       selected={selected}
       icon={getStepIcon()}
       title={data.node.name}
@@ -266,6 +297,7 @@ export const ParallelNode = memo(({ data, selected }: NodeProps<ParallelNodeData
 
   return (
     <BaseNode
+      nodeId={data.node.id}
       selected={selected}
       icon={<Shuffle className="h-4 w-4" />}
       title={data.node.name}
@@ -312,6 +344,7 @@ export const MapNode = memo(({ data, selected }: NodeProps<MapNodeData>) => {
 
   return (
     <BaseNode
+      nodeId={data.node.id}
       selected={selected}
       icon={<ArrowRightLeft className="h-4 w-4" />}
       title={data.node.name}
@@ -345,13 +378,24 @@ interface ConditionNodeData {
 
 export const ConditionNode = memo(({ data, selected }: NodeProps<ConditionNodeData>) => {
   const config = data.node.config as ConditionConfig;
+  const [isHovered, setIsHovered] = useState(false);
+  const { addNodeAfter } = useWorkflowStore();
+
+  const handleAddStepAfter = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    // For condition nodes, we could add different handling per branch
+    // For now, just add after the node
+    addNodeAfter(data.node.id, 'step');
+  };
 
   return (
     <div
       className={cn(
-        'min-w-[180px] max-w-[280px] rounded-lg border-2 bg-card shadow-md transition-all',
+        'min-w-[180px] max-w-[280px] rounded-lg border-2 bg-card shadow-md transition-all relative',
         selected ? 'border-primary shadow-lg ring-2 ring-primary/20' : 'border-border'
       )}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
       {/* Input handle */}
       <Handle
@@ -398,6 +442,30 @@ export const ConditionNode = memo(({ data, selected }: NodeProps<ConditionNodeDa
       <div className="absolute right-6 text-[10px] text-red-600" style={{ top: '65%' }}>
         false
       </div>
+
+      {/* Add Step After buttons - shows on hover */}
+      {isHovered && (
+        <>
+          <Button
+            size="sm"
+            className="absolute -right-16 h-6 w-6 p-0 rounded-full shadow-lg z-10 bg-green-600 hover:bg-green-700"
+            style={{ top: '25%' }}
+            onClick={handleAddStepAfter}
+            title="Add step for true branch"
+          >
+            <Plus className="h-3 w-3" />
+          </Button>
+          <Button
+            size="sm"
+            className="absolute -right-16 h-6 w-6 p-0 rounded-full shadow-lg z-10 bg-red-600 hover:bg-red-700"
+            style={{ top: '65%' }}
+            onClick={handleAddStepAfter}
+            title="Add step for false branch"
+          >
+            <Plus className="h-3 w-3" />
+          </Button>
+        </>
+      )}
     </div>
   );
 });
