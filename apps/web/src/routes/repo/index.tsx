@@ -144,7 +144,7 @@ export function RepoPage() {
             </Link>
           </div>
         ) : isOwner ? (
-          <div className="space-y-2">
+          <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
               Create versioned releases of your software
             </p>
@@ -186,7 +186,7 @@ export function RepoPage() {
             )}
           </div>
         ) : isOwner ? (
-          <div className="space-y-2">
+          <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
               Publish this repo as an npm package
             </p>
