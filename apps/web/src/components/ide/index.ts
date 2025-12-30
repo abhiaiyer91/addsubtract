@@ -8,3 +8,4 @@ export { PendingChangesPanel } from './pending-changes-panel';
 export { IDEToggle } from './ide-toggle';
 export { QuickOpen } from './quick-open';
 export { Breadcrumb } from './breadcrumb';
+export { InlineAICommand, useInlineAICommand } from './inline-ai-command';

@@ -1,9 +1,10 @@
 import { useRef, useCallback, useEffect, useState } from 'react';
 import Editor, { OnMount, OnChange, Monaco } from '@monaco-editor/react';
 import type { editor, languages, IDisposable } from 'monaco-editor';
-import { Loader2, Sparkles } from 'lucide-react';
+import { Loader2, Sparkles, Wand2 } from 'lucide-react';
 import { trpc } from '@/lib/trpc';
 import { getLanguageFromPath, shouldTriggerCompletion } from '@/lib/completion-service';
+import { InlineAICommand, useInlineAICommand } from './inline-ai-command';
 
 interface CodeEditorProps {
   content: string;
@@ -13,6 +14,7 @@ interface CodeEditorProps {
   onSave?: () => void;
   readOnly?: boolean;
   aiCompletionEnabled?: boolean;
+  repoId?: string;
 }
 
 // Map our language identifiers to Monaco language IDs
@@ -74,12 +76,16 @@ export function CodeEditor({
   onSave,
   readOnly = false,
   aiCompletionEnabled = true,
+  repoId,
 }: CodeEditorProps) {
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<Monaco | null>(null);
   const disposablesRef = useRef<IDisposable[]>([]);
   const [isCompletionLoading, setIsCompletionLoading] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
+  
+  // Inline AI command state
+  const inlineAI = useInlineAICommand();
   
   // Get the completion mutation from tRPC (using any to bypass type check during development)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -105,6 +111,23 @@ export function CodeEditor({
       onSave?.();
     });
 
+    // Add Cmd/Ctrl+K keybinding for inline AI command
+    editorInstance.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyK, () => {
+      const selection = editorInstance.getSelection();
+      const model = editorInstance.getModel();
+      
+      if (!selection || !model) return;
+      
+      // Get selected text (if any)
+      const selectedText = model.getValueInRange(selection);
+      const position = selection.getStartPosition();
+      
+      inlineAI.open(selectedText, {
+        lineNumber: position.lineNumber,
+        column: position.column,
+      });
+    });
+
     // Register inline completion provider for AI completions
     if (aiCompletionEnabled && completionMutation) {
       const provider = registerInlineCompletionProvider(
@@ -121,10 +144,44 @@ export function CodeEditor({
 
     // Focus the editor
     editorInstance.focus();
-  }, [onSave, aiCompletionEnabled, path, completionMutation]);
+  }, [onSave, aiCompletionEnabled, path, completionMutation, inlineAI]);
 
   const handleChange: OnChange = useCallback((value) => {
     onChange(value || '');
+  }, [onChange]);
+
+  // Handle applying AI-generated code
+  const handleApplyAIEdit = useCallback((newCode: string) => {
+    const editor = editorRef.current;
+    const model = editor?.getModel();
+    
+    if (!editor || !model) return;
+    
+    const selection = editor.getSelection();
+    
+    if (selection && !selection.isEmpty()) {
+      // Replace selected text
+      editor.executeEdits('ai-edit', [{
+        range: selection,
+        text: newCode,
+        forceMoveMarkers: true,
+      }]);
+    } else if (selection) {
+      // Insert at cursor position
+      editor.executeEdits('ai-edit', [{
+        range: {
+          startLineNumber: selection.positionLineNumber,
+          startColumn: selection.positionColumn,
+          endLineNumber: selection.positionLineNumber,
+          endColumn: selection.positionColumn,
+        },
+        text: newCode,
+        forceMoveMarkers: true,
+      }]);
+    }
+    
+    // Update the content state
+    onChange(model.getValue());
   }, [onChange]);
 
   return (
@@ -191,6 +248,28 @@ export function CodeEditor({
           <Sparkles className="h-3 w-3 animate-pulse text-purple-400" />
           <span>AI thinking...</span>
         </div>
+      )}
+      
+      {/* Cmd+K hint */}
+      {repoId && (
+        <div className="absolute bottom-4 left-4 flex items-center gap-2 px-3 py-1.5 bg-zinc-800/70 backdrop-blur-sm rounded-full border border-zinc-700/50 text-xs text-zinc-500 opacity-0 hover:opacity-100 transition-opacity">
+          <Wand2 className="h-3 w-3" />
+          <span>Press <kbd className="px-1 py-0.5 bg-zinc-700 rounded text-[10px]">⌘K</kbd> for AI edit</span>
+        </div>
+      )}
+      
+      {/* Inline AI Command Modal */}
+      {repoId && (
+        <InlineAICommand
+          isOpen={inlineAI.isOpen}
+          onClose={inlineAI.close}
+          selectedText={inlineAI.selectedText}
+          cursorPosition={inlineAI.cursorPosition}
+          filePath={path}
+          fileContent={content}
+          onApply={handleApplyAIEdit}
+          repoId={repoId}
+        />
       )}
     </div>
   );

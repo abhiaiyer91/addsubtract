@@ -472,8 +472,13 @@ Not grep. Understanding.
 | ESM/CommonJS configuration cleanup | P1 | TODO |
 | Error message audit | P1 | Complete |
 | Dogfood: use wit to build wit | P0 | Ongoing |
+| **Inline AI Edit (⌘K)** | P0 | ✅ Complete |
+| Selection actions menu | P1 | In Progress |
+| Agent plan visualization | P1 | TODO |
 
 **Success metric:** All tests pass, daily development uses wit.
+
+> 💡 See [IDE & Agent Vision](./docs/IDE_AND_AGENT_VISION.mdx) for the full roadmap to IDE greatness.
 
 ### Phase 2: Documentation & Onboarding (Next)
 

@@ -573,6 +573,7 @@ export function IDELayout({ owner, repo, repoId, defaultRef }: IDELayoutProps) {
                         path={activeFile.path}
                         onChange={(content) => updateFileContent(activeFile.path, content)}
                         onSave={handleSave}
+                        repoId={repoId}
                       />
                     )
                   )}
