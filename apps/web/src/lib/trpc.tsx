@@ -30,6 +30,13 @@ export function TRPCProvider({ children }: { children: React.ReactNode }) {
           true: unstable_httpSubscriptionLink({
             url: `${apiUrl}/trpc`,
             transformer: superjson,
+            // Include cookies for authentication on subscriptions
+            fetch: (url, options) => {
+              return fetch(url, {
+                ...options,
+                credentials: 'include',
+              });
+            },
           }),
           false: httpBatchLink({
             url: `${apiUrl}/trpc`,
