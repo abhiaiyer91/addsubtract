@@ -106,3 +106,11 @@ export { E2BProvider } from './providers/e2b';
 export { DaytonaProvider } from './providers/daytona';
 export { DockerProvider } from './providers/docker';
 export { VercelProvider } from './providers/vercel';
+
+// Sandbox Pool (for reusing sandboxes across requests)
+export {
+  SandboxPool,
+  getSandboxPool,
+  resetSandboxPool,
+  type PooledSandbox,
+} from './pool';
