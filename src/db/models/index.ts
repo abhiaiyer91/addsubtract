@@ -205,21 +205,11 @@ export { marketingAgentConfigModel } from './marketing-agent';
 // Gamification models (XP, levels, achievements)
 export {
   gamificationModel,
-  achievements,
-  userAchievements,
-  userGamification,
-  xpEvents,
   XP_REWARDS,
   LEVEL_TITLES,
   getXpForLevel,
   getLevelFromXp,
   getLevelTitle,
-  type Achievement,
-  type UserAchievement,
-  type UserGamification,
-  type XpEvent,
-  type AchievementCategory,
-  type AchievementRarity,
 } from './gamification';
 
 // Achievement definitions

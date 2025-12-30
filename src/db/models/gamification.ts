@@ -5,194 +5,28 @@
  * Makes development addictive through progression mechanics.
  */
 
-import { eq, and, desc, sql, gte, count, inArray } from 'drizzle-orm';
+import { eq, and, desc, sql, gte, count } from 'drizzle-orm';
 import { getDb } from '../index';
 import {
-  pgTable,
-  text,
-  timestamp,
-  integer,
-  uuid,
-  boolean,
-  unique,
-  index,
-  pgEnum,
-} from 'drizzle-orm/pg-core';
+  achievements,
+  userAchievements,
+  userGamification,
+  xpEvents,
+  type Achievement,
+  type UserAchievementRecord,
+  type UserGamificationRecord,
+  type XpEvent,
+  type AchievementCategory,
+  type AchievementRarity,
+} from '../schema';
 import { user } from '../auth-schema';
 
-// ============ ENUMS ============
-
-export const achievementCategoryEnum = pgEnum('achievement_category', [
-  'commits',      // Related to commits/pushes
-  'pull_requests', // PR related
-  'reviews',      // Code reviews
-  'issues',       // Issue tracking
-  'collaboration', // Working with others
-  'streaks',      // Consistency achievements
-  'milestones',   // Major milestones
-  'special',      // Special/rare achievements
-]);
-
-export const achievementRarityEnum = pgEnum('achievement_rarity', [
-  'common',       // Easy to get
-  'uncommon',     // Takes some effort
-  'rare',         // Significant achievement
-  'epic',         // Hard to achieve
-  'legendary',    // Very rare, major accomplishment
-]);
-
-// ============ TABLES ============
-
-/**
- * Achievement definitions - all available achievements
- */
-export const achievements = pgTable('achievements', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  
-  /** Unique identifier for the achievement (e.g., 'first_commit') */
-  key: text('key').notNull().unique(),
-  
-  /** Display name */
-  name: text('name').notNull(),
-  
-  /** Description of how to unlock */
-  description: text('description').notNull(),
-  
-  /** Category of achievement */
-  category: achievementCategoryEnum('category').notNull(),
-  
-  /** Rarity level */
-  rarity: achievementRarityEnum('rarity').notNull(),
-  
-  /** XP awarded when unlocked */
-  xpReward: integer('xp_reward').notNull().default(100),
-  
-  /** Icon (emoji or icon identifier) */
-  icon: text('icon').notNull(),
-  
-  /** Whether this achievement is hidden until unlocked */
-  isSecret: boolean('is_secret').notNull().default(false),
-  
-  /** Order for display (lower = first) */
-  displayOrder: integer('display_order').notNull().default(0),
-  
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-});
-
-/**
- * User achievements - tracks which users have unlocked which achievements
- */
-export const userAchievements = pgTable('user_achievements', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  
-  userId: text('user_id')
-    .notNull()
-    .references(() => user.id, { onDelete: 'cascade' }),
-  
-  achievementId: uuid('achievement_id')
-    .notNull()
-    .references(() => achievements.id, { onDelete: 'cascade' }),
-  
-  /** When the achievement was unlocked */
-  unlockedAt: timestamp('unlocked_at', { withTimezone: true }).defaultNow().notNull(),
-  
-  /** Context about how it was unlocked (e.g., which PR, repo, etc.) */
-  context: text('context'),
-}, (table) => ({
-  uniqueUserAchievement: unique().on(table.userId, table.achievementId),
-  userIdIdx: index('idx_user_achievements_user_id').on(table.userId),
-  unlockedAtIdx: index('idx_user_achievements_unlocked_at').on(table.unlockedAt),
-}));
-
-/**
- * User gamification stats - XP, level, and overall progress
- */
-export const userGamification = pgTable('user_gamification', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  
-  userId: text('user_id')
-    .notNull()
-    .references(() => user.id, { onDelete: 'cascade' })
-    .unique(),
-  
-  /** Total XP earned */
-  totalXp: integer('total_xp').notNull().default(0),
-  
-  /** Current level */
-  level: integer('level').notNull().default(1),
-  
-  /** XP progress toward next level */
-  xpToNextLevel: integer('xp_to_next_level').notNull().default(100),
-  
-  /** Current streak (consecutive days with activity) */
-  currentStreak: integer('current_streak').notNull().default(0),
-  
-  /** Longest streak ever achieved */
-  longestStreak: integer('longest_streak').notNull().default(0),
-  
-  /** Last activity date (for streak calculation) */
-  lastActivityDate: timestamp('last_activity_date', { withTimezone: true }),
-  
-  // Lifetime stats for achievements
-  totalCommits: integer('total_commits').notNull().default(0),
-  totalPrsOpened: integer('total_prs_opened').notNull().default(0),
-  totalPrsMerged: integer('total_prs_merged').notNull().default(0),
-  totalReviews: integer('total_reviews').notNull().default(0),
-  totalIssuesOpened: integer('total_issues_opened').notNull().default(0),
-  totalIssuesClosed: integer('total_issues_closed').notNull().default(0),
-  totalComments: integer('total_comments').notNull().default(0),
-  
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
-}, (table) => ({
-  levelIdx: index('idx_user_gamification_level').on(table.level),
-  totalXpIdx: index('idx_user_gamification_total_xp').on(table.totalXp),
-}));
-
-/**
- * XP events - log of all XP earned
- */
-export const xpEvents = pgTable('xp_events', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  
-  userId: text('user_id')
-    .notNull()
-    .references(() => user.id, { onDelete: 'cascade' }),
-  
-  /** Type of activity that earned XP */
-  activityType: text('activity_type').notNull(),
-  
-  /** Amount of XP earned */
-  xpAmount: integer('xp_amount').notNull(),
-  
-  /** Description of what earned the XP */
-  description: text('description'),
-  
-  /** Related entity (repo ID, PR ID, etc.) */
-  relatedId: text('related_id'),
-  
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-}, (table) => ({
-  userIdIdx: index('idx_xp_events_user_id').on(table.userId),
-  createdAtIdx: index('idx_xp_events_created_at').on(table.createdAt),
-}));
-
-// ============ TYPE EXPORTS ============
-
-export type Achievement = typeof achievements.$inferSelect;
-export type NewAchievement = typeof achievements.$inferInsert;
-
-export type UserAchievement = typeof userAchievements.$inferSelect;
-export type NewUserAchievement = typeof userAchievements.$inferInsert;
-
-export type UserGamification = typeof userGamification.$inferSelect;
-export type NewUserGamification = typeof userGamification.$inferInsert;
-
-export type XpEvent = typeof xpEvents.$inferSelect;
-export type NewXpEvent = typeof xpEvents.$inferInsert;
-
-export type AchievementCategory = (typeof achievementCategoryEnum.enumValues)[number];
-export type AchievementRarity = (typeof achievementRarityEnum.enumValues)[number];
+// Re-export types with simpler names
+export type { Achievement, AchievementCategory, AchievementRarity };
+export type UserAchievement = UserAchievementRecord;
+export type UserGamification = UserGamificationRecord;
+export { xpEvents, achievements, userAchievements, userGamification };
+export type { XpEvent };
 
 // ============ CONSTANTS ============
 
@@ -298,7 +132,7 @@ export const gamificationModel = {
   /**
    * Get or create gamification record for a user
    */
-  async getOrCreateUserGamification(userId: string): Promise<UserGamification> {
+  async getOrCreateUserGamification(userId: string): Promise<UserGamificationRecord> {
     const db = getDb();
     
     const [existing] = await db
@@ -414,7 +248,7 @@ export const gamificationModel = {
     }
     
     // Build update object based on activity type
-    const updates: Partial<UserGamification> = {
+    const updates: Partial<UserGamificationRecord> = {
       lastActivityDate: new Date(),
       currentStreak: newStreak,
       longestStreak: Math.max(newStreak, gamification.longestStreak),
@@ -458,10 +292,10 @@ export const gamificationModel = {
    * Get user's gamification profile
    */
   async getUserProfile(userId: string): Promise<{
-    gamification: UserGamification;
+    gamification: UserGamificationRecord;
     title: string;
     xpProgress: number;
-    achievements: (UserAchievement & { achievement: Achievement })[];
+    achievements: (UserAchievementRecord & { achievement: Achievement })[];
     recentXp: XpEvent[];
   }> {
     const db = getDb();
