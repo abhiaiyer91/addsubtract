@@ -1,13 +1,18 @@
-FROM node:20-alpine
+FROM node:20-slim
 
 WORKDIR /app
 
 # Install git for any git operations, docker CLI for sandbox, and curl for CodeRabbit CLI
-# Also install gcompat for glibc compatibility (needed for CodeRabbit CLI binary)
-RUN apk add --no-cache git docker-cli curl bash gcompat libstdc++
+# Using debian-slim instead of alpine because CodeRabbit CLI requires glibc
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    curl \
+    ca-certificates \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install CodeRabbit CLI for AI code reviews
-# Note: The CLI binary requires glibc, gcompat provides compatibility layer
+# Note: The CLI binary requires glibc (which debian-slim provides natively)
 RUN curl -fsSL https://cli.coderabbit.ai/install.sh | bash && \
     ls -la /root/.local/bin/ && \
     ln -sf /root/.local/bin/coderabbit /usr/local/bin/coderabbit && \
