@@ -66,8 +66,8 @@ export function BranchesPage() {
 
   return (
     <RepoLayout owner={owner!} repo={repo!}>
-
-      <div className="flex items-center justify-between">
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold flex items-center gap-2">
           <GitBranch className="h-5 w-5" />
           Branches
@@ -171,6 +171,7 @@ export function BranchesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      </div>
     </RepoLayout>
   );
 }
