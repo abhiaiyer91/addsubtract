@@ -1,0 +1,370 @@
+---
+title: "Rate Limiting"
+description: "Protect your wit server from abuse with configurable rate limits"
+---
+
+# Rate Limiting
+
+Wit's server includes a flexible rate limiting middleware to protect API endpoints from abuse. The rate limiter supports multiple storage backends and provides fine-grained control over request limits.
+
+## Overview
+
+Rate limiting features:
+
+- **Configurable limits** - Set requests per time window
+- **Multiple stores** - Memory, Redis, or sliding window
+- **Preset configurations** - Ready-to-use limits for common endpoints
+- **User-aware limits** - Different limits for authenticated users
+- **Trusted bypass** - Skip limits for trusted sources
+
+## Basic Usage
+
+```typescript
+import { rateLimit, RateLimitPresets } from 'wit/server/middleware/rate-limit';
+import { Hono } from 'hono';
+
+const app = new Hono();
+
+// Apply to all routes
+app.use('*', rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 100, // 100 requests per minute
+}));
+
+// Or use presets
+app.use('/api/*', rateLimit(RateLimitPresets.standard));
+```
+
+## Configuration Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `windowMs` | number | required | Time window in milliseconds |
+| `max` | number | required | Max requests per window |
+| `keyGenerator` | function | IP-based | Generate rate limit key |
+| `handler` | function | JSON 429 | Custom rate limit response |
+| `skip` | function | none | Skip rate limiting for request |
+| `keyPrefix` | string | 'ratelimit' | Prefix for storage keys |
+| `headers` | boolean | true | Send rate limit headers |
+| `message` | string | 'Too many requests' | Error message |
+
+## Presets
+
+Wit includes presets for common use cases:
+
+### Standard
+
+100 requests per minute for general API endpoints:
+
+```typescript
+app.use('/api/*', rateLimit(RateLimitPresets.standard));
+```
+
+### Strict
+
+5 requests per minute for sensitive endpoints:
+
+```typescript
+app.use('/api/admin/*', rateLimit(RateLimitPresets.strict));
+```
+
+### Auth
+
+3 requests per 15 minutes for authentication:
+
+```typescript
+app.use('/api/auth/login', rateLimit(RateLimitPresets.auth));
+```
+
+### Search
+
+20 requests per minute for expensive operations:
+
+```typescript
+app.use('/api/search', rateLimit(RateLimitPresets.search));
+```
+
+### Upload
+
+30 requests per minute for file uploads:
+
+```typescript
+app.use('/api/upload', rateLimit(RateLimitPresets.upload));
+```
+
+### Webhook
+
+60 requests per minute for webhook endpoints:
+
+```typescript
+app.use('/webhooks/*', rateLimit(RateLimitPresets.webhook));
+```
+
+### Relaxed
+
+300 requests per minute for read-only endpoints:
+
+```typescript
+app.use('/api/public/*', rateLimit(RateLimitPresets.relaxed));
+```
+
+## Preset Details
+
+| Preset | Requests | Window | Use Case |
+|--------|----------|--------|----------|
+| strict | 5 | 1 min | Admin, sensitive ops |
+| standard | 100 | 1 min | General API |
+| relaxed | 300 | 1 min | Read-only, public |
+| auth | 3 | 15 min | Login, registration |
+| upload | 30 | 1 min | File uploads |
+| webhook | 60 | 1 min | External webhooks |
+| search | 20 | 1 min | Search, AI features |
+
+## Response Headers
+
+When `headers: true` (default), rate limit info is included in responses:
+
+```
+X-RateLimit-Limit: 100
+X-RateLimit-Remaining: 95
+X-RateLimit-Reset: 1703520000
+```
+
+When rate limited:
+
+```
+Retry-After: 45
+```
+
+## Custom Key Generation
+
+By default, rate limiting is based on IP address. Customize this:
+
+```typescript
+rateLimit({
+  windowMs: 60000,
+  max: 100,
+  keyGenerator: (c) => {
+    // Rate limit by user ID if authenticated
+    const userId = c.get('userId');
+    if (userId) return `user:${userId}`;
+    
+    // Fall back to IP
+    return c.req.header('x-forwarded-for') || 'unknown';
+  },
+});
+```
+
+## User-Aware Rate Limiting
+
+Different limits for authenticated vs anonymous users:
+
+```typescript
+import { userRateLimit } from 'wit/server/middleware/rate-limit';
+
+app.use('/api/*', userRateLimit({
+  windowMs: 60000,
+  max: 100, // Default
+  authenticatedMax: 500, // Higher for logged-in users
+  unauthenticatedMax: 50, // Lower for anonymous
+  getUserId: async (c) => {
+    const session = c.get('session');
+    return session?.userId || null;
+  },
+}));
+```
+
+## Trusted Source Bypass
+
+Skip rate limiting for trusted sources:
+
+```typescript
+import { rateLimit, createTrustedBypass } from 'wit/server/middleware/rate-limit';
+
+const bypass = createTrustedBypass({
+  trustedIPs: ['192.168.1.0/24', '10.0.0.0/8'],
+  trustedApiKeys: ['sk-trusted-key-1', 'sk-trusted-key-2'],
+  apiKeyHeader: 'x-api-key',
+  isTrusted: async (c) => {
+    // Custom trust logic
+    return c.req.header('x-internal') === 'true';
+  },
+});
+
+app.use('/api/*', rateLimit({
+  windowMs: 60000,
+  max: 100,
+  skip: bypass,
+}));
+```
+
+## Storage Backends
+
+### Memory Store (Default)
+
+Suitable for single-instance deployments:
+
+```typescript
+import { MemoryStore, setRateLimitStore } from 'wit/server/middleware/rate-limit';
+
+const store = new MemoryStore(60000); // cleanup interval
+setRateLimitStore(store);
+```
+
+### Redis Store
+
+For distributed/multi-instance deployments:
+
+```typescript
+import { RedisStore, setRateLimitStore } from 'wit/server/middleware/rate-limit';
+import Redis from 'ioredis';
+
+const redis = new Redis(process.env.REDIS_URL);
+const store = new RedisStore(redis);
+setRateLimitStore(store);
+```
+
+### Sliding Window Store
+
+More accurate limiting using Redis sorted sets:
+
+```typescript
+import { SlidingWindowStore, setRateLimitStore } from 'wit/server/middleware/rate-limit';
+import Redis from 'ioredis';
+
+const redis = new Redis(process.env.REDIS_URL);
+const store = new SlidingWindowStore(redis);
+setRateLimitStore(store);
+```
+
+## Endpoint-Specific Limits
+
+Use the factory function for type-safe endpoint limits:
+
+```typescript
+import { rateLimitForEndpoint } from 'wit/server/middleware/rate-limit';
+
+// Type-safe endpoint types
+app.get('/api/repos', rateLimitForEndpoint('read'));
+app.post('/api/repos', rateLimitForEndpoint('write'));
+app.post('/api/auth/login', rateLimitForEndpoint('auth'));
+app.get('/api/search', rateLimitForEndpoint('search'));
+app.post('/api/upload', rateLimitForEndpoint('upload'));
+app.post('/webhooks/github', rateLimitForEndpoint('webhook'));
+app.get('/public/*', rateLimitForEndpoint('public'));
+
+// With overrides
+app.get('/api/heavy', rateLimitForEndpoint('search', {
+  max: 5, // Override default
+}));
+```
+
+## Custom Error Handler
+
+```typescript
+rateLimit({
+  windowMs: 60000,
+  max: 100,
+  handler: (c) => {
+    return c.json({
+      error: 'Rate limit exceeded',
+      code: 'RATE_LIMIT_EXCEEDED',
+      retryAfter: c.res.headers.get('Retry-After'),
+    }, 429);
+  },
+});
+```
+
+## Accessing Rate Limit Info
+
+Access rate limit info in route handlers:
+
+```typescript
+app.get('/api/status', (c) => {
+  const rateLimit = c.get('rateLimit');
+  
+  return c.json({
+    rateLimit: {
+      limit: rateLimit.limit,
+      remaining: rateLimit.remaining,
+      resetIn: rateLimit.resetTime,
+    },
+  });
+});
+```
+
+## Best Practices
+
+<Tip>
+Use Redis storage for production deployments with multiple instances.
+</Tip>
+
+<Tip>
+Set stricter limits on authentication endpoints to prevent brute force attacks.
+</Tip>
+
+<Tip>
+Use the sliding window algorithm for more accurate rate limiting at the cost of slightly higher Redis load.
+</Tip>
+
+<Warning>
+Memory store data is lost on restart. Use Redis for persistence.
+</Warning>
+
+<Warning>
+Rate limits based on IP can be bypassed with proxies. Consider user-based limits for authenticated endpoints.
+</Warning>
+
+## Example: Complete Setup
+
+```typescript
+import { Hono } from 'hono';
+import {
+  rateLimit,
+  userRateLimit,
+  RateLimitPresets,
+  RedisStore,
+  setRateLimitStore,
+  createTrustedBypass,
+} from 'wit/server/middleware/rate-limit';
+import Redis from 'ioredis';
+
+const app = new Hono();
+
+// Setup Redis store
+const redis = new Redis(process.env.REDIS_URL);
+setRateLimitStore(new RedisStore(redis));
+
+// Trusted bypass
+const trustedBypass = createTrustedBypass({
+  trustedIPs: ['10.0.0.0/8'],
+  trustedApiKeys: [process.env.INTERNAL_API_KEY],
+});
+
+// Global rate limit
+app.use('*', rateLimit({
+  ...RateLimitPresets.relaxed,
+  skip: trustedBypass,
+}));
+
+// Auth endpoints - strict
+app.use('/api/auth/*', rateLimit(RateLimitPresets.auth));
+
+// API endpoints - user-aware
+app.use('/api/*', userRateLimit({
+  ...RateLimitPresets.standard,
+  authenticatedMax: 1000,
+  unauthenticatedMax: 100,
+  getUserId: (c) => c.get('session')?.userId,
+}));
+
+// Search - expensive
+app.use('/api/search', rateLimit(RateLimitPresets.search));
+
+export default app;
+```
+
+## Related
+
+- [Server Configuration](/platform/server) - Server setup
+- [Self-Hosting](/platform/self-hosting) - Deployment guide

@@ -1,0 +1,182 @@
+---
+title: "cleanup"
+description: "Find and delete merged or stale branches"
+---
+
+# wit cleanup
+
+Automatically find and delete branches that have been merged or are stale. Much better than manually checking each branch.
+
+## Overview
+
+Over time, repositories accumulate branches that are no longer needed. `wit cleanup` helps you identify:
+
+- **Merged branches** - Already merged into main/master
+- **Stale branches** - No commits for a configurable period (default: 30 days)
+
+## Usage
+
+```bash
+# Find cleanup candidates (interactive)
+wit cleanup
+
+# Dry run - see what would be deleted
+wit cleanup --dry-run
+
+# Force delete without confirmation
+wit cleanup --force
+
+# Only show merged branches
+wit cleanup --merged
+
+# Only show stale branches
+wit cleanup --stale
+
+# Set stale threshold (days)
+wit cleanup --days 60
+```
+
+## Options
+
+| Option | Alias | Description |
+|--------|-------|-------------|
+| `--dry-run` | `-n` | Show what would be deleted without deleting |
+| `--force` | `-f` | Skip confirmation prompt |
+| `--merged` | | Only show branches merged into main |
+| `--stale` | | Only show branches older than stale threshold |
+| `--all` | `-a` | Show all candidates (merged + stale) |
+| `--days <n>` | | Days before a branch is considered stale (default: 30) |
+
+## Examples
+
+### Interactive Cleanup
+
+```bash
+wit cleanup
+```
+
+**Output:**
+```
+Branch cleanup candidates:
+
+  [merged] feature/add-auth
+    Last commit: Add authentication middleware
+    Date: 12/15/2024
+
+  [merged] fix/login-bug
+    Last commit: Fix login validation
+    Date: 12/10/2024
+
+  [stale: 45d] experiment/new-ui
+    Last commit: WIP: trying new design
+    Date: 11/15/2024
+
+This will delete 3 branch(es).
+Use --force to skip this confirmation.
+
+Continue? [y/N]
+```
+
+### Dry Run
+
+See what would be cleaned up without making changes:
+
+```bash
+wit cleanup --dry-run
+```
+
+**Output:**
+```
+Branch cleanup candidates:
+
+  [merged] feature/add-auth
+    Last commit: Add authentication middleware
+    Date: 12/15/2024
+
+Dry run - no branches deleted
+  Remove --dry-run to actually delete branches
+```
+
+### Merged Branches Only
+
+```bash
+wit cleanup --merged --force
+```
+
+**Output:**
+```
+ Deleted 2 branch(es):
+  - feature/add-auth
+  - fix/login-bug
+```
+
+### Custom Stale Threshold
+
+Consider branches stale after 60 days instead of 30:
+
+```bash
+wit cleanup --stale --days 60
+```
+
+## Protected Branches
+
+The following branches are never suggested for cleanup:
+
+- `main`
+- `master`
+- `develop`
+- `development`
+- The current checked-out branch
+
+## How It Works
+
+### Merge Detection
+
+A branch is considered "merged" if its tip commit is an ancestor of the main branch. This means all commits on that branch are already in main.
+
+```
+main:    A---B---C---D---E
+              \     /
+feature:       F---G  <-- merged (G is ancestor of E)
+```
+
+### Stale Detection
+
+A branch is "stale" if its most recent commit is older than the threshold (default: 30 days). The age is calculated from the commit's author timestamp.
+
+## Tips
+
+<Tip>
+Run `wit cleanup --dry-run` first to review what will be deleted before committing to the cleanup.
+</Tip>
+
+<Tip>
+Use `wit cleanup --merged --force` in CI/CD pipelines to automatically clean up after merges.
+</Tip>
+
+<Warning>
+Deleted branches cannot be easily recovered. Make sure you've merged or pushed important work before cleanup.
+</Warning>
+
+## Automation
+
+Add to your post-merge hooks or CI pipeline:
+
+```yaml
+# .wit/config.yaml
+hooks:
+  post-merge:
+    - wit cleanup --merged --force
+```
+
+Or in GitHub Actions:
+
+```yaml
+- name: Cleanup merged branches
+  run: wit cleanup --merged --force
+```
+
+## Related Commands
+
+- [`wit branch`](/commands/branches) - List and manage branches
+- [`wit branch -d`](/commands/branches) - Delete a specific branch

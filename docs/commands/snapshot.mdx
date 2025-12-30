@@ -1,0 +1,195 @@
+---
+title: "snapshot"
+description: "Create quick checkpoints without full commits"
+---
+
+# wit snapshot
+
+Create quick checkpoints of your working directory without making a full commit. Perfect for "save game" moments before risky operations.
+
+## Overview
+
+Snapshots capture the current state of all files in your working directory, storing them in the object database. Unlike commits, snapshots:
+
+- Don't require staged changes
+- Don't appear in history
+- Can be created and restored instantly
+- Are stored locally only
+
+## Usage
+
+```bash
+# Create a snapshot
+wit snapshot create [name] [description]
+
+# List all snapshots
+wit snapshot list
+
+# Restore a snapshot
+wit snapshot restore <id-or-name>
+
+# Delete a snapshot
+wit snapshot delete <id>
+```
+
+## Commands
+
+### Create
+
+Create a new snapshot of your working directory:
+
+```bash
+# Quick snapshot
+wit snapshot create
+
+# Named snapshot
+wit snapshot create "before-refactor"
+
+# With description
+wit snapshot create "experiment" "Trying new approach to auth"
+```
+
+**Output:**
+```
+ Created snapshot: before-refactor
+  ID: lxk4m2n7
+  Files: 142
+  Restore with: wit snapshot restore lxk4m2n7
+```
+
+### List
+
+Show all available snapshots:
+
+```bash
+wit snapshot list
+# or
+wit snapshot ls
+```
+
+**Output:**
+```
+Snapshots:
+
+before-refactor (lxk4m2n7)
+  Created: 5m ago  142 files  Branch: feature/auth
+  Trying new approach to auth
+
+working-state (abc123)
+  Created: 2h ago  138 files  Branch: main
+```
+
+### Restore
+
+Restore files from a snapshot:
+
+```bash
+# By ID
+wit snapshot restore lxk4m2n7
+
+# By name
+wit snapshot restore before-refactor
+```
+
+**Output:**
+```
+ Restored snapshot: before-refactor
+  142 files restored
+```
+
+<Warning>
+Restoring a snapshot overwrites files in your working directory. Make sure to commit or snapshot your current state first if needed.
+</Warning>
+
+### Delete
+
+Remove a snapshot:
+
+```bash
+wit snapshot delete lxk4m2n7
+# or
+wit snapshot rm before-refactor
+```
+
+## Use Cases
+
+### Before Risky Changes
+
+```bash
+# Save current state
+wit snapshot create "safe-point"
+
+# Try something risky
+npm run dangerous-migration
+
+# If it fails, restore
+wit snapshot restore safe-point
+```
+
+### Quick Experiments
+
+```bash
+# Snapshot before experimenting
+wit snapshot create "baseline"
+
+# Try approach A
+# ... make changes ...
+wit snapshot create "approach-a"
+wit snapshot restore baseline
+
+# Try approach B
+# ... make changes ...
+wit snapshot create "approach-b"
+
+# Compare and choose
+wit snapshot restore approach-a  # or approach-b
+```
+
+### Debugging Sessions
+
+```bash
+# Snapshot at each step while debugging
+wit snapshot create "step-1" "Initial state"
+# ... make changes ...
+wit snapshot create "step-2" "Added logging"
+# ... make changes ...
+wit snapshot create "step-3" "Found the bug"
+
+# Go back to any step
+wit snapshot restore step-2
+```
+
+## Snapshots vs Stash vs Commits
+
+| Feature | Snapshot | Stash | Commit |
+|---------|----------|-------|--------|
+| Captures all files | Yes | Only changes | Only staged |
+| Appears in history | No | No | Yes |
+| Named | Yes | Optional | Yes (message) |
+| Shareable | No | No | Yes |
+| Branch context | Stored | Stored | Part of branch |
+| Quick restore | Yes | Yes | Requires checkout |
+
+## Storage
+
+Snapshots are stored in:
+- `.wit/snapshots.json` - Metadata (names, timestamps, file lists)
+- `.wit/objects/` - File contents (as blobs)
+
+Snapshots use the same content-addressable storage as commits, so identical files aren't duplicated.
+
+## Tips
+
+<Tip>
+Use descriptive names for snapshots you plan to keep. The auto-generated ID is hard to remember.
+</Tip>
+
+<Tip>
+Snapshots are recorded in the journal, so you can see your snapshot history with `wit journal`.
+</Tip>
+
+## Related Commands
+
+- [`wit stash`](/commands/stash) - Temporarily shelve changes
+- [`wit commit`](/commands/basic-workflow) - Create permanent history
+- [`wit journal`](/commands/journal) - View operation history

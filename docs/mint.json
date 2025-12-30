@@ -65,6 +65,12 @@
         "commands/search",
         "commands/review",
         "commands/agent",
+        "commands/plan",
+        "commands/release",
+        "commands/snapshot",
+        "commands/cleanup",
+        "commands/github-import",
+        "commands/platform-status",
         "commands/dashboard",
         "commands/wrapped",
         "commands/journal",
@@ -89,6 +95,7 @@
         "features/smart-status",
         "features/ai-powered",
         "features/ai-agents",
+        "features/ai-workflows",
         "features/search",
         "features/review"
       ]
@@ -139,6 +146,8 @@
         "platform/overview",
         "platform/server",
         "platform/ssh-server",
+        "platform/sandboxes",
+        "platform/rate-limiting",
         "platform/self-hosting",
         "platform/pull-requests",
         "platform/issues"

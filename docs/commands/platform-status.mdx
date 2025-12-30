@@ -1,0 +1,214 @@
+---
+title: "status (platform)"
+description: "Show wit platform service status"
+---
+
+# wit status
+
+Display the current state of all wit platform services including the database, API server, and web UI.
+
+## Overview
+
+When running wit as a platform (with `wit up`), multiple services work together:
+
+- **Database** - PostgreSQL for data storage
+- **API Server** - Backend API endpoints
+- **Web UI** - Frontend dashboard
+
+The `wit status` command shows the health of all these services.
+
+## Usage
+
+```bash
+# Show status
+wit status
+
+# JSON output
+wit status --json
+```
+
+## Options
+
+| Option | Description |
+|--------|-------------|
+| `--json` | Output as JSON |
+| `-h, --help` | Show help message |
+
+## Output
+
+### Normal Output
+
+```bash
+wit status
+```
+
+**Output (all running):**
+```
+ wit platform status
+
+  Status: Running 
+
+  Services:
+     Database (postgresql://localhost:5432/wit)
+     API Server (http://localhost:3000)
+     Web UI (http://localhost:5173)
+
+  Started: 2024-12-25T10:30:00.000Z
+  Uptime:  2h 15m
+
+  Data:    ~/.wit
+```
+
+**Output (partial):**
+```
+ wit platform status
+
+  Status: Partial 
+
+  Services:
+     Database (postgresql://localhost:5432/wit)
+     API Server (http://localhost:3000)
+     Web UI
+
+  Started: 2024-12-25T10:30:00.000Z
+  Uptime:  2h 15m
+
+  Data:    ~/.wit
+```
+
+**Output (stopped):**
+```
+ wit platform status
+
+  Status: Stopped
+
+  Services:
+     Database
+     API Server
+     Web UI
+
+  Data:    ~/.wit
+
+  Start with: wit up
+```
+
+### JSON Output
+
+```bash
+wit status --json
+```
+
+```json
+{
+  "running": true,
+  "services": [
+    {
+      "name": "Database",
+      "running": true,
+      "port": 5432,
+      "url": "postgresql://localhost:5432/wit"
+    },
+    {
+      "name": "API Server",
+      "running": true,
+      "port": 3000,
+      "url": "http://localhost:3000",
+      "pid": 12345
+    },
+    {
+      "name": "Web UI",
+      "running": true,
+      "port": 5173,
+      "url": "http://localhost:5173",
+      "pid": 12346
+    }
+  ],
+  "startedAt": "2024-12-25T10:30:00.000Z",
+  "dataDir": "/Users/you/.wit"
+}
+```
+
+## Service Details
+
+### Database
+
+The database service runs PostgreSQL in a Docker container named `wit-postgres`.
+
+- Default port: 5432
+- Data stored in: `~/.wit/postgres`
+
+### API Server
+
+The API server provides:
+
+- tRPC API endpoints
+- Git HTTP protocol
+- Webhook handlers
+- Authentication
+
+- Default port: 3000
+
+### Web UI
+
+The web interface provides:
+
+- Repository browser
+- Pull request management
+- Issue tracking
+- Dashboard and analytics
+
+- Default port: 5173
+
+## Troubleshooting
+
+### Service Not Running
+
+If a service shows as not running:
+
+```bash
+# Restart all services
+wit down && wit up
+
+# Check Docker (for database)
+docker ps
+
+# Check process logs
+cat ~/.wit/logs/server.log
+```
+
+### Port Conflicts
+
+If ports are in use:
+
+```bash
+# Use custom ports
+wit up --port 3001 --db-port 5433
+```
+
+### Database Connection Issues
+
+```bash
+# Check database container
+docker logs wit-postgres
+
+# Restart database only
+docker restart wit-postgres
+```
+
+## Data Directory
+
+All wit platform data is stored in `~/.wit/`:
+
+```
+~/.wit/
+├── wit.pid          # Process IDs
+├── postgres/        # Database files
+├── logs/            # Service logs
+└── config.json      # Platform configuration
+```
+
+## Related Commands
+
+- [`wit up`](/platform/overview) - Start the platform
+- [`wit down`](/platform/overview) - Stop the platform
+- [`wit serve`](/platform/server) - Run the server directly

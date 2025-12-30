@@ -1,0 +1,284 @@
+---
+title: "plan"
+description: "Multi-agent task planning and execution"
+---
+
+# wit plan
+
+Break down complex coding tasks into subtasks and execute them in parallel using specialized AI agents.
+
+## Overview
+
+The `plan` command uses a multi-agent workflow to:
+
+1. **Analyze** your task and codebase
+2. **Plan** an execution strategy with parallel subtask groups
+3. **Execute** subtasks using specialized AI agents
+4. **Review** results and iterate if needed
+
+This is ideal for large refactoring tasks, feature implementations, or any complex coding work that benefits from structured planning.
+
+## Usage
+
+```bash
+# Execute a complex task
+wit plan "Add user authentication with JWT"
+
+# Preview without executing
+wit plan "Refactor database layer" --dry-run
+
+# With additional context
+wit plan "Add dark mode" -c "Use CSS custom properties"
+
+# JSON output
+wit plan "Fix all TypeScript errors" --json
+
+# Check status
+wit plan status
+```
+
+## Options
+
+| Option | Alias | Description |
+|--------|-------|-------------|
+| `--dry-run` | `-n` | Preview plan without executing |
+| `--verbose` | `-v` | Enable verbose output |
+| `--no-stream` | | Disable streaming output |
+| `--no-branch` | | Don't create a feature branch |
+| `--no-commit` | | Don't auto-commit changes |
+| `--json` | | Output results as JSON |
+| `--max-iterations` | `-i` | Maximum planning iterations (default: 3) |
+| `--max-parallel` | `-p` | Maximum parallel tasks (default: 5) |
+| `--branch` | `-b` | Custom branch name |
+| `--context` | `-c` | Additional context for planning |
+
+## How It Works
+
+### 1. Planner Agent
+
+Analyzes your task and creates an execution plan:
+
+- Breaks the task into atomic subtasks
+- Identifies dependencies between subtasks
+- Groups independent subtasks for parallel execution
+- Estimates effort and risk
+
+### 2. Executor Agents
+
+Run subtasks in parallel within each group:
+
+- Read and understand relevant files
+- Make code changes incrementally
+- Follow existing code patterns
+- Report results
+
+### 3. Reviewer Agent
+
+Validates completed work:
+
+- Checks if tasks met acceptance criteria
+- Identifies issues and inconsistencies
+- Determines if re-planning is needed
+
+## Examples
+
+### Feature Implementation
+
+```bash
+wit plan "Add user authentication with JWT"
+```
+
+**Output:**
+```
+ Multi-Agent Planning Workflow
+
+Task: Add user authentication with JWT
+Max iterations: 3
+Max parallel tasks: 5
+
+Starting workflow...
+------------------------------------------------------------
+
+ Step: analyze-task
+    Completed: analyze-task
+
+ Step: create-plan
+    Completed: create-plan
+
+ Step: execute-plan
+    Completed: execute-plan
+
+ Step: review-results
+    Completed: review-results
+
+------------------------------------------------------------
+
+Workflow completed. Run with --json for full results.
+```
+
+### Dry Run Preview
+
+```bash
+wit plan "Refactor the database layer to use connection pooling" --dry-run
+```
+
+**Output:**
+```
+[DRY RUN] Planning workflow will preview without executing changes.
+
+ Multi-Agent Planning Workflow
+
+Task: Refactor the database layer to use connection pooling
+
+============================================================
+WORKFLOW RESULTS
+============================================================
+
+Status:  Success
+Total iterations: 1
+Total duration: 2.34s
+
+ Execution Plan:
+   Summary: Implement connection pooling by creating a pool manager, updating queries, and adding configuration
+   Groups: 3
+
+   Group 1: Foundation
+       [DRY RUN] Create connection pool types and interfaces
+       [DRY RUN] Add pool configuration options
+
+   Group 2: Implementation
+       [DRY RUN] Implement pool manager class
+       [DRY RUN] Update database queries to use pool
+
+   Group 3: Integration
+       [DRY RUN] Add pool lifecycle management
+       [DRY RUN] Update configuration loading
+
+[DRY RUN] Would execute 6 subtasks in 3 groups
+```
+
+### With Context
+
+```bash
+wit plan "Implement dark mode" -c "Use CSS custom properties and respect system preferences"
+```
+
+### JSON Output
+
+```bash
+wit plan "Fix all TypeScript errors" --json
+```
+
+Returns structured JSON with:
+- Plan details
+- Execution results
+- Files modified
+- Commits created
+
+## Execution Plan Structure
+
+The planner creates a structured execution plan:
+
+```json
+{
+  "id": "plan-1234567890",
+  "version": 1,
+  "originalTask": "Add user authentication",
+  "summary": "Implement JWT auth in 3 phases",
+  "parallelGroups": [
+    {
+      "id": "group-1",
+      "name": "Foundation",
+      "executionOrder": 1,
+      "subtasks": [
+        {
+          "id": "task-1",
+          "title": "Create auth types",
+          "description": "Define User, Token, and Session types",
+          "priority": "high",
+          "estimatedEffort": "small",
+          "dependencies": [],
+          "targetFiles": ["src/types/auth.ts"],
+          "acceptanceCriteria": [
+            "Types are exported",
+            "Types include all required fields"
+          ]
+        }
+      ]
+    }
+  ],
+  "estimatedTotalEffort": "2-3 hours"
+}
+```
+
+## Status Command
+
+Check AI availability and workflow status:
+
+```bash
+wit plan status
+```
+
+**Output:**
+```
+ Multi-Agent Planning Status
+
+AI Available:  Yes
+Model: anthropic/claude-opus-4-5
+Provider: anthropic
+
+Workflow Components:
+   Planner Agent - Breaks down tasks into subtasks
+   Executor Agents - Run subtasks in parallel
+   Reviewer Agent - Validates results and triggers re-planning
+
+Capabilities:
+   Iterative task planning
+   Parallel subtask execution
+   Automatic dependency management
+   Result validation and re-planning
+   Branch creation and auto-commit
+```
+
+## Git Integration
+
+By default, `wit plan`:
+
+1. Creates a feature branch (e.g., `ai-planning/add-auth-lxk4m2n7`)
+2. Executes subtasks
+3. Commits changes after each group
+4. Leaves you on the feature branch
+
+Disable with `--no-branch` and `--no-commit`.
+
+## Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `OPENAI_API_KEY` | OpenAI API key (for GPT models) |
+| `ANTHROPIC_API_KEY` | Anthropic API key (for Claude models) |
+| `WIT_AI_MODEL` | Model to use (default: anthropic/claude-opus-4-5) |
+
+## Tips
+
+<Tip>
+Start with `--dry-run` to preview the plan before executing. This helps you understand what changes will be made.
+</Tip>
+
+<Tip>
+Use `--context` to provide important constraints or preferences that should guide the implementation.
+</Tip>
+
+<Tip>
+For large tasks, increase `--max-parallel` to speed up execution (if your API rate limits allow).
+</Tip>
+
+<Warning>
+The plan command modifies files and creates commits. Always review the changes before pushing.
+</Warning>
+
+## Related Commands
+
+- [`wit agent`](/commands/agent) - Interactive AI agent
+- [`wit ai`](/commands/ai) - AI-powered commands
+- [`wit review`](/commands/review) - AI code review

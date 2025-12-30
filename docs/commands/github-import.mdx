@@ -1,0 +1,295 @@
+---
+title: "github import"
+description: "Import repositories from GitHub including issues, PRs, and metadata"
+---
+
+# wit github import
+
+Import repositories from GitHub to wit, including all metadata like issues, pull requests, labels, milestones, and releases.
+
+## Overview
+
+The GitHub import command allows you to:
+
+- Clone Git repository data
+- Import issues with comments
+- Import pull requests with comments
+- Import labels and milestones
+- Import releases
+
+## Usage
+
+```bash
+# Import with defaults
+wit github import <owner/repo>
+
+# Import from URL
+wit github import https://github.com/owner/repo
+
+# Import with custom name
+wit github import owner/repo --name my-fork
+
+# Import into organization
+wit github import owner/repo --org my-company
+
+# Preview without importing
+wit github import owner/repo --preview
+
+# Import only specific data
+wit github import owner/repo --issues-only
+wit github import owner/repo --metadata-only
+```
+
+## Options
+
+| Option | Alias | Description |
+|--------|-------|-------------|
+| `--name` | `-n` | Use a different name for the imported repository |
+| `--description` | `-d` | Override the repository description |
+| `--org` | `-o` | Import into an organization |
+| `--private` | `-p` | Make the imported repository private |
+| `--token` | `-t` | GitHub access token |
+| `--yes` | `-y` | Skip confirmation prompts |
+| `--preview` | | Show what will be imported without importing |
+
+### Import Filters
+
+| Option | Description |
+|--------|-------------|
+| `--no-repo` | Skip cloning git data |
+| `--no-issues` | Skip importing issues |
+| `--no-prs` | Skip importing pull requests |
+| `--no-labels` | Skip importing labels |
+| `--no-milestones` | Skip importing milestones |
+| `--no-releases` | Skip importing releases |
+| `--issues-only` | Import only issues (and labels/milestones) |
+| `--prs-only` | Import only pull requests (and labels/milestones) |
+| `--metadata-only` | Import metadata without git data |
+
+## Examples
+
+### Basic Import
+
+```bash
+wit github import facebook/react
+```
+
+**Output:**
+```
+ Checking GitHub authentication...
+ GitHub authentication found
+ Fetching repository info for facebook/react...
+ Found repository: facebook/react
+
+Repository Information
+--------------------------------------------------
+  Name:        react
+  Description: The library for web and native user interfaces
+  Visibility:  public
+  Default:     main
+  Stars:       220000
+
+What will be imported
+--------------------------------------------------
+   Git repository (commits, branches, tags)
+   Labels: 45
+   Milestones: 3
+   Issues: 12500
+   Pull Requests: 8900
+   Releases: 150
+
+Import facebook/react as react? (y/N): y
+
+Importing...
+
+ Cloning repository...
+ Repository cloned to ./repos/user/react.git
+ Importing labels [45/45] 100%
+ Importing issues [12500/12500] 100%
+
+==================================================
+ Import Complete!
+==================================================
+
+   Repository: ./repos/user/react.git
+   Labels: 45 imported
+   Issues: 12500 imported
+   Pull Requests: 8900 imported
+   Releases: 150 imported
+```
+
+### Preview Mode
+
+```bash
+wit github import vercel/next.js --preview
+```
+
+**Output:**
+```
+Repository Information
+--------------------------------------------------
+  Name:        next.js
+  Description: The React Framework
+  Visibility:  public
+  Default:     canary
+  Stars:       115000
+
+What will be imported
+--------------------------------------------------
+   Git repository (commits, branches, tags)
+   Labels: 67
+   Milestones: 0
+   Issues: 45000
+   Pull Requests: 32000
+   Releases: 500
+
+Preview mode - no changes made
+Remove --preview flag to perform the import
+```
+
+### Import with Custom Name
+
+```bash
+wit github import owner/repo --name my-custom-name
+```
+
+### Import into Organization
+
+```bash
+wit github import owner/repo --org my-company
+```
+
+### Private Repository Import
+
+For private repositories, authenticate first:
+
+```bash
+# Option 1: Login to GitHub
+wit github login
+
+# Option 2: Provide token directly
+wit github import owner/private-repo --token ghp_xxxxxxxxxxxx
+```
+
+### Selective Import
+
+Import only issues:
+
+```bash
+wit github import owner/repo --issues-only
+```
+
+Import metadata without git data:
+
+```bash
+wit github import owner/repo --metadata-only
+```
+
+Skip specific data:
+
+```bash
+wit github import owner/repo --no-prs --no-releases
+```
+
+## Authentication
+
+### GitHub Login
+
+For the best experience, authenticate with GitHub first:
+
+```bash
+wit github login
+```
+
+This stores credentials securely for future imports.
+
+### Token Authentication
+
+Alternatively, provide a token directly:
+
+```bash
+wit github import owner/repo --token ghp_xxxxxxxxxxxx
+```
+
+Required token scopes:
+- `repo` - For private repositories
+- `public_repo` - For public repositories only
+
+## What Gets Imported
+
+### Git Data
+
+- All commits and history
+- All branches
+- All tags
+- Repository configuration
+
+### Issues
+
+- Title and body
+- Labels and assignees
+- Milestone association
+- Open/closed state
+- Comments (with author attribution)
+- Original creation date (noted in body)
+
+### Pull Requests
+
+- Title and body
+- Source and target branches
+- Labels and assignees
+- Merge status
+- Comments and review comments
+- Original creation date
+
+### Labels
+
+- Name and color
+- Description
+
+### Milestones
+
+- Title and description
+- Due date
+- Open/closed state
+
+### Releases
+
+- Tag name
+- Title and body
+- Draft/prerelease status
+- Assets (metadata only)
+
+## Notes
+
+<Info>
+GitHub usernames are preserved in comments as "@username" but won't link to wit users unless they exist.
+</Info>
+
+<Info>
+Issue and PR numbers may differ in wit but original numbers are preserved in the content for reference.
+</Info>
+
+<Warning>
+For very large repositories, the import may take significant time. Consider using `--metadata-only` for initial testing.
+</Warning>
+
+## Server Mode
+
+For full import functionality with database storage:
+
+```bash
+# Start wit server
+wit serve
+
+# Import will store data in the database
+wit github import owner/repo
+```
+
+In CLI-only mode, git data is cloned locally but metadata import has limited persistence.
+
+## Related Commands
+
+- [`wit github login`](/features/github) - Authenticate with GitHub
+- [`wit clone`](/commands/basic-workflow) - Clone a wit repository
+- [`wit remote`](/commands/remotes) - Manage remote repositories

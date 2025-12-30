@@ -1,0 +1,354 @@
+---
+title: "AI Workflows"
+description: "Orchestrated multi-step AI workflows for complex tasks"
+---
+
+# AI Workflows
+
+Wit includes powerful AI workflows that orchestrate multiple steps and agents to accomplish complex tasks. These workflows use the Mastra framework for reliable, observable AI operations.
+
+## Overview
+
+AI workflows provide:
+
+- **Multi-step orchestration** - Chain AI operations together
+- **Parallel execution** - Run independent tasks simultaneously
+- **Error handling** - Graceful recovery and retry logic
+- **Streaming output** - Real-time progress updates
+- **Structured output** - Type-safe inputs and outputs
+
+## Available Workflows
+
+| Workflow | Description |
+|----------|-------------|
+| Multi-Agent Planning | Break down tasks, execute in parallel, review results |
+| Code Generation | Generate code from natural language descriptions |
+| Marketing Content | Generate release announcements and marketing copy |
+| PR Review | Comprehensive pull request code review |
+
+---
+
+## Multi-Agent Planning Workflow
+
+The most sophisticated workflow, using three specialized agents to plan and execute complex coding tasks.
+
+### Agents
+
+1. **Planner Agent** - Analyzes tasks, creates execution plans with parallel groups
+2. **Executor Agents** - Run subtasks in parallel using full code agent capabilities
+3. **Reviewer Agent** - Validates results, triggers re-planning if needed
+
+### Usage
+
+```bash
+# Via CLI
+wit plan "Add user authentication with JWT"
+
+# Preview without executing
+wit plan "Refactor database layer" --dry-run
+```
+
+### Programmatic Usage
+
+```typescript
+import { runMultiAgentPlanningWorkflow } from 'wit/ai/workflows/multi-agent-planning.workflow';
+
+const result = await runMultiAgentPlanningWorkflow({
+  repoId: 'my-repo',
+  repoPath: '/path/to/repo',
+  owner: 'username',
+  repoName: 'my-repo',
+  userId: 'user-123',
+  task: 'Add dark mode support',
+  context: 'Use CSS custom properties',
+  maxIterations: 3,
+  maxParallelTasks: 5,
+  dryRun: false,
+  createBranch: true,
+  autoCommit: true,
+});
+
+console.log(result.summary);
+console.log('Files modified:', result.filesModified);
+```
+
+### Streaming Execution
+
+```typescript
+import { streamMultiAgentPlanningWorkflow } from 'wit/ai/workflows/multi-agent-planning.workflow';
+
+for await (const event of streamMultiAgentPlanningWorkflow(input)) {
+  switch (event.type) {
+    case 'step-start':
+      console.log(`Starting: ${event.stepId}`);
+      break;
+    case 'step-complete':
+      console.log(`Completed: ${event.stepId}`);
+      break;
+    case 'step-error':
+      console.error(`Failed: ${event.stepId} - ${event.error}`);
+      break;
+  }
+}
+```
+
+### Execution Plan Structure
+
+```typescript
+interface ExecutionPlan {
+  id: string;
+  version: number;
+  originalTask: string;
+  summary: string;
+  parallelGroups: ParallelGroup[];
+  estimatedTotalEffort: string;
+  riskAssessment?: string;
+  createdAt: string;
+}
+
+interface ParallelGroup {
+  id: string;
+  name: string;
+  executionOrder: number;
+  subtasks: Subtask[];
+}
+
+interface Subtask {
+  id: string;
+  title: string;
+  description: string;
+  priority: 'critical' | 'high' | 'medium' | 'low';
+  estimatedEffort: 'trivial' | 'small' | 'medium' | 'large';
+  dependencies: string[];
+  targetFiles?: string[];
+  acceptanceCriteria: string[];
+  status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'skipped';
+}
+```
+
+---
+
+## Code Generation Workflow
+
+Generate code from natural language descriptions with context awareness.
+
+### Features
+
+- Analyzes existing codebase for patterns
+- Generates type-safe code
+- Follows project conventions
+- Creates tests alongside implementation
+
+### Usage
+
+```typescript
+import { codeGenerationWorkflow } from 'wit/ai/workflows/code-generation.workflow';
+
+const result = await codeGenerationWorkflow.run({
+  repoPath: '/path/to/repo',
+  prompt: 'Create a React hook for managing user preferences',
+  targetPath: 'src/hooks/usePreferences.ts',
+  includeTests: true,
+  language: 'typescript',
+});
+
+console.log(result.generatedCode);
+console.log(result.testCode);
+```
+
+### Options
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `repoPath` | string | Path to repository |
+| `prompt` | string | Natural language description |
+| `targetPath` | string | Where to create the file |
+| `includeTests` | boolean | Generate test file |
+| `language` | string | Target language |
+| `framework` | string | Framework context (react, vue, etc.) |
+
+---
+
+## Marketing Content Workflow
+
+Generate marketing content for releases, announcements, and documentation.
+
+### Features
+
+- Release announcement generation
+- Changelog formatting
+- Social media posts
+- Documentation updates
+
+### Usage
+
+```typescript
+import { marketingContentWorkflow } from 'wit/ai/workflows/marketing-content.workflow';
+
+const result = await marketingContentWorkflow.run({
+  version: 'v1.2.0',
+  previousVersion: 'v1.1.0',
+  commits: [...], // commits between versions
+  style: 'professional',
+  platforms: ['twitter', 'linkedin', 'blog'],
+});
+
+console.log(result.blogPost);
+console.log(result.tweets);
+console.log(result.linkedInPost);
+```
+
+### Output Types
+
+```typescript
+interface MarketingOutput {
+  blogPost: string;
+  tweets: string[];
+  linkedInPost: string;
+  releaseNotes: string;
+  changelog: string;
+}
+```
+
+---
+
+## Creating Custom Workflows
+
+You can create custom workflows using the Mastra framework:
+
+```typescript
+import { createWorkflow, createStep } from '@mastra/core/workflows';
+import { z } from 'zod';
+
+// Define input/output schemas
+const inputSchema = z.object({
+  task: z.string(),
+  context: z.string().optional(),
+});
+
+const outputSchema = z.object({
+  success: z.boolean(),
+  result: z.string(),
+});
+
+// Create steps
+const analyzeStep = createStep({
+  id: 'analyze',
+  inputSchema,
+  outputSchema: z.object({ analysis: z.string() }),
+  execute: async ({ inputData, mastra }) => {
+    const agent = mastra.getAgent('wit');
+    const response = await agent.generate(`Analyze: ${inputData.task}`);
+    return { analysis: response.text };
+  },
+});
+
+const executeStep = createStep({
+  id: 'execute',
+  inputSchema: z.object({ analysis: z.string() }),
+  outputSchema,
+  execute: async ({ inputData, mastra }) => {
+    // Implementation
+    return { success: true, result: 'Done' };
+  },
+});
+
+// Compose workflow
+export const customWorkflow = createWorkflow({
+  id: 'custom-workflow',
+  inputSchema,
+  outputSchema,
+})
+  .then(analyzeStep)
+  .then(executeStep)
+  .commit();
+```
+
+### Registering with Mastra
+
+```typescript
+import { getTsgitMastra } from 'wit/ai/mastra';
+
+const mastra = getTsgitMastra();
+mastra.registerWorkflow('customWorkflow', customWorkflow);
+```
+
+---
+
+## Error Handling
+
+Workflows include built-in error handling:
+
+```typescript
+const result = await workflow.run(input);
+
+if (result.status === 'failed') {
+  console.error('Workflow failed:', result.error);
+  // Access partial results
+  console.log('Completed steps:', result.completedSteps);
+}
+```
+
+### Retry Logic
+
+```typescript
+const step = createStep({
+  id: 'retry-step',
+  // ... schemas
+  execute: async ({ inputData }) => {
+    // Automatic retry on failure
+  },
+  retries: 3,
+  retryDelay: 1000, // ms
+});
+```
+
+---
+
+## Observability
+
+### Logging
+
+```typescript
+const result = await workflow.run(input, {
+  onStepStart: (stepId) => console.log(`Starting ${stepId}`),
+  onStepComplete: (stepId, result) => console.log(`Completed ${stepId}`),
+  onStepError: (stepId, error) => console.error(`Failed ${stepId}:`, error),
+});
+```
+
+### Metrics
+
+Workflows automatically track:
+
+- Step duration
+- Success/failure rates
+- Token usage (for AI steps)
+
+Access via the Mastra dashboard or API.
+
+---
+
+## Best Practices
+
+<Tip>
+Use `dryRun: true` when testing new workflows to see the execution plan without making changes.
+</Tip>
+
+<Tip>
+Break complex tasks into smaller, focused workflows that can be composed together.
+</Tip>
+
+<Tip>
+Always define Zod schemas for inputs and outputs to ensure type safety.
+</Tip>
+
+<Warning>
+Workflows with AI steps consume API tokens. Monitor usage in production.
+</Warning>
+
+## Related
+
+- [`wit plan`](/commands/plan) - CLI for multi-agent planning
+- [`wit agent`](/commands/agent) - Interactive AI agent
+- [AI Agents](/features/ai-agents) - Specialized AI agents
