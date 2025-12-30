@@ -71,8 +71,8 @@ export function JournalPageDetail() {
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastLoadedPageId = useRef<string | null>(null);
   const lastSavedContent = useRef<string>('');
-  const pageRef = useRef(page);
-  const updateMutationRef = useRef(updateMutation);
+  const pageRef = useRef<typeof page>(undefined);
+  const updateMutationRef = useRef<typeof updateMutation>(undefined!);
 
   // Fetch repository data
   const { data: repoData, isLoading: repoLoading } = trpc.repos.get.useQuery(

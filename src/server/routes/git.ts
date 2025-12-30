@@ -13,6 +13,7 @@ import { ObjectType } from '../../core/types';
 import { repoModel, userModel, activityModel } from '../../db/models';
 import { isConnected } from '../../db';
 import { gitAuthMiddleware } from '../middleware/auth';
+import { computeLanguageStats } from '../../api/trpc/routers/repos';
 
 /**
  * Git Smart HTTP server routes
@@ -681,9 +682,24 @@ async function handleDatabaseIntegration(
       }
     }
 
-    // Update pushed_at timestamp
+    // Update pushed_at timestamp and language stats
     if (dbRepo) {
       await repoModel.updatePushedAt(dbRepo.id);
+      
+      // Update language stats in the background (fire and forget)
+      // This makes future getLanguages calls fast by caching the result
+      computeLanguageStats(diskPath, dbRepo.defaultBranch)
+        .then(stats => {
+          if (stats.length > 0) {
+            return repoModel.updateLanguageStats(dbRepo.id, stats);
+          }
+        })
+        .then(() => {
+          console.log(`[server] Updated language stats for ${owner}/${repoName}`);
+        })
+        .catch(err => {
+          console.error(`[server] Failed to update language stats for ${owner}/${repoName}:`, err);
+        });
     }
 
     // Log activity if we have both repo and user

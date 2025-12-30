@@ -346,6 +346,39 @@ export const repoModel = {
   },
 
   /**
+   * Update cached language statistics for a repository
+   */
+  async updateLanguageStats(id: string, stats: unknown[]): Promise<void> {
+    const db = getDb();
+    await db
+      .update(repositories)
+      .set({
+        languageStats: stats,
+        languageStatsUpdatedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(repositories.id, id));
+  },
+
+  /**
+   * Get cached language statistics for a repository
+   */
+  async getLanguageStats(id: string): Promise<{ stats: unknown[] | null; updatedAt: Date | null }> {
+    const db = getDb();
+    const [repo] = await db
+      .select({
+        languageStats: repositories.languageStats,
+        languageStatsUpdatedAt: repositories.languageStatsUpdatedAt,
+      })
+      .from(repositories)
+      .where(eq(repositories.id, id));
+    return {
+      stats: repo?.languageStats as unknown[] | null,
+      updatedAt: repo?.languageStatsUpdatedAt ?? null,
+    };
+  },
+
+  /**
    * Transfer a repository to a new owner (user or organization)
    * Updates the ownerId, ownerType, and diskPath
    */

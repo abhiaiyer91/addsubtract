@@ -27,68 +27,33 @@ export function RepoPage() {
   const isMobile = useMobile();
   const { data: session } = useSession();
 
-  // Fetch repository data
-  const { data: repoData, isLoading: repoLoading } = trpc.repos.get.useQuery(
+  // Fetch all page data in a single request for better performance
+  const { data: pageData, isLoading: pageLoading } = trpc.repos.getPageData.useQuery(
     { owner: owner!, repo: repo! },
     { enabled: !!owner && !!repo }
   );
 
-  // Fetch branches
-  const { data: branches, isLoading: branchesLoading } = trpc.repos.getBranches.useQuery(
-    { owner: owner!, repo: repo! },
-    { enabled: !!owner && !!repo }
-  );
-
-  // Fetch tree
-  const { data: treeData, isLoading: treeLoading } = trpc.repos.getTree.useQuery(
-    {
-      owner: owner!,
-      repo: repo!,
-      ref: repoData?.repo.defaultBranch || 'main',
-      path: '',
-    },
-    { enabled: !!repoData }
-  );
-
-  // Fetch README
-  const { data: readmeData } = trpc.repos.getFile.useQuery(
-    {
-      owner: owner!,
-      repo: repo!,
-      ref: repoData?.repo.defaultBranch || 'main',
-      path: 'README.md',
-    },
-    { enabled: !!repoData }
-  );
-
-  // Fetch releases count
+  // Fetch releases count (still separate as it's less critical)
   const { data: releases } = trpc.releases.list.useQuery(
-    { repoId: repoData?.repo.id! },
-    { enabled: !!repoData?.repo.id }
+    { repoId: pageData?.repo.id! },
+    { enabled: !!pageData?.repo.id }
   );
 
-  // Fetch package info
+  // Fetch package info (still separate as it's less critical)
   const { data: packageData } = trpc.packages.getByRepoId.useQuery(
-    { repoId: repoData?.repo.id ?? '' },
-    { enabled: !!repoData?.repo.id }
+    { repoId: pageData?.repo.id ?? '' },
+    { enabled: !!pageData?.repo.id }
   );
 
-  // Fetch languages
-  const { data: languagesData } = trpc.repos.getLanguages.useQuery(
-    {
-      owner: owner!,
-      repo: repo!,
-      ref: repoData?.repo.defaultBranch || 'main',
-    },
-    { enabled: !!repoData }
-  );
-
-  const repoInfo = repoData?.repo;
-  const ownerInfo = repoData?.owner;
+  // Extract data from combined response
+  const repoInfo = pageData?.repo;
+  const ownerInfo = pageData?.owner;
+  const branches = pageData?.branches;
+  const tree = pageData?.tree?.entries || [];
+  const treeError = pageData?.tree?.error;
+  const readme = pageData?.readme?.encoding === 'utf-8' ? pageData.readme.content : null;
+  const languagesData = pageData?.languages;
   const ownerUsername = (ownerInfo && 'username' in ownerInfo ? ownerInfo.username : null) || owner!;
-  const tree = treeData?.entries || [];
-  const treeError = treeData?.error;
-  const readme = readmeData?.encoding === 'utf-8' ? readmeData.content : null;
   
   // Check if current user is the owner
   const isOwner = session?.user?.id === repoInfo?.ownerId;
@@ -247,7 +212,7 @@ export function RepoPage() {
           {/* Branch selector and actions - mobile optimized */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
-              {branchesLoading ? (
+              {pageLoading ? (
                 <div className="h-9 w-32 bg-muted rounded-md animate-pulse" />
               ) : branches && branches.length > 0 ? (
                 <BranchSelector
@@ -320,14 +285,14 @@ export function RepoPage() {
             currentRef={repoInfo?.defaultBranch || 'main'}
             error={treeError}
             canResync={isOwner && !!treeError}
-            isLoading={repoLoading || treeLoading}
+            isLoading={pageLoading}
             onResyncComplete={() => {
-              utils.repos.getTree.invalidate({ owner: owner!, repo: repo! });
+              utils.repos.getPageData.invalidate({ owner: owner!, repo: repo! });
             }}
           />
 
           {/* README */}
-          {repoLoading ? (
+          {pageLoading ? (
             <div className="border rounded-lg overflow-hidden">
               <div className="px-4 py-2 bg-muted/50 border-b">
                 <div className="h-5 w-24 bg-muted rounded animate-pulse" />

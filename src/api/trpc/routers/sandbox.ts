@@ -600,13 +600,20 @@ export const sandboxRouter = router({
                   execArgs = parsed.slice(1);
                 }
 
-                const result = await sandbox.runCommand(execCommand, execArgs, {
+                let result = await sandbox.runCommand({
+                  cmd: execCommand,
+                  args: execArgs,
                   signal: AbortSignal.timeout(input.timeout),
                 });
 
+                // Handle Command vs CommandFinished - wait for completion if needed
+                if (!('stdout' in result)) {
+                  result = await result.wait();
+                }
+
                 return {
                   success: result.exitCode === 0,
-                  exitCode: result.exitCode,
+                  exitCode: result.exitCode ?? 1,
                   stdout: result.stdout,
                   stderr: result.stderr,
                 };
