@@ -339,6 +339,7 @@ The goal: new users should never see a cryptic "module not found" error - they s
     category: 'User Experience',
     priority: 'P1',
     tags: ['ux', 'cli', 'error-handling'],
+    completed: true,
     prompt: `I'm contributing to wit, an AI-native Git platform. Please help me audit and improve error messages to be helpful, not frustrating.
 
 1. Find all error messages in the codebase:
