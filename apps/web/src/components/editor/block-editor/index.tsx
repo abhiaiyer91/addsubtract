@@ -109,17 +109,6 @@ export function BlockEditor({
 
   const containerRef = useRef<HTMLDivElement>(null);
   const isInitialMount = useRef(true);
-  // Use a ref to track the last value we processed to avoid sync loops
-  const lastExternalValue = useRef<string>(value);
-  // Use a ref to store onChange to avoid infinite loops
-  const onChangeRef = useRef(onChange);
-  // Use a ref to track if we're in the middle of an internal update
-  const isInternalUpdate = useRef(false);
-
-  // Keep onChangeRef updated
-  useEffect(() => {
-    onChangeRef.current = onChange;
-  }, [onChange]);
 
   // DnD sensors
   const sensors = useSensors(
@@ -155,31 +144,14 @@ export function BlockEditor({
     }
 
     const markdown = blocksToMarkdown(blocks);
-    // Only call onChange if the content actually changed
-    if (markdown !== lastExternalValue.current) {
-      // Mark that this is an internal update to prevent the value sync effect from running
-      isInternalUpdate.current = true;
-      lastExternalValue.current = markdown;
-      onChangeRef.current(markdown);
-    }
-  }, [blocks]);
+    onChange(markdown);
+  }, [blocks, onChange]);
 
-  // Update blocks when external value changes
-  useEffect(() => {
-    // Skip if this change originated from our own onChange call
-    if (isInternalUpdate.current) {
-      isInternalUpdate.current = false;
-      return;
-    }
-
-    // Only update if the raw value is different from what we last received
-    // This prevents loops from normalization differences
-    if (value !== lastExternalValue.current) {
-      lastExternalValue.current = value;
-      const newBlocks = markdownToBlocks(value);
-      setBlocks(newBlocks);
-    }
-  }, [value]);
+  // NOTE: We intentionally do NOT sync external value changes after mount.
+  // The parent component (page-detail.tsx) manages the content state and only
+  // passes new values on page navigation (which remounts this component via key={page.id}).
+  // Syncing external changes would cause blocks to get new IDs, breaking React
+  // reconciliation and causing focus/cursor issues while typing.
 
   // Compute list numbers - derived state, not stored
   // This creates a signature of numbered list positions to detect when we need to update
