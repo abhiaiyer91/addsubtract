@@ -28,6 +28,7 @@ import {
   // AI commands
   handleAI,
   handleAgent,
+  handlePlan,
   // Quality of Life commands
   handleAmend,
   handleWip,
@@ -364,6 +365,10 @@ AI-Powered Features:
   agent ask <query>     One-shot question to the coding agent
   agent status          Show agent configuration
   
+  plan <task>           Multi-agent planning for complex tasks
+  plan <task> --dry-run Preview plan without executing
+  plan status           Show planning system status
+  
   search <query>        Semantic code search
   search index          Index repo for semantic search
   search status         Show index health
@@ -455,7 +460,7 @@ const COMMANDS = [
   'amend', 'wip', 'fixup', 'cleanup', 'blame', 'stats', 'snapshot',
   'scope', 'graph',
   'ui', 'web',
-  'ai', 'agent', 'search', 'review',
+  'ai', 'agent', 'plan', 'search', 'review',
   // Issue tracking
   'issue', 'cycle', 'project',
   // Journal (Notion-like docs)
@@ -818,6 +823,18 @@ function main(): void {
       case 'agent':
         // Interactive coding agent
         handleAgent(rawArgs).catch((error: Error) => {
+          if (error instanceof TsgitError) {
+            console.error((error as TsgitError).format());
+          } else {
+            console.error(`error: ${error.message}`);
+          }
+          process.exit(1);
+        });
+        return; // Exit main() to let async handle complete
+
+      case 'plan':
+        // Multi-agent planning workflow
+        handlePlan(rawArgs).catch((error: Error) => {
           if (error instanceof TsgitError) {
             console.error((error as TsgitError).format());
           } else {

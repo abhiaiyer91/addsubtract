@@ -37,6 +37,7 @@ import { adminRouter } from './admin';
 import { sandboxRouter } from './sandbox';
 import { githubImportRouter } from './github-import';
 import { marketingRouter } from './marketing';
+import { planningRouter } from './planning';
 
 /**
  * Main application router
@@ -81,6 +82,7 @@ export const appRouter = router({
   sandbox: sandboxRouter,
   githubImport: githubImportRouter,
   marketing: marketingRouter,
+  planning: planningRouter,
 });
 
 /**
@@ -127,4 +129,5 @@ export {
   sandboxRouter,
   githubImportRouter,
   marketingRouter,
+  planningRouter,
 };
