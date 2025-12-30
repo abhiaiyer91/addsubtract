@@ -34,3 +34,18 @@ export {
   type MarketingContentInput,
   type MarketingContentOutput,
 } from './marketing-content.workflow.js';
+
+// Multi-Agent Planning Workflow
+export {
+  multiAgentPlanningWorkflow,
+  runMultiAgentPlanningWorkflow,
+  streamMultiAgentPlanningWorkflow,
+  type MultiAgentPlanningInput,
+  type MultiAgentPlanningOutput,
+  type ExecutionPlan,
+  type Subtask,
+  type ParallelGroup,
+  type SubtaskResult,
+  type GroupResult,
+  type ReviewResult,
+} from './multi-agent-planning.workflow.js';

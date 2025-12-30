@@ -19,11 +19,13 @@ export {
   runIssueTriageWorkflow,
   runCodeGenerationWorkflow,
   runCIExecutionWorkflow,
+  runMultiAgentPlanningWorkflow,
   // Workflow streamers
   streamPRReviewWorkflow,
   streamIssueTriageWorkflow,
   streamCodeGenerationWorkflow,
   streamCIExecutionWorkflow,
+  streamMultiAgentPlanningWorkflow,
 } from './mastra.js';
 
 // Tools
@@ -37,12 +39,21 @@ export {
   prReviewWorkflow,
   issueTriageWorkflow,
   codeGenerationWorkflow,
+  multiAgentPlanningWorkflow,
   type PRReviewInput,
   type PRReviewOutput,
   type IssueTriageInput,
   type IssueTriageOutput,
   type CodeGenerationInput,
   type CodeGenerationOutput,
+  type MultiAgentPlanningInput,
+  type MultiAgentPlanningOutput,
+  type ExecutionPlan,
+  type Subtask,
+  type ParallelGroup,
+  type SubtaskResult,
+  type GroupResult,
+  type ReviewResult,
 } from './workflows/index.js';
 
 // CI/CD Workflow (built on Mastra)

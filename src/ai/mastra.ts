@@ -14,7 +14,7 @@ import { LibSQLStore } from '@mastra/libsql';
 import { PostgresStore } from '@mastra/pg';
 import { witAgent, createTsgitAgent } from './agent.js';
 import { witTools } from './tools/index.js';
-import { prReviewWorkflow, issueTriageWorkflow, codeGenerationWorkflow } from './workflows/index.js';
+import { prReviewWorkflow, issueTriageWorkflow, codeGenerationWorkflow, multiAgentPlanningWorkflow } from './workflows/index.js';
 import { ciExecutionWorkflow } from '../ci/workflows/index.js';
 import type { AIConfig } from './types.js';
 
@@ -97,6 +97,7 @@ export function createTsgitMastra(config: AIConfig = {}): Mastra {
       issueTriage: issueTriageWorkflow,
       codeGeneration: codeGenerationWorkflow,
       ciExecution: ciExecutionWorkflow,
+      multiAgentPlanning: multiAgentPlanningWorkflow,
     },
     memory: {
       wit: memory,
@@ -295,6 +296,7 @@ import type { PRReviewInput, PRReviewOutput } from './workflows/pr-review.workfl
 import type { IssueTriageInput, IssueTriageOutput } from './workflows/issue-triage.workflow.js';
 import type { CodeGenerationInput, CodeGenerationOutput } from './workflows/code-generation.workflow.js';
 import type { CIExecutionInput, CIExecutionOutput } from '../ci/workflows/ci-execution.workflow.js';
+import type { MultiAgentPlanningInput, MultiAgentPlanningOutput } from './workflows/multi-agent-planning.workflow.js';
 
 /**
  * Run the PR Review workflow
@@ -480,6 +482,62 @@ export async function runCIExecutionWorkflow(input: CIExecutionInput): Promise<C
 export async function* streamCIExecutionWorkflow(input: CIExecutionInput) {
   const mastra = getTsgitMastra();
   const workflow = mastra.getWorkflow('ciExecution');
+  
+  const run = await workflow.createRun();
+  const result = await run.stream({ inputData: input });
+  
+  for await (const chunk of result.fullStream) {
+    yield chunk;
+  }
+}
+
+// =============================================================================
+// Multi-Agent Planning Workflow Execution Helpers
+// =============================================================================
+
+/**
+ * Run the Multi-Agent Planning workflow
+ * 
+ * This workflow breaks down complex tasks into subtasks, executes them in parallel
+ * groups, and supports iterative re-planning based on results.
+ * 
+ * @param input - Multi-agent planning input parameters
+ * @returns Planning results including execution plan and task results
+ */
+export async function runMultiAgentPlanningWorkflow(input: MultiAgentPlanningInput): Promise<MultiAgentPlanningOutput> {
+  const mastra = getTsgitMastra();
+  const workflow = mastra.getWorkflow('multiAgentPlanning');
+  
+  const run = await workflow.createRun();
+  const result = await run.start({ inputData: input });
+  
+  if (result.status === 'failed') {
+    return {
+      success: false,
+      totalIterations: 0,
+      groupResults: [],
+      summary: 'Workflow execution failed',
+      filesModified: [],
+      totalDuration: 0,
+      error: 'Mastra workflow execution failed',
+    };
+  }
+  
+  return (result as any).result as MultiAgentPlanningOutput;
+}
+
+/**
+ * Stream the Multi-Agent Planning workflow execution
+ * 
+ * Streams workflow events for real-time progress updates.
+ * Shows planning, execution, and review phases as they happen.
+ * 
+ * @param input - Multi-agent planning input parameters
+ * @returns AsyncIterator of workflow events
+ */
+export async function* streamMultiAgentPlanningWorkflow(input: MultiAgentPlanningInput): AsyncGenerator<unknown> {
+  const mastra = getTsgitMastra();
+  const workflow = mastra.getWorkflow('multiAgentPlanning');
   
   const run = await workflow.createRun();
   const result = await run.stream({ inputData: input });
