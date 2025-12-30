@@ -28,19 +28,19 @@ export function RepoPage() {
   const { data: session } = useSession();
 
   // Fetch repository data
-  const { data: repoData } = trpc.repos.get.useQuery(
+  const { data: repoData, isLoading: repoLoading } = trpc.repos.get.useQuery(
     { owner: owner!, repo: repo! },
     { enabled: !!owner && !!repo }
   );
 
   // Fetch branches
-  const { data: branches } = trpc.repos.getBranches.useQuery(
+  const { data: branches, isLoading: branchesLoading } = trpc.repos.getBranches.useQuery(
     { owner: owner!, repo: repo! },
     { enabled: !!owner && !!repo }
   );
 
   // Fetch tree
-  const { data: treeData } = trpc.repos.getTree.useQuery(
+  const { data: treeData, isLoading: treeLoading } = trpc.repos.getTree.useQuery(
     {
       owner: owner!,
       repo: repo!,
@@ -223,14 +223,16 @@ export function RepoPage() {
           {/* Branch selector and actions - mobile optimized */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
-              {branches && branches.length > 0 && (
+              {branchesLoading ? (
+                <div className="h-9 w-32 bg-muted rounded-md animate-pulse" />
+              ) : branches && branches.length > 0 ? (
                 <BranchSelector
                   branches={branches}
                   currentRef={repoInfo?.defaultBranch || 'main'}
                   owner={ownerUsername}
                   repo={repoInfo?.name || repo!}
                 />
-              )}
+              ) : null}
               <Link
                 to={`/${owner}/${repo}/branches`}
                 className="text-xs sm:text-sm text-muted-foreground hover:text-foreground"
@@ -294,13 +296,26 @@ export function RepoPage() {
             currentRef={repoInfo?.defaultBranch || 'main'}
             error={treeError}
             canResync={isOwner && !!treeError}
+            isLoading={repoLoading || treeLoading}
             onResyncComplete={() => {
               utils.repos.getTree.invalidate({ owner: owner!, repo: repo! });
             }}
           />
 
           {/* README */}
-          {readme && (
+          {repoLoading ? (
+            <div className="border rounded-lg overflow-hidden">
+              <div className="px-4 py-2 bg-muted/50 border-b">
+                <div className="h-5 w-24 bg-muted rounded animate-pulse" />
+              </div>
+              <div className="p-6 space-y-3">
+                <div className="h-6 w-3/4 bg-muted rounded animate-pulse" />
+                <div className="h-4 w-full bg-muted rounded animate-pulse" />
+                <div className="h-4 w-5/6 bg-muted rounded animate-pulse" />
+                <div className="h-4 w-2/3 bg-muted rounded animate-pulse" />
+              </div>
+            </div>
+          ) : readme ? (
             <div className="border rounded-lg overflow-hidden">
               <div className="px-4 py-2 bg-muted/50 border-b">
                 <span className="font-medium">README.md</span>
@@ -309,7 +324,7 @@ export function RepoPage() {
                 <Markdown content={readme} />
               </div>
             </div>
-          )}
+          ) : null}
         </div>
 
         {/* About Sidebar - Desktop only */}

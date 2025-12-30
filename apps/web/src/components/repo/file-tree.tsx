@@ -24,9 +24,10 @@ interface FileTreeProps {
   error?: string;
   canResync?: boolean;
   onResyncComplete?: () => void;
+  isLoading?: boolean;
 }
 
-export function FileTree({ entries, owner, repo, repoId, currentRef, currentPath, error, canResync, onResyncComplete }: FileTreeProps) {
+export function FileTree({ entries, owner, repo, repoId, currentRef, currentPath, error, canResync, onResyncComplete, isLoading }: FileTreeProps) {
   const [showResync, setShowResync] = useState(false);
   const [githubRepo, setGithubRepo] = useState(`${owner}/${repo}`);
   const [isResyncing, setIsResyncing] = useState(false);
@@ -93,7 +94,16 @@ export function FileTree({ entries, owner, repo, repoId, currentRef, currentPath
         </div>
       )}
 
-      {error ? (
+      {isLoading ? (
+        <div className="divide-y divide-border">
+          {[...Array(8)].map((_, i) => (
+            <div key={i} className="flex items-center gap-3 px-4 py-2.5">
+              <div className="h-4 w-4 rounded bg-muted animate-pulse" />
+              <div className="h-4 rounded bg-muted animate-pulse" style={{ width: `${Math.random() * 40 + 20}%` }} />
+            </div>
+          ))}
+        </div>
+      ) : error ? (
         <div className="px-4 py-8 text-center">
           <div className="flex flex-col items-center gap-3">
             <AlertCircle className="h-8 w-8 text-destructive" />
