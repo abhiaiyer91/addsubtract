@@ -19,11 +19,16 @@ import {
   GitMerge,
   Clock,
   Eye,
+  Trophy,
+  Zap,
+  Flame,
+  Award,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loading } from '@/components/ui/loading';
 import { LanguageDot } from '@/components/repo/language-bar';
@@ -266,6 +271,12 @@ export function UserHomePage() {
     { enabled: isOwnProfile }
   );
 
+  // Gamification data
+  const { data: gamificationData } = trpc.gamification.getProfile.useQuery(
+    { username: owner! },
+    { enabled: !!owner }
+  );
+
   if (userLoading) {
     return <Loading text="Loading..." />;
   }
@@ -318,7 +329,60 @@ export function UserHomePage() {
         )}
       </div>
 
+      {/* Gamification Card */}
+      {gamificationData && (
+        <Card className="bg-gradient-to-r from-yellow-500/5 via-purple-500/5 to-blue-500/5 border-yellow-500/20">
+          <CardContent className="py-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+              {/* Level Badge */}
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <div className="w-14 h-14 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center text-white font-bold text-xl shadow-lg">
+                    {gamificationData.level}
+                  </div>
+                  <div className="absolute -bottom-1 -right-1 bg-yellow-500 text-white rounded-full p-1">
+                    <Trophy className="h-3 w-3" />
+                  </div>
+                </div>
+                <div>
+                  <p className="font-semibold">{gamificationData.title}</p>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Zap className="h-3 w-3 text-yellow-500" />
+                    <span>{gamificationData.totalXp.toLocaleString()} XP</span>
+                    <span>•</span>
+                    <span>Rank #{gamificationData.rank}</span>
+                  </div>
+                </div>
+              </div>
 
+              {/* Progress Bar */}
+              <div className="flex-1 w-full sm:w-auto">
+                <div className="flex justify-between text-xs mb-1">
+                  <span>Level {gamificationData.level}</span>
+                  <span className="text-muted-foreground">{Math.round(gamificationData.xpProgress)}%</span>
+                </div>
+                <Progress value={gamificationData.xpProgress} className="h-2" />
+              </div>
+
+              {/* Quick Stats */}
+              <div className="flex items-center gap-4 text-sm">
+                <div className="flex items-center gap-1">
+                  <Flame className="h-4 w-4 text-orange-500" />
+                  <span className="font-medium">{gamificationData.currentStreak}</span>
+                  <span className="text-muted-foreground hidden sm:inline">day streak</span>
+                </div>
+                <Link 
+                  to={`/${owner}/achievements`}
+                  className="flex items-center gap-1 text-primary hover:underline"
+                >
+                  <Award className="h-4 w-4" />
+                  <span>Achievements</span>
+                </Link>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Main Content */}
       <div className="grid lg:grid-cols-3 gap-4 lg:gap-6">

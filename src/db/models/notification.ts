@@ -234,4 +234,39 @@ export const notificationHelpers = {
       url: `/${repoFullName}/issues/${issueNumber}`,
     });
   },
+
+  /**
+   * Notify user when they unlock an achievement
+   */
+  async achievementUnlocked(
+    userId: string,
+    achievementName: string,
+    achievementIcon: string,
+    xpReward: number
+  ): Promise<Notification> {
+    return notificationModel.create({
+      userId,
+      type: 'achievement_unlocked',
+      title: `${achievementIcon} Achievement Unlocked!`,
+      body: `You earned "${achievementName}" (+${xpReward} XP)`,
+      url: '/achievements',
+    });
+  },
+
+  /**
+   * Notify user when they level up
+   */
+  async levelUp(
+    userId: string,
+    newLevel: number,
+    levelTitle: string
+  ): Promise<Notification> {
+    return notificationModel.create({
+      userId,
+      type: 'level_up',
+      title: `🎉 Level Up!`,
+      body: `You reached Level ${newLevel}: ${levelTitle}`,
+      url: '/profile',
+    });
+  },
 };

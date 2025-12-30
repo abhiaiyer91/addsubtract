@@ -201,3 +201,21 @@ export { marketingContentModel } from './marketing-content';
 
 // Marketing agent config model
 export { marketingAgentConfigModel } from './marketing-agent';
+
+// Gamification models (XP, levels, achievements)
+export {
+  gamificationModel,
+  XP_REWARDS,
+  LEVEL_TITLES,
+  getXpForLevel,
+  getLevelFromXp,
+  getLevelTitle,
+} from './gamification';
+
+// Achievement definitions
+export {
+  ACHIEVEMENT_DEFINITIONS,
+  getAchievementThresholds,
+  getAchievementKeyForMilestone,
+  type AchievementDefinition,
+} from './achievement-definitions';
