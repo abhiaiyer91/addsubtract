@@ -4,6 +4,11 @@
  * REST endpoints for sandbox management.
  * WebSocket support requires @hono/node-ws adapter.
  * 
+ * Features:
+ * - Sandbox pooling for reuse across requests (reduces cold starts)
+ * - Automatic idle timeout and cleanup
+ * - Per-provider sandbox management
+ * 
  * For interactive terminals:
  * 1. Install: npm install @hono/node-ws
  * 2. Update server to use createNodeWebSocket
@@ -19,6 +24,7 @@ import {
 } from '../../db/models/sandbox';
 import { repoModel } from '../../db/models';
 import { createAuth } from '../../lib/auth';
+import { getSandboxPool, type PooledSandbox } from '../sandbox/pool';
 
 /**
  * Create sandbox REST routes
@@ -91,7 +97,7 @@ export function createSandboxRoutes() {
         }
       }
 
-      // Execute command based on provider
+      // Execute command based on provider (with sandbox pooling)
       const result = await executeCommand(config.provider, {
         apiKey,
         command: body.command,
@@ -99,6 +105,8 @@ export function createSandboxRoutes() {
         timeout: body.timeout || 60000,
         cwd: body.cwd || '/workspace',
         config,
+        repoId,
+        userId,
       });
 
       return c.json(result);
@@ -133,11 +141,67 @@ export function createSandboxRoutes() {
     }
   });
 
+  // Get sandbox pool statistics
+  app.get('/pool/stats', async (c) => {
+    const auth = createAuth();
+    const session = await auth.api.getSession({
+      headers: c.req.raw.headers,
+    });
+
+    if (!session?.user?.id) {
+      return c.json({ error: 'Authentication required' }, 401);
+    }
+
+    const pool = getSandboxPool();
+    return c.json(pool.getStats());
+  });
+
+  // Clear sandbox pool for a repository (force new sandbox on next request)
+  app.delete('/:repoId/pool', async (c) => {
+    const repoId = c.req.param('repoId');
+    
+    const auth = createAuth();
+    const session = await auth.api.getSession({
+      headers: c.req.raw.headers,
+    });
+
+    if (!session?.user?.id) {
+      return c.json({ error: 'Authentication required' }, 401);
+    }
+
+    const userId = session.user.id;
+    const pool = getSandboxPool();
+    const stats = pool.getStats();
+    
+    // Find and remove all sandboxes for this repo/user combination
+    let removed = 0;
+    for (const key of stats.keys) {
+      if (key.includes(repoId) && key.includes(userId)) {
+        const sandbox = pool.get(key);
+        if (sandbox) {
+          await pool.remove(key, sandbox.id);
+          removed++;
+        }
+      }
+    }
+
+    return c.json({ 
+      success: true, 
+      removed,
+      message: removed > 0 
+        ? `Removed ${removed} pooled sandbox(es)` 
+        : 'No pooled sandboxes found for this repository'
+    });
+  });
+
   return app;
 }
 
 /**
- * Execute a command in the sandbox
+ * Execute a command in the sandbox (with pooling)
+ * 
+ * Sandboxes are pooled and reused across requests to reduce cold start latency.
+ * After execution, the sandbox is released back to the pool for reuse.
  */
 async function executeCommand(
   provider: SandboxProvider,
@@ -148,6 +212,8 @@ async function executeCommand(
     timeout: number;
     cwd: string;
     config: NonNullable<Awaited<ReturnType<typeof sandboxConfigModel.getConfig>>>;
+    repoId: string;
+    userId: string;
   }
 ): Promise<{
   success: boolean;
@@ -155,33 +221,67 @@ async function executeCommand(
   stdout?: string;
   stderr?: string;
   error?: string;
+  pooled?: boolean;
 }> {
-  const { apiKey, command, args, timeout, cwd, config } = options;
+  const { apiKey, command, args, timeout, cwd, config, repoId, userId } = options;
   const fullCommand = [command, ...args].join(' ');
+  const pool = getSandboxPool();
+  const poolKey = `${provider}:${repoId}:${userId}`;
 
   switch (provider) {
     case 'e2b': {
       try {
         const { Sandbox } = await import('@e2b/code-interpreter');
-        const sandbox = await Sandbox.create({
-          apiKey,
-          timeoutMs: config.timeoutMinutes * 60 * 1000,
+        
+        // Try to get from pool or create new
+        const sandbox = await pool.acquire<PooledSandbox>(poolKey, async () => {
+          const instance = await Sandbox.create({
+            apiKey,
+            timeoutMs: config.timeoutMinutes * 60 * 1000,
+          });
+          
+          return {
+            id: instance.sandboxId,
+            provider: 'e2b',
+            instance,
+            createdAt: new Date(),
+            lastUsedAt: new Date(),
+            useCount: 0,
+            stop: () => instance.kill(),
+            runCommand: async (cmd: string, cmdArgs?: string[], opts?: { signal?: AbortSignal }) => {
+              const fullCmd = cmdArgs ? [cmd, ...cmdArgs].join(' ') : cmd;
+              const result = await instance.commands.run(fullCmd, {
+                cwd,
+                timeoutMs: opts?.signal ? timeout : undefined,
+              });
+              return {
+                exitCode: result.exitCode,
+                stdout: result.stdout,
+                stderr: result.stderr,
+              };
+            },
+          };
         });
 
         try {
-          const result = await sandbox.commands.run(fullCommand, {
-            cwd,
-            timeoutMs: timeout,
+          const result = await sandbox.runCommand(command, args, {
+            signal: AbortSignal.timeout(timeout),
           });
+
+          // Release back to pool for reuse
+          pool.release(poolKey, sandbox);
 
           return {
             success: result.exitCode === 0,
             exitCode: result.exitCode,
             stdout: result.stdout,
             stderr: result.stderr,
+            pooled: sandbox.useCount > 1,
           };
-        } finally {
-          await sandbox.kill();
+        } catch (error) {
+          // On error, remove from pool (sandbox may be in bad state)
+          await pool.remove(poolKey, sandbox.id);
+          throw error;
         }
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code === 'MODULE_NOT_FOUND') {
@@ -198,25 +298,53 @@ async function executeCommand(
       try {
         const { Daytona } = await import('@daytonaio/sdk');
         const daytona = new Daytona({ apiKey });
-        const sandbox = await daytona.create({
-          language: config.defaultLanguage as 'typescript' | 'javascript' | 'python',
-          autoStopInterval: config.daytonaAutoStop,
+        
+        const sandbox = await pool.acquire<PooledSandbox>(poolKey, async () => {
+          const instance = await daytona.create({
+            language: config.defaultLanguage as 'typescript' | 'javascript' | 'python',
+            autoStopInterval: config.daytonaAutoStop,
+          });
+          
+          return {
+            id: instance.id,
+            provider: 'daytona',
+            instance,
+            createdAt: new Date(),
+            lastUsedAt: new Date(),
+            useCount: 0,
+            stop: () => instance.delete(),
+            runCommand: async (cmd: string, cmdArgs?: string[], opts?: { signal?: AbortSignal }) => {
+              const fullCmd = cmdArgs ? [cmd, ...cmdArgs].join(' ') : cmd;
+              const result = await instance.process.commandRun(fullCmd, {
+                cwd,
+                timeout,
+              });
+              return {
+                exitCode: result.exitCode,
+                stdout: result.stdout,
+                stderr: result.stderr,
+              };
+            },
+          };
         });
 
         try {
-          const result = await sandbox.process.commandRun(fullCommand, {
-            cwd,
-            timeout,
+          const result = await sandbox.runCommand(command, args, {
+            signal: AbortSignal.timeout(timeout),
           });
+
+          pool.release(poolKey, sandbox);
 
           return {
             success: result.exitCode === 0,
             exitCode: result.exitCode,
             stdout: result.stdout,
             stderr: result.stderr,
+            pooled: sandbox.useCount > 1,
           };
-        } finally {
-          await sandbox.delete();
+        } catch (error) {
+          await pool.remove(poolKey, sandbox.id);
+          throw error;
         }
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code === 'MODULE_NOT_FOUND') {
@@ -230,6 +358,8 @@ async function executeCommand(
     }
 
     case 'docker': {
+      // Docker containers are ephemeral by design (--rm flag)
+      // Pooling doesn't apply here - each command runs in a fresh container
       const { spawn, execSync } = await import('child_process');
       
       // Check if Docker is available
@@ -278,7 +408,6 @@ async function executeCommand(
 
         child.on('error', (err) => {
           clearTimeout(timer);
-          // Provide helpful error message for common issues
           let errorMsg = err.message;
           if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
             errorMsg = 'Docker CLI not found. Install Docker or use E2B/Daytona provider.';
@@ -298,6 +427,7 @@ async function executeCommand(
             exitCode: code ?? undefined,
             stdout: stdout || undefined,
             stderr: stderr || undefined,
+            pooled: false,
           });
         });
       });
@@ -307,7 +437,6 @@ async function executeCommand(
       try {
         const { Sandbox } = await import('@vercel/sandbox');
 
-        // Get Vercel project ID and team ID from config
         const vercelProjectId = config.vercelProjectId;
         const vercelTeamId = config.vercelTeamId;
         if (!vercelProjectId) {
@@ -329,23 +458,44 @@ async function executeCommand(
           };
         }
 
-        // Debug: Log credentials being passed to Vercel SDK
-        console.log('[Vercel Sandbox] Creating sandbox with:', {
-          projectId: vercelProjectId,
-          teamId: vercelTeamId,
-          hasToken: !!apiKey,
-          tokenLength: apiKey.length,
-          tokenPrefix: apiKey.substring(0, 10) + '...',
-          timeout: config.timeoutMinutes * 60 * 1000,
-          runtime: config.vercelRuntime || 'node22',
-        });
+        // Vercel sandbox max timeout is 2,700,000 ms (45 minutes)
+        const VERCEL_MAX_TIMEOUT_MS = 2700000;
+        const requestedTimeout = config.timeoutMinutes * 60 * 1000;
+        const sandboxTimeout = Math.min(requestedTimeout, VERCEL_MAX_TIMEOUT_MS);
 
-        const sandbox = await Sandbox.create({
-          projectId: vercelProjectId,
-          teamId: vercelTeamId,
-          token: apiKey,
-          timeout: config.timeoutMinutes * 60 * 1000,
-          runtime: (config.vercelRuntime as 'node22' | 'python3.13') || 'node22',
+        const sandbox = await pool.acquire<PooledSandbox>(poolKey, async () => {
+          console.log('[Vercel Sandbox] Creating new pooled sandbox:', {
+            projectId: vercelProjectId,
+            teamId: vercelTeamId,
+            timeout: sandboxTimeout,
+            runtime: config.vercelRuntime || 'node22',
+          });
+
+          const instance = await Sandbox.create({
+            projectId: vercelProjectId,
+            teamId: vercelTeamId,
+            token: apiKey,
+            timeout: sandboxTimeout,
+            runtime: (config.vercelRuntime as 'node22' | 'python3.13') || 'node22',
+          });
+          
+          return {
+            id: instance.sandboxId,
+            provider: 'vercel',
+            instance,
+            createdAt: new Date(),
+            lastUsedAt: new Date(),
+            useCount: 0,
+            stop: () => instance.stop(),
+            runCommand: async (cmd: string, cmdArgs?: string[], opts?: { signal?: AbortSignal }) => {
+              const result = await instance.runCommand(cmd, cmdArgs, opts);
+              return {
+                exitCode: result.exitCode,
+                stdout: result.stdout,
+                stderr: result.stderr,
+              };
+            },
+          };
         });
 
         try {
@@ -353,14 +503,27 @@ async function executeCommand(
             signal: AbortSignal.timeout(timeout),
           });
 
+          // Release back to pool for reuse
+          pool.release(poolKey, sandbox);
+
+          console.log('[Vercel Sandbox] Command completed, sandbox released to pool:', {
+            sandboxId: sandbox.id,
+            useCount: sandbox.useCount,
+            pooled: sandbox.useCount > 1,
+          });
+
           return {
             success: result.exitCode === 0,
             exitCode: result.exitCode,
             stdout: result.stdout,
             stderr: result.stderr,
+            pooled: sandbox.useCount > 1,
           };
-        } finally {
-          await sandbox.stop();
+        } catch (error) {
+          // On error, remove from pool
+          console.error('[Vercel Sandbox] Command failed, removing from pool:', error);
+          await pool.remove(poolKey, sandbox.id);
+          throw error;
         }
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code === 'MODULE_NOT_FOUND') {
