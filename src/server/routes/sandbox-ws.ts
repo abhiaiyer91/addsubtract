@@ -1057,9 +1057,63 @@ async function createFallbackPtySession(
 }
 
 /**
+ * Check if this is a fallback PTY session (no native PTY support)
+ */
+function isFallbackSession(session: PtySession): boolean {
+  // Fallback sessions have specific properties in their sandbox object
+  return 'inputBuffer' in session.sandbox && 'onData' in session.sandbox;
+}
+
+/**
  * Send input to PTY session
  */
 async function sendPtyInput(session: PtySession, data: string): Promise<void> {
+  // Handle fallback mode first - this applies to any provider that fell back
+  if (isFallbackSession(session)) {
+    const sandbox = session.sandbox;
+    sandbox.inputBuffer += data;
+    
+    // Echo the input
+    sandbox.onData(data);
+    
+    // Check for Enter key
+    if (data === '\r' || data === '\n') {
+      const command = sandbox.inputBuffer.trim();
+      sandbox.inputBuffer = '';
+      sandbox.onData('\r\n');
+      
+      if (command) {
+        try {
+          const result = await executeCommand(sandbox.provider, {
+            apiKey: sandbox.options.apiKey,
+            command,
+            args: [],
+            timeout: 60000,
+            cwd: '/workspace',
+            config: sandbox.options.config,
+            repoId: sandbox.options.repoId,
+            userId: sandbox.options.userId,
+          });
+          
+          if (result.stdout) {
+            sandbox.onData(result.stdout.replace(/\n/g, '\r\n'));
+          }
+          if (result.stderr) {
+            sandbox.onData(`\x1b[31m${result.stderr.replace(/\n/g, '\r\n')}\x1b[0m`);
+          }
+          if (result.error) {
+            sandbox.onData(`\x1b[31mError: ${result.error}\x1b[0m\r\n`);
+          }
+        } catch (error) {
+          sandbox.onData(`\x1b[31mError: ${error instanceof Error ? error.message : 'Command failed'}\x1b[0m\r\n`);
+        }
+      }
+      sandbox.onData('$ ');
+    }
+    return;
+  }
+
+  // Native PTY mode for each provider
   switch (session.provider) {
     case 'vercel': {
       const { shell } = session.sandbox;
@@ -1084,51 +1138,6 @@ async function sendPtyInput(session: PtySession, data: string): Promise<void> {
       child.stdin?.write(data);
       break;
     }
-
-    default: {
-      // Fallback mode - accumulate input and execute on Enter
-      const sandbox = session.sandbox;
-      sandbox.inputBuffer += data;
-      
-      // Echo the input
-      sandbox.onData(data);
-      
-      // Check for Enter key
-      if (data === '\r' || data === '\n') {
-        const command = sandbox.inputBuffer.trim();
-        sandbox.inputBuffer = '';
-        sandbox.onData('\r\n');
-        
-        if (command) {
-          try {
-            const result = await executeCommand(sandbox.provider, {
-              apiKey: sandbox.options.apiKey,
-              command,
-              args: [],
-              timeout: 60000,
-              cwd: '/workspace',
-              config: sandbox.options.config,
-              repoId: sandbox.options.repoId,
-              userId: sandbox.options.userId,
-            });
-            
-            if (result.stdout) {
-              sandbox.onData(result.stdout.replace(/\n/g, '\r\n'));
-            }
-            if (result.stderr) {
-              sandbox.onData(`\x1b[31m${result.stderr.replace(/\n/g, '\r\n')}\x1b[0m`);
-            }
-            if (result.error) {
-              sandbox.onData(`\x1b[31mError: ${result.error}\x1b[0m\r\n`);
-            }
-          } catch (error) {
-            sandbox.onData(`\x1b[31mError: ${error instanceof Error ? error.message : 'Command failed'}\x1b[0m\r\n`);
-          }
-        }
-        sandbox.onData('$ ');
-      }
-      break;
-    }
   }
 }
 
@@ -1136,6 +1145,11 @@ async function sendPtyInput(session: PtySession, data: string): Promise<void> {
  * Resize PTY session
  */
 async function resizePty(session: PtySession, cols: number, rows: number): Promise<void> {
+  // Fallback sessions don't support resize
+  if (isFallbackSession(session)) {
+    return;
+  }
+
   switch (session.provider) {
     case 'vercel': {
       const { shell } = session.sandbox;
