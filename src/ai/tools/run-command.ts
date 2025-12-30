@@ -158,6 +158,20 @@ async function executeInSandbox(
 }> {
   const { provider, apiKey, repoId, userId, cwd, timeout, env } = options;
 
+  // Debug: Log sandbox execution request
+  console.log('[Sandbox] executeInSandbox called:', {
+    provider,
+    command,
+    args,
+    argsLength: args.length,
+    repoId,
+    userId,
+    cwd,
+    timeout,
+    hasApiKey: !!apiKey,
+    hasEnv: !!env && Object.keys(env).length > 0,
+  });
+
   try {
     // Dynamic import of sandbox provider based on type
     switch (provider) {
@@ -181,6 +195,21 @@ async function executeInSandbox(
         };
     }
   } catch (error) {
+    // Enhanced error logging
+    const errorObj = error as any;
+    console.error('[Sandbox] executeInSandbox error:', {
+      provider,
+      command,
+      args,
+      error: {
+        message: errorObj?.message,
+        code: errorObj?.code,
+        name: errorObj?.name,
+        details: errorObj?.details,
+        cause: errorObj?.cause,
+      },
+    });
+    
     return {
       success: false,
       errorMessage: error instanceof Error ? error.message : 'Sandbox execution failed',
@@ -465,16 +494,39 @@ async function executeInVercel(
     });
 
     try {
+      // Vercel SDK expects executable and args separately
+      // Wrap in shell to support full command strings and shell features
+      const fullCmd = args.length > 0 ? `${command} ${args.join(' ')}` : command;
+      
+      // Debug: Log command execution details
+      console.log('[Vercel Sandbox] Executing command:', {
+        command,
+        args,
+        argsLength: args.length,
+        fullCmd,
+        cwd: options.cwd,
+        timeout: options.timeout,
+        hasEnv: !!options.env && Object.keys(options.env).length > 0,
+      });
+
       let result = await sandbox.runCommand({
-        cmd: command,
-        args: args,
+        cmd: '/bin/sh',
+        args: ['-c', fullCmd],
         signal: AbortSignal.timeout(options.timeout),
       });
 
       // Handle Command vs CommandFinished - wait for completion if needed
       if (!('stdout' in result)) {
+        console.log('[Vercel Sandbox] Command returned streaming result, waiting for completion...');
         result = await result.wait();
       }
+
+      console.log('[Vercel Sandbox] Command completed:', {
+        exitCode: result.exitCode,
+        stdoutLength: result.stdout?.length ?? 0,
+        stderrLength: result.stderr?.length ?? 0,
+        success: result.exitCode === 0,
+      });
 
       return {
         success: result.exitCode === 0,
@@ -484,6 +536,7 @@ async function executeInVercel(
         sandbox: true,
       };
     } finally {
+      console.log('[Vercel Sandbox] Stopping sandbox...');
       await sandbox.stop();
     }
   } catch (error) {
@@ -495,6 +548,20 @@ async function executeInVercel(
         sandbox: true,
       };
     }
+    
+    // Enhanced error logging for debugging
+    const errorObj = error as any;
+    console.error('[Vercel Sandbox] Command execution error:', {
+      message: errorObj?.message,
+      code: errorObj?.code,
+      name: errorObj?.name,
+      stack: errorObj?.stack?.split('\n').slice(0, 5).join('\n'),
+      // Log additional error properties that might be present
+      details: errorObj?.details,
+      cause: errorObj?.cause,
+      response: errorObj?.response,
+    });
+    
     throw error;
   }
 }
@@ -535,6 +602,18 @@ Do NOT use this for file operations - use readFile, writeFile, editFile instead.
       const repo = Repository.find();
       const context = getSandboxContext();
 
+      // Debug: Log initial tool invocation
+      console.log('[RunCommand] Tool invoked with:', {
+        command,
+        args,
+        argsLength: args.length,
+        timeout,
+        hasEnv: Object.keys(env).length > 0,
+        hasContext: !!context,
+        repoId: context?.repoId,
+        userId: context?.userId,
+      });
+
       // Parse command and args if command contains spaces and no args provided
       let execCommand = command;
       let execArgs = args;
@@ -543,10 +622,20 @@ Do NOT use this for file operations - use readFile, writeFile, editFile instead.
         const parts = parseCommand(command);
         execCommand = parts[0];
         execArgs = parts.slice(1);
+        
+        // Debug: Log parsed command
+        console.log('[RunCommand] Parsed command string:', {
+          original: command,
+          parsedCommand: execCommand,
+          parsedArgs: execArgs,
+        });
       }
 
       // Check if sandbox is available
       const sandboxCheck = await checkSandboxAvailability(context?.repoId);
+      
+      // Debug: Log sandbox availability check result
+      console.log('[RunCommand] Sandbox availability:', sandboxCheck);
       
       const startTime = Date.now();
 
