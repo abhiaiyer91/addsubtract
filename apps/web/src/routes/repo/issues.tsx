@@ -162,16 +162,7 @@ export function IssuesPage() {
     { enabled: authenticated && isInboxView && !!repoData?.repo.id }
   );
 
-  // Fetch counts
-  // @ts-expect-error - Type generation may be stale
-  const { data: issueCounts } = trpc.issues.count.useQuery(
-    { 
-      repoId: repoData?.repo.id!,
-      projectId: selectedProjectId || undefined,
-      cycleId: selectedCycleId || undefined,
-    },
-    { enabled: !!repoData?.repo.id }
-  );
+
 
   const isLoading = repoLoading || (viewMode === 'list' ? issuesLoading : viewMode === 'kanban' ? kanbanLoading : false);
 
@@ -187,9 +178,10 @@ export function IssuesPage() {
     );
   });
 
-  // Counts
-  const openCount = issueCounts?.open || 0;
-  const closedCount = issueCounts?.closed || 0;
+  // Counts - use repo info for open count  
+  const openCount = repoData?.repo.openIssuesCount || 0;
+  // For closed count, use the filtered list length when viewing closed
+  const closedCount = currentState === 'closed' ? filteredIssues.length : 0;
 
   // Group issues by status for list view
   const groupedByStatus = useMemo(() => {

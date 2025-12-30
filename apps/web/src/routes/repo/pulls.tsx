@@ -63,12 +63,7 @@ export function PullsPage() {
     { enabled: !!repoData?.repo.id }
   );
 
-  // Fetch counts
-  // @ts-expect-error - Type generation may be stale
-  const { data: prCounts } = trpc.pulls.count.useQuery(
-    { repoId: repoData?.repo.id! },
-    { enabled: !!repoData?.repo.id }
-  );
+
 
   const isLoading = repoLoading || pullsLoading;
 
@@ -84,9 +79,10 @@ export function PullsPage() {
     );
   });
 
-  // Count PRs by state
-  const openCount = prCounts?.open || 0;
-  const closedCount = (prCounts?.closed || 0) + (prCounts?.merged || 0);
+  // Count PRs by state - using repo info for open count
+  const openCount = repoData?.repo.openPrsCount || 0;
+  // For closed count, use the filtered list length when viewing closed
+  const closedCount = currentState === 'closed' ? filteredPulls.length : 0;
 
   const handleStateChange = (state: string) => {
     const params = new URLSearchParams(searchParams);
