@@ -153,8 +153,12 @@ export function BlockEditor({
 
   // Update blocks when external value changes
   useEffect(() => {
-    // Only update if the external value changed (not from our own onChange)
-    if (value !== lastExternalValue.current) {
+    // Normalize both values by parsing and re-serializing to get canonical form
+    // This avoids infinite loops from whitespace/formatting differences
+    const canonicalValue = blocksToMarkdown(markdownToBlocks(value));
+    const canonicalLast = blocksToMarkdown(markdownToBlocks(lastExternalValue.current));
+    
+    if (canonicalValue !== canonicalLast) {
       lastExternalValue.current = value;
       const newBlocks = markdownToBlocks(value);
       setBlocks(newBlocks);
