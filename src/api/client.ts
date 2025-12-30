@@ -401,6 +401,7 @@ export class ApiClient {
         targetBranch: string;
         headSha: string;
         baseSha: string;
+        isDraft?: boolean;
       }
     ): Promise<PullRequest> => {
       return this.request('POST', `/api/repos/${owner}/${repo}/pulls`, data);
@@ -413,9 +414,18 @@ export class ApiClient {
       owner: string,
       repo: string,
       number: number,
-      data: { title?: string; body?: string }
+      data: { title?: string; body?: string; isDraft?: boolean }
     ): Promise<PullRequest> => {
       return this.request('PATCH', `/api/repos/${owner}/${repo}/pulls/${number}`, data);
+    },
+
+    /**
+     * Mark a draft PR as ready for review
+     */
+    ready: async (owner: string, repo: string, number: number): Promise<PullRequest> => {
+      return this.request('PATCH', `/api/repos/${owner}/${repo}/pulls/${number}`, {
+        isDraft: false,
+      });
     },
 
     /**
