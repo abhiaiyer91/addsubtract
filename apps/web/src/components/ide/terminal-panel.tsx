@@ -5,10 +5,8 @@ import { WebLinksAddon } from '@xterm/addon-web-links';
 import { Terminal, Trash2, Loader2, AlertCircle, Power, PowerOff } from 'lucide-react';
 import { useIDEStore } from '@/lib/ide-store';
 import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { cn } from '@/lib/utils';
 import { trpc } from '@/lib/trpc';
 import '@xterm/xterm/css/xterm.css';
 
@@ -22,16 +20,46 @@ interface TerminalPanelProps {
 type TerminalTab = 'output' | 'sandbox';
 type SandboxState = 'disconnected' | 'connecting' | 'connected' | 'error';
 
+// Shared xterm theme
+const xtermTheme = {
+  background: '#09090b', // zinc-950
+  foreground: '#e4e4e7', // zinc-200 - brighter for better readability
+  cursor: '#f4f4f5', // zinc-100
+  cursorAccent: '#09090b',
+  selectionBackground: '#3f3f46', // zinc-700
+  black: '#18181b',
+  red: '#ef4444',
+  green: '#22c55e',
+  yellow: '#eab308',
+  blue: '#3b82f6',
+  magenta: '#a855f7',
+  cyan: '#06b6d4',
+  white: '#f4f4f5',
+  brightBlack: '#71717a', // zinc-500
+  brightRed: '#f87171',
+  brightGreen: '#4ade80',
+  brightYellow: '#facc15',
+  brightBlue: '#60a5fa',
+  brightMagenta: '#c084fc',
+  brightCyan: '#22d3ee',
+  brightWhite: '#ffffff',
+};
+
 export function TerminalPanel({ height, repoId, owner, repo }: TerminalPanelProps) {
   const { terminalOutputs, clearTerminal } = useIDEStore();
-  const scrollRef = useRef<HTMLDivElement>(null);
   const [activeTab, setActiveTab] = useState<TerminalTab>('output');
   const [sandboxState, setSandboxState] = useState<SandboxState>('disconnected');
   
-  // xterm.js refs
-  const terminalContainerRef = useRef<HTMLDivElement>(null);
-  const xtermRef = useRef<XTerm | null>(null);
-  const fitAddonRef = useRef<FitAddon | null>(null);
+  // Output terminal refs (xterm.js for proper terminal rendering)
+  const outputContainerRef = useRef<HTMLDivElement>(null);
+  const outputXtermRef = useRef<XTerm | null>(null);
+  const outputFitAddonRef = useRef<FitAddon | null>(null);
+  const lastOutputCountRef = useRef(0);
+  
+  // Sandbox terminal refs
+  const sandboxContainerRef = useRef<HTMLDivElement>(null);
+  const sandboxXtermRef = useRef<XTerm | null>(null);
+  const sandboxFitAddonRef = useRef<FitAddon | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
 
   // Check if sandbox is available for this repo
@@ -42,42 +70,24 @@ export function TerminalPanel({ height, repoId, owner, repo }: TerminalPanelProp
 
   const sandboxAvailable = sandboxStatus?.ready ?? false;
 
-  // Initialize xterm.js when sandbox tab is active
+  // Initialize output xterm.js terminal
   useEffect(() => {
-    if (activeTab !== 'sandbox' || !terminalContainerRef.current || xtermRef.current) return;
-    if (!sandboxAvailable) return;
+    if (activeTab !== 'output' || !outputContainerRef.current || outputXtermRef.current) return;
 
     const xterm = new XTerm({
-      theme: {
-        background: '#09090b', // zinc-950
-        foreground: '#a1a1aa', // zinc-400
-        cursor: '#f4f4f5', // zinc-100
-        cursorAccent: '#09090b',
-        selectionBackground: '#3f3f46', // zinc-700
-        black: '#18181b',
-        red: '#ef4444',
-        green: '#22c55e',
-        yellow: '#eab308',
-        blue: '#3b82f6',
-        magenta: '#a855f7',
-        cyan: '#06b6d4',
-        white: '#f4f4f5',
-        brightBlack: '#52525b',
-        brightRed: '#f87171',
-        brightGreen: '#4ade80',
-        brightYellow: '#facc15',
-        brightBlue: '#60a5fa',
-        brightMagenta: '#c084fc',
-        brightCyan: '#22d3ee',
-        brightWhite: '#ffffff',
-      },
+      theme: xtermTheme,
       fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
       fontSize: 13,
       lineHeight: 1.4,
-      cursorBlink: true,
+      cursorBlink: false,
       cursorStyle: 'bar',
       scrollback: 10000,
       tabStopWidth: 4,
+      disableStdin: true, // Output terminal is read-only
+      convertEol: true, // Convert \n to \r\n for proper line breaks
+      scrollOnUserInput: true,
+      fastScrollModifier: 'alt', // Hold alt for fast scrolling
+      smoothScrollDuration: 0, // Instant scrolling for better responsiveness
     });
 
     const fitAddon = new FitAddon();
@@ -85,23 +95,142 @@ export function TerminalPanel({ height, repoId, owner, repo }: TerminalPanelProp
 
     xterm.loadAddon(fitAddon);
     xterm.loadAddon(webLinksAddon);
-    xterm.open(terminalContainerRef.current);
+    xterm.open(outputContainerRef.current);
     
-    // Delay fit to ensure container has proper dimensions
-    requestAnimationFrame(() => {
-      fitAddon.fit();
-    });
+    outputXtermRef.current = xterm;
+    outputFitAddonRef.current = fitAddon;
 
-    xtermRef.current = xterm;
-    fitAddonRef.current = fitAddon;
+    // Fit after a short delay to ensure container has dimensions
+    const fitTerminal = () => {
+      try {
+        fitAddon.fit();
+      } catch (e) {
+        // Ignore fit errors during initialization
+      }
+    };
+
+    // Initial fit with multiple attempts for reliability
+    requestAnimationFrame(() => {
+      fitTerminal();
+      // Second fit after layout settles
+      setTimeout(fitTerminal, 100);
+    });
 
     // Handle resize with ResizeObserver
     const resizeObserver = new ResizeObserver(() => {
-      requestAnimationFrame(() => {
-        fitAddon.fit();
-      });
+      requestAnimationFrame(fitTerminal);
     });
-    resizeObserver.observe(terminalContainerRef.current);
+    resizeObserver.observe(outputContainerRef.current);
+
+    // Welcome message
+    xterm.writeln('\x1b[90m─── Agent Terminal Output ───\x1b[0m');
+    xterm.writeln('');
+
+    // Write existing outputs
+    for (const output of terminalOutputs) {
+      writeOutputToXterm(xterm, output);
+    }
+    lastOutputCountRef.current = terminalOutputs.length;
+
+    return () => {
+      resizeObserver.disconnect();
+      xterm.dispose();
+      outputXtermRef.current = null;
+      outputFitAddonRef.current = null;
+    };
+  }, [activeTab]); // Only depend on activeTab, not terminalOutputs
+
+  // Write new outputs to xterm when they change
+  useEffect(() => {
+    if (!outputXtermRef.current || activeTab !== 'output') return;
+    
+    const xterm = outputXtermRef.current;
+    const newOutputs = terminalOutputs.slice(lastOutputCountRef.current);
+    
+    for (const output of newOutputs) {
+      writeOutputToXterm(xterm, output);
+    }
+    
+    lastOutputCountRef.current = terminalOutputs.length;
+  }, [terminalOutputs, activeTab]);
+
+  // Helper to write terminal output with proper formatting
+  const writeOutputToXterm = (xterm: XTerm, output: { command: string; output: string; exitCode?: number; isRunning: boolean }) => {
+    // Command prompt
+    xterm.writeln(`\x1b[32m❯\x1b[0m \x1b[1m${output.command}\x1b[0m`);
+    
+    // Output content - write as-is to preserve ANSI codes
+    if (output.output) {
+      // Split by lines and write each, handling both \n and \r\n
+      const lines = output.output.split(/\r?\n/);
+      for (const line of lines) {
+        xterm.writeln(line);
+      }
+    }
+    
+    // Status indicator
+    if (output.isRunning) {
+      xterm.writeln('\x1b[33m⟳ running...\x1b[0m');
+    } else if (output.exitCode !== undefined) {
+      if (output.exitCode === 0) {
+        xterm.writeln(`\x1b[32m✓ exit code: ${output.exitCode}\x1b[0m`);
+      } else {
+        xterm.writeln(`\x1b[31m✗ exit code: ${output.exitCode}\x1b[0m`);
+      }
+    }
+    
+    xterm.writeln(''); // Blank line between commands
+  };
+
+  // Initialize sandbox xterm.js terminal
+  useEffect(() => {
+    if (activeTab !== 'sandbox' || !sandboxContainerRef.current || sandboxXtermRef.current) return;
+    if (!sandboxAvailable) return;
+
+    const xterm = new XTerm({
+      theme: xtermTheme,
+      fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
+      fontSize: 13,
+      lineHeight: 1.4,
+      cursorBlink: true,
+      cursorStyle: 'bar',
+      scrollback: 10000,
+      tabStopWidth: 4,
+      scrollOnUserInput: true,
+      fastScrollModifier: 'alt',
+      smoothScrollDuration: 0,
+    });
+
+    const fitAddon = new FitAddon();
+    const webLinksAddon = new WebLinksAddon();
+
+    xterm.loadAddon(fitAddon);
+    xterm.loadAddon(webLinksAddon);
+    xterm.open(sandboxContainerRef.current);
+    
+    sandboxXtermRef.current = xterm;
+    sandboxFitAddonRef.current = fitAddon;
+
+    // Fit after a short delay to ensure container has dimensions
+    const fitTerminal = () => {
+      try {
+        fitAddon.fit();
+      } catch (e) {
+        // Ignore fit errors during initialization
+      }
+    };
+
+    // Initial fit with multiple attempts for reliability
+    requestAnimationFrame(() => {
+      fitTerminal();
+      setTimeout(fitTerminal, 100);
+    });
+
+    // Handle resize with ResizeObserver
+    const resizeObserver = new ResizeObserver(() => {
+      requestAnimationFrame(fitTerminal);
+    });
+    resizeObserver.observe(sandboxContainerRef.current);
 
     // Welcome message
     xterm.writeln('\x1b[1;36mSandbox Terminal\x1b[0m');
@@ -117,26 +246,28 @@ export function TerminalPanel({ height, repoId, owner, repo }: TerminalPanelProp
         wsRef.current = null;
       }
       xterm.dispose();
-      xtermRef.current = null;
-      fitAddonRef.current = null;
+      sandboxXtermRef.current = null;
+      sandboxFitAddonRef.current = null;
     };
   }, [activeTab, sandboxAvailable, owner, repo]);
 
   // Handle resize when height changes
   useEffect(() => {
-    if (fitAddonRef.current && activeTab === 'sandbox') {
-      requestAnimationFrame(() => {
-        fitAddonRef.current?.fit();
-      });
-    }
+    requestAnimationFrame(() => {
+      if (activeTab === 'output' && outputFitAddonRef.current) {
+        outputFitAddonRef.current.fit();
+      } else if (activeTab === 'sandbox' && sandboxFitAddonRef.current) {
+        sandboxFitAddonRef.current.fit();
+      }
+    });
   }, [height, activeTab]);
 
   // Connect to sandbox WebSocket
   const connectToSandbox = useCallback(async () => {
     if (sandboxState === 'connecting' || sandboxState === 'connected') return;
-    if (!xtermRef.current || !repoId) return;
+    if (!sandboxXtermRef.current || !repoId) return;
 
-    const xterm = xtermRef.current;
+    const xterm = sandboxXtermRef.current;
     setSandboxState('connecting');
 
     xterm.clear();
@@ -224,17 +355,21 @@ export function TerminalPanel({ height, repoId, owner, repo }: TerminalPanelProp
     setSandboxState('disconnected');
   }, []);
 
-  // Auto-scroll to bottom when new output is added
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  // Clear output terminal
+  const clearOutputTerminal = useCallback(() => {
+    if (outputXtermRef.current) {
+      outputXtermRef.current.clear();
+      outputXtermRef.current.writeln('\x1b[90m─── Agent Terminal Output ───\x1b[0m');
+      outputXtermRef.current.writeln('');
     }
-  }, [terminalOutputs]);
+    clearTerminal(); // Also clear the store
+    lastOutputCountRef.current = 0;
+  }, [clearTerminal]);
 
   // Clear sandbox terminal
   const clearSandboxTerminal = useCallback(() => {
-    if (xtermRef.current) {
-      xtermRef.current.clear();
+    if (sandboxXtermRef.current) {
+      sandboxXtermRef.current.clear();
     }
   }, []);
 
@@ -320,7 +455,7 @@ export function TerminalPanel({ height, repoId, owner, repo }: TerminalPanelProp
             variant="ghost"
             size="icon-sm"
             className="h-6 w-6 text-muted-foreground hover:text-foreground"
-            onClick={activeTab === 'output' ? clearTerminal : clearSandboxTerminal}
+            onClick={activeTab === 'output' ? clearOutputTerminal : clearSandboxTerminal}
             title="Clear"
           >
             <Trash2 className="h-3 w-3" />
@@ -328,53 +463,21 @@ export function TerminalPanel({ height, repoId, owner, repo }: TerminalPanelProp
         </div>
       </div>
 
-      {/* Content */}
+      {/* Content - Terminal containers need explicit height for xterm scrolling */}
       {activeTab === 'output' ? (
-        /* Output Tab - Agent command results */
-        <ScrollArea className="flex-1">
-          <div ref={scrollRef} className="p-3 font-mono text-xs space-y-2">
-            {terminalOutputs.length === 0 ? (
-              <div className="text-zinc-500">
-                Terminal output from agent commands will appear here...
-              </div>
-            ) : (
-              terminalOutputs.map((output) => (
-                <div key={output.id} className="space-y-1">
-                  {/* Command */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-emerald-400">$</span>
-                    <span className="text-zinc-300">{output.command}</span>
-                    {output.isRunning && (
-                      <span className="text-amber-400 animate-pulse">running...</span>
-                    )}
-                  </div>
-
-                  {/* Output */}
-                  {output.output && (
-                    <pre className="text-zinc-400 whitespace-pre-wrap pl-4">
-                      {output.output}
-                    </pre>
-                  )}
-
-                  {/* Exit code */}
-                  {output.exitCode !== undefined && !output.isRunning && (
-                    <div
-                      className={cn(
-                        'text-xs pl-4',
-                        output.exitCode === 0 ? 'text-emerald-500' : 'text-red-500'
-                      )}
-                    >
-                      exit code: {output.exitCode}
-                    </div>
-                  )}
-                </div>
-              ))
-            )}
-          </div>
-        </ScrollArea>
+        /* Output Tab - xterm.js terminal for agent command results */
+        <div 
+          ref={outputContainerRef} 
+          className="flex-1 min-h-0"
+          style={{ 
+            padding: '4px',
+            // Ensure xterm can calculate proper dimensions
+            overflow: 'hidden',
+          }}
+        />
       ) : (
         /* Sandbox Tab - xterm.js Interactive terminal */
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
           {!sandboxAvailable ? (
             <div className="p-3 font-mono text-xs text-zinc-500">
               {sandboxStatus?.provider === 'docker' && sandboxStatus?.dockerAvailable === false ? (
@@ -396,8 +499,9 @@ export function TerminalPanel({ height, repoId, owner, repo }: TerminalPanelProp
             </div>
           ) : (
             <div 
-              ref={terminalContainerRef} 
-              className="flex-1 p-1"
+              ref={sandboxContainerRef} 
+              className="flex-1 min-h-0 p-1"
+              style={{ overflow: 'hidden' }}
             />
           )}
         </div>
