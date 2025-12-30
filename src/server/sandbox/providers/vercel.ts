@@ -71,14 +71,14 @@ type VercelSandboxModule = {
       resources?: { vcpus: number };
       runtime?: 'node22' | 'python3.13';
       signal?: AbortSignal;
-      accessToken?: string;
+      token?: string;
       teamId?: string;
       projectId?: string;
     }) => Promise<VercelSandboxInstance>;
     get: (params: {
       sandboxId: string;
       signal?: AbortSignal;
-      accessToken?: string;
+      token?: string;
       teamId?: string;
       projectId?: string;
     }) => Promise<VercelSandboxInstance>;
@@ -88,7 +88,7 @@ type VercelSandboxModule = {
       since?: number | Date;
       until?: number | Date;
       signal?: AbortSignal;
-      accessToken?: string;
+      token?: string;
       teamId?: string;
     }) => Promise<{
       sandboxes: Array<{
@@ -444,9 +444,9 @@ export class VercelProvider extends BaseSandboxProvider {
       sandboxOptions.source = this.vercelConfig.options.source;
     }
 
-    // Add credentials
+    // Add credentials (SDK uses 'token' not 'accessToken')
     if (this.vercelConfig.options?.accessToken) {
-      sandboxOptions.accessToken = this.vercelConfig.options.accessToken;
+      (sandboxOptions as any).token = this.vercelConfig.options.accessToken;
     }
     if (this.vercelConfig.options?.teamId) {
       sandboxOptions.teamId = this.vercelConfig.options.teamId;
@@ -506,7 +506,7 @@ export class VercelProvider extends BaseSandboxProvider {
         await this.vercelModule.Sandbox.list({
           projectId: this.vercelConfig.options.projectId,
           limit: 1,
-          accessToken: this.vercelConfig.options?.accessToken,
+          token: this.vercelConfig.options?.accessToken,
           teamId: this.vercelConfig.options?.teamId,
         });
       }
@@ -539,7 +539,7 @@ export class VercelProvider extends BaseSandboxProvider {
     try {
       const sandbox = await this.vercelModule.Sandbox.get({
         sandboxId,
-        accessToken: this.vercelConfig.options?.accessToken,
+        token: this.vercelConfig.options?.accessToken,
         teamId: this.vercelConfig.options?.teamId,
         projectId: this.vercelConfig.options?.projectId,
       });
@@ -580,7 +580,7 @@ export class VercelProvider extends BaseSandboxProvider {
       limit: options?.limit,
       since: options?.since,
       until: options?.until,
-      accessToken: this.vercelConfig.options?.accessToken,
+      token: this.vercelConfig.options?.accessToken,
       teamId: this.vercelConfig.options?.teamId,
     });
 

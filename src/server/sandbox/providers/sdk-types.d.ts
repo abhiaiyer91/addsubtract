@@ -125,8 +125,8 @@ declare module '@daytonaio/sdk' {
 
 declare module '@vercel/sandbox' {
   export interface Credentials {
-    accessToken: string;
-    teamId?: string;
+    token: string;
+    teamId: string;
     projectId: string;
   }
 
@@ -165,7 +165,7 @@ declare module '@vercel/sandbox' {
       resources?: { vcpus: number };
       runtime?: 'node22' | 'python3.13' | string;
       signal?: AbortSignal;
-      accessToken?: string;
+      token?: string;
       teamId?: string;
       projectId?: string;
     }): Promise<Sandbox>;
@@ -173,7 +173,7 @@ declare module '@vercel/sandbox' {
     static get(params: {
       sandboxId: string;
       signal?: AbortSignal;
-      accessToken?: string;
+      token?: string;
       teamId?: string;
       projectId?: string;
     }): Promise<Sandbox>;
@@ -184,7 +184,7 @@ declare module '@vercel/sandbox' {
       since?: number | Date;
       until?: number | Date;
       signal?: AbortSignal;
-      accessToken?: string;
+      token?: string;
       teamId?: string;
     }): Promise<{
       sandboxes: Array<{

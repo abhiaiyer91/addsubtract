@@ -445,10 +445,21 @@ async function executeInVercel(
       };
     }
 
+    // Debug: Log credentials info (without exposing full token)
+    console.log('[Vercel Sandbox] Creating sandbox with:', {
+      projectId: vercelProjectId,
+      teamId: vercelTeamId,
+      hasToken: !!options.apiKey,
+      tokenLength: options.apiKey.length,
+      tokenPrefix: options.apiKey.substring(0, 10) + '...',
+      timeout: options.timeout,
+      runtime: config.vercelRuntime || 'node22',
+    });
+
     const sandbox = await Sandbox.create({ 
       projectId: vercelProjectId,
       teamId: vercelTeamId,
-      accessToken: options.apiKey,
+      token: options.apiKey,
       timeout: options.timeout,
       runtime: (config.vercelRuntime as 'node22' | 'python3.13') || 'node22',
     });
