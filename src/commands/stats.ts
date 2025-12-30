@@ -11,7 +11,7 @@
 
 import { Repository } from '../core/repository';
 import { Commit } from '../core/object';
-import { TsgitError, ErrorCode } from '../core/errors';
+import { TsgitError } from '../core/errors';
 import * as path from 'path';
 import * as fs from 'fs';
 import { colors } from '../utils/colors';

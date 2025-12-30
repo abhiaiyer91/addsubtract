@@ -22,7 +22,7 @@
 import * as path from 'path';
 import * as fs from 'fs';
 import { spawn, SpawnOptions } from 'child_process';
-import { exists, readFile, writeFile, mkdirp, readDir, readFileText } from '../utils/fs';
+import { exists, writeFile, mkdirp, readDir, readFileText } from '../utils/fs';
 
 /**
  * Available hook types
@@ -693,8 +693,6 @@ import {
   generateHookScript,
   generateStagedHookScript,
   initHookConfig,
-  createSampleConfig,
-  HookConfig,
 } from './hook-config';
 
 /**

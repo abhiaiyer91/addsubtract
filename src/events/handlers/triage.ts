@@ -65,7 +65,7 @@ async function handleIssueReopened(event: IssueReopenedEvent): Promise<void> {
  */
 async function handleIssueTriage(
   payload: { issueId: string; issueNumber: number; issueTitle: string; repoId: string; repoFullName: string },
-  trigger: 'created' | 'reopened'
+  _trigger: 'created' | 'reopened'
 ): Promise<void> {
   const { issueId, issueNumber, issueTitle, repoId, repoFullName } = payload;
   
@@ -111,8 +111,8 @@ async function handleIssueTriage(
     }
     console.log(`[TriageHandler] Found author: ${author.username || author.name}`);
 
-    // Get the owner info for the repo path
-    const [ownerName] = repoFullName.split('/');
+    // Get the owner info for the repo path (ownerName available if needed)
+    // const [ownerName] = repoFullName.split('/');
 
     // Resolve the actual filesystem path from the stored diskPath
     const resolvedRepoPath = resolveDiskPath(repo.diskPath);

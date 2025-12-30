@@ -180,7 +180,7 @@ function formatDate(date: string): string {
 function printTree(
   pages: Array<{ title: string; slug: string; status: string; icon?: string; children: any[] }>,
   indent: string = '',
-  isLast: boolean = true
+  _isLast: boolean = true
 ): void {
   for (let i = 0; i < pages.length; i++) {
     const page = pages[i];

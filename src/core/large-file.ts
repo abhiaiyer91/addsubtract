@@ -4,9 +4,7 @@
  */
 
 import * as path from 'path';
-import { ObjectStore } from './object-store';
-import { Blob } from './object';
-import { hashObject, computeHash } from '../utils/hash';
+import { computeHash } from '../utils/hash';
 import { compress, decompress } from '../utils/compression';
 import { exists, readFile, writeFile, mkdirp } from '../utils/fs';
 
@@ -245,7 +243,7 @@ export class LargeFileHandler {
    * Garbage collect unused chunks
    * Returns the number of chunks removed
    */
-  gc(usedHashes: Set<string>): number {
+  gc(_usedHashes: Set<string>): number {
     // Implementation would scan chunks and remove unused ones
     // This is a placeholder for the full implementation
     return 0;

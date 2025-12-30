@@ -12,8 +12,8 @@ import * as zlib from 'zlib';
 import * as crypto from 'crypto';
 import { exists, readFile, writeFile, mkdirp, readDir, isDirectory, readFileText } from '../utils/fs';
 import { compress } from '../utils/compression';
-import { ObjectType, Author } from './types';
-import { setHashAlgorithm, getHashAlgorithm, HashAlgorithm } from '../utils/hash';
+import { ObjectType } from './types';
+import { setHashAlgorithm, HashAlgorithm } from '../utils/hash';
 
 /**
  * Migration options
@@ -50,21 +50,9 @@ export interface MigrationResult {
   errors: string[];
 }
 
-/**
- * Pack file index entry
- */
-interface PackIndexEntry {
-  offset: number;
-  crc: number;
-}
-
-/**
- * Pack file header info
- */
-interface PackHeader {
-  version: number;
-  numObjects: number;
-}
+// PackIndexEntry and PackHeader interfaces defined for pack file parsing
+// interface PackIndexEntry { offset: number; crc: number; }
+// interface PackHeader { version: number; numObjects: number; }
 
 /**
  * Git object types (as stored in pack files)
@@ -414,7 +402,7 @@ async function collectAllGitObjects(
         const data = zlib.inflateSync(compressed);
         const { type, content } = parseGitObject(data);
         objects.set(hash, { type, content });
-      } catch (error) {
+      } catch {
         // Skip corrupted objects
       }
     }
@@ -443,7 +431,7 @@ async function collectAllGitObjects(
             objects.set(hash, obj);
           }
         }
-      } catch (error) {
+      } catch {
         // Skip corrupted pack files
       }
     }
@@ -525,7 +513,7 @@ async function readPackFile(
     // Read object header (variable length encoding)
     let byte = packData[offset++];
     const objType = (byte >> 4) & 7;
-    let size = byte & 0x0f;
+    // size and shift track variable-length encoding
     let shift = 4;
 
     while (byte & 0x80) {
@@ -599,7 +587,7 @@ async function readPackFile(
 
   // Build offset -> hash map for delta resolution
   const offsetToHash = new Map<number, string>();
-  for (const [hash, { type }] of result) {
+  for (const [hash] of result) {
     if (hashToOffset) {
       const off = hashToOffset.get(hash);
       if (off !== undefined) {
@@ -724,8 +712,7 @@ function decompressAt(data: Buffer, offset: number): { data: Buffer; bytesRead: 
 function applyDelta(base: Buffer, delta: Buffer): Buffer {
   let offset = 0;
 
-  // Read source size (variable length)
-  let sourceSize = 0;
+  // Read source size (variable length) - used for validation
   let shift = 0;
   let byte: number;
   do {
@@ -804,7 +791,7 @@ function packObjectTypeToString(type: number): ObjectType | null {
 function transformTreeContent(
   content: Buffer,
   hashMap: Map<string, string>,
-  hashAlgorithm: HashAlgorithm
+  _hashAlgorithm: HashAlgorithm
 ): Buffer | null {
   const entries: Array<{ mode: string; name: string; hash: string }> = [];
   let offset = 0;
@@ -837,8 +824,7 @@ function transformTreeContent(
     offset = nullIndex + 1 + oldHashBytes;
   }
 
-  // Rebuild tree content with new hashes
-  const newHashBytes = hashAlgorithm === 'sha256' ? 32 : 20;
+  // Rebuild tree content with new hashes (newHashBytes for reference: sha256=32, sha1=20)
   const parts: Buffer[] = [];
   
   for (const entry of entries) {

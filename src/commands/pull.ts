@@ -341,8 +341,8 @@ function performRebase(
   repo: Repository,
   headHash: string,
   targetHash: string,
-  currentBranch: string,
-  options: PullOptions
+  _currentBranch: string,
+  _options: PullOptions
 ): PullResult {
   // A full rebase implementation would:
   // 1. Find the merge base

@@ -1,4 +1,4 @@
-import { eq, and, desc, asc, sql, inArray, lt, gt, gte, lte, isNull, isNotNull, count, ne, or } from 'drizzle-orm';
+import { eq, and, desc, asc, sql, inArray, lt, gte, lte, isNull, isNotNull, count, ne, or } from 'drizzle-orm';
 import { getDb } from '../index';
 import {
   issues,
@@ -1080,7 +1080,7 @@ export const issueModel = {
    * Get sub-issue progress
    */
   async getSubIssueProgress(parentId: string): Promise<{ total: number; completed: number; percentage: number }> {
-    const db = getDb();
+    // db available via getDb() if needed for direct queries
     
     const subIssues = await this.getSubIssues(parentId);
     const total = subIssues.length;

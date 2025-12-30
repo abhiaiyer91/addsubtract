@@ -1,11 +1,10 @@
-import { eq, desc, and, inArray } from 'drizzle-orm';
+import { eq, desc, inArray } from 'drizzle-orm';
 import { getDb } from '../index';
 import {
   activities,
   watches,
   repositories,
   type Activity,
-  type NewActivity,
   type Repository,
 } from '../schema';
 import { user } from '../auth-schema';

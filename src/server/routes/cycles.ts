@@ -215,7 +215,7 @@ export function createCycleRoutes(): Hono {
    * Remove issue from cycle
    */
   app.delete('/:owner/:repo/cycles/:number/issues/:issueNumber', async (c) => {
-    const { owner, repo, number, issueNumber } = c.req.param();
+    const { owner, repo, issueNumber } = c.req.param();
     
     const dbRepo = await getRepo(owner, repo);
     const issue = await issueModel.findByRepoAndNumber(dbRepo.id, parseInt(issueNumber, 10));

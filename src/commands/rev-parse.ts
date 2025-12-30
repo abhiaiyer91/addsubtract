@@ -13,11 +13,10 @@
  * This is a plumbing command for scripting and advanced usage.
  */
 
-import * as path from 'path';
 import { Repository } from '../core/repository';
-import { TsgitError, ErrorCode } from '../core/errors';
+import { TsgitError } from '../core/errors';
 import { parseRevision } from './reset';
-import { shortHash, getDigestLength } from '../utils/hash';
+import { shortHash } from '../utils/hash';
 
 export interface RevParseOptions {
   short?: boolean | number;

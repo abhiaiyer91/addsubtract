@@ -13,7 +13,7 @@ import { renderDiffHTML, getDiffStyles, getWordDiffStyles } from './diff-viewer'
 import { buildFileTree, renderFileTreeHTML, getFileTreeStyles } from './file-tree';
 import { SearchEngine, renderSearchResultsHTML, getSearchStyles } from './search';
 import { getTheme, Theme, getThemeNames } from './themes';
-import { IssueManager, IssueStatus } from '../core/issues';
+import { IssueManager } from '../core/issues';
 import { renderBoard, renderIssueList, renderIssueDetail, getIssueBoardStyles, getIssueBoardScript } from './issue-board';
 import { 
   CollaboratorManager, 

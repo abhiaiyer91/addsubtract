@@ -73,11 +73,8 @@ const REPO_PERMISSION_LEVELS: Record<RepoPermission, number> = {
   admin: 3,
 };
 
-const ORG_ROLE_LEVELS: Record<OrgRole, number> = {
-  member: 1,
-  admin: 2,
-  owner: 3,
-};
+// ORG_ROLE_LEVELS available for future org permission checks
+// const ORG_ROLE_LEVELS: Record<OrgRole, number> = { member: 1, admin: 2, owner: 3 };
 
 /**
  * Maps OAuth scopes to repository permissions

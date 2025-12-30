@@ -18,15 +18,17 @@ import { getConflictDetails } from '../../../server/storage/conflicts';
 import { resolveDiskPath, BareRepository } from '../../../server/storage/repos';
 import { triggerAsyncReview } from '../../../ai/services/pr-review';
 import { exists } from '../../../utils/fs';
-import { eventBus, extractMentions } from '../../../events';
+import { eventBus } from '../../../events';
 import { diff, createHunks } from '../../../core/diff';
 import { Blob, Tree, Commit } from '../../../core/object';
 import { TreeEntry, Author } from '../../../core/types';
 
 /**
  * Parse a unified diff into structured file changes
+ * @internal Currently unused but kept for future PR diff parsing needs
  */
-function parseDiff(diffText: string): Array<{
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function _parseDiff(diffText: string): Array<{
   oldPath: string;
   newPath: string;
   status: 'added' | 'deleted' | 'modified' | 'renamed';

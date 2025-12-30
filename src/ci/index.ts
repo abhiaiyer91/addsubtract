@@ -84,7 +84,7 @@ import {
   PushTrigger,
   PullRequestTrigger,
 } from './types';
-import { loadWorkflows, loadWorkflowFile, validateWorkflowFile, WorkflowLoadError } from './parser';
+import { loadWorkflows, loadWorkflowFile, validateWorkflowFile } from './parser';
 
 /**
  * CI Engine configuration

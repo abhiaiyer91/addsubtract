@@ -4,7 +4,7 @@ import { ObjectType } from './types';
 import { GitObject, Blob, Tree, Commit, Tag } from './object';
 import { createObjectBuffer, parseObjectBuffer, hashObject } from '../utils/hash';
 import { compress, decompress } from '../utils/compression';
-import { exists, readFile, writeFile, mkdirp, readDir } from '../utils/fs';
+import { exists, readFile, writeFile, readDir } from '../utils/fs';
 import { packTypeToObjectType } from './protocol/types';
 import { applyDelta } from './protocol/pack';
 
@@ -147,13 +147,10 @@ export class ObjectStore {
     // Read object header (variable-length encoding)
     let byte = packData[pos++];
     const type = (byte >> 4) & 0x07;
-    let size = byte & 0x0f;
-    let shift = 4;
+    // size and shift track variable-length encoding of decompressed object size
     
     while (byte & 0x80) {
       byte = packData[pos++];
-      size |= (byte & 0x7f) << shift;
-      shift += 7;
     }
 
     let result: { type: ObjectType; content: Buffer };

@@ -1,5 +1,4 @@
 import * as path from 'path';
-import * as crypto from 'crypto';
 import { IndexEntry } from './types';
 import { exists, readFile, writeFile, stat } from '../utils/fs';
 

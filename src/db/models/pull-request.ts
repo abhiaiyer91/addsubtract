@@ -16,7 +16,6 @@ import {
   type PrComment,
   type NewPrComment,
   type PrReviewer,
-  type NewPrReviewer,
   type Label,
 } from '../schema';
 import { user } from '../auth-schema';

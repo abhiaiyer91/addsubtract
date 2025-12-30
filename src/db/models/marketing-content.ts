@@ -9,7 +9,6 @@ import { getDb } from '../index';
 import {
   marketingContent,
   type MarketingContent,
-  type NewMarketingContent,
   type MarketingContentStatus,
   type MarketingContentSource,
 } from '../schema';

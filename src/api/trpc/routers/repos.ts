@@ -3005,7 +3005,6 @@ export const reposRouter = router({
       const newDiskPath = `/repos/${newOwnerName}/${repo.name}.git`;
 
       // Move the repository on disk
-      const reposDir = process.env.REPOS_DIR || './repos';
       const oldAbsolutePath = resolveDiskPath(repo.diskPath);
       const newAbsolutePath = resolveDiskPath(newDiskPath);
 

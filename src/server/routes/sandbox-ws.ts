@@ -18,7 +18,7 @@ import {
   sandboxSessionModel,
   type SandboxProvider,
 } from '../../db/models/sandbox';
-import { repoModel } from '../../db/models';
+
 import { createAuth } from '../../lib/auth';
 import { getSandboxPool, type PooledSandbox } from '../sandbox/pool';
 
@@ -36,7 +36,7 @@ export function createSandboxRoutes() {
     try {
       const status = await sandboxConfigModel.getStatus(repoId);
       return c.json(status);
-    } catch (error) {
+    } catch {
       return c.json({ error: 'Failed to get status' }, 500);
     }
   });
@@ -133,7 +133,7 @@ export function createSandboxRoutes() {
     try {
       const sessions = await sandboxSessionModel.getActiveSessions(repoId);
       return c.json({ sessions });
-    } catch (error) {
+    } catch {
       return c.json({ error: 'Failed to list sessions' }, 500);
     }
   });
@@ -310,7 +310,7 @@ async function executeCommand(
             lastUsedAt: new Date(),
             useCount: 0,
             stop: () => instance.delete(),
-            runCommand: async (cmd: string, cmdArgs?: string[], opts?: { signal?: AbortSignal }) => {
+            runCommand: async (cmd: string, cmdArgs?: string[], _opts?: { signal?: AbortSignal }) => {
               const fullCmd = cmdArgs ? [cmd, ...cmdArgs].join(' ') : cmd;
               const result = await instance.process.commandRun(fullCmd, {
                 cwd,

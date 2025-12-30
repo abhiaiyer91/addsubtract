@@ -15,7 +15,7 @@ import * as fs from 'fs';
 import * as readline from 'readline';
 import { Repository } from '../core/repository';
 import { exists } from '../utils/fs';
-import { ansi, c } from '../utils/colors';
+import { c } from '../utils/colors';
 
 // Lazy load AI features to avoid missing dependency issues
 let _aiModule: typeof import('../ai/mastra') | null = null;
@@ -47,8 +47,7 @@ function isAIAvailable(): boolean {
   return !!(process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY);
 }
 
-// Re-export ansi as colors for backwards compatibility within this file
-const colors = ansi;
+// ansi available for raw color access (aliased as colors in original code)
 
 /**
  * Infer what the user is working on from branch name and changes
@@ -124,6 +123,7 @@ function groupFilesByPurpose(files: string[]): Map<string, string[]> {
 /**
  * Get a quick summary of the repo (for future use in enhanced status)
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function _getRepoSummary(repo: Repository): { type: string; framework?: string; language: string } {
   const workDir = repo.workDir;
   

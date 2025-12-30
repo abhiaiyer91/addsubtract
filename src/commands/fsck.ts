@@ -12,10 +12,9 @@
  * This is a plumbing command for verifying repository integrity.
  */
 
-import * as path from 'path';
 import { Repository } from '../core/repository';
-import { TsgitError, ErrorCode } from '../core/errors';
-import { Commit, Tree, Tag, Blob } from '../core/object';
+import { TsgitError } from '../core/errors';
+import { Commit, Tree, Tag } from '../core/object';
 import { hashObject } from '../utils/hash';
 import { colors } from '../utils/colors';
 

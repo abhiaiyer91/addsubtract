@@ -15,8 +15,7 @@
  */
 
 import * as path from 'path';
-import * as fs from 'fs';
-import { exists, readFile, writeFile, mkdirp } from '../utils/fs';
+import { exists, readFile, writeFile } from '../utils/fs';
 import { TsgitError, ErrorCode } from './errors';
 
 /**
@@ -114,7 +113,7 @@ const DEFAULT_RULE: Omit<BranchProtectionRule, 'id' | 'pattern' | 'createdAt' | 
  * Generate a simple UUID
  */
 function generateId(): string {
-  const hex = () => Math.floor(Math.random() * 16).toString(16);
+  // hex generator available: () => Math.floor(Math.random() * 16).toString(16)
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
     const r = Math.floor(Math.random() * 16);
     const v = c === 'x' ? r : (r & 0x3 | 0x8);
@@ -161,7 +160,7 @@ export class BranchProtectionManager {
       for (const rule of data.rules) {
         this.rules.set(rule.id, rule);
       }
-    } catch (error) {
+    } catch {
       // Start fresh if corrupted
       this.rules.clear();
     }
@@ -802,7 +801,7 @@ const { colors } = require('../utils/colors');
       const options = parseProtectionOptions(args.slice(2));
       
       try {
-        const rule = manager.updateRule(pattern, options);
+        manager.updateRule(pattern, options);
         console.log(colors.green('✓') + ` Updated protection for '${pattern}'`);
       } catch (error) {
         if (error instanceof TsgitError) {

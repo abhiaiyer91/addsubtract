@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { sql } from 'drizzle-orm';
-import { initDatabase, getDb, closeDatabase, schema } from '../index';
-import { userModel, sessionModel, oauthAccountModel } from '../models/user';
-import { repoModel, collaboratorModel, starModel, watchModel } from '../models/repository';
-import { prModel, prReviewModel, prCommentModel } from '../models/pull-request';
-import { issueModel, issueCommentModel, labelModel, issueLabelModel } from '../models/issue';
-import { orgModel, orgMemberModel, teamModel, teamMemberModel } from '../models/organization';
+import { initDatabase, getDb, closeDatabase } from '../index';
+import { userModel } from '../models/user';
+import { repoModel, starModel, watchModel } from '../models/repository';
+import { prModel } from '../models/pull-request';
+import { issueModel, labelModel, issueLabelModel } from '../models/issue';
+import { orgModel, orgMemberModel } from '../models/organization';
 import { activityModel, activityHelpers } from '../models/activity';
 import { webhookModel } from '../models/webhook';
 

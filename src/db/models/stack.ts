@@ -7,8 +7,6 @@ import {
   type Stack,
   type NewStack,
   type StackBranch,
-  type NewStackBranch,
-  type PullRequest,
 } from '../schema';
 import { user } from '../auth-schema';
 

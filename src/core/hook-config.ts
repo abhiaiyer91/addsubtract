@@ -11,9 +11,8 @@
  */
 
 import * as path from 'path';
-import * as fs from 'fs';
 import { exists, readFileText, writeFile, mkdirp } from '../utils/fs';
-import { HookType, HOOK_TEMPLATES } from './hooks';
+import { HookType } from './hooks';
 
 /**
  * Hook definition in config

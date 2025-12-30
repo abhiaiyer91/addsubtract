@@ -8,9 +8,9 @@
 import * as path from 'path';
 import * as fs from 'fs';
 import { Repository } from '../core/repository';
-import { reset, parseRevision } from '../commands/reset';
+import { reset } from '../commands/reset';
 import { diff as computeDiff, createHunks, formatUnifiedDiff, FileDiff } from '../core/diff';
-import { exists, mkdirp, walkDir, loadIgnorePatterns } from '../utils/fs';
+import { walkDir, loadIgnorePatterns } from '../utils/fs';
 import type { FileEntry, FileStatus, FileStat, CommitInfo, FsMergeResult } from './types';
 
 // Re-export types

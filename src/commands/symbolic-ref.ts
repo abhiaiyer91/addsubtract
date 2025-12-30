@@ -12,7 +12,6 @@
  */
 
 import * as path from 'path';
-import * as fs from 'fs';
 import { Repository } from '../core/repository';
 import { TsgitError, ErrorCode } from '../core/errors';
 import { exists, readFileText, writeFile, deleteFile } from '../utils/fs';
@@ -84,7 +83,7 @@ export function setSymbolicRef(
   repo: Repository,
   refName: string,
   target: string,
-  options: SymbolicRefOptions = {}
+  _options: SymbolicRefOptions = {}
 ): void {
   const refPath = path.join(repo.gitDir, refName);
 

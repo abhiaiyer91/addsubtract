@@ -258,7 +258,7 @@ function pushToLocal(
 /**
  * Copy objects needed for a commit to remote
  */
-function copyObjectsToRemote(srcGitDir: string, destGitDir: string, commitHash: string): void {
+function copyObjectsToRemote(srcGitDir: string, destGitDir: string, _commitHash: string): void {
   const srcObjectsDir = path.join(srcGitDir, 'objects');
   const destObjectsDir = path.join(destGitDir, 'objects');
 
@@ -634,14 +634,16 @@ function collectAllObjects(
 
 /**
  * Push to a remote repository (network) - sync wrapper
+ * @internal Currently unused - async version is used instead
  */
-function pushToRemote(
-  repo: Repository,
-  remoteManager: RemoteManager,
-  remoteName: string,
-  remoteUrl: string,
-  refs: { local: string; remote: string }[],
-  options: PushOptions = {}
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function _pushToRemote(
+  _repo: Repository,
+  _remoteManager: RemoteManager,
+  _remoteName: string,
+  _remoteUrl: string,
+  _refs: { local: string; remote: string }[],
+  _options: PushOptions = {}
 ): PushResult {
   throw new TsgitError(
     'Use pushAsync for remote repositories',
@@ -914,9 +916,9 @@ export async function pushMultiAsync(
  * Push to remote (sync version - only for local repos)
  */
 export function push(
-  remoteName?: string,
-  branchName?: string,
-  options: PushOptions = {}
+  _remoteName?: string,
+  _branchName?: string,
+  _options: PushOptions = {}
 ): PushResult {
   throw new TsgitError(
     'Synchronous push is not supported. Use pushAsync() instead.',

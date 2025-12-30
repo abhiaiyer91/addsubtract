@@ -8,7 +8,7 @@
  * - Optionally starts the web UI
  */
 
-import { spawn, execSync, ChildProcess } from 'child_process';
+import { spawn, execSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -276,7 +276,7 @@ async function runMigrations(options: UpOptions): Promise<void> {
       cwd: getWitInstallDir(),
     });
     console.log(colors.green('  ✓ Migrations complete'));
-  } catch (error) {
+  } catch {
     // Migrations might already be applied
     console.log(colors.dim('  ✓ Database ready'));
   }

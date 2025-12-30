@@ -5,7 +5,7 @@
 
 import * as path from 'path';
 import { ObjectStore } from './object-store';
-import { GitObject, Blob, Tree, Commit } from './object';
+import { GitObject } from './object';
 import { exists, readFile, writeFile, mkdirp } from '../utils/fs';
 import { TsgitError, ErrorCode } from './errors';
 

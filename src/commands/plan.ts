@@ -136,7 +136,7 @@ async function runPlanWorkflow(options: PlanOptions): Promise<void> {
   let repo: Repository;
   try {
     repo = Repository.find();
-  } catch (error) {
+  } catch {
     console.error('Not in a wit repository.');
     process.exit(1);
   }
@@ -185,7 +185,7 @@ async function runPlanWorkflow(options: PlanOptions): Promise<void> {
       console.log('Starting workflow...\n');
       console.log('─'.repeat(60));
 
-      let lastStepId = '';
+      // step tracking via eventData.stepId
 
       for await (const event of streamMultiAgentPlanningWorkflow(input)) {
         if (options.verbose) {
@@ -195,7 +195,6 @@ async function runPlanWorkflow(options: PlanOptions): Promise<void> {
         // Handle different event types
         const eventData = event as any;
         if (eventData.type === 'step-start') {
-          lastStepId = eventData.stepId;
           console.log(`\n📍 Step: ${eventData.stepId}`);
         } else if (eventData.type === 'step-complete') {
           console.log(`   ✅ Completed: ${eventData.stepId}`);

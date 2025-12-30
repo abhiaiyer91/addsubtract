@@ -147,7 +147,7 @@ Untracked files: ${status.untracked.length}
 /**
  * Start an interactive chat session with the agent
  */
-async function startInteractiveSession(args: string[]): Promise<void> {
+async function startInteractiveSession(_args: string[]): Promise<void> {
   if (!isAIAvailable()) {
     printAINotConfigured();
     process.exit(1);
@@ -422,7 +422,7 @@ async function printHistory(session: AgentSession, memory: Memory): Promise<void
         console.log(`${roleColor}${roleName}:${colors.reset} ${preview}`);
       }
     }
-  } catch (error) {
+  } catch {
     console.log(`${colors.dim}Unable to fetch history.${colors.reset}`);
   }
   console.log('');

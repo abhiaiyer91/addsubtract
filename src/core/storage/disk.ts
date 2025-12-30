@@ -16,10 +16,8 @@
 
 import * as path from 'path';
 import * as fs from 'fs';
-import { ObjectStore } from '../object-store';
-import { Refs } from '../refs';
 import { compress, decompress } from '../../utils/compression';
-import { createObjectBuffer, parseObjectBuffer, hashObject } from '../../utils/hash';
+import { createObjectBuffer, parseObjectBuffer } from '../../utils/hash';
 import { exists, mkdirp, readFile, writeFile, readDir, isDirectory } from '../../utils/fs';
 import type {
   StorageBackend,

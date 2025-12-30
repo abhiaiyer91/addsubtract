@@ -15,7 +15,7 @@ import {
   SideBandChannel,
   NULL_HASH,
 } from './types';
-import { parseRefAdvertisement, serializeCapabilities } from './refs-discovery';
+import { parseRefAdvertisement } from './refs-discovery';
 import { loadGitHubCredentials } from '../github';
 
 /**

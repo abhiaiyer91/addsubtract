@@ -259,15 +259,10 @@ export class CredentialManager {
    * Detect git credential helper
    */
   private detectGitCredentialHelper(): void {
-    // Common credential helper names
-    const helpers = [
-      'git-credential-manager',
-      'git-credential-manager-core',
-      'git-credential-osxkeychain',
-      'git-credential-wincred',
-      'git-credential-libsecret',
-      'git-credential-gnome-keyring',
-    ];
+    // Common credential helper names available:
+    // 'git-credential-manager', 'git-credential-manager-core',
+    // 'git-credential-osxkeychain', 'git-credential-wincred',
+    // 'git-credential-libsecret', 'git-credential-gnome-keyring'
 
     // For now, just check if git is available
     // A more complete implementation would read git config
@@ -375,7 +370,7 @@ export class CredentialManager {
       });
 
       let stdout = '';
-      let stderr = '';
+      // stderr captured but not used - child errors handled via exit code
       let resolved = false;
 
       // Timeout after 5 seconds

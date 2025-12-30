@@ -485,7 +485,6 @@ export function forkRepository(
 
     // Open source repo to read refs
     const sourceRepo = new BareRepository(sourceRepoPath);
-    const targetRefs = new Refs(targetPath);
 
     // Copy all branch refs
     const branches = sourceRepo.refs.listBranches();

@@ -2,8 +2,8 @@ import * as path from 'path';
 import { ObjectStore } from './object-store';
 import { Index, buildTreeFromIndex } from './index';
 import { Refs } from './refs';
-import { Tree, Commit, Blob } from './object';
-import { Author, TreeEntry, IndexEntry } from './types';
+import { Tree, Commit } from './object';
+import { Author, TreeEntry } from './types';
 import { exists, mkdirp, writeFile, readFile, walkDir, readFileText, loadIgnorePatterns, deleteFile, readDir, isDirectory } from '../utils/fs';
 import { Journal } from './journal';
 import { LargeFileHandler, CHUNK_THRESHOLD } from './large-file';
@@ -321,7 +321,7 @@ export class Repository {
       try {
         this.objects.readCommit(headHash);
         parentHashes.push(headHash);
-      } catch (error) {
+      } catch {
         // Parent commit doesn't exist - this could happen if objects weren't properly stored
         console.warn(`Warning: HEAD points to ${headHash} but commit object not found. Creating orphan commit.`);
       }
@@ -798,7 +798,7 @@ export class Repository {
       throw new Error(`Unknown ref: ${ref}`);
     }
 
-    const commit = this.objects.readCommit(hash);
+    // commit available via this.objects.readCommit(hash) if needed
     const tree = this.getHeadTree();
     const blobHash = tree.get(filePath);
 

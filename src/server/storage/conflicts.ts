@@ -5,8 +5,6 @@
  * from bare repositories using wit's TypeScript API.
  */
 
-import * as path from 'path';
-import * as fs from 'fs';
 import { BareRepository } from './repos';
 import { exists } from '../../utils/fs';
 import { diff } from '../../core/diff';

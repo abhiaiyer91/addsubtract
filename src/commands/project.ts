@@ -450,7 +450,7 @@ async function handleProjectDelete(args: string[]): Promise<void> {
  * List issues in a project
  */
 async function handleProjectIssues(args: string[]): Promise<void> {
-  const { flags, positional } = parseArgs(args);
+  const { positional } = parseArgs(args);
   const name = positional[0];
 
   if (!name) {

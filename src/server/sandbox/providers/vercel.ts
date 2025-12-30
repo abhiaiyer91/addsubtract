@@ -426,7 +426,7 @@ export class VercelProvider extends BaseSandboxProvider {
     // Dynamically import Vercel Sandbox SDK
     try {
       this.vercelModule = await import('@vercel/sandbox') as VercelSandboxModule;
-    } catch (error) {
+    } catch {
       throw new Error(
         'Vercel Sandbox SDK not installed. Install with: npm install @vercel/sandbox'
       );

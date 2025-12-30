@@ -1,4 +1,4 @@
-import { eq, and, asc, desc } from 'drizzle-orm';
+import { eq, and, asc } from 'drizzle-orm';
 import { getDb } from '../index';
 import {
   issueStages,

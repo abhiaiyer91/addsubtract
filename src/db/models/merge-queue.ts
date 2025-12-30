@@ -4,7 +4,7 @@
  * Provides CRUD operations and queries for the merge queue system
  */
 
-import { eq, and, desc, asc, sql, inArray, lt, gt, isNull } from 'drizzle-orm';
+import { eq, and, desc, asc, sql, inArray, gt } from 'drizzle-orm';
 import { getDb } from '../index';
 import {
   mergeQueueConfig,
@@ -12,7 +12,6 @@ import {
   mergeQueueBatches,
   mergeQueueHistory,
   pullRequests,
-  repositories,
   type MergeQueueConfig,
   type NewMergeQueueConfig,
   type MergeQueueEntry,
@@ -22,7 +21,6 @@ import {
   type MergeQueueHistoryEntry,
   type NewMergeQueueHistoryEntry,
   type MergeQueueState,
-  type MergeQueueStrategy,
 } from '../schema';
 
 // ============ TYPES ============
@@ -301,7 +299,7 @@ export const mergeQueueEntryModel = {
    * Remove a PR from the queue
    */
   async remove(prId: string, actorId: string): Promise<boolean> {
-    const db = getDb();
+    // db available via getDb() if needed for transactions
     const entry = await this.findByPrId(prId);
     if (!entry) return false;
 

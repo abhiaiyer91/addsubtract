@@ -10,7 +10,8 @@ import { router, publicProcedure, protectedProcedure } from '../trpc';
 import { repoModel, collaboratorModel, userModel, issueModel, prModel, userAiKeyModel } from '../../../db/models';
 import { resolveDiskPath, BareRepository } from '../../../server/storage/repos';
 import { exists } from '../../../utils/fs';
-import { isAIAvailable } from '../../../ai/mastra';
+// isAIAvailable is available but semantic search uses direct embedding check
+// import { isAIAvailable } from '../../../ai/mastra';
 import { generateEmbedding, detectLanguage, cosineSimilarity } from '../../../search/embeddings';
 
 /**
@@ -318,7 +319,7 @@ export const searchRouter = router({
               });
             }
           }
-        } catch (e) {
+        } catch {
           // Issue search not yet implemented, skip
         }
       }
@@ -355,7 +356,7 @@ export const searchRouter = router({
               });
             }
           }
-        } catch (e) {
+        } catch {
           // PR search not yet implemented, skip
         }
       }
@@ -557,7 +558,7 @@ export const searchRouter = router({
       query: z.string().min(1),
       limit: z.number().min(1).max(10).default(5),
     }))
-    .query(async ({ input, ctx }) => {
+    .query(async ({ input }) => {
       const suggestions: Array<{
         type: 'repository' | 'user' | 'issue' | 'pull_request';
         text: string;

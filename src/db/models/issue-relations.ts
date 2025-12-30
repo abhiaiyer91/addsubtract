@@ -4,7 +4,6 @@ import {
   issueRelations,
   issues,
   type IssueRelation,
-  type NewIssueRelation,
   type IssueRelationType,
   type Issue,
 } from '../schema';

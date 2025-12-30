@@ -18,8 +18,10 @@ import {
 /**
  * Parse a command string into command and arguments
  * Handles quoted strings properly
+ * @internal Currently unused but kept for future sandbox command parsing
  */
-function parseCommand(cmd: string): string[] {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function _parseCommand(cmd: string): string[] {
   const parts: string[] = [];
   let current = '';
   let inQuote = false;
@@ -447,7 +449,7 @@ export const sandboxRouter = router({
         cwd: z.string().optional().default('/workspace'),
       })
     )
-    .mutation(async ({ input, ctx }) => {
+    .mutation(async ({ input }) => {
       // Check sandbox is ready
       const status = await sandboxConfigModel.getStatus(input.repoId);
       if (!status.ready) {

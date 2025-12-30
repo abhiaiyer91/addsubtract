@@ -35,7 +35,7 @@ import { RepoManager } from './storage/repos';
 import { syncReposToDatabase } from './storage/sync';
 import { appRouter, createContext } from '../api/trpc';
 import * as fs from 'fs';
-import { initDatabase, healthCheck as dbHealthCheck, isConnected as isDbConnected } from '../db';
+import { initDatabase, healthCheck as dbHealthCheck } from '../db';
 import { SSHServer, generateHostKey, SSHServerOptions } from './ssh';
 import { SSHKeyManager, FileBasedAccessControl } from './ssh/keys';
 import { Repository } from '../core/repository';

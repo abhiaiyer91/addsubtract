@@ -12,9 +12,9 @@
 
 import * as path from 'path';
 import { Repository } from '../core/repository';
-import { Commit, Tree, Blob } from '../core/object';
+import { Commit } from '../core/object';
 import { TsgitError, ErrorCode } from '../core/errors';
-import { Author, TreeEntry } from '../core/types';
+import { Author } from '../core/types';
 import { exists, readFile, writeFile, mkdirp } from '../utils/fs';
 import { colors } from '../utils/colors';
 

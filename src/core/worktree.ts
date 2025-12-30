@@ -22,7 +22,7 @@
 
 import * as path from 'path';
 import * as fs from 'fs';
-import { exists, readFile, writeFile, mkdirp, readFileText, readDir, isDirectory } from '../utils/fs';
+import { exists, writeFile, mkdirp, readFileText, readDir, isDirectory } from '../utils/fs';
 import { TsgitError, ErrorCode } from './errors';
 
 /**
@@ -38,13 +38,7 @@ export interface WorktreeInfo {
   isPrunable: boolean;
 }
 
-/**
- * Worktree entry stored in .wit/worktrees/<name>/
- */
-interface WorktreeEntry {
-  gitdir: string;  // Path to the worktree's gitdir
-  locked?: string;  // Lock reason, if locked
-}
+// WorktreeEntry interface defined for worktree data: { gitdir: string; locked?: string; }
 
 /**
  * Worktree Manager
@@ -352,7 +346,7 @@ export class WorktreeManager {
   private checkoutToWorktree(worktreePath: string, commitHash: string, entryDir: string): void {
     // Import necessary modules
     const { ObjectStore } = require('./object-store');
-    const objectsDir = path.join(this.gitDir, 'objects');
+    // objectsDir at path.join(this.gitDir, 'objects') is implicitly used by ObjectStore
     
     // Simple object store access
     const objectStore = new ObjectStore(this.gitDir);
@@ -468,8 +462,9 @@ export class WorktreeManager {
       if (exists(gitFile)) {
         const content = readFileText(gitFile).trim();
         if (content.startsWith('gitdir:')) {
-          const entryDir = content.replace('gitdir:', '').trim();
-          const indexPath = path.join(entryDir, 'index');
+          // entryDir and indexPath available for modification checking:
+          // const entryDir = content.replace('gitdir:', '').trim();
+          // const indexPath = path.join(entryDir, 'index');
           
           // We could check for modifications here, but for simplicity
           // we'll just warn if there are any files

@@ -330,8 +330,7 @@ export class MergeManager {
       this.updateWorkingDirectoryAfterMerge(sourceTree, result);
       
       if (!options.noCommit) {
-        // Create merge commit
-        const message = options.message || `Merge branch '${sourceBranch}' into ${targetBranch}`;
+        // Create merge commit (would use options.message or default message)
         // Note: Would need to extend commit to support multiple parents
       }
     }

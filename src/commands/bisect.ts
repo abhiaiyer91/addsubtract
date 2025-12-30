@@ -15,7 +15,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { Repository } from '../core/repository';
 import { TsgitError, ErrorCode } from '../core/errors';
-import { exists, readFile, writeFile, mkdirp } from '../utils/fs';
+import { exists, readFile, writeFile } from '../utils/fs';
 import { parseRevision } from './reset';
 import { colors } from '../utils/colors';
 
@@ -289,7 +289,7 @@ export class BisectManager {
 
     this.saveState(state);
 
-    const remaining = Math.ceil(Math.log2(candidates.length));
+    // remaining steps: Math.ceil(Math.log2(candidates.length))
     return { state, nextCommit, found: false };
   }
 

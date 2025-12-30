@@ -75,8 +75,7 @@ export function createAuth() {
   }
 
   const db = getDb();
-  
-  const appUrl = process.env.APP_URL || 'http://localhost:5173';
+  // appUrl available from process.env.APP_URL || 'http://localhost:5173'
   const emailService = getGlobalEmailService();
   
   const githubConfig = getGitHubOAuthConfig();

@@ -16,7 +16,7 @@
 
 import * as path from 'path';
 import { Repository } from '../core/repository';
-import { TsgitError, ErrorCode } from '../core/errors';
+import { TsgitError } from '../core/errors';
 import { exists, readDir, readFileText, isDirectory } from '../utils/fs';
 import { shortHash } from '../utils/hash';
 
@@ -134,7 +134,7 @@ function collectRefs(dir: string, prefix: string, refs: RefEntry[]): void {
 export function verifyRef(
   repo: Repository,
   refName: string,
-  options: ShowRefOptions = {}
+  _options: ShowRefOptions = {}
 ): RefEntry | null {
   // Try to resolve the ref
   const hash = repo.refs.resolve(refName);

@@ -10,7 +10,6 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   createRepoWithCommit,
   cleanupTempDir,
-  createTestFile,
   suppressConsole,
   restoreCwd,
 } from './test-utils';

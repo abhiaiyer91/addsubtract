@@ -1,7 +1,7 @@
 import * as path from 'path';
 import { Repository } from '../core/repository';
 import { diff, createHunks, formatColoredDiff, isBinary, FileDiff, detectRenames, RenameDetectionOptions } from '../core/diff';
-import { readFile, walkDir, exists } from '../utils/fs';
+import { readFile, exists } from '../utils/fs';
 
 export interface DiffCommandOptions {
   staged?: boolean;

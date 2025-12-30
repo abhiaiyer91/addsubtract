@@ -22,7 +22,7 @@
  */
 
 import * as path from 'path';
-import { exists, readFile, writeFile, mkdirp, readDir } from '../utils/fs';
+import { exists, readFile, writeFile, mkdirp } from '../utils/fs';
 import { Repository } from './repository';
 import { TsgitError, ErrorCode } from './errors';
 import { RebaseManager } from '../commands/rebase';
@@ -422,7 +422,7 @@ export class StackManager {
   /**
    * Submit (push) all branches in the stack
    */
-  submit(remote: string = 'origin', force: boolean = false): SubmitResult {
+  submit(_remote: string = 'origin', _force: boolean = false): SubmitResult {
     const stack = this.getCurrentStack();
     if (!stack) {
       throw new TsgitError(

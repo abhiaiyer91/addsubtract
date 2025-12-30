@@ -7,7 +7,6 @@
 import * as path from 'path';
 import { exists, readFile, writeFile, mkdirp, walkDir, stat } from '../utils/fs';
 import { compress, decompress } from '../utils/compression';
-import { computeHash } from '../utils/hash';
 
 /**
  * Represents the state of a file in the working directory

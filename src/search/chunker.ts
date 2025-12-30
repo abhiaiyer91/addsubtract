@@ -141,7 +141,6 @@ function chunkTypeScript(content: string, opts: Required<ChunkOptions>): CodeChu
   
   let currentChunk: Partial<CodeChunk> | null = null;
   let braceCount = 0;
-  let inClass = false;
   let className = '';
   let importBlock: string[] = [];
   let importStartLine = 0;
@@ -179,7 +178,6 @@ function chunkTypeScript(content: string, opts: Required<ChunkOptions>): CodeChu
     // Check for class start
     const classMatch = trimmedLine.match(patterns.class);
     if (classMatch && !currentChunk) {
-      inClass = true;
       className = classMatch[1];
       currentChunk = {
         content: line,
@@ -268,7 +266,6 @@ function chunkTypeScript(content: string, opts: Required<ChunkOptions>): CodeChu
         
         // Reset class tracking if we just finished a class
         if (currentChunk.type === 'class') {
-          inClass = false;
           className = '';
         }
         

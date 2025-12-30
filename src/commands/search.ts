@@ -15,10 +15,7 @@
 import * as readline from 'readline';
 import { Repository } from '../core/repository';
 import { SearchEngine, ContentSearchResult } from '../ui/search';
-import { ansi, c } from '../utils/colors';
-
-// Use ansi codes for raw color access
-const colors = ansi;
+import { c } from '../utils/colors';
 
 // Lazy load search modules to avoid dependency issues
 let _semanticSearch: typeof import('../search') | null = null;

@@ -390,14 +390,8 @@ async function handleExplain(args: string[]): Promise<void> {
     
     const commit = repo.objects.readCommit(hash);
     
-    // Get the diff for this commit
-    const diffContent = '';
-    if (commit.parentHashes.length > 0) {
-      // Get diff between parent and this commit
-      const parentHash = commit.parentHashes[0];
-      // For now, just show the commit info
-      // TODO: Implement tree diff
-    }
+    // TODO: Implement tree diff to get actual diff content
+    // For now, we just show the commit info
     
     console.log('\n📖 Explaining commit...\n');
     

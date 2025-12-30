@@ -7,7 +7,6 @@ import {
   init,
   parseInitArgs,
   add,
-  commit,
   status,
   log,
   branch,
