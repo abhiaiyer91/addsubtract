@@ -166,6 +166,14 @@ export function AgentsSettingsPage() {
     { enabled: !!repoData?.repo.id }
   );
 
+  // Marketing agent config
+  const { data: marketingConfig } = trpc.marketing.getConfig.useQuery(
+    { repoId: repoData?.repo.id! },
+    { enabled: !!repoData?.repo.id }
+  );
+
+  const isMarketingEnabled = marketingConfig?.config?.enabled ?? false;
+
   // AI Mutations
   const setKeyMutation = trpc.repoAiKeys.set.useMutation({
     onSuccess: () => {
@@ -197,6 +205,12 @@ export function AgentsSettingsPage() {
   const setEnabledMutation = trpc.triageAgent.setEnabled.useMutation({
     onSuccess: () => {
       utils.triageAgent.getConfig.invalidate({ owner: owner!, repo: repo! });
+    },
+  });
+
+  const setMarketingEnabledMutation = trpc.marketing.setEnabled.useMutation({
+    onSuccess: () => {
+      utils.marketing.getConfig.invalidate({ repoId: repoData?.repo.id! });
     },
   });
 
@@ -678,11 +692,16 @@ export function AgentsSettingsPage() {
                       <CardDescription>Generate social content</CardDescription>
                     </div>
                   </div>
-                  {pendingCount && pendingCount.count > 0 && (
-                    <Badge variant="secondary" className="bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
-                      {pendingCount.count} pending
-                    </Badge>
-                  )}
+                  <Switch
+                    checked={isMarketingEnabled}
+                    onCheckedChange={(checked) => {
+                      setMarketingEnabledMutation.mutate({
+                        repoId: repoData?.repo.id!,
+                        enabled: checked,
+                      });
+                    }}
+                    disabled={!availability?.available || setMarketingEnabledMutation.isPending}
+                  />
                 </div>
               </CardHeader>
               <CardContent className="flex-1 space-y-4">
@@ -690,8 +709,13 @@ export function AgentsSettingsPage() {
                   Auto-generates tweets when PRs are merged or releases are published.
                 </p>
 
-                {availability?.available ? (
+                {isMarketingEnabled && availability?.available ? (
                   <div className="space-y-3">
+                    {pendingCount && pendingCount.count > 0 && (
+                      <Badge variant="secondary" className="bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
+                        {pendingCount.count} pending review
+                      </Badge>
+                    )}
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Check className="h-4 w-4 text-green-600" />
                       <span>Runs automatically on PR merge & release</span>

@@ -198,3 +198,6 @@ export {
 
 // Marketing content model (auto-generated social content)
 export { marketingContentModel } from './marketing-content';
+
+// Marketing agent config model
+export { marketingAgentConfigModel } from './marketing-agent';

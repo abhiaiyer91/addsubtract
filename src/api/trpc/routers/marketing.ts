@@ -8,7 +8,7 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { router, protectedProcedure } from '../trpc';
-import { marketingContentModel, repoModel } from '../../../db/models';
+import { marketingContentModel, repoModel, marketingAgentConfigModel, repoAiKeyModel } from '../../../db/models';
 import { triggerMarketingContent } from '../../../events';
 
 export const marketingRouter = router({
@@ -150,6 +150,140 @@ export const marketingRouter = router({
       }
 
       return result;
+    }),
+
+  /**
+   * Get marketing agent configuration for a repository
+   */
+  getConfig: protectedProcedure
+    .input(z.object({ repoId: z.string().uuid() }))
+    .query(async ({ input, ctx }) => {
+      const repo = await repoModel.findById(input.repoId);
+      if (!repo) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Repository not found',
+        });
+      }
+
+      // Check if user has access
+      const isOwner = repo.ownerId === ctx.user.id;
+      if (!isOwner) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only the repository owner can view agent settings',
+        });
+      }
+
+      const config = await marketingAgentConfigModel.findByRepoId(input.repoId);
+      const aiAvailability = await repoAiKeyModel.checkAvailability(input.repoId);
+
+      return {
+        config: config ? {
+          id: config.id,
+          enabled: config.enabled,
+          prompt: config.prompt,
+          generateOnPrMerge: config.generateOnPrMerge,
+          generateOnRelease: config.generateOnRelease,
+          updatedAt: config.updatedAt,
+        } : null,
+        aiAvailable: aiAvailability.available,
+      };
+    }),
+
+  /**
+   * Enable or disable the marketing agent
+   */
+  setEnabled: protectedProcedure
+    .input(
+      z.object({
+        repoId: z.string().uuid(),
+        enabled: z.boolean(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const repo = await repoModel.findById(input.repoId);
+      if (!repo) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Repository not found',
+        });
+      }
+
+      // Only owner can manage
+      if (repo.ownerId !== ctx.user.id) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only the repository owner can manage the marketing agent',
+        });
+      }
+
+      // Check AI availability before enabling
+      if (input.enabled) {
+        const aiAvailability = await repoAiKeyModel.checkAvailability(input.repoId);
+        if (!aiAvailability.available) {
+          throw new TRPCError({
+            code: 'PRECONDITION_FAILED',
+            message: 'AI API keys must be configured before enabling the marketing agent',
+          });
+        }
+      }
+
+      const config = await marketingAgentConfigModel.setEnabled(
+        input.repoId,
+        input.enabled,
+        ctx.user.id
+      );
+
+      return { enabled: config.enabled };
+    }),
+
+  /**
+   * Update marketing agent configuration
+   */
+  updateConfig: protectedProcedure
+    .input(
+      z.object({
+        repoId: z.string().uuid(),
+        prompt: z.string().nullable().optional(),
+        generateOnPrMerge: z.boolean().optional(),
+        generateOnRelease: z.boolean().optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const repo = await repoModel.findById(input.repoId);
+      if (!repo) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Repository not found',
+        });
+      }
+
+      // Only owner can manage
+      if (repo.ownerId !== ctx.user.id) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only the repository owner can manage the marketing agent',
+        });
+      }
+
+      const { repoId, ...data } = input;
+      const updateData: Record<string, unknown> = { updatedById: ctx.user.id };
+      
+      if (data.prompt !== undefined) updateData.prompt = data.prompt;
+      if (data.generateOnPrMerge !== undefined) updateData.generateOnPrMerge = data.generateOnPrMerge;
+      if (data.generateOnRelease !== undefined) updateData.generateOnRelease = data.generateOnRelease;
+
+      const config = await marketingAgentConfigModel.upsert(repoId, updateData as any);
+
+      return {
+        id: config.id,
+        enabled: config.enabled,
+        prompt: config.prompt,
+        generateOnPrMerge: config.generateOnPrMerge,
+        generateOnRelease: config.generateOnRelease,
+        updatedAt: config.updatedAt,
+      };
     }),
 });
 

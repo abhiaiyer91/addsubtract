@@ -1753,6 +1753,36 @@ export const marketingContent = pgTable('marketing_content', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+/**
+ * Marketing agent configuration per repository
+ * Allows users to configure the AI agent that generates social media content
+ */
+export const marketingAgentConfig = pgTable('marketing_agent_config', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  repoId: uuid('repo_id')
+    .notNull()
+    .references(() => repositories.id, { onDelete: 'cascade' })
+    .unique(), // One config per repo
+  
+  /** Whether the marketing agent is enabled */
+  enabled: boolean('enabled').notNull().default(false),
+  
+  /** Custom prompt/instructions for content generation */
+  prompt: text('prompt'),
+  
+  /** Whether to auto-generate on PR merge */
+  generateOnPrMerge: boolean('generate_on_pr_merge').notNull().default(true),
+  
+  /** Whether to auto-generate on release publish */
+  generateOnRelease: boolean('generate_on_release').notNull().default(true),
+  
+  /** User who created/updated this config */
+  updatedById: text('updated_by_id').notNull(),
+  
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
 // ============ JOURNAL (Notion-like documentation) ============
 
 /**
@@ -2445,6 +2475,10 @@ export type NewTriageAgentConfig = typeof triageAgentConfig.$inferInsert;
 
 export type TriageAgentRun = typeof triageAgentRuns.$inferSelect;
 export type NewTriageAgentRun = typeof triageAgentRuns.$inferInsert;
+
+// Marketing Agent types
+export type MarketingAgentConfig = typeof marketingAgentConfig.$inferSelect;
+export type NewMarketingAgentConfig = typeof marketingAgentConfig.$inferInsert;
 
 // Package registry types
 export type PackageVisibility = (typeof packageVisibilityEnum.enumValues)[number];
