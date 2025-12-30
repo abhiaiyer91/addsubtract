@@ -28,6 +28,8 @@ import {
   prLabelModel,
   releaseModel,
   activityHelpers,
+  orgModel,
+  orgMemberModel,
 } from '../../../db/models';
 import { RepoManager } from '../../../server/storage/repos';
 import {
@@ -115,6 +117,7 @@ export const githubImportRouter = router({
         token: z.string().optional(),
         name: z.string().optional(), // Custom name for the imported repo
         description: z.string().optional(),
+        orgId: z.string().uuid().optional(), // Organization to import into (uses personal account if not provided)
         isPrivate: z.boolean().default(false),
         import: z.object({
           repository: z.boolean().default(true),
@@ -189,8 +192,37 @@ export const githubImportRouter = router({
         // Determine the repo name to use
         const repoName = input.name || data.repo.name;
 
+        // Determine owner (user or org)
+        let ownerId = ctx.user.id;
+        let ownerType: 'user' | 'organization' = 'user';
+        let ownerName = ctx.user.username || ctx.user.id;
+
+        if (input.orgId) {
+          // Importing to an organization
+          const org = await orgModel.findById(input.orgId);
+          if (!org) {
+            throw new TRPCError({
+              code: 'NOT_FOUND',
+              message: 'Organization not found',
+            });
+          }
+
+          // Check if user has permission to create repos in this org (at least admin role)
+          const hasPermission = await orgMemberModel.hasRole(input.orgId, ctx.user.id, 'admin');
+          if (!hasPermission) {
+            throw new TRPCError({
+              code: 'FORBIDDEN',
+              message: 'You do not have permission to create repositories in this organization',
+            });
+          }
+
+          ownerId = org.id;
+          ownerType = 'organization';
+          ownerName = org.name;
+        }
+
         // Check if repo already exists
-        const existingRepo = await repoModel.findByOwnerAndName(ctx.user.id, repoName);
+        const existingRepo = await repoModel.findByOwnerAndName(ownerId, repoName);
         if (existingRepo) {
           throw new TRPCError({
             code: 'CONFLICT',
@@ -198,17 +230,15 @@ export const githubImportRouter = router({
           });
         }
 
-        // Get the username
-        const username = ctx.user.username || ctx.user.id;
-        const diskPath = `/repos/${username}/${repoName}.git`;
+        const diskPath = `/repos/${ownerName}/${repoName}.git`;
 
         // Clone the repository if importing repository data
         let cloneSuccess = false;
         if (options.import.repository) {
           const reposDir = process.env.REPOS_DIR || './repos';
           const absolutePath = path.isAbsolute(reposDir)
-            ? path.join(reposDir, username, `${repoName}.git`)
-            : path.join(process.cwd(), reposDir, username, `${repoName}.git`);
+            ? path.join(reposDir, ownerName, `${repoName}.git`)
+            : path.join(process.cwd(), reposDir, ownerName, `${repoName}.git`);
 
           // Create parent directory
           mkdirp(path.dirname(absolutePath));
@@ -240,8 +270,8 @@ export const githubImportRouter = router({
           name: repoName,
           description: input.description ?? data.repo.description ?? undefined,
           isPrivate: input.isPrivate,
-          ownerId: ctx.user.id,
-          ownerType: 'user',
+          ownerId,
+          ownerType,
           diskPath,
           defaultBranch: data.repo.default_branch,
         });
@@ -547,8 +577,15 @@ export const githubImportRouter = router({
         });
       }
 
-      // Check ownership
-      if (repo.ownerId !== ctx.user.id) {
+      // Check ownership or org permission
+      let hasPermission = repo.ownerId === ctx.user.id;
+      
+      if (!hasPermission && repo.ownerType === 'organization') {
+        // Check if user has admin permission in the org
+        hasPermission = await orgMemberModel.hasRole(repo.ownerId, ctx.user.id, 'admin');
+      }
+      
+      if (!hasPermission) {
         throw new TRPCError({
           code: 'FORBIDDEN',
           message: 'You do not have permission to resync this repository',
@@ -587,6 +624,14 @@ export const githubImportRouter = router({
           ? path.join(reposDir, relativePath)
           : path.join(process.cwd(), reposDir, relativePath);
 
+        console.log(`[GitHub Resync] Path resolution:`, {
+          diskPath: repo.diskPath,
+          reposDir,
+          relativePath,
+          absolutePath,
+          cwd: process.cwd(),
+        });
+
         // Remove existing repository directory if it exists
         if (await exists(absolutePath)) {
           console.log(`[GitHub Resync] Removing existing directory: ${absolutePath}`);
@@ -601,10 +646,26 @@ export const githubImportRouter = router({
 
         // Clone as a bare repository
         console.log(`[GitHub Resync] Cloning ${data.repo.full_name} to ${absolutePath}`);
-        execSync(`git clone --bare "${cloneUrl}" "${absolutePath}"`, {
-          stdio: 'pipe',
-          timeout: 300000, // 5 minute timeout
-        });
+        try {
+          execSync(`git clone --bare "${cloneUrl}" "${absolutePath}"`, {
+            stdio: 'pipe',
+            timeout: 300000, // 5 minute timeout
+          });
+          
+          // Verify the clone was successful
+          const objectsPath = path.join(absolutePath, 'objects');
+          const cloneExists = await exists(absolutePath);
+          const objectsExist = await exists(objectsPath);
+          console.log(`[GitHub Resync] Clone verification:`, { absolutePath, cloneExists, objectsExist });
+          
+          if (!objectsExist) {
+            throw new Error('Clone completed but objects directory not found');
+          }
+        } catch (cloneError) {
+          const cloneMsg = cloneError instanceof Error ? cloneError.message : 'Unknown error';
+          console.error(`[GitHub Resync] Clone failed:`, cloneMsg);
+          throw cloneError;
+        }
 
         // Update the repository's default branch if it changed
         if (data.repo.default_branch !== repo.defaultBranch) {
