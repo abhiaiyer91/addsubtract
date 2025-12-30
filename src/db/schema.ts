@@ -15,6 +15,75 @@ import {
 // Import better-auth user table for foreign key references
 import { user as authUser } from './auth-schema';
 
+// ============ STORAGE CONFIGURATION TYPES ============
+
+/**
+ * Base storage configuration shared by all backends
+ */
+export interface BaseStorageConfig {
+  /** Optional prefix/subdirectory for all objects */
+  prefix?: string;
+  /** Reference to stored credentials (for cloud backends) */
+  credentialsId?: string;
+  /** Enable compression for objects */
+  compression?: boolean;
+  /** Enable encryption at rest */
+  encryption?: boolean;
+}
+
+/**
+ * Local filesystem storage configuration
+ */
+export interface LocalStorageConfig extends BaseStorageConfig {
+  /** Override the default disk path */
+  path?: string;
+}
+
+/**
+ * S3-compatible storage configuration (S3, R2, MinIO)
+ */
+export interface S3StorageConfig extends BaseStorageConfig {
+  /** Bucket name (required) */
+  bucket: string;
+  /** AWS region (default: us-east-1) */
+  region?: string;
+  /** Custom endpoint URL (for R2, MinIO) */
+  endpoint?: string;
+  /** Force path-style URLs (required for some S3-compatible services) */
+  forcePathStyle?: boolean;
+  /** Storage class (STANDARD, INTELLIGENT_TIERING, etc.) */
+  storageClass?: string;
+}
+
+/**
+ * Google Cloud Storage configuration
+ */
+export interface GCSStorageConfig extends BaseStorageConfig {
+  /** Bucket name (required) */
+  bucket: string;
+  /** Project ID */
+  projectId?: string;
+}
+
+/**
+ * Azure Blob Storage configuration
+ */
+export interface AzureStorageConfig extends BaseStorageConfig {
+  /** Container name (required) */
+  container: string;
+  /** Storage account name */
+  accountName?: string;
+}
+
+/**
+ * Union type for all storage configurations
+ */
+export type StorageConfig = 
+  | LocalStorageConfig 
+  | S3StorageConfig 
+  | GCSStorageConfig 
+  | AzureStorageConfig;
+
 // ============ ENUMS ============
 
 export const ownerTypeEnum = pgEnum('owner_type', ['user', 'organization']);
@@ -109,6 +178,19 @@ export const mergeQueueStrategyEnum = pgEnum('merge_queue_strategy', [
   'sequential',   // Merge PRs one at a time in order
   'optimistic',   // Speculatively merge batches, rollback on failure
   'adaptive',     // AI-driven: analyze conflicts and determine best order
+]);
+
+/**
+ * Storage backend type enum
+ * Defines where Git objects are stored for a repository
+ */
+export const storageBackendEnum = pgEnum('storage_backend', [
+  'local',        // Local filesystem (default)
+  's3',           // AWS S3
+  'r2',           // Cloudflare R2 (S3-compatible)
+  'gcs',          // Google Cloud Storage
+  'minio',        // Self-hosted MinIO
+  'azure',        // Azure Blob Storage
 ]);
 
 // ============ USERS ============
@@ -293,8 +375,25 @@ export const repositories = pgTable('repositories', {
   languageStats: jsonb('language_stats'),
   languageStatsUpdatedAt: timestamp('language_stats_updated_at', { withTimezone: true }),
 
-  // Filesystem path to bare repo
+  // Filesystem path to bare repo (used for local storage backend)
   diskPath: text('disk_path').notNull(),
+
+  // Storage configuration
+  // Defines where Git objects are stored for this repository
+  storageBackend: storageBackendEnum('storage_backend').notNull().default('local'),
+  
+  // Storage-specific configuration (bucket, prefix, credentials ref, etc.)
+  // Structure depends on storageBackend:
+  // - local: { path?: string } (override diskPath)
+  // - s3/r2/minio: { bucket, prefix?, region?, endpoint?, credentialsId? }
+  // - gcs: { bucket, prefix?, credentialsId? }
+  // - azure: { container, prefix?, credentialsId? }
+  storageConfig: jsonb('storage_config').$type<StorageConfig>(),
+
+  // Storage statistics
+  storageSizeBytes: integer('storage_size_bytes').default(0),
+  storageObjectCount: integer('storage_object_count').default(0),
+  storageLastSyncAt: timestamp('storage_last_sync_at', { withTimezone: true }),
 
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
@@ -313,6 +412,49 @@ export const repositories = pgTable('repositories', {
   pushedAtIdx: index('idx_repositories_pushed_at').on(table.pushedAt),
   // Index for trending/popular repos
   starsCountIdx: index('idx_repositories_stars_count').on(table.starsCount),
+  // Index for storage backend (for migration/cleanup operations)
+  storageBackendIdx: index('idx_repositories_storage_backend').on(table.storageBackend),
+}));
+
+// ============ STORAGE CREDENTIALS ============
+
+/**
+ * Stored credentials for cloud storage backends
+ * Credentials are encrypted at rest using ENCRYPTION_KEY
+ */
+export const storageCredentials = pgTable('storage_credentials', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  
+  // Owner of the credentials (user or org)
+  ownerId: text('owner_id').notNull(),
+  ownerType: ownerTypeEnum('owner_type').notNull(),
+  
+  // Human-readable name
+  name: text('name').notNull(),
+  
+  // Which backend this is for
+  backendType: storageBackendEnum('backend_type').notNull(),
+  
+  // Encrypted credentials JSON
+  encryptedCredentials: text('encrypted_credentials').notNull(),
+  
+  // Metadata for display (not sensitive)
+  metadata: jsonb('metadata').$type<{
+    bucket?: string;
+    region?: string;
+    endpoint?: string;
+    accountName?: string;
+  }>(),
+  
+  // Usage tracking
+  lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+  usageCount: integer('usage_count').default(0),
+  
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  // Index for listing credentials by owner
+  ownerIdx: index('idx_storage_credentials_owner').on(table.ownerId, table.ownerType),
 }));
 
 export const collaborators = pgTable(
@@ -1729,6 +1871,7 @@ export const aiProviderEnum = pgEnum('ai_provider', [
   'openai',
   'anthropic',
   'coderabbit',
+  'openrouter',
 ]);
 
 /**
@@ -1744,7 +1887,7 @@ export const repoAiKeys = pgTable('repo_ai_keys', {
     .notNull()
     .references(() => repositories.id, { onDelete: 'cascade' }),
   
-  // AI provider (openai, anthropic)
+  // AI provider (openai, anthropic, coderabbit, openrouter)
   provider: aiProviderEnum('provider').notNull(),
   
   // Encrypted API key (we store encrypted, never plain text)
@@ -1779,7 +1922,7 @@ export const userAiKeys = pgTable('user_ai_keys', {
     .notNull()
     .references(() => authUser.id, { onDelete: 'cascade' }),
   
-  // AI provider (openai, anthropic)
+  // AI provider (openai, anthropic, coderabbit, openrouter)
   provider: aiProviderEnum('provider').notNull(),
   
   // Encrypted API key (we store encrypted, never plain text)

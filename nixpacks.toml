@@ -1,0 +1,72 @@
+# =============================================================================
+# Nixpacks Configuration for wit Server
+# =============================================================================
+# This configures the build and runtime environment for Railway deployments.
+# See: https://nixpacks.com/docs/configuration/file
+
+providers = ["node"]
+
+# =============================================================================
+# Setup Phase - Install system dependencies
+# =============================================================================
+[phases.setup]
+nixPkgs = [
+  "nodejs_22",    # Node.js 22 LTS
+  "openssl",      # For crypto operations
+  "cacert",       # SSL certificates
+]
+aptPkgs = [
+  "git",              # For git operations
+  "openssh-client",   # For SSH key generation
+]
+
+# =============================================================================
+# Install Phase - Install npm dependencies
+# =============================================================================
+[phases.install]
+cmds = ["npm ci --prefer-offline"]
+cacheDirectories = ["/root/.npm"]
+
+# =============================================================================
+# Build Phase - Compile TypeScript and run migrations
+# =============================================================================
+[phases.build]
+cmds = [
+  # Build the application
+  "npm run build",
+  
+  # Run database migrations if DATABASE_URL is set
+  # Uses db:push for Drizzle ORM
+  "if [ -n \"$DATABASE_URL\" ]; then npm run db:push; else echo 'Skipping migrations (no DATABASE_URL)'; fi"
+]
+
+# Cache the TypeScript build output and node_modules
+cacheDirectories = [
+  "node_modules/.cache",
+  ".turbo",
+]
+
+# =============================================================================
+# Start Phase - Run the server
+# =============================================================================
+[start]
+cmd = "node dist/cli.js serve --port $PORT --repos /data/repos"
+
+# =============================================================================
+# Environment Variables
+# =============================================================================
+[variables]
+# Increase Node.js memory limit for large repos
+NODE_OPTIONS = "--max-old-space-size=2048 --enable-source-maps"
+
+# Increase libuv thread pool for better async I/O
+UV_THREADPOOL_SIZE = "16"
+
+# Use production mode
+NODE_ENV = "production"
+
+# Disable npm update notifier
+NPM_CONFIG_UPDATE_NOTIFIER = "false"
+
+# Enable npm prefer-offline for faster installs
+NPM_CONFIG_PREFER_OFFLINE = "true"

@@ -273,6 +273,7 @@ export class ComputeSDKProvider extends BaseSandboxProvider {
 
     // Dynamically import ComputeSDK
     try {
+      // @ts-ignore - computesdk may not be installed
       const computesdk = await import('computesdk');
       this.computeModule = computesdk.compute as unknown as ComputeModule;
     } catch {
@@ -310,6 +311,7 @@ export class ComputeSDKProvider extends BaseSandboxProvider {
 
     switch (providerType) {
       case 'e2b': {
+        // @ts-ignore - @computesdk/e2b may not be installed
         providerModule = await import('@computesdk/e2b');
         const apiKey =
           this.computeSDKConfig.options?.providerApiKey ||
@@ -322,6 +324,7 @@ export class ComputeSDKProvider extends BaseSandboxProvider {
         break;
       }
       case 'daytona': {
+        // @ts-ignore - @computesdk/daytona may not be installed
         providerModule = await import('@computesdk/daytona');
         const apiKey =
           this.computeSDKConfig.options?.providerApiKey ||
@@ -336,6 +339,7 @@ export class ComputeSDKProvider extends BaseSandboxProvider {
         break;
       }
       case 'modal': {
+        // @ts-ignore - @computesdk/modal may not be installed
         providerModule = await import('@computesdk/modal');
         const tokenId =
           process.env.MODAL_TOKEN_ID;
@@ -351,6 +355,7 @@ export class ComputeSDKProvider extends BaseSandboxProvider {
         break;
       }
       case 'codesandbox': {
+        // @ts-ignore - @computesdk/codesandbox may not be installed
         providerModule = await import('@computesdk/codesandbox');
         const token =
           this.computeSDKConfig.options?.providerApiKey ||

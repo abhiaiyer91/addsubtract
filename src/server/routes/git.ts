@@ -1,6 +1,10 @@
 import { Hono } from 'hono';
 import { RepoManager, BareRepository } from '../storage/repos';
 import {
+  StorageAwareRepoManager,
+  StorageAwareBareRepository,
+} from '../../storage';
+import {
   pktLine,
   pktFlush,
   parsePktLines,
@@ -15,11 +19,25 @@ import { isConnected } from '../../db';
 import { gitAuthMiddleware } from '../middleware/auth';
 import { computeLanguageStats } from '../../api/trpc/routers/repos';
 
+// Union type for both repo manager types
+type AnyRepoManager = RepoManager | StorageAwareRepoManager;
+type AnyRepository = BareRepository | StorageAwareBareRepository;
+
 /**
  * Git Smart HTTP server routes
+ * Supports both legacy RepoManager and StorageAwareRepoManager
  */
-export function createGitRoutes(repoManager: RepoManager): Hono {
+export function createGitRoutes(repoManager: AnyRepoManager): Hono {
   const app = new Hono();
+  
+  // Helper to get repo - works with both manager types
+  const getRepository = (owner: string, repo: string, autoCreate: boolean = true): AnyRepository | null => {
+    if (repoManager instanceof StorageAwareRepoManager) {
+      // Use sync method for backward compatibility
+      return repoManager.getRepoSync(owner, repo, autoCreate);
+    }
+    return repoManager.getRepo(owner, repo, autoCreate);
+  };
 
   // Apply auth middleware to all git routes
   app.use('*', gitAuthMiddleware);
@@ -54,7 +72,7 @@ export function createGitRoutes(repoManager: RepoManager): Hono {
     }
 
     // Get or create repository
-    const repository = repoManager.getRepo(owner, repo, true);
+    const repository = getRepository(owner, repo, true);
     if (!repository) {
       return c.text('Repository not found', 404);
     }
@@ -81,7 +99,7 @@ export function createGitRoutes(repoManager: RepoManager): Hono {
     const { owner, repo } = c.req.param();
     console.log(`[server] upload-pack: ${owner}/${repo}`);
 
-    const repository = repoManager.getRepo(owner, repo, false);
+    const repository = getRepository(owner, repo, false);
     if (!repository) {
       return c.text('Repository not found', 404);
     }
@@ -129,7 +147,7 @@ export function createGitRoutes(repoManager: RepoManager): Hono {
     const { owner, repo } = c.req.param();
     console.log(`[server] receive-pack: ${owner}/${repo}`);
 
-    const repository = repoManager.getRepo(owner, repo, true);
+    const repository = getRepository(owner, repo, true);
     if (!repository) {
       return c.text('Repository not found', 404);
     }
@@ -169,7 +187,7 @@ export function createGitRoutes(repoManager: RepoManager): Hono {
 /**
  * Build ref advertisement response
  */
-function buildRefAdvertisement(repo: BareRepository, service: string): Buffer {
+function buildRefAdvertisement(repo: AnyRepository, service: string): Buffer {
   const parts: Buffer[] = [];
 
   // Service line (required for smart HTTP)
@@ -300,7 +318,7 @@ function parseUploadPackRequest(data: Buffer): UploadPackRequest {
  * Build upload-pack response (packfile with objects)
  */
 function buildUploadPackResponse(
-  repo: BareRepository,
+  repo: AnyRepository,
   wants: string[],
   haves: string[],
   capabilities: Set<string>
@@ -358,7 +376,7 @@ function buildUploadPackResponse(
  * Collect all objects that need to be sent
  */
 function collectObjectsToSend(
-  repo: BareRepository,
+  repo: AnyRepository,
   wants: string[],
   haves: string[]
 ): PackableObject[] {
@@ -479,7 +497,7 @@ function parseReceivePackRequest(data: Buffer): ReceivePackRequest {
  * Process receive-pack request
  */
 function processReceivePack(
-  repo: BareRepository,
+  repo: AnyRepository,
   commands: RefCommand[],
   packData: Buffer,
   capabilities: Set<string>
@@ -737,7 +755,7 @@ async function handleDatabaseIntegration(
 /**
  * Process a single ref update command
  */
-function processRefCommand(repo: BareRepository, cmd: RefCommand): void {
+function processRefCommand(repo: AnyRepository, cmd: RefCommand): void {
   const { oldHash, newHash, refName } = cmd;
 
   // Validate ref name

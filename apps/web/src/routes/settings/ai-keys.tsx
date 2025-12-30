@@ -39,20 +39,28 @@ import { trpc } from '@/lib/trpc';
 
 const AI_PROVIDERS = [
   { 
-    value: 'openai', 
-    label: 'OpenAI', 
-    description: 'GPT-4, embeddings for semantic search',
-    placeholder: 'sk-...',
-    prefix: 'sk-',
-    docsUrl: 'https://platform.openai.com/api-keys',
-  },
-  { 
     value: 'anthropic', 
     label: 'Anthropic', 
     description: 'Claude models for code generation',
     placeholder: 'sk-ant-...',
     prefix: 'sk-ant-',
     docsUrl: 'https://console.anthropic.com/settings/keys',
+  },
+  { 
+    value: 'openrouter', 
+    label: 'OpenRouter', 
+    description: 'Access any model (Claude, GPT, Llama, etc.)',
+    placeholder: 'sk-or-...',
+    prefix: 'sk-or-',
+    docsUrl: 'https://openrouter.ai/keys',
+  },
+  { 
+    value: 'openai', 
+    label: 'OpenAI', 
+    description: 'GPT-4, embeddings for semantic search',
+    placeholder: 'sk-...',
+    prefix: 'sk-',
+    docsUrl: 'https://platform.openai.com/api-keys',
   },
 ] as const;
 
@@ -63,7 +71,7 @@ export function UserAIKeysPage() {
   const authenticated = !!session?.user;
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [selectedProvider, setSelectedProvider] = useState<Provider>('openai');
+  const [selectedProvider, setSelectedProvider] = useState<Provider>('anthropic');
   const [apiKey, setApiKey] = useState('');
   const [showKey, setShowKey] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -383,7 +391,19 @@ export function UserAIKeysPage() {
           <CardContent className="text-sm text-muted-foreground">
             <p>
               PR descriptions, code review, and the Agent assistant work with 
-              either OpenAI or Anthropic keys.
+              Anthropic, OpenRouter, or OpenAI keys.
+            </p>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">OpenRouter</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground">
+            <p>
+              <strong>OpenRouter</strong> gives you access to any AI model (Claude, GPT, Llama, Mistral, and more) 
+              through a single API key. Perfect for trying different models.
             </p>
           </CardContent>
         </Card>

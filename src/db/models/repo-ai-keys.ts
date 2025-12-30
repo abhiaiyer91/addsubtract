@@ -214,17 +214,23 @@ export const repoAiKeyModel = {
 
   /**
    * Get any available LLM API key for a repository
-   * Prefers Anthropic (Claude Opus 4.5), then OpenAI (GPT 5.2)
+   * Prefers Anthropic, then OpenRouter (any model), then OpenAI
    * Note: Does not return CodeRabbit keys as they are not LLM providers
    */
-  async getAnyKey(repoId: string): Promise<{ provider: 'openai' | 'anthropic'; key: string } | null> {
-    // Try Anthropic first (recommended - Claude Opus 4.5)
+  async getAnyKey(repoId: string): Promise<{ provider: 'openai' | 'anthropic' | 'openrouter'; key: string } | null> {
+    // Try Anthropic first (recommended - Claude)
     const anthropicKey = await this.getDecryptedKey(repoId, 'anthropic');
     if (anthropicKey) {
       return { provider: 'anthropic', key: anthropicKey };
     }
     
-    // Fall back to OpenAI (GPT 5.2)
+    // Try OpenRouter (supports any model)
+    const openrouterKey = await this.getDecryptedKey(repoId, 'openrouter');
+    if (openrouterKey) {
+      return { provider: 'openrouter', key: openrouterKey };
+    }
+    
+    // Fall back to OpenAI
     const openaiKey = await this.getDecryptedKey(repoId, 'openai');
     if (openaiKey) {
       return { provider: 'openai', key: openaiKey };
@@ -313,7 +319,8 @@ export const repoAiKeyModel = {
     // Check if server has global keys
     const hasServerKeys = !!(
       process.env.OPENAI_API_KEY || 
-      process.env.ANTHROPIC_API_KEY
+      process.env.ANTHROPIC_API_KEY ||
+      process.env.OPENROUTER_API_KEY
     );
     
     return {
