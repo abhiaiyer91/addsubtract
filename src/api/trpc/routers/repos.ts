@@ -779,18 +779,41 @@ export const reposRouter = router({
       // Get the bare repository
       const bareRepo = getRepoFromDisk(result.repo.diskPath);
       if (!bareRepo) {
+        console.warn('[repos.getLanguages] Repository not found on disk:', result.repo.diskPath);
         return [];
       }
 
       try {
-        // Resolve the ref to a commit
-        const commitHash = bareRepo.refs.resolve(input.ref);
+        // Resolve the ref to a commit - try multiple fallbacks
+        let commitHash = bareRepo.refs.resolve(input.ref);
+        
+        if (!commitHash && input.ref === 'HEAD') {
+          // Try the repo's configured default branch
+          const defaultBranch = result.repo.defaultBranch || 'main';
+          commitHash = bareRepo.refs.resolve(`refs/heads/${defaultBranch}`);
+          
+          if (!commitHash) {
+            // Try common default branch names
+            for (const branch of ['main', 'master', 'develop']) {
+              commitHash = bareRepo.refs.resolve(`refs/heads/${branch}`);
+              if (commitHash) break;
+            }
+          }
+        }
+        
         if (!commitHash) {
+          console.warn('[repos.getLanguages] Could not resolve ref:', input.ref);
           return [];
         }
 
         // Read the commit to get the tree
-        const commit = bareRepo.objects.readCommit(commitHash);
+        let commit;
+        try {
+          commit = bareRepo.objects.readCommit(commitHash);
+        } catch (commitError) {
+          console.warn('[repos.getLanguages] Could not read commit:', commitHash, commitError);
+          return [];
+        }
         
         // Recursively collect all files with their sizes
         const files: Array<{ path: string; size: number }> = [];
