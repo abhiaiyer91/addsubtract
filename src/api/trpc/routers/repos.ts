@@ -1149,6 +1149,9 @@ export const reposRouter = router({
       }
 
       try {
+        // Resolve ref - if it's HEAD use directly, otherwise prefix with refs/heads/
+        const refToResolve = input.ref === 'HEAD' ? 'HEAD' : `refs/heads/${input.ref}`;
+        
         // Log available refs for debugging
         const allBranches = bareRepo.refs.listBranches();
         console.log(`[repos.getTree] Attempting to resolve ref '${refToResolve}', available branches: ${allBranches.join(', ') || '(none)'}`);
@@ -1249,6 +1252,146 @@ export const reposRouter = router({
         }
         
         return { entries: [], error: 'Failed to read repository tree. Please try again.' };
+      }
+    }),
+
+  /**
+   * List all files in a repository (recursive)
+   * Used for @ mentions and file autocomplete
+   */
+  listFiles: publicProcedure
+    .input(
+      z.object({
+        owner: z.string(),
+        repo: z.string(),
+        ref: z.string().default('HEAD'),
+        query: z.string().optional(),
+        limit: z.number().min(1).max(100).default(50),
+      })
+    )
+    .query(async ({ input, ctx }) => {
+      const result = await repoModel.findByPath(input.owner, input.repo);
+
+      if (!result) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Repository not found',
+        });
+      }
+
+      // Check access for private repos
+      if (result.repo.isPrivate) {
+        if (!ctx.user) {
+          throw new TRPCError({
+            code: 'UNAUTHORIZED',
+            message: 'Authentication required',
+          });
+        }
+
+        let hasAccess = result.repo.ownerId === ctx.user.id;
+        
+        // Check collaborator access
+        if (!hasAccess) {
+          hasAccess = await collaboratorModel.hasPermission(result.repo.id, ctx.user.id, 'read');
+        }
+        
+        // Check org membership for org-owned repos
+        if (!hasAccess && result.repo.ownerType === 'organization') {
+          hasAccess = await orgMemberModel.isMember(result.repo.ownerId, ctx.user.id);
+        }
+
+        if (!hasAccess) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'You do not have access to this repository',
+          });
+        }
+      }
+
+      const bareRepo = getRepoFromDisk(result.repo.diskPath);
+      if (!bareRepo) {
+        return { files: [] };
+      }
+
+      try {
+        // Resolve ref
+        const refToResolve = input.ref === 'HEAD' ? 'HEAD' : `refs/heads/${input.ref}`;
+        let commitHash = bareRepo.refs.resolve(refToResolve);
+        
+        if (!commitHash && refToResolve === 'HEAD') {
+          const defaultBranch = result.repo.defaultBranch || 'main';
+          commitHash = bareRepo.refs.resolve(`refs/heads/${defaultBranch}`);
+          
+          if (!commitHash) {
+            const fallbackBranches = ['main', 'master', 'develop'];
+            for (const branch of fallbackBranches) {
+              commitHash = bareRepo.refs.resolve(`refs/heads/${branch}`);
+              if (commitHash) break;
+            }
+          }
+        }
+        
+        if (!commitHash) {
+          return { files: [] };
+        }
+
+        const commit = bareRepo.objects.readCommit(commitHash);
+        
+        // Walk tree recursively
+        const walkTree = (treeHash: string, prefix: string = ''): string[] => {
+          const files: string[] = [];
+          try {
+            const tree = bareRepo.objects.readTree(treeHash);
+            for (const entry of tree.entries) {
+              const fullPath = prefix ? `${prefix}/${entry.name}` : entry.name;
+              if (entry.mode === '40000') {
+                // Directory - recurse
+                files.push(...walkTree(entry.hash, fullPath));
+              } else {
+                // File
+                files.push(fullPath);
+              }
+            }
+          } catch {
+            // Skip invalid trees
+          }
+          return files;
+        };
+
+        let files = walkTree(commit.treeHash);
+        
+        // Filter by query if provided
+        if (input.query) {
+          const lowerQuery = input.query.toLowerCase();
+          files = files.filter(f => f.toLowerCase().includes(lowerQuery));
+        }
+        
+        // Sort by relevance (exact filename match first, then path match)
+        if (input.query) {
+          const lowerQuery = input.query.toLowerCase();
+          files.sort((a, b) => {
+            const aName = a.split('/').pop()?.toLowerCase() || '';
+            const bName = b.split('/').pop()?.toLowerCase() || '';
+            const aExact = aName === lowerQuery;
+            const bExact = bName === lowerQuery;
+            const aStartsWith = aName.startsWith(lowerQuery);
+            const bStartsWith = bName.startsWith(lowerQuery);
+            
+            if (aExact && !bExact) return -1;
+            if (bExact && !aExact) return 1;
+            if (aStartsWith && !bStartsWith) return -1;
+            if (bStartsWith && !aStartsWith) return 1;
+            return a.localeCompare(b);
+          });
+        }
+        
+        // Limit results
+        files = files.slice(0, input.limit);
+        
+        return { files };
+      } catch (error) {
+        console.error('[repos.listFiles] Error:', error);
+        return { files: [] };
       }
     }),
 

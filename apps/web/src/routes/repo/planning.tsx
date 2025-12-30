@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   Brain,
@@ -24,6 +24,8 @@ import {
   Square,
   Copy,
   Check,
+  AtSign,
+  File,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -159,6 +161,236 @@ const phaseConfig: Record<WorkflowPhase, {
   completed: { label: 'Completed', description: 'All tasks finished', icon: CheckCircle2, color: 'text-green-500', bgColor: 'bg-green-500' },
   failed: { label: 'Failed', description: 'Workflow encountered errors', icon: XCircle, color: 'text-red-500', bgColor: 'bg-red-500' },
 };
+
+// =============================================================================
+// Component: MentionTextarea - Textarea with @ file mention support
+// =============================================================================
+
+interface MentionTextareaProps {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  className?: string;
+  owner: string;
+  repo: string;
+  autoFocus?: boolean;
+}
+
+function MentionTextarea({ 
+  value, 
+  onChange, 
+  placeholder, 
+  className,
+  owner,
+  repo,
+  autoFocus,
+}: MentionTextareaProps) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [showMentions, setShowMentions] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState('');
+  const [mentionStart, setMentionStart] = useState<number | null>(null);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+
+  // Fetch files for autocomplete
+  const { data: filesData, isLoading: filesLoading } = trpc.repos.listFiles.useQuery(
+    { owner, repo, query: mentionQuery, limit: 10 },
+    { enabled: showMentions && mentionQuery.length > 0 }
+  );
+
+  const files = useMemo(() => filesData?.files || [], [filesData]);
+
+  // Reset selected index when files change
+  useEffect(() => {
+    setSelectedIndex(0);
+  }, [files]);
+
+  // Detect @ mention trigger
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newValue = e.target.value;
+    const cursorPos = e.target.selectionStart;
+    onChange(newValue);
+
+    // Check if we just typed @ or are in a mention
+    const textBeforeCursor = newValue.slice(0, cursorPos);
+    const atIndex = textBeforeCursor.lastIndexOf('@');
+    
+    if (atIndex !== -1) {
+      // Check if there's a space or start of text before @
+      const charBeforeAt = atIndex > 0 ? textBeforeCursor[atIndex - 1] : ' ';
+      if (charBeforeAt === ' ' || charBeforeAt === '\n' || atIndex === 0) {
+        const query = textBeforeCursor.slice(atIndex + 1);
+        // Only show dropdown if query doesn't contain spaces (active mention)
+        if (!query.includes(' ')) {
+          setShowMentions(true);
+          setMentionQuery(query);
+          setMentionStart(atIndex);
+          return;
+        }
+      }
+    }
+    
+    setShowMentions(false);
+    setMentionQuery('');
+    setMentionStart(null);
+  };
+
+  // Handle keyboard navigation
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (!showMentions || files.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedIndex(prev => (prev + 1) % files.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedIndex(prev => (prev - 1 + files.length) % files.length);
+    } else if (e.key === 'Enter' && showMentions) {
+      e.preventDefault();
+      selectFile(files[selectedIndex]);
+    } else if (e.key === 'Escape') {
+      setShowMentions(false);
+    } else if (e.key === 'Tab' && showMentions) {
+      e.preventDefault();
+      selectFile(files[selectedIndex]);
+    }
+  };
+
+  // Select a file from the dropdown
+  const selectFile = (file: string) => {
+    if (mentionStart === null || !textareaRef.current) return;
+
+    const before = value.slice(0, mentionStart);
+    const after = value.slice(textareaRef.current.selectionStart);
+    const newValue = `${before}@${file} ${after}`;
+    
+    onChange(newValue);
+    setShowMentions(false);
+    setMentionQuery('');
+    setMentionStart(null);
+
+    // Set cursor position after the inserted mention
+    setTimeout(() => {
+      if (textareaRef.current) {
+        const newCursorPos = mentionStart + file.length + 2; // +2 for @ and space
+        textareaRef.current.selectionStart = newCursorPos;
+        textareaRef.current.selectionEnd = newCursorPos;
+        textareaRef.current.focus();
+      }
+    }, 0);
+  };
+
+  // Click outside to close dropdown
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        dropdownRef.current && 
+        !dropdownRef.current.contains(e.target as Node) &&
+        textareaRef.current &&
+        !textareaRef.current.contains(e.target as Node)
+      ) {
+        setShowMentions(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Get dropdown position
+  const getDropdownPosition = () => {
+    if (!textareaRef.current || mentionStart === null) return { top: 0, left: 0 };
+    
+    // Create a hidden div to measure text position
+    const div = document.createElement('div');
+    const style = window.getComputedStyle(textareaRef.current);
+    div.style.cssText = `
+      position: absolute;
+      visibility: hidden;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      font: ${style.font};
+      padding: ${style.padding};
+      width: ${textareaRef.current.clientWidth}px;
+      line-height: ${style.lineHeight};
+    `;
+    div.textContent = value.slice(0, mentionStart);
+    document.body.appendChild(div);
+    
+    const textHeight = div.offsetHeight;
+    document.body.removeChild(div);
+    
+    return {
+      top: Math.min(textHeight + 24, textareaRef.current.clientHeight - 10),
+      left: 8,
+    };
+  };
+
+  const dropdownPos = getDropdownPosition();
+
+  return (
+    <div className="relative">
+      <div className="relative">
+        <textarea
+          ref={textareaRef}
+          value={value}
+          onChange={handleChange}
+          onKeyDown={handleKeyDown}
+          placeholder={placeholder}
+          autoFocus={autoFocus}
+          className={cn(
+            'flex min-h-[120px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm',
+            className
+          )}
+        />
+        
+        {/* Hint for @ mentions */}
+        <div className="absolute bottom-2 right-2 flex items-center gap-1 text-xs text-muted-foreground pointer-events-none">
+          <AtSign className="h-3 w-3" />
+          <span>to reference files</span>
+        </div>
+      </div>
+
+      {/* File mention dropdown */}
+      {showMentions && (
+        <div 
+          ref={dropdownRef}
+          className="absolute z-50 mt-1 w-full max-h-64 overflow-y-auto rounded-lg border bg-popover shadow-lg"
+          style={{ top: dropdownPos.top }}
+        >
+          {filesLoading ? (
+            <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Searching files...
+            </div>
+          ) : files.length === 0 ? (
+            <div className="px-3 py-2 text-sm text-muted-foreground">
+              {mentionQuery ? `No files matching "${mentionQuery}"` : 'Type to search files...'}
+            </div>
+          ) : (
+            <div className="py-1">
+              {files.map((file, index) => (
+                <button
+                  key={file}
+                  onClick={() => selectFile(file)}
+                  className={cn(
+                    'flex items-center gap-2 w-full px-3 py-2 text-left text-sm transition-colors',
+                    index === selectedIndex 
+                      ? 'bg-accent text-accent-foreground' 
+                      : 'hover:bg-muted'
+                  )}
+                >
+                  <File className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span className="font-mono truncate">{file}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // =============================================================================
 // Component: WorkflowHeader - Always visible task context
@@ -1272,21 +1504,24 @@ export function PlanningPage() {
           <div className="space-y-4 p-6 rounded-xl border-2 border-dashed bg-card">
             <div className="space-y-2">
               <label className="text-sm font-medium">What do you want to build?</label>
-              <Textarea
-                placeholder="Describe the task you want to accomplish... (e.g., 'Add user authentication with JWT tokens and password reset functionality')"
+              <MentionTextarea
+                placeholder="Describe the task you want to accomplish... Use @ to reference files (e.g., 'Add user authentication with JWT tokens')"
                 value={task}
-                onChange={(e) => setTask(e.target.value)}
-                className="min-h-[120px] text-base"
+                onChange={setTask}
+                owner={owner!}
+                repo={repo!}
                 autoFocus
               />
             </div>
 
             <div className="space-y-2">
               <label className="text-sm font-medium text-muted-foreground">Additional context (optional)</label>
-              <Textarea
-                placeholder="Any additional requirements, constraints, or context..."
+              <MentionTextarea
+                placeholder="Any additional requirements, constraints, or context... Use @ to reference specific files"
                 value={context}
-                onChange={(e) => setContext(e.target.value)}
+                onChange={setContext}
+                owner={owner!}
+                repo={repo!}
                 className="min-h-[60px]"
               />
             </div>

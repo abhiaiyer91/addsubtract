@@ -561,7 +561,7 @@ const applyAndValidateStep = createStep({
     }),
   }),
   execute: async ({ inputData }) => {
-    const { writeRepoFile } = await import('./utils.js');
+    const { writeRepoFile, readRepoFile } = await import('./utils.js');
     const { spawn } = await import('child_process');
     
     const appliedFiles: Array<{
