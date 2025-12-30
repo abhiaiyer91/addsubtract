@@ -16,14 +16,7 @@ import { Commit, Tree, Blob } from '../core/object';
 import { TsgitError, ErrorCode } from '../core/errors';
 import { Author, TreeEntry } from '../core/types';
 import { exists, readFile, writeFile, mkdirp } from '../utils/fs';
-
-const colors = {
-  green: (s: string) => `\x1b[32m${s}\x1b[0m`,
-  yellow: (s: string) => `\x1b[33m${s}\x1b[0m`,
-  cyan: (s: string) => `\x1b[36m${s}\x1b[0m`,
-  red: (s: string) => `\x1b[31m${s}\x1b[0m`,
-  dim: (s: string) => `\x1b[2m${s}\x1b[0m`,
-};
+import { colors } from '../utils/colors';
 
 /**
  * Revert state saved during multi-commit or conflict resolution

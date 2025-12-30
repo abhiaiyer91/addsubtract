@@ -1,11 +1,6 @@
 import { Repository } from '../core/repository';
 import { Commit } from '../core/object';
-
-const colors = {
-  yellow: (s: string) => `\x1b[33m${s}\x1b[0m`,
-  cyan: (s: string) => `\x1b[36m${s}\x1b[0m`,
-  bold: (s: string) => `\x1b[1m${s}\x1b[0m`,
-};
+import { colors } from '../utils/colors';
 
 export function log(ref: string = 'HEAD', options: { oneline?: boolean; n?: number } = {}): void {
   try {

@@ -24,23 +24,7 @@ import {
   type DashboardSummary,
   type ContributionStats,
 } from '../api/client';
-
-const colors = {
-  green: (s: string) => `\x1b[32m${s}\x1b[0m`,
-  yellow: (s: string) => `\x1b[33m${s}\x1b[0m`,
-  cyan: (s: string) => `\x1b[36m${s}\x1b[0m`,
-  red: (s: string) => `\x1b[31m${s}\x1b[0m`,
-  magenta: (s: string) => `\x1b[35m${s}\x1b[0m`,
-  dim: (s: string) => `\x1b[2m${s}\x1b[0m`,
-  bold: (s: string) => `\x1b[1m${s}\x1b[0m`,
-  blue: (s: string) => `\x1b[34m${s}\x1b[0m`,
-  white: (s: string) => `\x1b[37m${s}\x1b[0m`,
-  bgGreen: (s: string) => `\x1b[42m\x1b[30m${s}\x1b[0m`,
-  bgYellow: (s: string) => `\x1b[43m\x1b[30m${s}\x1b[0m`,
-  bgRed: (s: string) => `\x1b[41m\x1b[37m${s}\x1b[0m`,
-  bgBlue: (s: string) => `\x1b[44m\x1b[37m${s}\x1b[0m`,
-  bgMagenta: (s: string) => `\x1b[45m\x1b[37m${s}\x1b[0m`,
-};
+import { colors } from '../utils/colors';
 
 export const DASHBOARD_HELP = `
 wit dashboard - Your Personal Dashboard

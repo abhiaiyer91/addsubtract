@@ -17,14 +17,7 @@ import { Repository } from '../core/repository';
 import { TsgitError, ErrorCode } from '../core/errors';
 import { Commit, Tree, Tag, Blob } from '../core/object';
 import { hashObject } from '../utils/hash';
-
-const colors = {
-  green: (s: string) => `\x1b[32m${s}\x1b[0m`,
-  yellow: (s: string) => `\x1b[33m${s}\x1b[0m`,
-  red: (s: string) => `\x1b[31m${s}\x1b[0m`,
-  dim: (s: string) => `\x1b[2m${s}\x1b[0m`,
-  bold: (s: string) => `\x1b[1m${s}\x1b[0m`,
-};
+import { colors } from '../utils/colors';
 
 export interface FsckOptions {
   full?: boolean;

@@ -18,16 +18,7 @@
 import { Repository } from '../core/repository';
 import { StackManager, StackMetadata, StackNode } from '../core/stack';
 import { TsgitError } from '../core/errors';
-
-const colors = {
-  green: (s: string) => `\x1b[32m${s}\x1b[0m`,
-  yellow: (s: string) => `\x1b[33m${s}\x1b[0m`,
-  cyan: (s: string) => `\x1b[36m${s}\x1b[0m`,
-  red: (s: string) => `\x1b[31m${s}\x1b[0m`,
-  dim: (s: string) => `\x1b[2m${s}\x1b[0m`,
-  bold: (s: string) => `\x1b[1m${s}\x1b[0m`,
-  magenta: (s: string) => `\x1b[35m${s}\x1b[0m`,
-};
+import { colors } from '../utils/colors';
 
 const HELP = `
 wit stack - Manage stacked diffs
