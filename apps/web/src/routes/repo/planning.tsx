@@ -18,31 +18,24 @@ import {
   Search,
   Zap,
   Eye,
-  Activity,
-  Terminal,
   CircleDot,
-  CheckCheck,
   AlertTriangle,
   Info,
+  Square,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from '@/components/ui/tabs';
 import { RepoLayout } from './components/repo-layout';
 import { Loading } from '@/components/ui/loading';
 import { useSession } from '@/lib/auth-client';
@@ -144,132 +137,329 @@ const stepToProgress: Record<string, number> = {
 // =============================================================================
 
 const taskStatusConfig: Record<TaskStatus, { label: string; icon: typeof CheckCircle2; color: string }> = {
-  pending: { label: 'Pending', icon: Clock, color: 'text-gray-500 bg-gray-500/10' },
-  in_progress: { label: 'Running', icon: Loader2, color: 'text-blue-500 bg-blue-500/10' },
-  completed: { label: 'Done', icon: CheckCircle2, color: 'text-green-500 bg-green-500/10' },
-  failed: { label: 'Failed', icon: XCircle, color: 'text-red-500 bg-red-500/10' },
-  skipped: { label: 'Skipped', icon: Clock, color: 'text-yellow-500 bg-yellow-500/10' },
+  pending: { label: 'Pending', icon: Clock, color: 'text-muted-foreground' },
+  in_progress: { label: 'Running', icon: Loader2, color: 'text-blue-500' },
+  completed: { label: 'Done', icon: CheckCircle2, color: 'text-green-500' },
+  failed: { label: 'Failed', icon: XCircle, color: 'text-red-500' },
+  skipped: { label: 'Skipped', icon: Clock, color: 'text-yellow-500' },
 };
 
-const phaseConfig: Record<WorkflowPhase, { label: string; icon: typeof Brain; color: string; bgColor: string }> = {
-  idle: { label: 'Ready', icon: Brain, color: 'text-gray-500', bgColor: 'bg-gray-500' },
-  analyzing: { label: 'Analyzing', icon: Search, color: 'text-purple-500', bgColor: 'bg-purple-500' },
-  planning: { label: 'Planning', icon: Brain, color: 'text-indigo-500', bgColor: 'bg-indigo-500' },
-  executing: { label: 'Executing', icon: Zap, color: 'text-orange-500', bgColor: 'bg-orange-500' },
-  reviewing: { label: 'Reviewing', icon: Eye, color: 'text-cyan-500', bgColor: 'bg-cyan-500' },
-  completed: { label: 'Completed', icon: CheckCircle2, color: 'text-green-500', bgColor: 'bg-green-500' },
-  failed: { label: 'Failed', icon: XCircle, color: 'text-red-500', bgColor: 'bg-red-500' },
+const phaseConfig: Record<WorkflowPhase, { 
+  label: string; 
+  description: string;
+  icon: typeof Brain; 
+  color: string; 
+  bgColor: string;
+}> = {
+  idle: { label: 'Ready', description: 'Enter a task to begin', icon: Brain, color: 'text-muted-foreground', bgColor: 'bg-muted' },
+  analyzing: { label: 'Analyzing', description: 'Understanding your codebase...', icon: Search, color: 'text-purple-500', bgColor: 'bg-purple-500' },
+  planning: { label: 'Planning', description: 'Creating execution plan...', icon: Brain, color: 'text-indigo-500', bgColor: 'bg-indigo-500' },
+  executing: { label: 'Executing', description: 'Running subtasks...', icon: Zap, color: 'text-orange-500', bgColor: 'bg-orange-500' },
+  reviewing: { label: 'Reviewing', description: 'Validating results...', icon: Eye, color: 'text-cyan-500', bgColor: 'bg-cyan-500' },
+  completed: { label: 'Completed', description: 'All tasks finished', icon: CheckCircle2, color: 'text-green-500', bgColor: 'bg-green-500' },
+  failed: { label: 'Failed', description: 'Workflow encountered errors', icon: XCircle, color: 'text-red-500', bgColor: 'bg-red-500' },
 };
 
 // =============================================================================
-// Component: PhaseProgress
+// Component: WorkflowHeader - Always visible task context
 // =============================================================================
 
-function PhaseProgress({ phase, progress }: { phase: WorkflowPhase; progress: number }) {
-  const phases: WorkflowPhase[] = ['analyzing', 'planning', 'executing', 'reviewing'];
-  const currentIndex = phases.indexOf(phase);
-  
+function WorkflowHeader({ 
+  task, 
+  phase, 
+  progress,
+  onCancel,
+  onRetry,
+  onNewTask,
+  startTime,
+}: { 
+  task: string;
+  phase: WorkflowPhase;
+  progress: number;
+  onCancel?: () => void;
+  onRetry?: () => void;
+  onNewTask?: () => void;
+  startTime?: Date;
+}) {
+  const config = phaseConfig[phase];
+  const PhaseIcon = config.icon;
+  const isRunning = !['idle', 'completed', 'failed'].includes(phase);
+  const isComplete = phase === 'completed' || phase === 'failed';
+  const [copied, setCopied] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+
+  // Update elapsed time
+  useEffect(() => {
+    if (!startTime || isComplete) return;
+    const interval = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - startTime.getTime()) / 1000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [startTime, isComplete]);
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+  };
+
+  const copyTask = () => {
+    navigator.clipboard.writeText(task);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between text-sm">
-        <span className={cn('font-medium flex items-center gap-2', phaseConfig[phase].color)}>
-          {(() => {
-            const PhaseIcon = phaseConfig[phase].icon;
-            return <PhaseIcon className={cn('h-4 w-4', phase === 'executing' && 'animate-pulse')} />;
-          })()}
-          {phaseConfig[phase].label}
-        </span>
-        <span className="text-muted-foreground">{progress}%</span>
-      </div>
-      <Progress value={progress} className="h-2" />
-      <div className="flex justify-between">
-        {phases.map((p, index) => {
-          const isActive = index === currentIndex;
-          const isComplete = index < currentIndex || phase === 'completed';
-          const config = phaseConfig[p];
-          const Icon = isComplete ? CheckCircle2 : config.icon;
-          
-          return (
-            <div
-              key={p}
-              className={cn(
-                'flex flex-col items-center gap-1 text-xs transition-all',
-                isActive && config.color,
-                isComplete && 'text-green-500',
-                !isActive && !isComplete && 'text-muted-foreground'
-              )}
-            >
-              <div className={cn(
-                'w-8 h-8 rounded-full flex items-center justify-center transition-all',
-                isActive && `${config.bgColor}/20`,
-                isComplete && 'bg-green-500/20',
-                !isActive && !isComplete && 'bg-muted'
-              )}>
-                <Icon className={cn('h-4 w-4', isActive && phase !== 'completed' && phase !== 'failed' && 'animate-spin')} />
-              </div>
-              <span className="font-medium">{config.label}</span>
+    <div className={cn(
+      'rounded-xl border-2 transition-all duration-300',
+      isRunning && 'border-blue-500/50 bg-blue-500/5',
+      phase === 'completed' && 'border-green-500/50 bg-green-500/5',
+      phase === 'failed' && 'border-red-500/50 bg-red-500/5',
+      phase === 'idle' && 'border-border bg-card',
+    )}>
+      {/* Task Display - Always Visible */}
+      <div className="p-4 pb-3">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+              <span>Task</span>
+              <button 
+                onClick={copyTask}
+                className="hover:text-foreground transition-colors"
+                title="Copy task"
+              >
+                {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+              </button>
             </div>
-          );
-        })}
+            <p className="text-sm font-medium leading-relaxed">{task}</p>
+          </div>
+          {isRunning && onCancel && (
+            <Button variant="outline" size="sm" onClick={onCancel} className="shrink-0 gap-1.5">
+              <Square className="h-3 w-3" />
+              Stop
+            </Button>
+          )}
+          {isComplete && (
+            <div className="flex items-center gap-2 shrink-0">
+              {onRetry && (
+                <Button variant="default" size="sm" onClick={onRetry} className="gap-1.5">
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  Retry
+                </Button>
+              )}
+              {onNewTask && (
+                <Button variant="outline" size="sm" onClick={onNewTask} className="gap-1.5">
+                  New Task
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* Status Bar */}
+      <div className={cn(
+        'px-4 py-3 border-t flex items-center justify-between gap-4',
+        isRunning && 'bg-blue-500/5',
+        phase === 'completed' && 'bg-green-500/5',
+        phase === 'failed' && 'bg-red-500/5',
+      )}>
+        {/* Current Phase */}
+        <div className="flex items-center gap-3">
+          <div className={cn(
+            'w-10 h-10 rounded-lg flex items-center justify-center',
+            `${config.bgColor}/20`
+          )}>
+            <PhaseIcon className={cn(
+              'h-5 w-5',
+              config.color,
+              isRunning && 'animate-pulse'
+            )} />
+          </div>
+          <div>
+            <div className={cn('font-semibold', config.color)}>
+              {config.label}
+            </div>
+            <div className="text-xs text-muted-foreground">
+              {config.description}
+            </div>
+          </div>
+        </div>
+
+        {/* Progress & Time */}
+        <div className="flex items-center gap-4">
+          {startTime && (
+            <div className="text-sm text-muted-foreground">
+              {formatTime(elapsed)}
+            </div>
+          )}
+          {isRunning && (
+            <div className="flex items-center gap-2">
+              <div className="w-32 h-2 bg-muted rounded-full overflow-hidden">
+                <div 
+                  className={cn('h-full transition-all duration-500', config.bgColor)}
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+              <span className="text-sm font-mono text-muted-foreground w-10">
+                {progress}%
+              </span>
+            </div>
+          )}
+          {phase === 'completed' && (
+            <Badge className="bg-green-500 text-white">Complete</Badge>
+          )}
+          {phase === 'failed' && (
+            <Badge variant="destructive">Failed</Badge>
+          )}
+        </div>
+      </div>
+
+      {/* Phase Progress Steps */}
+      {(isRunning || isComplete) && (
+        <div className="px-4 py-3 border-t bg-muted/30">
+          <div className="flex items-center justify-between">
+            {(['analyzing', 'planning', 'executing', 'reviewing'] as WorkflowPhase[]).map((p, index, arr) => {
+              const stepConfig = phaseConfig[p];
+              const StepIcon = stepConfig.icon;
+              const currentIndex = ['analyzing', 'planning', 'executing', 'reviewing'].indexOf(phase);
+              const stepIndex = index;
+              const isActive = p === phase;
+              const isPast = stepIndex < currentIndex || phase === 'completed';
+              const isFuture = stepIndex > currentIndex && phase !== 'completed';
+
+              return (
+                <div key={p} className="flex items-center">
+                  <div className={cn(
+                    'flex items-center gap-2 px-3 py-1.5 rounded-full transition-all',
+                    isActive && `${stepConfig.bgColor}/20`,
+                    isPast && 'bg-green-500/10',
+                  )}>
+                    <div className={cn(
+                      'w-6 h-6 rounded-full flex items-center justify-center',
+                      isActive && stepConfig.bgColor,
+                      isPast && 'bg-green-500',
+                      isFuture && 'bg-muted',
+                    )}>
+                      {isPast ? (
+                        <CheckCircle2 className="h-4 w-4 text-white" />
+                      ) : (
+                        <StepIcon className={cn(
+                          'h-3.5 w-3.5',
+                          isActive && 'text-white',
+                          isFuture && 'text-muted-foreground',
+                        )} />
+                      )}
+                    </div>
+                    <span className={cn(
+                      'text-sm font-medium',
+                      isActive && stepConfig.color,
+                      isPast && 'text-green-500',
+                      isFuture && 'text-muted-foreground',
+                    )}>
+                      {stepConfig.label}
+                    </span>
+                  </div>
+                  {index < arr.length - 1 && (
+                    <div className={cn(
+                      'w-8 h-0.5 mx-1',
+                      isPast ? 'bg-green-500' : 'bg-muted',
+                    )} />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 // =============================================================================
-// Component: ActivityLog
+// Component: LiveActivityFeed - Real-time updates
 // =============================================================================
 
-function ActivityLog({ entries, maxHeight = 300 }: { entries: ActivityLogEntry[]; maxHeight?: number }) {
+function LiveActivityFeed({ 
+  entries, 
+  currentAction,
+}: { 
+  entries: ActivityLogEntry[];
+  currentAction?: string;
+}) {
   const scrollRef = useRef<HTMLDivElement>(null);
   
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [entries]);
+  }, [entries, currentAction]);
 
   const getIcon = (type: ActivityLogEntry['type']) => {
     switch (type) {
-      case 'success': return <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />;
-      case 'warning': return <AlertTriangle className="h-3.5 w-3.5 text-yellow-500" />;
-      case 'error': return <XCircle className="h-3.5 w-3.5 text-red-500" />;
-      case 'phase': return <CircleDot className="h-3.5 w-3.5 text-blue-500" />;
-      case 'task': return <Zap className="h-3.5 w-3.5 text-orange-500" />;
-      default: return <Info className="h-3.5 w-3.5 text-muted-foreground" />;
+      case 'success': return <CheckCircle2 className="h-4 w-4 text-green-500" />;
+      case 'warning': return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
+      case 'error': return <XCircle className="h-4 w-4 text-red-500" />;
+      case 'phase': return <CircleDot className="h-4 w-4 text-blue-500" />;
+      case 'task': return <Zap className="h-4 w-4 text-orange-500" />;
+      default: return <Info className="h-4 w-4 text-muted-foreground" />;
     }
   };
 
   return (
-    <ScrollArea ref={scrollRef} className="border rounded-lg bg-muted/30" style={{ maxHeight }}>
-      <div className="p-3 space-y-2 font-mono text-xs">
-        {entries.length === 0 ? (
-          <div className="text-muted-foreground text-center py-4">
-            Activity will appear here...
+    <div className="rounded-lg border bg-card overflow-hidden">
+      <div className="px-4 py-2 border-b bg-muted/50 flex items-center justify-between">
+        <span className="text-sm font-medium">Live Activity</span>
+        {currentAction && (
+          <div className="flex items-center gap-2 text-sm text-blue-500">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            <span className="animate-pulse">{currentAction}</span>
           </div>
-        ) : (
-          entries.map((entry) => (
-            <div key={entry.id} className="flex items-start gap-2">
-              <span className="text-muted-foreground shrink-0 w-16">
-                {entry.timestamp.toLocaleTimeString()}
-              </span>
-              <span className="shrink-0">{getIcon(entry.type)}</span>
-              <span className={cn(
-                entry.type === 'error' && 'text-red-500',
-                entry.type === 'warning' && 'text-yellow-500',
-                entry.type === 'success' && 'text-green-500',
-                entry.type === 'phase' && 'text-blue-500 font-medium',
-              )}>
-                {entry.message}
-                {entry.details && (
-                  <span className="text-muted-foreground ml-1">({entry.details})</span>
-                )}
-              </span>
-            </div>
-          ))
         )}
       </div>
-    </ScrollArea>
+      <ScrollArea ref={scrollRef} className="h-64">
+        <div className="p-3 space-y-2">
+          {entries.length === 0 ? (
+            <div className="text-muted-foreground text-center py-8 text-sm">
+              Waiting to start...
+            </div>
+          ) : (
+            entries.map((entry) => (
+              <div 
+                key={entry.id} 
+                className={cn(
+                  'flex items-start gap-3 p-2 rounded-lg transition-colors',
+                  entry.type === 'error' && 'bg-red-500/10',
+                  entry.type === 'success' && 'bg-green-500/5',
+                  entry.type === 'phase' && 'bg-blue-500/5',
+                )}
+              >
+                <div className="mt-0.5 shrink-0">{getIcon(entry.type)}</div>
+                <div className="flex-1 min-w-0">
+                  <div className={cn(
+                    'text-sm',
+                    entry.type === 'error' && 'text-red-500',
+                    entry.type === 'warning' && 'text-yellow-500',
+                    entry.type === 'success' && 'text-green-600 dark:text-green-400',
+                    entry.type === 'phase' && 'text-blue-500 font-medium',
+                  )}>
+                    {entry.message}
+                  </div>
+                  {entry.details && (
+                    <div className="text-xs text-muted-foreground mt-0.5">
+                      {entry.details}
+                    </div>
+                  )}
+                </div>
+                <div className="text-xs text-muted-foreground shrink-0">
+                  {entry.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </ScrollArea>
+    </div>
   );
 }
 
@@ -288,39 +478,31 @@ function TaskCard({ task, isExpanded, onToggle }: {
   return (
     <div className={cn(
       'border rounded-lg transition-all',
-      task.status === 'in_progress' && 'border-blue-500/50 bg-blue-500/5',
-      task.status === 'completed' && 'border-green-500/30',
-      task.status === 'failed' && 'border-red-500/30 bg-red-500/5',
+      task.status === 'in_progress' && 'border-blue-500 bg-blue-500/5 shadow-sm',
+      task.status === 'completed' && 'border-green-500/50',
+      task.status === 'failed' && 'border-red-500/50 bg-red-500/5',
     )}>
       <button
         onClick={onToggle}
         className="w-full flex items-center gap-3 p-3 text-left hover:bg-muted/50 transition-colors"
       >
-        <div className={cn('p-1.5 rounded shrink-0', config.color)}>
-          <StatusIcon className={cn(
-            'h-4 w-4',
-            task.status === 'in_progress' && 'animate-spin'
-          )} />
-        </div>
+        <StatusIcon className={cn(
+          'h-5 w-5 shrink-0',
+          config.color,
+          task.status === 'in_progress' && 'animate-spin'
+        )} />
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="font-medium truncate">{task.title}</span>
-            <Badge variant="outline" className="text-xs shrink-0">
-              {task.priority}
-            </Badge>
-            {task.estimatedEffort && (
-              <Badge variant="secondary" className="text-xs shrink-0">
-                {task.estimatedEffort}
-              </Badge>
-            )}
-          </div>
+          <div className="font-medium truncate">{task.title}</div>
           {task.status === 'in_progress' && (
-            <p className="text-xs text-blue-500 mt-0.5 animate-pulse">
+            <div className="text-xs text-blue-500 animate-pulse mt-0.5">
               Executing...
-            </p>
+            </div>
           )}
         </div>
-        <div className="shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
+          <Badge variant="outline" className="text-xs">
+            {task.priority}
+          </Badge>
           {isExpanded ? (
             <ChevronDown className="h-4 w-4 text-muted-foreground" />
           ) : (
@@ -330,13 +512,13 @@ function TaskCard({ task, isExpanded, onToggle }: {
       </button>
       
       {isExpanded && (
-        <div className="px-3 pb-3 pt-0 border-t space-y-2">
-          <p className="text-sm text-muted-foreground">{task.description}</p>
+        <div className="px-3 pb-3 pt-0 border-t space-y-3">
+          <p className="text-sm text-muted-foreground pt-3">{task.description}</p>
           
           {task.targetFiles && task.targetFiles.length > 0 && (
-            <div className="flex flex-wrap gap-1">
+            <div className="flex flex-wrap gap-1.5">
               {task.targetFiles.map((file) => (
-                <Badge key={file} variant="outline" className="text-xs font-mono">
+                <Badge key={file} variant="secondary" className="text-xs font-mono">
                   <FileCode className="h-3 w-3 mr-1" />
                   {file}
                 </Badge>
@@ -345,28 +527,27 @@ function TaskCard({ task, isExpanded, onToggle }: {
           )}
           
           {task.result && (
-            <div className="p-2 rounded bg-green-500/10 text-sm text-green-600 dark:text-green-400">
+            <div className="p-2.5 rounded-lg bg-green-500/10 text-sm text-green-600 dark:text-green-400 border border-green-500/20">
+              <CheckCircle2 className="h-4 w-4 inline mr-2" />
               {task.result}
             </div>
           )}
           
           {task.error && (
-            <div className="p-2 rounded bg-red-500/10 text-sm text-red-600 dark:text-red-400">
+            <div className="p-2.5 rounded-lg bg-red-500/10 text-sm text-red-600 dark:text-red-400 border border-red-500/20">
+              <XCircle className="h-4 w-4 inline mr-2" />
               {task.error}
             </div>
           )}
           
-          {task.filesModified && task.filesModified.length > 0 && (
-            <div className="text-xs text-muted-foreground">
-              Modified: {task.filesModified.join(', ')}
-            </div>
-          )}
-          
-          {task.duration !== undefined && (
-            <div className="text-xs text-muted-foreground">
-              Duration: {(task.duration / 1000).toFixed(1)}s
-            </div>
-          )}
+          <div className="flex items-center gap-4 text-xs text-muted-foreground pt-1">
+            {task.filesModified && task.filesModified.length > 0 && (
+              <span>{task.filesModified.length} files modified</span>
+            )}
+            {task.duration !== undefined && (
+              <span>{(task.duration / 1000).toFixed(1)}s</span>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -377,10 +558,11 @@ function TaskCard({ task, isExpanded, onToggle }: {
 // Component: ExecutionPlanView
 // =============================================================================
 
-function ExecutionPlanView({ plan, expandedTasks, onToggleTask }: {
+function ExecutionPlanView({ plan, expandedTasks, onToggleTask, phase }: {
   plan: ExecutionPlan;
   expandedTasks: Set<string>;
   onToggleTask: (taskId: string) => void;
+  phase: WorkflowPhase;
 }) {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => 
     new Set(plan.parallelGroups.map(g => g.id))
@@ -407,45 +589,75 @@ function ExecutionPlanView({ plan, expandedTasks, onToggleTask }: {
     (sum, g) => sum + g.subtasks.filter(t => t.status === 'failed').length,
     0
   );
+  const runningTasks = plan.parallelGroups.reduce(
+    (sum, g) => sum + g.subtasks.filter(t => t.status === 'in_progress').length,
+    0
+  );
 
   return (
     <div className="space-y-4">
-      {/* Plan Summary */}
-      <div className="p-4 rounded-lg border bg-muted/50">
-        <p className="text-sm">{plan.summary}</p>
-        <div className="flex flex-wrap gap-3 mt-3 text-xs text-muted-foreground">
-          <span className="flex items-center gap-1">
-            <ListTodo className="h-3.5 w-3.5" />
-            {totalTasks} subtasks
-          </span>
-          <span className="flex items-center gap-1">
-            <Activity className="h-3.5 w-3.5" />
-            {plan.parallelGroups.length} groups
-          </span>
-          <span className="flex items-center gap-1">
-            <Clock className="h-3.5 w-3.5" />
-            {plan.estimatedTotalEffort}
-          </span>
-          {completedTasks > 0 && (
-            <span className="flex items-center gap-1 text-green-500">
-              <CheckCircle2 className="h-3.5 w-3.5" />
-              {completedTasks} done
-            </span>
-          )}
-          {failedTasks > 0 && (
-            <span className="flex items-center gap-1 text-red-500">
-              <XCircle className="h-3.5 w-3.5" />
-              {failedTasks} failed
-            </span>
-          )}
+      {/* Plan Header */}
+      <div className="rounded-lg border bg-card">
+        <div className="p-4 border-b">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h3 className="font-semibold">Execution Plan</h3>
+              <p className="text-sm text-muted-foreground mt-1">{plan.summary}</p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <Badge variant="outline" className="gap-1">
+                <ListTodo className="h-3 w-3" />
+                {totalTasks} tasks
+              </Badge>
+              <Badge variant="outline" className="gap-1">
+                <Clock className="h-3 w-3" />
+                {plan.estimatedTotalEffort}
+              </Badge>
+            </div>
+          </div>
         </div>
-        {plan.riskAssessment && (
-          <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-2 flex items-center gap-1">
-            <AlertTriangle className="h-3.5 w-3.5" />
-            {plan.riskAssessment}
-          </p>
-        )}
+
+        {/* Progress Bar */}
+        <div className="p-4 bg-muted/30">
+          <div className="flex items-center justify-between mb-2 text-sm">
+            <span className="text-muted-foreground">Progress</span>
+            <div className="flex items-center gap-3">
+              {runningTasks > 0 && (
+                <span className="text-blue-500 flex items-center gap-1">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  {runningTasks} running
+                </span>
+              )}
+              <span className="text-green-500">{completedTasks} done</span>
+              {failedTasks > 0 && (
+                <span className="text-red-500">{failedTasks} failed</span>
+              )}
+            </div>
+          </div>
+          <div className="h-3 bg-muted rounded-full overflow-hidden flex">
+            <div 
+              className="bg-green-500 transition-all duration-300"
+              style={{ width: `${(completedTasks / totalTasks) * 100}%` }}
+            />
+            <div 
+              className="bg-blue-500 animate-pulse transition-all duration-300"
+              style={{ width: `${(runningTasks / totalTasks) * 100}%` }}
+            />
+            <div 
+              className="bg-red-500 transition-all duration-300"
+              style={{ width: `${(failedTasks / totalTasks) * 100}%` }}
+            />
+          </div>
+        </div>
       </div>
+
+      {/* Risk Assessment */}
+      {plan.riskAssessment && (
+        <div className="p-3 rounded-lg border border-yellow-500/30 bg-yellow-500/10 flex items-start gap-2">
+          <AlertTriangle className="h-4 w-4 text-yellow-500 mt-0.5 shrink-0" />
+          <p className="text-sm text-yellow-600 dark:text-yellow-400">{plan.riskAssessment}</p>
+        </div>
+      )}
 
       {/* Parallel Groups */}
       <div className="space-y-3">
@@ -456,6 +668,7 @@ function ExecutionPlanView({ plan, expandedTasks, onToggleTask }: {
             const groupFailed = group.subtasks.filter(t => t.status === 'failed').length;
             const groupRunning = group.subtasks.filter(t => t.status === 'in_progress').length;
             const isExpanded = expandedGroups.has(group.id);
+            const allDone = groupCompleted + groupFailed === group.subtasks.length;
             
             return (
               <Collapsible
@@ -465,8 +678,9 @@ function ExecutionPlanView({ plan, expandedTasks, onToggleTask }: {
               >
                 <div className={cn(
                   'rounded-lg border bg-card overflow-hidden transition-all',
-                  groupRunning > 0 && 'border-blue-500/50 shadow-sm shadow-blue-500/10',
-                  group.isCompleted && 'border-green-500/30',
+                  groupRunning > 0 && 'border-blue-500 shadow-sm shadow-blue-500/20',
+                  allDone && groupFailed === 0 && 'border-green-500/50',
+                  allDone && groupFailed > 0 && 'border-red-500/50',
                 )}>
                   <CollapsibleTrigger asChild>
                     <button className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors">
@@ -476,34 +690,43 @@ function ExecutionPlanView({ plan, expandedTasks, onToggleTask }: {
                         ) : (
                           <ChevronRight className="h-4 w-4 text-muted-foreground" />
                         )}
-                        <Badge variant="outline" className="font-mono text-xs">
-                          #{group.executionOrder}
-                        </Badge>
-                        <span className="font-medium">{group.name}</span>
-                        {groupRunning > 0 && (
-                          <Badge className="bg-blue-500 text-white animate-pulse">
-                            Running
-                          </Badge>
-                        )}
+                        <div className={cn(
+                          'w-7 h-7 rounded-lg flex items-center justify-center text-sm font-bold',
+                          groupRunning > 0 && 'bg-blue-500 text-white',
+                          allDone && groupFailed === 0 && 'bg-green-500 text-white',
+                          allDone && groupFailed > 0 && 'bg-red-500 text-white',
+                          !groupRunning && !allDone && 'bg-muted text-muted-foreground',
+                        )}>
+                          {group.executionOrder}
+                        </div>
+                        <div className="text-left">
+                          <div className="font-medium">{group.name}</div>
+                          {groupRunning > 0 && (
+                            <div className="text-xs text-blue-500 animate-pulse">
+                              {groupRunning} task{groupRunning > 1 ? 's' : ''} running...
+                            </div>
+                          )}
+                        </div>
                       </div>
                       <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-1 text-sm">
-                          {groupCompleted > 0 && (
-                            <span className="text-green-500">{groupCompleted}</span>
-                          )}
+                        <div className="text-sm text-muted-foreground">
+                          <span className={groupCompleted > 0 ? 'text-green-500' : ''}>{groupCompleted}</span>
                           {groupFailed > 0 && (
                             <span className="text-red-500">/{groupFailed}</span>
                           )}
-                          <span className="text-muted-foreground">/{group.subtasks.length}</span>
+                          <span>/{group.subtasks.length}</span>
                         </div>
-                        {group.isCompleted && (
-                          <CheckCircle2 className="h-4 w-4 text-green-500" />
+                        {allDone && groupFailed === 0 && (
+                          <CheckCircle2 className="h-5 w-5 text-green-500" />
+                        )}
+                        {groupRunning > 0 && (
+                          <Loader2 className="h-5 w-5 text-blue-500 animate-spin" />
                         )}
                       </div>
                     </button>
                   </CollapsibleTrigger>
                   <CollapsibleContent>
-                    <div className="border-t p-3 space-y-2">
+                    <div className="border-t p-3 space-y-2 bg-muted/20">
                       {group.subtasks.map((subtask) => (
                         <TaskCard
                           key={subtask.id}
@@ -530,72 +753,152 @@ function ExecutionPlanView({ plan, expandedTasks, onToggleTask }: {
 function ReviewView({ review }: { review: ReviewResult }) {
   return (
     <div className="space-y-4">
+      {/* Overall Result */}
       <div className={cn(
-        'p-4 rounded-lg border',
-        review.overallSuccess ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'
+        'p-6 rounded-xl border-2',
+        review.overallSuccess 
+          ? 'bg-green-500/10 border-green-500/50' 
+          : 'bg-red-500/10 border-red-500/50'
       )}>
-        <div className="flex items-center gap-2 mb-2">
+        <div className="flex items-center gap-3 mb-3">
           {review.overallSuccess ? (
-            <CheckCircle2 className="h-5 w-5 text-green-500" />
+            <div className="w-12 h-12 rounded-full bg-green-500 flex items-center justify-center">
+              <CheckCircle2 className="h-6 w-6 text-white" />
+            </div>
           ) : (
-            <XCircle className="h-5 w-5 text-red-500" />
+            <div className="w-12 h-12 rounded-full bg-red-500 flex items-center justify-center">
+              <XCircle className="h-6 w-6 text-white" />
+            </div>
           )}
-          <span className="font-medium">
-            {review.overallSuccess ? 'All tasks completed successfully' : 'Some tasks failed'}
-          </span>
+          <div>
+            <h3 className={cn(
+              'text-lg font-semibold',
+              review.overallSuccess ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+            )}>
+              {review.overallSuccess ? 'All tasks completed successfully!' : 'Some tasks failed'}
+            </h3>
+            <p className="text-sm text-muted-foreground">{review.summary}</p>
+          </div>
         </div>
-        <p className="text-sm text-muted-foreground">{review.summary}</p>
         
-        <div className="flex gap-4 mt-3 text-sm">
-          <span className="text-green-500">{review.completedTasks} completed</span>
+        <div className="flex gap-6 text-sm">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 text-green-500" />
+            <span><strong>{review.completedTasks}</strong> completed</span>
+          </div>
           {review.failedTasks > 0 && (
-            <span className="text-red-500">{review.failedTasks} failed</span>
+            <div className="flex items-center gap-2">
+              <XCircle className="h-4 w-4 text-red-500" />
+              <span><strong>{review.failedTasks}</strong> failed</span>
+            </div>
           )}
           {review.skippedTasks > 0 && (
-            <span className="text-yellow-500">{review.skippedTasks} skipped</span>
+            <div className="flex items-center gap-2">
+              <Clock className="h-4 w-4 text-yellow-500" />
+              <span><strong>{review.skippedTasks}</strong> skipped</span>
+            </div>
           )}
         </div>
       </div>
 
+      {/* Issues */}
       {review.issues.length > 0 && (
-        <div className="space-y-2">
-          <h4 className="text-sm font-medium">Issues</h4>
-          {review.issues.map((issue, i) => (
-            <div
-              key={i}
-              className={cn(
-                'p-3 rounded-lg border text-sm',
-                issue.severity === 'error' && 'bg-red-500/10 border-red-500/30',
-                issue.severity === 'warning' && 'bg-yellow-500/10 border-yellow-500/30',
-                issue.severity === 'info' && 'bg-blue-500/10 border-blue-500/30',
-              )}
-            >
-              <div className="flex items-center gap-2 mb-1">
-                {issue.severity === 'error' && <XCircle className="h-4 w-4 text-red-500" />}
-                {issue.severity === 'warning' && <AlertTriangle className="h-4 w-4 text-yellow-500" />}
-                {issue.severity === 'info' && <Info className="h-4 w-4 text-blue-500" />}
-                <span className="font-medium">{issue.subtaskId}</span>
+        <div className="rounded-lg border bg-card">
+          <div className="p-3 border-b bg-muted/50">
+            <h4 className="font-medium">Issues ({review.issues.length})</h4>
+          </div>
+          <div className="p-3 space-y-2">
+            {review.issues.map((issue, i) => (
+              <div
+                key={i}
+                className={cn(
+                  'p-3 rounded-lg border',
+                  issue.severity === 'error' && 'bg-red-500/10 border-red-500/30',
+                  issue.severity === 'warning' && 'bg-yellow-500/10 border-yellow-500/30',
+                  issue.severity === 'info' && 'bg-blue-500/10 border-blue-500/30',
+                )}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  {issue.severity === 'error' && <XCircle className="h-4 w-4 text-red-500" />}
+                  {issue.severity === 'warning' && <AlertTriangle className="h-4 w-4 text-yellow-500" />}
+                  {issue.severity === 'info' && <Info className="h-4 w-4 text-blue-500" />}
+                  <span className="font-medium text-sm">{issue.subtaskId}</span>
+                </div>
+                <p className="text-sm">{issue.issue}</p>
+                {issue.suggestion && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Suggestion: {issue.suggestion}
+                  </p>
+                )}
               </div>
-              <p>{issue.issue}</p>
-              {issue.suggestion && (
-                <p className="text-muted-foreground mt-1">Suggestion: {issue.suggestion}</p>
-              )}
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       )}
 
+      {/* Replanning */}
       {review.needsReplanning && review.replanningReason && (
-        <div className="p-3 rounded-lg border border-orange-500/30 bg-orange-500/10">
-          <div className="flex items-center gap-2 mb-1">
-            <RefreshCw className="h-4 w-4 text-orange-500" />
+        <div className="p-4 rounded-lg border border-orange-500/30 bg-orange-500/10">
+          <div className="flex items-center gap-2 mb-2">
+            <RefreshCw className="h-5 w-5 text-orange-500" />
             <span className="font-medium text-orange-600 dark:text-orange-400">
               Re-planning recommended
             </span>
           </div>
-          <p className="text-sm">{review.replanningReason}</p>
+          <p className="text-sm text-muted-foreground">{review.replanningReason}</p>
         </div>
       )}
+    </div>
+  );
+}
+
+// =============================================================================
+// Component: ResultsSummary
+// =============================================================================
+
+function ResultsSummary({ 
+  branchCreated, 
+  filesModified 
+}: { 
+  branchCreated: string | null;
+  filesModified: string[];
+}) {
+  if (!branchCreated && filesModified.length === 0) return null;
+
+  return (
+    <div className="rounded-lg border bg-card p-4">
+      <h3 className="font-semibold mb-3">Results</h3>
+      <div className="space-y-2">
+        {branchCreated && (
+          <div className="flex items-center gap-2 text-sm">
+            <GitBranch className="h-4 w-4 text-muted-foreground" />
+            <span>Branch created:</span>
+            <code className="px-2 py-0.5 rounded bg-muted font-mono text-xs">
+              {branchCreated}
+            </code>
+          </div>
+        )}
+        {filesModified.length > 0 && (
+          <div className="text-sm">
+            <div className="flex items-center gap-2 mb-2">
+              <FileCode className="h-4 w-4 text-muted-foreground" />
+              <span>{filesModified.length} files modified</span>
+            </div>
+            <div className="flex flex-wrap gap-1.5 pl-6">
+              {filesModified.slice(0, 10).map((file) => (
+                <Badge key={file} variant="secondary" className="font-mono text-xs">
+                  {file}
+                </Badge>
+              ))}
+              {filesModified.length > 10 && (
+                <Badge variant="outline" className="text-xs">
+                  +{filesModified.length - 10} more
+                </Badge>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -626,7 +929,9 @@ export function PlanningPage() {
   const [error, setError] = useState<string | null>(null);
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [activityLog, setActivityLog] = useState<ActivityLogEntry[]>([]);
-  const [activeTab, setActiveTab] = useState<'plan' | 'activity' | 'review'>('plan');
+  const [currentAction, setCurrentAction] = useState<string | undefined>();
+  const [startTime, setStartTime] = useState<Date | undefined>();
+  const [submittedTask, setSubmittedTask] = useState('');
   
   // Results state
   const [branchCreated, setBranchCreated] = useState<string | null>(null);
@@ -676,12 +981,12 @@ export function PlanningPage() {
     });
   }, []);
 
-  // Streaming subscription - interprets Mastra workflow events
+  // Streaming subscription
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (trpc as any).planning?.stream?.useSubscription(
     {
       repoId: repoData?.repo.id!,
-      task: task.trim(),
+      task: submittedTask.trim(),
       context: context.trim() || undefined,
       dryRun,
       createBranch,
@@ -690,13 +995,14 @@ export function PlanningPage() {
       maxParallelTasks: 5,
     },
     {
-      enabled: isRunning && !!repoData?.repo.id,
+      enabled: isRunning && !!repoData?.repo.id && !!submittedTask,
       onData: (event: { type: string; stepId?: string; result?: any; error?: string }) => {
         const { type, stepId, result, error: eventError } = event;
         
         switch (type) {
           case 'started':
-            addLog('phase', `Starting workflow for: ${result?.task?.slice(0, 50) || task.slice(0, 50)}...`);
+            addLog('phase', 'Workflow started');
+            setCurrentAction('Initializing...');
             setPhase('analyzing');
             setProgress(5);
             break;
@@ -707,7 +1013,8 @@ export function PlanningPage() {
               if (newPhase) {
                 setPhase(newPhase);
                 setProgress(stepToProgress[stepId] || progress);
-                addLog('phase', `${phaseConfig[newPhase]?.label || stepId}...`);
+                setCurrentAction(phaseConfig[newPhase]?.description);
+                addLog('phase', `${phaseConfig[newPhase]?.label}...`);
               }
             }
             break;
@@ -716,11 +1023,13 @@ export function PlanningPage() {
             if (stepId) {
               setProgress(stepToProgress[stepId] ? stepToProgress[stepId] + 10 : progress + 10);
               
-              // Handle step-specific results
               if (stepId === 'analyze-task' && result) {
                 if (result.projectInfo) {
                   setProjectInfo(result.projectInfo);
                   addLog('success', `Detected ${result.projectInfo.language} ${result.projectInfo.type} project`);
+                }
+                if (result.relevantFiles?.length) {
+                  addLog('info', `Found ${result.relevantFiles.length} relevant files`);
                 }
               }
               
@@ -729,12 +1038,10 @@ export function PlanningPage() {
                 const taskCount = result.plan.parallelGroups?.reduce(
                   (sum: number, g: ParallelGroup) => sum + g.subtasks.length, 0
                 ) || 0;
-                addLog('success', `Created plan with ${taskCount} tasks`);
-                setActiveTab('plan');
+                addLog('success', `Created plan with ${taskCount} subtasks in ${result.plan.parallelGroups?.length || 0} groups`);
               }
               
               if (stepId === 'execute-plan' && result) {
-                // Update plan with execution results
                 if (result.groupResults) {
                   for (const group of result.groupResults) {
                     for (const taskResult of group.subtaskResults) {
@@ -764,25 +1071,27 @@ export function PlanningPage() {
                   result.review.overallSuccess ? 'success' : 'warning',
                   result.review.summary
                 );
-                setActiveTab('review');
               }
             }
             break;
             
           case 'step-error':
             addLog('error', `Step failed: ${stepId}`, eventError);
+            setCurrentAction(undefined);
             break;
             
           case 'complete':
             setPhase('completed');
             setProgress(100);
-            addLog('success', 'Workflow completed', `${result?.totalDuration ? (result.totalDuration / 1000).toFixed(1) + 's' : ''}`);
+            setCurrentAction(undefined);
+            addLog('success', 'Workflow completed successfully');
             setIsRunning(false);
             break;
             
           case 'error':
             setError(eventError || 'Unknown error');
             setPhase('failed');
+            setCurrentAction(undefined);
             addLog('error', eventError || 'Workflow failed');
             setIsRunning(false);
             break;
@@ -791,6 +1100,7 @@ export function PlanningPage() {
       onError: (err: Error) => {
         setError(err.message);
         setPhase('failed');
+        setCurrentAction(undefined);
         setIsRunning(false);
         addLog('error', `Connection error: ${err.message}`);
       },
@@ -800,7 +1110,8 @@ export function PlanningPage() {
   const handleStart = () => {
     if (!task.trim() || !repoData?.repo.id) return;
     
-    // Reset state
+    // Save the task and reset state
+    setSubmittedTask(task.trim());
     setIsRunning(true);
     setPhase('analyzing');
     setProgress(0);
@@ -812,12 +1123,43 @@ export function PlanningPage() {
     setBranchCreated(null);
     setFilesModified([]);
     setExpandedTasks(new Set());
-    setActiveTab('activity');
+    setCurrentAction('Starting workflow...');
+    setStartTime(new Date());
     
     addLog('phase', 'Initializing workflow...');
   };
 
-  const handleReset = () => {
+  const handleCancel = () => {
+    setIsRunning(false);
+    setPhase('failed');
+    setCurrentAction(undefined);
+    addLog('warning', 'Workflow cancelled by user');
+  };
+
+  const handleRetry = () => {
+    if (!submittedTask.trim() || !repoData?.repo.id) return;
+    
+    // Reset workflow state but keep the task
+    setIsRunning(true);
+    setPhase('analyzing');
+    setProgress(0);
+    setPlan(null);
+    setReview(null);
+    setProjectInfo(null);
+    setError(null);
+    setActivityLog([]);
+    setBranchCreated(null);
+    setFilesModified([]);
+    setExpandedTasks(new Set());
+    setCurrentAction('Retrying workflow...');
+    setStartTime(new Date());
+    
+    addLog('phase', 'Retrying workflow...');
+  };
+
+  const handleNewTask = () => {
+    setTask('');
+    setSubmittedTask('');
     setIsRunning(false);
     setPhase('idle');
     setProgress(0);
@@ -829,7 +1171,8 @@ export function PlanningPage() {
     setBranchCreated(null);
     setFilesModified([]);
     setExpandedTasks(new Set());
-    setActiveTab('plan');
+    setCurrentAction(undefined);
+    setStartTime(undefined);
   };
 
   const toggleTask = (taskId: string) => {
@@ -864,6 +1207,7 @@ export function PlanningPage() {
 
   const isIdle = phase === 'idle';
   const isComplete = phase === 'completed' || phase === 'failed';
+  const showWorkflow = isRunning || isComplete;
 
   return (
     <RepoLayout owner={owner!} repo={repo!} activeTab="planning">
@@ -872,7 +1216,7 @@ export function PlanningPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className={cn(
-              'p-2 rounded-lg transition-colors',
+              'p-2.5 rounded-xl transition-colors',
               isRunning ? 'bg-blue-500/10' : 'bg-primary/10'
             )}>
               <Brain className={cn(
@@ -888,8 +1232,8 @@ export function PlanningPage() {
             </div>
           </div>
           {planningStatus?.available && (
-            <Badge variant="outline" className="gap-1">
-              <Sparkles className="h-3 w-3" />
+            <Badge variant="outline" className="gap-1.5 py-1">
+              <Sparkles className="h-3.5 w-3.5" />
               {planningStatus.provider}
             </Badge>
           )}
@@ -897,8 +1241,8 @@ export function PlanningPage() {
 
         {/* AI Not Available Warning */}
         {planningStatus && !planningStatus.available && (
-          <div className="flex items-center gap-3 p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-            <AlertCircle className="h-5 w-5 text-yellow-500" />
+          <div className="flex items-center gap-3 p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/30">
+            <AlertCircle className="h-5 w-5 text-yellow-500 shrink-0" />
             <div>
               <p className="font-medium text-yellow-600 dark:text-yellow-400">
                 AI not configured
@@ -910,58 +1254,37 @@ export function PlanningPage() {
           </div>
         )}
 
-        {/* Progress Section (shown when running) */}
-        {(isRunning || isComplete) && (
-          <div className="p-6 rounded-lg border bg-card">
-            <PhaseProgress phase={phase} progress={progress} />
-            
-            {/* Project Info */}
-            {projectInfo && (
-              <div className="mt-4 pt-4 border-t flex flex-wrap gap-2">
-                <Badge variant="secondary">{projectInfo.language}</Badge>
-                <Badge variant="secondary">{projectInfo.type}</Badge>
-                {projectInfo.hasTests && <Badge variant="outline">Tests</Badge>}
-                {projectInfo.hasLinting && <Badge variant="outline">Linting</Badge>}
-              </div>
-            )}
-            
-            {/* Results Summary */}
-            {isComplete && (
-              <div className="mt-4 pt-4 border-t space-y-2">
-                {branchCreated && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <GitBranch className="h-4 w-4 text-muted-foreground" />
-                    <span>Branch: <code className="px-1 py-0.5 rounded bg-muted">{branchCreated}</code></span>
-                  </div>
-                )}
-                {filesModified.length > 0 && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <FileCode className="h-4 w-4 text-muted-foreground" />
-                    <span>{filesModified.length} files modified</span>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+        {/* Workflow Header - Shows task & progress when running */}
+        {showWorkflow && submittedTask && (
+          <WorkflowHeader
+            task={submittedTask}
+            phase={phase}
+            progress={progress}
+            onCancel={isRunning ? handleCancel : undefined}
+            onRetry={isComplete ? handleRetry : undefined}
+            onNewTask={isComplete ? handleNewTask : undefined}
+            startTime={startTime}
+          />
         )}
 
-        {/* Task Input (shown when idle) */}
+        {/* Task Input - Only shown when idle */}
         {isIdle && (
-          <div className="space-y-4 p-6 rounded-lg border bg-card">
+          <div className="space-y-4 p-6 rounded-xl border-2 border-dashed bg-card">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Task Description</label>
+              <label className="text-sm font-medium">What do you want to build?</label>
               <Textarea
                 placeholder="Describe the task you want to accomplish... (e.g., 'Add user authentication with JWT tokens and password reset functionality')"
                 value={task}
                 onChange={(e) => setTask(e.target.value)}
-                className="min-h-[100px]"
+                className="min-h-[120px] text-base"
+                autoFocus
               />
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Additional Context (optional)</label>
+              <label className="text-sm font-medium text-muted-foreground">Additional context (optional)</label>
               <Textarea
-                placeholder="Any additional context, requirements, or constraints..."
+                placeholder="Any additional requirements, constraints, or context..."
                 value={context}
                 onChange={(e) => setContext(e.target.value)}
                 className="min-h-[60px]"
@@ -969,7 +1292,7 @@ export function PlanningPage() {
             </div>
 
             {/* Options */}
-            <div className="flex flex-wrap items-center gap-4 pt-2">
+            <div className="flex flex-wrap items-center gap-6 pt-2">
               <div className="flex items-center gap-2">
                 <Checkbox
                   id="dryRun"
@@ -977,7 +1300,7 @@ export function PlanningPage() {
                   onCheckedChange={(checked) => setDryRun(checked as boolean)}
                 />
                 <label htmlFor="dryRun" className="text-sm cursor-pointer">
-                  Dry run (preview only)
+                  Preview only (dry run)
                 </label>
               </div>
               <div className="flex items-center gap-2">
@@ -995,14 +1318,14 @@ export function PlanningPage() {
             {/* Advanced Options */}
             <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
               <CollapsibleTrigger asChild>
-                <Button variant="ghost" size="sm" className="gap-1 -ml-2">
+                <Button variant="ghost" size="sm" className="gap-1.5 -ml-2 text-muted-foreground">
                   {showAdvanced ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                   Advanced options
                 </Button>
               </CollapsibleTrigger>
-              <CollapsibleContent className="pt-4 space-y-4">
+              <CollapsibleContent className="pt-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Branch Name (optional)</label>
+                  <label className="text-sm font-medium">Custom branch name</label>
                   <Input
                     placeholder="ai-planning/my-feature"
                     value={branchName}
@@ -1014,10 +1337,11 @@ export function PlanningPage() {
             </Collapsible>
 
             {/* Start Button */}
-            <div className="flex items-center gap-3 pt-4">
+            <div className="pt-4">
               <Button
                 onClick={handleStart}
                 disabled={!task.trim() || !planningStatus?.available}
+                size="lg"
                 className="gap-2"
               >
                 <Play className="h-4 w-4" />
@@ -1029,8 +1353,8 @@ export function PlanningPage() {
 
         {/* Error Display */}
         {error && (
-          <div className="flex items-start gap-3 p-4 rounded-lg bg-red-500/10 border border-red-500/20">
-            <XCircle className="h-5 w-5 text-red-500 mt-0.5" />
+          <div className="flex items-start gap-3 p-4 rounded-xl bg-red-500/10 border border-red-500/30">
+            <XCircle className="h-5 w-5 text-red-500 mt-0.5 shrink-0" />
             <div>
               <p className="font-medium text-red-600 dark:text-red-400">
                 {phase === 'failed' ? 'Workflow failed' : 'Error'}
@@ -1040,84 +1364,64 @@ export function PlanningPage() {
           </div>
         )}
 
-        {/* Main Content Tabs (shown when running or complete) */}
-        {(isRunning || plan || review) && (
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="plan" className="gap-2">
-                <ListTodo className="h-4 w-4" />
-                Plan
-                {plan && (
-                  <Badge variant="secondary" className="ml-1">
-                    {plan.parallelGroups.reduce((sum, g) => sum + g.subtasks.length, 0)}
-                  </Badge>
-                )}
-              </TabsTrigger>
-              <TabsTrigger value="activity" className="gap-2">
-                <Terminal className="h-4 w-4" />
-                Activity
-                {isRunning && <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />}
-              </TabsTrigger>
-              <TabsTrigger value="review" className="gap-2" disabled={!review}>
-                <Eye className="h-4 w-4" />
-                Review
-                {review && (
-                  <Badge variant={review.overallSuccess ? 'default' : 'destructive'} className="ml-1">
-                    {review.overallSuccess ? 'Pass' : 'Fail'}
-                  </Badge>
-                )}
-              </TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="plan" className="mt-4">
-              {plan ? (
+        {/* Main Content - Two columns when running */}
+        {showWorkflow && (
+          <div className="grid lg:grid-cols-5 gap-6">
+            {/* Left: Activity Feed */}
+            <div className="lg:col-span-2 space-y-4">
+              <LiveActivityFeed 
+                entries={activityLog} 
+                currentAction={isRunning ? currentAction : undefined}
+              />
+              
+              {/* Project Info */}
+              {projectInfo && (
+                <div className="rounded-lg border bg-card p-4">
+                  <h3 className="text-sm font-medium mb-2">Project Detected</h3>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="secondary">{projectInfo.language}</Badge>
+                    <Badge variant="secondary">{projectInfo.type}</Badge>
+                    {projectInfo.hasTests && <Badge variant="outline">Has Tests</Badge>}
+                    {projectInfo.hasLinting && <Badge variant="outline">Has Linting</Badge>}
+                  </div>
+                </div>
+              )}
+
+              {/* Results Summary */}
+              {isComplete && (
+                <ResultsSummary 
+                  branchCreated={branchCreated} 
+                  filesModified={filesModified} 
+                />
+              )}
+            </div>
+
+            {/* Right: Plan/Review */}
+            <div className="lg:col-span-3">
+              {review ? (
+                <ReviewView review={review} />
+              ) : plan ? (
                 <ExecutionPlanView
                   plan={plan}
                   expandedTasks={expandedTasks}
                   onToggleTask={toggleTask}
+                  phase={phase}
                 />
               ) : (
-                <div className="text-center py-12 text-muted-foreground">
-                  <Brain className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>Plan will appear here once created...</p>
+                <div className="rounded-lg border bg-card p-12 text-center">
+                  <Brain className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50 animate-pulse" />
+                  <p className="text-muted-foreground">Creating execution plan...</p>
                 </div>
               )}
-            </TabsContent>
-            
-            <TabsContent value="activity" className="mt-4">
-              <ActivityLog entries={activityLog} maxHeight={500} />
-            </TabsContent>
-            
-            <TabsContent value="review" className="mt-4">
-              {review ? (
-                <ReviewView review={review} />
-              ) : (
-                <div className="text-center py-12 text-muted-foreground">
-                  <Eye className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>Review will appear after execution...</p>
-                </div>
-              )}
-            </TabsContent>
-          </Tabs>
-        )}
-
-        {/* Reset Button (shown when complete) */}
-        {isComplete && (
-          <div className="flex justify-center">
-            <Button variant="outline" onClick={handleReset} className="gap-2">
-              <RefreshCw className="h-4 w-4" />
-              Start New Planning Session
-            </Button>
+            </div>
           </div>
         )}
 
         {/* Empty State */}
-        {isIdle && !plan && !error && (
-          <div className="text-center py-12 text-muted-foreground">
-            <Brain className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p>Describe a task to get started</p>
-            <p className="text-sm mt-1">
-              The AI will analyze your codebase, create a plan, and execute tasks in parallel
+        {isIdle && !error && (
+          <div className="text-center py-8 text-muted-foreground">
+            <p className="text-sm">
+              The AI will analyze your codebase, create an execution plan, and run tasks in parallel.
             </p>
           </div>
         )}
