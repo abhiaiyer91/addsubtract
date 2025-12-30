@@ -147,8 +147,10 @@ export const prModel = {
       .values({ ...data, number })
       .returning();
 
-    // Increment open PR count
-    await repoModel.incrementCounter(data.repoId, 'openPrsCount', 1);
+    // Increment open PR count only if the PR is open
+    if (data.state === 'open') {
+      await repoModel.incrementCounter(data.repoId, 'openPrsCount', 1);
+    }
 
     return pr;
   },

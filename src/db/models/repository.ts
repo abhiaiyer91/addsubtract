@@ -1,4 +1,4 @@
-import { eq, and, or, desc, sql, ilike } from 'drizzle-orm';
+import { eq, and, or, desc, sql, ilike, count } from 'drizzle-orm';
 import { getDb } from '../index';
 import {
   repositories,
@@ -343,6 +343,44 @@ export const repoModel = {
    */
   async incrementForksCount(id: string): Promise<void> {
     await this.incrementCounter(id, 'forksCount', 1);
+  },
+
+  /**
+   * Recalculate open issues and PRs counts from actual data
+   */
+  async recalculateCounts(id: string): Promise<{ openIssuesCount: number; openPrsCount: number }> {
+    const db = getDb();
+    
+    // Import here to avoid circular dependencies
+    const { issues } = await import('../schema');
+    const { pullRequests } = await import('../schema');
+    
+    // Count open issues
+    const [issueResult] = await db
+      .select({ count: count() })
+      .from(issues)
+      .where(and(eq(issues.repoId, id), eq(issues.state, 'open')));
+    
+    // Count open PRs
+    const [prResult] = await db
+      .select({ count: count() })
+      .from(pullRequests)
+      .where(and(eq(pullRequests.repoId, id), eq(pullRequests.state, 'open')));
+    
+    const openIssuesCount = Number(issueResult?.count ?? 0);
+    const openPrsCount = Number(prResult?.count ?? 0);
+    
+    // Update the repository
+    await db
+      .update(repositories)
+      .set({
+        openIssuesCount,
+        openPrsCount,
+        updatedAt: new Date(),
+      })
+      .where(eq(repositories.id, id));
+    
+    return { openIssuesCount, openPrsCount };
   },
 };
 

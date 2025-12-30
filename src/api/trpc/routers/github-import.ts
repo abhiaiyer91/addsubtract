@@ -611,12 +611,17 @@ export const githubImportRouter = router({
           await repoModel.update(repo.id, { defaultBranch: data.repo.default_branch });
         }
 
+        // Recalculate open issues and PRs counts
+        const counts = await repoModel.recalculateCounts(repo.id);
+        console.log(`[GitHub Resync] Recalculated counts: ${counts.openIssuesCount} open issues, ${counts.openPrsCount} open PRs`);
+
         console.log(`[GitHub Resync] Successfully resynced ${repo.name}`);
 
         return {
           success: true,
           message: 'Repository resynced successfully',
           defaultBranch: data.repo.default_branch,
+          ...counts,
         };
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';

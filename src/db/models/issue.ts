@@ -183,8 +183,10 @@ export const issueModel = {
       .values({ ...data, number, stageId })
       .returning();
 
-    // Increment open issues count
-    await repoModel.incrementCounter(data.repoId, 'openIssuesCount', 1);
+    // Increment open issues count only if the issue is open
+    if (data.state !== 'closed') {
+      await repoModel.incrementCounter(data.repoId, 'openIssuesCount', 1);
+    }
 
     return issue;
   },

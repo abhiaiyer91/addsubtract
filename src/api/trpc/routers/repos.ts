@@ -2318,4 +2318,40 @@ export const reposRouter = router({
         return { commits: [], stats: { totalCommits: 0 } };
       }
     }),
+
+  /**
+   * Recalculate open issues and PRs counts (owner only)
+   */
+  recalculateCounts: protectedProcedure
+    .input(
+      z.object({
+        owner: z.string(),
+        repo: z.string(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const result = await repoModel.findByPath(input.owner, input.repo);
+
+      if (!result) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Repository not found',
+        });
+      }
+
+      // Check ownership
+      if (result.repo.ownerId !== ctx.user.id) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have permission to modify this repository',
+        });
+      }
+
+      const counts = await repoModel.recalculateCounts(result.repo.id);
+      
+      return {
+        success: true,
+        ...counts,
+      };
+    }),
 });

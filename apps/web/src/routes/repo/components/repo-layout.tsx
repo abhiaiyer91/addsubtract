@@ -84,6 +84,16 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
     { enabled: !!repoData?.repo.id }
   );
 
+  // Fetch accurate counts for issues and PRs
+  const { data: issueCounts } = trpc.issues.count.useQuery(
+    { repoId: repoData?.repo.id || '' },
+    { enabled: !!repoData?.repo.id }
+  );
+  const { data: prCounts } = trpc.pulls.count.useQuery(
+    { repoId: repoData?.repo.id || '' },
+    { enabled: !!repoData?.repo.id }
+  );
+
   // Star/unstar mutation with optimistic updates
   const starMutation = trpc.repos.star.useMutation({
     onMutate: async () => {
@@ -488,14 +498,14 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
               <CircleDot className="h-4 w-4" />
               <span className="sr-only sm:not-sr-only sm:inline">Issues</span>
               <Badge variant="secondary" className="ml-1 text-xs">
-                {repoInfo.openIssuesCount}
+                {issueCounts?.open ?? repoInfo.openIssuesCount}
               </Badge>
             </Link>
             <Link to={`/${owner}/${repo}/pulls`} className={tabClass('pulls')}>
               <GitPullRequest className="h-4 w-4" />
               <span className="sr-only sm:not-sr-only sm:inline">PRs</span>
               <Badge variant="secondary" className="ml-1 text-xs">
-                {repoInfo.openPrsCount}
+                {prCounts?.open ?? repoInfo.openPrsCount}
               </Badge>
             </Link>
             <Link to={`/${owner}/${repo}/stacks`} className={tabClass('stacks')}>
@@ -534,14 +544,14 @@ export function RepoLayout({ owner, repo, children }: RepoLayoutProps) {
             <CircleDot className="h-4 w-4" />
             <span>Issues</span>
             <Badge variant="secondary" className="ml-1 text-xs">
-              {repoInfo.openIssuesCount}
+              {issueCounts?.open ?? repoInfo.openIssuesCount}
             </Badge>
           </Link>
           <Link to={`/${owner}/${repo}/pulls`} className={tabClass('pulls')}>
             <GitPullRequest className="h-4 w-4" />
             <span>PRs</span>
             <Badge variant="secondary" className="ml-1 text-xs">
-              {repoInfo.openPrsCount}
+              {prCounts?.open ?? repoInfo.openPrsCount}
             </Badge>
           </Link>
           <Link to={`/${owner}/${repo}/stacks`} className={tabClass('stacks')}>
