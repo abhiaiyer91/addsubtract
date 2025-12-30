@@ -1,21 +1,17 @@
 /**
  * Sandbox Routes
  * 
- * REST endpoints for sandbox management.
- * WebSocket support requires @hono/node-ws adapter.
+ * REST endpoints and WebSocket PTY for sandbox management.
  * 
  * Features:
  * - Sandbox pooling for reuse across requests (reduces cold starts)
  * - Automatic idle timeout and cleanup
  * - Per-provider sandbox management
- * 
- * For interactive terminals:
- * 1. Install: npm install @hono/node-ws
- * 2. Update server to use createNodeWebSocket
- * 3. Use upgradeWebSocket from @hono/node-ws
+ * - WebSocket PTY for interactive terminal sessions
  */
 
 import { Hono } from 'hono';
+import type { WSContext } from 'hono/ws';
 import {
   sandboxConfigModel,
   sandboxKeyModel,
@@ -570,26 +566,599 @@ async function executeCommand(
 }
 
 /**
- * WebSocket support instructions:
- * 
- * To enable interactive terminal support:
- * 
- * 1. Install the WebSocket adapter:
- *    npm install @hono/node-ws
- * 
- * 2. Update server/index.ts:
- *    import { createNodeWebSocket } from '@hono/node-ws';
- *    
- *    const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app });
- *    
- *    // Pass upgradeWebSocket to createSandboxRoutes
- *    const sandboxRoutes = createSandboxRoutes({ upgradeWebSocket });
- *    app.route('/api/sandbox', sandboxRoutes);
- * 
- * 3. Add WebSocket endpoint in this file:
- *    app.get('/:repoId/ws', upgradeWebSocket((c) => ({
- *      onOpen(event, ws) { ... },
- *      onMessage(event, ws) { ... },
- *      onClose() { ... },
- *    })));
+ * WebSocket PTY message types
  */
+interface WsInitMessage {
+  type: 'init';
+  cols: number;
+  rows: number;
+  branch?: string;
+}
+
+interface WsInputMessage {
+  type: 'input';
+  data: string;
+}
+
+interface WsResizeMessage {
+  type: 'resize';
+  cols: number;
+  rows: number;
+}
+
+type WsClientMessage = WsInitMessage | WsInputMessage | WsResizeMessage;
+
+/**
+ * Active PTY session tracking
+ */
+interface PtySession {
+  sandboxId: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  sandbox: any;
+  provider: SandboxProvider;
+  cleanup: () => Promise<void>;
+}
+
+const ptySessions = new Map<string, PtySession>();
+
+/**
+ * Create sandbox WebSocket routes for interactive PTY terminal
+ */
+export function createSandboxWsRoutes(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  upgradeWebSocket: any
+) {
+  const app = new Hono();
+
+  // WebSocket endpoint for interactive PTY terminal
+  app.get(
+    '/ws/:repoId',
+    upgradeWebSocket(async (c: { req: { param: (name: string) => string; raw: Request } }) => {
+      const repoId = c.req.param('repoId');
+      let session: PtySession | null = null;
+      let authenticated = false;
+      let userId: string | null = null;
+
+      return {
+        async onOpen(_event: Event, ws: WSContext) {
+          try {
+            // Authenticate via cookie/session
+            const auth = createAuth();
+            const authSession = await auth.api.getSession({
+              headers: c.req.raw.headers,
+            });
+
+            if (!authSession?.user?.id) {
+              ws.send(JSON.stringify({ type: 'error', message: 'Authentication required' }));
+              ws.close(1008, 'Authentication required');
+              return;
+            }
+
+            authenticated = true;
+            userId = authSession.user.id;
+
+            // Check sandbox is ready
+            const status = await sandboxConfigModel.getStatus(repoId);
+            if (!status.ready) {
+              ws.send(JSON.stringify({ 
+                type: 'error', 
+                message: status.configured 
+                  ? 'Sandbox is not enabled or API key is missing' 
+                  : 'Sandbox is not configured for this repository'
+              }));
+              ws.close(1008, 'Sandbox not ready');
+              return;
+            }
+
+            ws.send(JSON.stringify({ type: 'ready' }));
+          } catch (error) {
+            console.error('[sandbox-ws] onOpen error:', error);
+            ws.send(JSON.stringify({ 
+              type: 'error', 
+              message: error instanceof Error ? error.message : 'Connection failed' 
+            }));
+            ws.close(1011, 'Internal error');
+          }
+        },
+
+        async onMessage(event: MessageEvent, ws: WSContext) {
+          if (!authenticated || !userId) {
+            ws.send(JSON.stringify({ type: 'error', message: 'Not authenticated' }));
+            return;
+          }
+
+          try {
+            const msg = JSON.parse(event.data as string) as WsClientMessage;
+
+            switch (msg.type) {
+              case 'init': {
+                // Initialize PTY session
+                const config = await sandboxConfigModel.getConfig(repoId);
+                if (!config) {
+                  ws.send(JSON.stringify({ type: 'error', message: 'Sandbox not configured' }));
+                  return;
+                }
+
+                let apiKey: string | undefined;
+                if (config.provider !== 'docker') {
+                  apiKey = await sandboxKeyModel.getDecryptedKey(repoId, config.provider) ?? undefined;
+                  if (!apiKey) {
+                    ws.send(JSON.stringify({ type: 'error', message: 'Sandbox API key not found' }));
+                    return;
+                  }
+                }
+
+                // Create PTY session based on provider
+                session = await createPtySession(
+                  config.provider,
+                  {
+                    apiKey,
+                    config,
+                    repoId,
+                    userId,
+                    cols: msg.cols || 120,
+                    rows: msg.rows || 30,
+                  },
+                  (data: string) => {
+                    // Send output to client
+                    ws.send(JSON.stringify({ type: 'data', data }));
+                  },
+                  (code: number) => {
+                    // Process exited
+                    ws.send(JSON.stringify({ type: 'exit', code }));
+                  }
+                );
+
+                if (session) {
+                  ptySessions.set(`${repoId}:${userId}`, session);
+                  ws.send(JSON.stringify({ type: 'session', sessionId: session.sandboxId }));
+                }
+                break;
+              }
+
+              case 'input': {
+                if (session) {
+                  await sendPtyInput(session, msg.data);
+                }
+                break;
+              }
+
+              case 'resize': {
+                if (session) {
+                  await resizePty(session, msg.cols, msg.rows);
+                }
+                break;
+              }
+            }
+          } catch (error) {
+            console.error('[sandbox-ws] onMessage error:', error);
+            ws.send(JSON.stringify({ 
+              type: 'error', 
+              message: error instanceof Error ? error.message : 'Message handling failed' 
+            }));
+          }
+        },
+
+        async onClose() {
+          if (session && userId) {
+            ptySessions.delete(`${repoId}:${userId}`);
+            try {
+              await session.cleanup();
+            } catch (error) {
+              console.error('[sandbox-ws] cleanup error:', error);
+            }
+          }
+        },
+
+        onError(event: Event) {
+          console.error('[sandbox-ws] WebSocket error:', event);
+        },
+      };
+    })
+  );
+
+  return app;
+}
+
+/**
+ * Create a PTY session for the given provider
+ */
+async function createPtySession(
+  provider: SandboxProvider,
+  options: {
+    apiKey?: string;
+    config: NonNullable<Awaited<ReturnType<typeof sandboxConfigModel.getConfig>>>;
+    repoId: string;
+    userId: string;
+    cols: number;
+    rows: number;
+  },
+  onData: (data: string) => void,
+  onExit: (code: number) => void
+): Promise<PtySession | null> {
+  const { apiKey, config, cols, rows } = options;
+
+  switch (provider) {
+    case 'vercel': {
+      try {
+        const { Sandbox } = await import('@vercel/sandbox');
+
+        const vercelProjectId = config.vercelProjectId;
+        const vercelTeamId = config.vercelTeamId;
+        if (!vercelProjectId || !vercelTeamId || !apiKey) {
+          throw new Error('Vercel configuration incomplete');
+        }
+
+        const VERCEL_MAX_TIMEOUT_MS = 2700000;
+        const requestedTimeout = config.timeoutMinutes * 60 * 1000;
+        const sandboxTimeout = Math.min(requestedTimeout, VERCEL_MAX_TIMEOUT_MS);
+
+        const sandbox = await Sandbox.create({
+          projectId: vercelProjectId,
+          teamId: vercelTeamId,
+          token: apiKey,
+          timeout: sandboxTimeout,
+          runtime: (config.vercelRuntime as 'node22' | 'python3.13') || 'node22',
+        });
+
+        // Start an interactive shell
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const shell = await (sandbox as any).shells.create();
+        
+        // Set up output streaming
+        shell.onOutput((data: string) => {
+          onData(data);
+        });
+
+        // Handle shell exit
+        shell.onExit((code: number) => {
+          onExit(code);
+        });
+
+        // Resize terminal
+        await shell.resize({ cols, rows });
+
+        return {
+          sandboxId: sandbox.sandboxId,
+          sandbox: { sandbox, shell },
+          provider: 'vercel',
+          cleanup: async () => {
+            await shell.kill();
+            await sandbox.stop();
+          },
+        };
+      } catch (error) {
+        console.error('[vercel-pty] Failed to create PTY session:', error);
+        // Fall back to shell command execution
+        return createFallbackPtySession(provider, options, onData, onExit);
+      }
+    }
+
+    case 'e2b': {
+      try {
+        const { Sandbox } = await import('@e2b/code-interpreter');
+
+        const sandbox = await Sandbox.create({
+          apiKey,
+          timeoutMs: config.timeoutMinutes * 60 * 1000,
+        });
+
+        // E2B supports interactive terminals via commands API
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const sbx = sandbox as any;
+        
+        // Try to use terminal API if available, otherwise fall back
+        if (sbx.terminal?.start) {
+          const terminal = await sbx.terminal.start({
+            cols,
+            rows,
+            onData: (data: Uint8Array | string) => {
+              if (typeof data === 'string') {
+                onData(data);
+              } else {
+                onData(new TextDecoder().decode(data));
+              }
+            },
+            onExit: () => {
+              onExit(0);
+            },
+          });
+
+          return {
+            sandboxId: sandbox.sandboxId,
+            sandbox: { sandbox, terminal },
+            provider: 'e2b',
+            cleanup: async () => {
+              terminal.kill?.();
+              await sandbox.kill();
+            },
+          };
+        } else {
+          // Fall back to command execution mode
+          return createFallbackPtySession(provider, options, onData, onExit);
+        }
+      } catch (error) {
+        console.error('[e2b-pty] Failed to create PTY session:', error);
+        return createFallbackPtySession(provider, options, onData, onExit);
+      }
+    }
+
+    case 'daytona': {
+      try {
+        const { Daytona } = await import('@daytonaio/sdk');
+        const daytona = new Daytona({ apiKey });
+
+        const sandbox = await daytona.create({
+          language: config.defaultLanguage as 'typescript' | 'javascript' | 'python',
+          autoStopInterval: config.daytonaAutoStop,
+        });
+
+        // Daytona supports PTY
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const sbx = sandbox as any;
+        const pty = await sbx.process.createPty({
+          id: `pty_${Date.now()}`,
+          cols,
+          rows,
+          onData: (data: string | Uint8Array) => {
+            if (typeof data === 'string') {
+              onData(data);
+            } else {
+              onData(new TextDecoder().decode(data));
+            }
+          },
+        });
+
+        await pty.waitForConnection();
+
+        return {
+          sandboxId: sbx.id,
+          sandbox: { sandbox, pty },
+          provider: 'daytona',
+          cleanup: async () => {
+            await sbx.delete();
+          },
+        };
+      } catch (error) {
+        console.error('[daytona-pty] Failed to create PTY session:', error);
+        return createFallbackPtySession(provider, options, onData, onExit);
+      }
+    }
+
+    case 'docker': {
+      return createDockerPtySession(options, onData, onExit);
+    }
+
+    default:
+      return null;
+  }
+}
+
+/**
+ * Create a Docker-based PTY session using docker exec -it
+ */
+async function createDockerPtySession(
+  options: {
+    config: NonNullable<Awaited<ReturnType<typeof sandboxConfigModel.getConfig>>>;
+    repoId: string;
+    userId: string;
+    cols: number;
+    rows: number;
+  },
+  onData: (data: string) => void,
+  onExit: (code: number) => void
+): Promise<PtySession | null> {
+  const { spawn, execSync } = await import('child_process');
+  const { config, cols, rows } = options;
+
+  // Check if Docker is available
+  try {
+    execSync('docker version', { stdio: 'ignore', timeout: 5000 });
+  } catch {
+    return null;
+  }
+
+  // Start a container with an interactive shell
+  const containerName = `wit-sandbox-${options.repoId.slice(0, 8)}-${Date.now()}`;
+  
+  const dockerArgs = [
+    'run',
+    '-it',
+    '--rm',
+    '--name', containerName,
+    '-w', '/workspace',
+    '--network', config.networkMode === 'none' ? 'none' : 'bridge',
+    '--memory', `${config.memoryMB}m`,
+    '--cpus', `${config.cpuCores}`,
+    '--security-opt', 'no-new-privileges',
+    '-e', `TERM=xterm-256color`,
+    '-e', `COLUMNS=${cols}`,
+    '-e', `LINES=${rows}`,
+    config.dockerImage,
+    '/bin/sh',
+  ];
+
+  const child = spawn('docker', dockerArgs, {
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
+
+  child.stdout?.on('data', (data: Buffer) => {
+    onData(data.toString());
+  });
+
+  child.stderr?.on('data', (data: Buffer) => {
+    onData(data.toString());
+  });
+
+  child.on('exit', (code) => {
+    onExit(code ?? 0);
+  });
+
+  return {
+    sandboxId: containerName,
+    sandbox: { child, containerName },
+    provider: 'docker',
+    cleanup: async () => {
+      child.kill();
+      // Try to stop container if still running
+      try {
+        execSync(`docker stop ${containerName}`, { stdio: 'ignore', timeout: 5000 });
+      } catch {
+        // Ignore - container may already be stopped
+      }
+    },
+  };
+}
+
+/**
+ * Fallback PTY session using command execution
+ * For providers that don't support native PTY
+ */
+async function createFallbackPtySession(
+  provider: SandboxProvider,
+  options: {
+    apiKey?: string;
+    config: NonNullable<Awaited<ReturnType<typeof sandboxConfigModel.getConfig>>>;
+    repoId: string;
+    userId: string;
+    cols: number;
+    rows: number;
+  },
+  onData: (data: string) => void,
+  _onExit: (code: number) => void
+): Promise<PtySession | null> {
+  // Create a simple command-based session
+  // This doesn't support full PTY but allows basic command execution
+  onData('\x1b[33mNote: This provider has limited terminal support.\x1b[0m\r\n');
+  onData('\x1b[33mTUI applications may not work correctly.\x1b[0m\r\n\r\n');
+  onData('$ ');
+
+  const pool = getSandboxPool();
+  const poolKey = `${provider}:${options.repoId}:${options.userId}`;
+  
+  // We'll handle commands line by line
+  let inputBuffer = '';
+
+  return {
+    sandboxId: `fallback-${Date.now()}`,
+    sandbox: {
+      inputBuffer,
+      poolKey,
+      pool,
+      onData,
+      provider,
+      options,
+    },
+    provider,
+    cleanup: async () => {
+      // Nothing to clean up for fallback
+    },
+  };
+}
+
+/**
+ * Send input to PTY session
+ */
+async function sendPtyInput(session: PtySession, data: string): Promise<void> {
+  switch (session.provider) {
+    case 'vercel': {
+      const { shell } = session.sandbox;
+      await shell.write(data);
+      break;
+    }
+
+    case 'e2b': {
+      const { terminal } = session.sandbox;
+      terminal.sendData(data);
+      break;
+    }
+
+    case 'daytona': {
+      const { pty } = session.sandbox;
+      await pty.sendInput(data);
+      break;
+    }
+
+    case 'docker': {
+      const { child } = session.sandbox;
+      child.stdin?.write(data);
+      break;
+    }
+
+    default: {
+      // Fallback mode - accumulate input and execute on Enter
+      const sandbox = session.sandbox;
+      sandbox.inputBuffer += data;
+      
+      // Echo the input
+      sandbox.onData(data);
+      
+      // Check for Enter key
+      if (data === '\r' || data === '\n') {
+        const command = sandbox.inputBuffer.trim();
+        sandbox.inputBuffer = '';
+        sandbox.onData('\r\n');
+        
+        if (command) {
+          try {
+            const result = await executeCommand(sandbox.provider, {
+              apiKey: sandbox.options.apiKey,
+              command,
+              args: [],
+              timeout: 60000,
+              cwd: '/workspace',
+              config: sandbox.options.config,
+              repoId: sandbox.options.repoId,
+              userId: sandbox.options.userId,
+            });
+            
+            if (result.stdout) {
+              sandbox.onData(result.stdout.replace(/\n/g, '\r\n'));
+            }
+            if (result.stderr) {
+              sandbox.onData(`\x1b[31m${result.stderr.replace(/\n/g, '\r\n')}\x1b[0m`);
+            }
+            if (result.error) {
+              sandbox.onData(`\x1b[31mError: ${result.error}\x1b[0m\r\n`);
+            }
+          } catch (error) {
+            sandbox.onData(`\x1b[31mError: ${error instanceof Error ? error.message : 'Command failed'}\x1b[0m\r\n`);
+          }
+        }
+        sandbox.onData('$ ');
+      }
+      break;
+    }
+  }
+}
+
+/**
+ * Resize PTY session
+ */
+async function resizePty(session: PtySession, cols: number, rows: number): Promise<void> {
+  switch (session.provider) {
+    case 'vercel': {
+      const { shell } = session.sandbox;
+      await shell.resize({ cols, rows });
+      break;
+    }
+
+    case 'e2b': {
+      const { terminal } = session.sandbox;
+      terminal.resize(cols, rows);
+      break;
+    }
+
+    case 'daytona': {
+      const { pty } = session.sandbox;
+      await pty.resize(cols, rows);
+      break;
+    }
+
+    case 'docker': {
+      // Docker resize requires docker exec with stty
+      // For simplicity, we skip resize for Docker PTY
+      break;
+    }
+  }
+}
