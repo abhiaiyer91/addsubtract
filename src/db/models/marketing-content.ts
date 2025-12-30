@@ -5,7 +5,7 @@
  */
 
 import { eq, desc, and } from 'drizzle-orm';
-import { db } from '../index';
+import { getDb } from '../index';
 import {
   marketingContent,
   type MarketingContent,
@@ -27,7 +27,7 @@ export const marketingContentModel = {
     thread?: string[] | null;
     status?: MarketingContentStatus;
   }): Promise<MarketingContent> {
-    const [content] = await db
+    const [content] = await getDb()
       .insert(marketingContent)
       .values({
         repoId: data.repoId,
@@ -47,7 +47,7 @@ export const marketingContentModel = {
    * Find by ID
    */
   async findById(id: string): Promise<MarketingContent | null> {
-    const [content] = await db
+    const [content] = await getDb()
       .select()
       .from(marketingContent)
       .where(eq(marketingContent.id, id))
@@ -63,7 +63,7 @@ export const marketingContentModel = {
     sourceType: MarketingContentSource,
     sourceId: string
   ): Promise<MarketingContent | null> {
-    const [content] = await db
+    const [content] = await getDb()
       .select()
       .from(marketingContent)
       .where(
@@ -94,7 +94,7 @@ export const marketingContentModel = {
       conditions.push(eq(marketingContent.status, options.status));
     }
 
-    return db
+    return getDb()
       .select()
       .from(marketingContent)
       .where(and(...conditions))
@@ -123,7 +123,7 @@ export const marketingContentModel = {
       }
     }
 
-    const [updated] = await db
+    const [updated] = await getDb()
       .update(marketingContent)
       .set(updates)
       .where(eq(marketingContent.id, id))
@@ -139,7 +139,7 @@ export const marketingContentModel = {
     id: string,
     data: { tweet?: string; thread?: string[] | null }
   ): Promise<MarketingContent | null> {
-    const [updated] = await db
+    const [updated] = await getDb()
       .update(marketingContent)
       .set({
         ...data,
@@ -155,7 +155,7 @@ export const marketingContentModel = {
    * Delete content
    */
   async delete(id: string): Promise<boolean> {
-    const result = await db
+    const result = await getDb()
       .delete(marketingContent)
       .where(eq(marketingContent.id, id));
 
@@ -166,7 +166,7 @@ export const marketingContentModel = {
    * Get pending content count for a repo
    */
   async getPendingCount(repoId: string): Promise<number> {
-    const result = await db
+    const result = await getDb()
       .select()
       .from(marketingContent)
       .where(

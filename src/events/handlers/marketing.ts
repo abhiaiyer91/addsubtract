@@ -163,7 +163,7 @@ export async function triggerMarketingContent(
         error: result.error,
       };
     } else {
-      const release = await releaseModel.findById(id);
+      const release = await releaseModel.getById(id);
       if (!release) {
         return { success: false, error: 'Release not found' };
       }

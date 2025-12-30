@@ -8,6 +8,7 @@ import {
   uuid,
   primaryKey,
   unique,
+  jsonb,
 } from 'drizzle-orm/pg-core';
 
 // Import better-auth user table for foreign key references

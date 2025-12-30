@@ -367,7 +367,7 @@ export async function runMarketingContentWorkflow(
   input: MarketingContentInput
 ): Promise<MarketingContentOutput> {
   try {
-    const run = marketingContentWorkflow.createRun();
+    const run = await marketingContentWorkflow.createRun();
     const result = await run.start({ inputData: input });
     
     if (result.status === 'success' && result.result) {
