@@ -24,6 +24,7 @@ import { createIssueRoutes } from './routes/issues';
 import { createProjectRoutes } from './routes/projects';
 import { createCycleRoutes } from './routes/cycles';
 import { createAgentStreamRoutes } from './routes/agent-stream';
+import { createPlanningStreamRoutes } from './routes/planning-stream';
 import { createPackageRoutes } from './routes/packages';
 import { createOAuthRoutes } from './routes/oauth';
 import { createSandboxRoutes, createSandboxWsRoutes } from './routes/sandbox-ws';
@@ -175,6 +176,7 @@ export function createApp(repoManager: RepoManager, options: { verbose?: boolean
   const projectRoutes = createProjectRoutes();
   const cycleRoutes = createCycleRoutes();
   const agentStreamRoutes = createAgentStreamRoutes();
+  const planningStreamRoutes = createPlanningStreamRoutes();
   const oauthRoutes = createOAuthRoutes();
   const sandboxRoutes = createSandboxRoutes();
   const sandboxWsRoutes = createSandboxWsRoutes(upgradeWebSocket);
@@ -184,6 +186,7 @@ export function createApp(repoManager: RepoManager, options: { verbose?: boolean
   app.route('/api/repos', projectRoutes);
   app.route('/api/repos', cycleRoutes);
   app.route('/api/agent', agentStreamRoutes);
+  app.route('/api/planning', planningStreamRoutes);
   app.route('/api/sandbox', sandboxRoutes);
   app.route('/api/sandbox', sandboxWsRoutes);
   app.route('/oauth', oauthRoutes);
