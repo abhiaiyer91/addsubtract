@@ -18,9 +18,10 @@ import {
 } from '../../../db/models';
 
 // Schema definitions
-const sandboxProviderSchema = z.enum(['e2b', 'daytona', 'docker']);
+const sandboxProviderSchema = z.enum(['e2b', 'daytona', 'docker', 'vercel']);
 const networkModeSchema = z.enum(['none', 'restricted', 'full']);
 const languageSchema = z.enum(['typescript', 'javascript', 'python']);
+const vercelRuntimeSchema = z.enum(['node22', 'python3.13']);
 
 // Sandbox settings input schema
 const sandboxSettingsSchema = z.object({
@@ -43,6 +44,10 @@ const sandboxSettingsSchema = z.object({
 
   // Docker settings
   dockerImage: z.string().optional(),
+
+  // Vercel settings
+  vercelProjectId: z.string().optional(),
+  vercelRuntime: vercelRuntimeSchema.optional(),
 });
 
 /**
@@ -144,6 +149,8 @@ export const sandboxRouter = router({
           daytonaSnapshot: undefined,
           daytonaAutoStop: 15,
           dockerImage: 'wit-sandbox:latest',
+          vercelProjectId: undefined,
+          vercelRuntime: 'node22' as const,
         };
       }
 
@@ -163,6 +170,8 @@ export const sandboxRouter = router({
         daytonaSnapshot: config.daytonaSnapshot ?? undefined,
         daytonaAutoStop: config.daytonaAutoStop,
         dockerImage: config.dockerImage,
+        vercelProjectId: (config as any).vercelProjectId ?? undefined,
+        vercelRuntime: (config as any).vercelRuntime ?? 'node22',
       };
     }),
 
@@ -253,7 +262,7 @@ export const sandboxRouter = router({
     .input(
       z.object({
         repoId: z.string().uuid(),
-        provider: z.enum(['e2b', 'daytona']),
+        provider: z.enum(['e2b', 'daytona', 'vercel']),
         apiKey: z.string().min(1),
       })
     )
@@ -291,7 +300,7 @@ export const sandboxRouter = router({
     .input(
       z.object({
         repoId: z.string().uuid(),
-        provider: z.enum(['e2b', 'daytona']),
+        provider: z.enum(['e2b', 'daytona', 'vercel']),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -467,6 +476,41 @@ export const sandboxRouter = router({
               };
             } finally {
               await sandbox.delete();
+            }
+          }
+
+          case 'vercel': {
+            const { Sandbox } = await import('@vercel/sandbox');
+
+            // Get Vercel project ID from config (stored separately)
+            const vercelProjectId = (config as any).vercelProjectId;
+            if (!vercelProjectId) {
+              throw new TRPCError({
+                code: 'BAD_REQUEST',
+                message: 'Vercel Project ID is not configured',
+              });
+            }
+
+            const sandbox = await Sandbox.create({
+              projectId: vercelProjectId,
+              accessToken: apiKey,
+              timeout: config.timeoutMinutes * 60 * 1000,
+              runtime: (config as any).vercelRuntime || 'node22',
+            });
+
+            try {
+              const result = await sandbox.runCommand(input.command, input.args || [], {
+                signal: AbortSignal.timeout(input.timeout),
+              });
+
+              return {
+                success: result.exitCode === 0,
+                exitCode: result.exitCode,
+                stdout: result.stdout,
+                stderr: result.stderr,
+              };
+            } finally {
+              await sandbox.stop();
             }
           }
 

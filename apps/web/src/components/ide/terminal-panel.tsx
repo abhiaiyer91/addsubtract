@@ -274,7 +274,7 @@ export function TerminalPanel({ height, repoId, owner, repo }: TerminalPanelProp
                     <>
                       <p className="text-amber-400">Docker sandbox is configured but Docker is not available.</p>
                       <p className="mt-2">
-                        Either install Docker, ensure it's running, or switch to E2B/Daytona provider in{' '}
+                        Either install Docker, ensure it's running, or switch to E2B/Daytona/Vercel provider in{' '}
                         <span className="text-zinc-300">Settings → Sandbox</span>.
                       </p>
                     </>

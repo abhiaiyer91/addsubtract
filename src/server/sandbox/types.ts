@@ -8,6 +8,7 @@
  * - E2B: Firecracker microVM sandboxes (e2b.dev) - Recommended for production
  * - Daytona: Cloud dev environments with PTY support (daytona.io)
  * - Docker: Local container-based isolation (self-hosted)
+ * - Vercel: Vercel Sandbox ephemeral compute (vercel.com) - Great for AI agents
  */
 
 import { EventEmitter } from 'events';
@@ -15,7 +16,7 @@ import { EventEmitter } from 'events';
 /**
  * Sandbox provider types
  */
-export type SandboxProviderType = 'e2b' | 'daytona' | 'docker';
+export type SandboxProviderType = 'e2b' | 'daytona' | 'docker' | 'vercel';
 
 /**
  * Network isolation mode
@@ -407,12 +408,74 @@ export interface DockerProviderConfig extends SandboxProviderConfig {
 }
 
 /**
+ * Vercel Sandbox provider configuration
+ *
+ * Vercel Sandbox provides ephemeral compute environments for AI agents
+ * and code execution with ~1s startup time.
+ * Best for: AI agents, code generation, developer experimentation
+ *
+ * @see https://vercel.com/docs/vercel-sandbox
+ */
+export interface VercelProviderConfig extends SandboxProviderConfig {
+  type: 'vercel';
+  options: {
+    /**
+     * Vercel access token (required unless using OIDC)
+     * Create at: https://vercel.com/account/tokens
+     */
+    accessToken?: string;
+    /**
+     * Vercel team ID (required for team-scoped sandboxes)
+     */
+    teamId?: string;
+    /**
+     * Vercel project ID (required)
+     */
+    projectId: string;
+    /**
+     * Default sandbox timeout in milliseconds
+     * Default: 300000 (5 minutes)
+     * Maximum depends on your Vercel plan
+     */
+    timeoutMs?: number;
+    /**
+     * Runtime to use for sandboxes
+     * Default: 'node22'
+     */
+    runtime?: 'node22' | 'python3.13';
+    /**
+     * Number of vCPUs for the sandbox
+     * Default: 1
+     */
+    vcpus?: number;
+    /**
+     * Ports to expose from the sandbox
+     * Used for development servers, etc.
+     */
+    ports?: number[];
+    /**
+     * Git repository to clone into the sandbox
+     */
+    source?: {
+      type: 'git';
+      url: string;
+      revision?: string;
+      depth?: number;
+    } | {
+      type: 'tarball';
+      url: string;
+    };
+  };
+}
+
+/**
  * Union of all provider configurations
  */
 export type ProviderConfig =
   | E2BProviderConfig
   | DaytonaProviderConfig
-  | DockerProviderConfig;
+  | DockerProviderConfig
+  | VercelProviderConfig;
 
 /**
  * Sandbox provider interface
@@ -582,5 +645,15 @@ export const PROVIDER_FEATURES = {
     persistence: true,
     pricing: 'Self-hosted',
     bestFor: 'Development, self-hosted production',
+  },
+  vercel: {
+    name: 'Vercel Sandbox',
+    isolation: 'Linux MicroVM',
+    startupTime: '~1s',
+    ptySupport: false,
+    codeInterpreter: true,
+    persistence: false,
+    pricing: 'Per-second billing',
+    bestFor: 'AI agents, code generation, ephemeral workloads',
   },
 } as const;

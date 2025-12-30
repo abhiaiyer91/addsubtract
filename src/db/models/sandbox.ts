@@ -17,7 +17,7 @@ import {
 } from '../schema';
 
 // Types inferred from schema
-export type SandboxProvider = 'e2b' | 'daytona' | 'docker';
+export type SandboxProvider = 'e2b' | 'daytona' | 'docker' | 'vercel';
 export type SandboxNetworkMode = 'none' | 'restricted' | 'full';
 
 export interface SandboxConfig {
@@ -34,6 +34,8 @@ export interface SandboxConfig {
   daytonaSnapshot: string | null;
   daytonaAutoStop: number;
   dockerImage: string;
+  vercelProjectId: string | null;
+  vercelRuntime: string | null;
   updatedById: string;
   createdAt: Date;
   updatedAt: Date;
@@ -147,6 +149,8 @@ export function getDefaultConfig(repoId: string, userId: string): Omit<SandboxCo
     daytonaSnapshot: null,
     daytonaAutoStop: 15,
     dockerImage: 'wit-sandbox:latest',
+    vercelProjectId: null,
+    vercelRuntime: 'node22',
     updatedById: userId,
   };
 }
@@ -182,6 +186,8 @@ export const sandboxConfigModel = {
       daytonaSnapshot: config.daytonaSnapshot,
       daytonaAutoStop: config.daytonaAutoStop,
       dockerImage: config.dockerImage,
+      vercelProjectId: config.vercelProjectId,
+      vercelRuntime: config.vercelRuntime,
       updatedById: config.updatedById,
       createdAt: config.createdAt,
       updatedAt: config.updatedAt,
@@ -227,6 +233,8 @@ export const sandboxConfigModel = {
         daytonaSnapshot: updated.daytonaSnapshot,
         daytonaAutoStop: updated.daytonaAutoStop,
         dockerImage: updated.dockerImage,
+        vercelProjectId: updated.vercelProjectId,
+        vercelRuntime: updated.vercelRuntime,
         updatedById: updated.updatedById,
         createdAt: updated.createdAt,
         updatedAt: updated.updatedAt,
@@ -258,6 +266,8 @@ export const sandboxConfigModel = {
       daytonaSnapshot: created.daytonaSnapshot,
       daytonaAutoStop: created.daytonaAutoStop,
       dockerImage: created.dockerImage,
+      vercelProjectId: created.vercelProjectId,
+      vercelRuntime: created.vercelRuntime,
       updatedById: created.updatedById,
       createdAt: created.createdAt,
       updatedAt: created.updatedAt,
@@ -295,6 +305,7 @@ export const sandboxConfigModel = {
     hasApiKey: boolean;
     ready: boolean;
     dockerAvailable?: boolean;
+    vercelOidcAvailable?: boolean;
   }> {
     const config = await this.getConfig(repoId);
 
@@ -311,6 +322,7 @@ export const sandboxConfigModel = {
     // Docker doesn't need an API key but needs Docker to be available
     let hasApiKey = config.provider === 'docker';
     let dockerAvailable: boolean | undefined;
+    let vercelOidcAvailable: boolean | undefined;
     
     if (config.provider === 'docker') {
       // Check if Docker is available
@@ -320,6 +332,19 @@ export const sandboxConfigModel = {
         dockerAvailable = true;
       } catch {
         dockerAvailable = false;
+      }
+    }
+
+    // Vercel can use OIDC tokens (auto-managed by Vercel) or access tokens
+    if (config.provider === 'vercel') {
+      // Check if we have environment variables for OIDC or access token
+      const hasVercelEnv = !!(
+        process.env.VERCEL_PROJECT_ID &&
+        (process.env.VERCEL_TOKEN || process.env.VERCEL_OIDC_TOKEN)
+      );
+      if (hasVercelEnv) {
+        hasApiKey = true;
+        vercelOidcAvailable = !!process.env.VERCEL_OIDC_TOKEN;
       }
     }
     
@@ -337,6 +362,7 @@ export const sandboxConfigModel = {
       hasApiKey,
       ready: isReady,
       dockerAvailable,
+      vercelOidcAvailable,
     };
   },
 };

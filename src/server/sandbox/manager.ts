@@ -127,6 +127,11 @@ export class SandboxManager extends EventEmitter {
           const { DockerProvider } = await import('./providers/docker');
           return new DockerProvider(config);
         }
+        case 'vercel': {
+          if (config.type !== 'vercel') return null;
+          const { VercelProvider } = await import('./providers/vercel');
+          return new VercelProvider(config);
+        }
         default:
           return null;
       }
@@ -476,6 +481,27 @@ export function createSandboxManagerFromEnv(
             snapshot: process.env.DAYTONA_SNAPSHOT,
             language: (process.env.DAYTONA_LANGUAGE as 'python' | 'typescript' | 'javascript') || 'typescript',
             autoStopInterval: parseInt(process.env.DAYTONA_AUTO_STOP_INTERVAL || '15', 10),
+          },
+        },
+        enableAuditLog: process.env.SANDBOX_AUDIT_LOG === 'true',
+      };
+      break;
+
+    case 'vercel':
+      if (!process.env.VERCEL_PROJECT_ID) {
+        throw new Error('VERCEL_PROJECT_ID environment variable is required');
+      }
+      config = {
+        repoRoot,
+        provider: {
+          type: 'vercel',
+          options: {
+            accessToken: process.env.VERCEL_TOKEN,
+            teamId: process.env.VERCEL_TEAM_ID,
+            projectId: process.env.VERCEL_PROJECT_ID,
+            timeoutMs: parseInt(process.env.VERCEL_SANDBOX_TIMEOUT_MS || '300000', 10),
+            runtime: (process.env.VERCEL_SANDBOX_RUNTIME as 'node22' | 'python3.13') || 'node22',
+            vcpus: parseInt(process.env.VERCEL_SANDBOX_VCPUS || '1', 10),
           },
         },
         enableAuditLog: process.env.SANDBOX_AUDIT_LOG === 'true',
