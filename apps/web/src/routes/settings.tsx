@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Loader2, Check, Key, Ticket, ChevronRight, AppWindow, Shield, Bell, Sparkles, Keyboard } from 'lucide-react';
+import { Loader2, Check, Key, Ticket, ChevronRight, AppWindow, Shield, Bell, Sparkles, Keyboard, HardDrive } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -274,6 +274,23 @@ export function SettingsPage() {
                 <div className="font-medium">Authorized Applications</div>
                 <div className="text-sm text-muted-foreground">
                   Manage third-party apps with access to your account
+                </div>
+              </div>
+            </div>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          </Link>
+          <Link
+            to="/settings/storage"
+            className="flex items-center justify-between p-3 rounded-lg hover:bg-muted transition-colors group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-muted rounded-md group-hover:bg-background">
+                <HardDrive className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <div>
+                <div className="font-medium">Storage Credentials</div>
+                <div className="text-sm text-muted-foreground">
+                  Manage cloud storage credentials for repositories
                 </div>
               </div>
             </div>

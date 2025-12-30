@@ -1,0 +1,9 @@
+# Railway configuration for wit web UI
+# See: https://docs.railway.app/reference/config-as-code
+
+[build]
+builder = "nixpacks"
+buildCommand = "npm ci && npm run build"
+
+[deploy]
+startCommand = "npm run preview -- --host 0.0.0.0 --port ${PORT:-4173}"

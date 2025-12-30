@@ -1,0 +1,36 @@
+# Railway Configuration for Wit Platform
+# https://docs.railway.app/reference/config-as-code
+#
+# This file configures the main API server deployment.
+# For multi-service setup, see docs/platform/railway-deployment.mdx
+
+[build]
+builder = "nixpacks"
+# Install deps, compile TypeScript, run migrations
+buildCommand = "npm ci && npm run build && npm run db:push"
+
+[deploy]
+# Start the API server with repo storage in persistent volume
+startCommand = "node dist/cli.js serve --repos /data/repos"
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 5
+
+# ===========================================
+# QUICK START
+# ===========================================
+#
+# 1. Create Railway project and add PostgreSQL
+# 2. Add Redis (optional, for rate limiting)
+# 3. Add a Volume mounted at /data
+# 4. Set required environment variables:
+#
+#    NODE_ENV=production
+#    BETTER_AUTH_SECRET=<openssl rand -base64 32>
+#    BETTER_AUTH_URL=https://your-app.up.railway.app
+#    CORS_ORIGINS=https://your-web-app.up.railway.app
+#
+# 5. Deploy from GitHub
+#
+# See: docs/platform/railway-deployment.mdx for full guide
