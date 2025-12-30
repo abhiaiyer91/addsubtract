@@ -287,6 +287,11 @@ export const repositories = pgTable('repositories', {
   openIssuesCount: integer('open_issues_count').notNull().default(0),
   openPrsCount: integer('open_prs_count').notNull().default(0),
 
+  // Cached language stats (JSON array of {language, percentage, color, bytes})
+  // Updated on push to avoid expensive per-request calculation
+  languageStats: jsonb('language_stats'),
+  languageStatsUpdatedAt: timestamp('language_stats_updated_at', { withTimezone: true }),
+
   // Filesystem path to bare repo
   diskPath: text('disk_path').notNull(),
 

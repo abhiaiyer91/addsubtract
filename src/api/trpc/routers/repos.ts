@@ -58,6 +58,101 @@ function getRepoFromDisk(diskPath: string, autoCreate: boolean = false): BareRep
   return new BareRepository(absolutePath);
 }
 
+/**
+ * Compute language statistics for a repository by reading all files.
+ * This is an expensive operation and should only be called when:
+ * 1. No cached stats exist
+ * 2. After a push event to update the cache
+ * 
+ * @param diskPath - The disk path to the bare repository
+ * @param defaultBranch - The default branch name (e.g., 'main')
+ * @returns Array of language statistics
+ */
+export async function computeLanguageStats(
+  diskPath: string,
+  defaultBranch: string | null
+): Promise<LanguageStats[]> {
+  const bareRepo = getRepoFromDisk(diskPath);
+  if (!bareRepo) {
+    console.warn('[computeLanguageStats] Repository not found on disk:', diskPath);
+    return [];
+  }
+
+  try {
+    // Resolve HEAD to a commit - try multiple fallbacks
+    let commitHash = bareRepo.refs.resolve('HEAD');
+    
+    if (!commitHash) {
+      // Try the repo's configured default branch
+      const branch = defaultBranch || 'main';
+      commitHash = bareRepo.refs.resolve(`refs/heads/${branch}`);
+      
+      if (!commitHash) {
+        // Try common default branch names
+        for (const fallback of ['main', 'master', 'develop']) {
+          commitHash = bareRepo.refs.resolve(`refs/heads/${fallback}`);
+          if (commitHash) break;
+        }
+      }
+    }
+    
+    if (!commitHash) {
+      console.warn('[computeLanguageStats] Could not resolve any ref');
+      return [];
+    }
+
+    // Read the commit to get the tree
+    let commit;
+    try {
+      commit = bareRepo.objects.readCommit(commitHash);
+    } catch (commitError) {
+      console.warn('[computeLanguageStats] Could not read commit:', commitHash, commitError);
+      return [];
+    }
+    
+    // Recursively collect all files with their sizes
+    const files: Array<{ path: string; size: number }> = [];
+    
+    const collectFiles = (treeHash: string, prefix: string = ''): void => {
+      try {
+        const tree = bareRepo.objects.readTree(treeHash);
+        
+        for (const entry of tree.entries) {
+          const fullPath = prefix ? `${prefix}/${entry.name}` : entry.name;
+          
+          if (entry.mode === '40000') {
+            // Directory - check if should be ignored
+            if (!shouldIgnorePath(entry.name)) {
+              collectFiles(entry.hash, fullPath);
+            }
+          } else {
+            // File - get its size
+            try {
+              const blob = bareRepo.objects.readBlob(entry.hash);
+              files.push({
+                path: fullPath,
+                size: blob.content.length,
+              });
+            } catch {
+              // Skip files we can't read
+            }
+          }
+        }
+      } catch {
+        // Skip trees we can't read
+      }
+    };
+    
+    collectFiles(commit.treeHash);
+    
+    // Calculate language statistics
+    return calculateLanguageStats(files);
+  } catch (error) {
+    console.error('[computeLanguageStats] Error:', error);
+    return [];
+  }
+}
+
 export const reposRouter = router({
   /**
    * List repositories by owner (username)
@@ -149,6 +244,197 @@ export const reposRouter = router({
       }
 
       return result;
+    }),
+
+  /**
+   * Get all data needed for the repo page in a single request.
+   * This is an optimization to reduce the number of round trips.
+   * Fetches: repo, branches, tree, README, languages, and optionally star/watch status.
+   */
+  getPageData: publicProcedure
+    .input(
+      z.object({
+        owner: z.string().min(1),
+        repo: z.string().min(1),
+      })
+    )
+    .query(async ({ input, ctx }) => {
+      const result = await repoModel.findByPath(input.owner, input.repo);
+
+      if (!result) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Repository not found',
+        });
+      }
+
+      const { repo: repoInfo, owner: ownerInfo } = result;
+
+      // Check access for private repos
+      if (repoInfo.isPrivate) {
+        if (!ctx.user) {
+          throw new TRPCError({
+            code: 'UNAUTHORIZED',
+            message: 'Authentication required',
+          });
+        }
+
+        const isOwner = repoInfo.ownerId === ctx.user.id;
+        const hasAccess = isOwner || (await collaboratorModel.hasPermission(repoInfo.id, ctx.user.id, 'read'));
+
+        if (!hasAccess) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'You do not have access to this repository',
+          });
+        }
+      }
+
+      // Fetch all data in parallel
+      const bareRepo = getRepoFromDisk(repoInfo.diskPath);
+      
+      // Get branches
+      let branches: Array<{ name: string; sha: string; isDefault: boolean }> = [];
+      if (bareRepo) {
+        try {
+          const branchNames = bareRepo.refs.listBranches();
+          branches = branchNames.map(name => ({
+            name,
+            sha: bareRepo.refs.resolve(`refs/heads/${name}`) || '',
+            isDefault: name === repoInfo.defaultBranch,
+          }));
+        } catch (error) {
+          console.error('[repos.getPageData] Error getting branches:', error);
+        }
+      }
+
+      // Get tree for root directory
+      let tree: Array<{ name: string; path: string; type: 'file' | 'directory'; sha: string; size?: number }> = [];
+      let treeError: string | undefined;
+      if (bareRepo) {
+        try {
+          let commitHash = bareRepo.refs.resolve('HEAD');
+          if (!commitHash) {
+            const defaultBranch = repoInfo.defaultBranch || 'main';
+            commitHash = bareRepo.refs.resolve(`refs/heads/${defaultBranch}`);
+            if (!commitHash) {
+              for (const branch of ['main', 'master', 'develop']) {
+                commitHash = bareRepo.refs.resolve(`refs/heads/${branch}`);
+                if (commitHash) break;
+              }
+            }
+          }
+          
+          if (commitHash) {
+            const commit = bareRepo.objects.readCommit(commitHash);
+            const treeObj = bareRepo.objects.readTree(commit.treeHash);
+            tree = treeObj.entries.map(entry => ({
+              name: entry.name,
+              path: entry.name,
+              type: entry.mode === '40000' ? 'directory' as const : 'file' as const,
+              sha: entry.hash,
+              size: entry.mode !== '40000' ? (() => {
+                try {
+                  const blob = bareRepo.objects.readBlob(entry.hash);
+                  return blob.content.length;
+                } catch {
+                  return undefined;
+                }
+              })() : undefined,
+            }));
+            // Sort: directories first, then alphabetically
+            tree.sort((a, b) => {
+              if (a.type !== b.type) {
+                return a.type === 'directory' ? -1 : 1;
+              }
+              return a.name.localeCompare(b.name);
+            });
+          } else {
+            const availableBranches = bareRepo.refs.listBranches();
+            treeError = availableBranches.length > 0 
+              ? `Available branches: ${availableBranches.join(', ')}`
+              : 'The repository may be empty or have no branches.';
+          }
+        } catch (error) {
+          console.error('[repos.getPageData] Error getting tree:', error);
+          treeError = 'Failed to read repository tree.';
+        }
+      }
+
+      // Get README content
+      let readme: { content: string; encoding: 'utf-8' | 'base64' } | null = null;
+      if (bareRepo) {
+        try {
+          let commitHash = bareRepo.refs.resolve('HEAD');
+          if (!commitHash) {
+            const defaultBranch = repoInfo.defaultBranch || 'main';
+            commitHash = bareRepo.refs.resolve(`refs/heads/${defaultBranch}`);
+          }
+          
+          if (commitHash) {
+            const commit = bareRepo.objects.readCommit(commitHash);
+            const treeObj = bareRepo.objects.readTree(commit.treeHash);
+            
+            // Look for README.md (case-insensitive)
+            const readmeEntry = treeObj.entries.find(e => 
+              e.name.toLowerCase() === 'readme.md' && e.mode !== '40000'
+            );
+            
+            if (readmeEntry) {
+              const blob = bareRepo.objects.readBlob(readmeEntry.hash);
+              try {
+                const content = blob.content.toString('utf-8');
+                if (!content.includes('\uFFFD')) {
+                  readme = { content, encoding: 'utf-8' };
+                } else {
+                  readme = { content: blob.content.toString('base64'), encoding: 'base64' };
+                }
+              } catch {
+                readme = { content: blob.content.toString('base64'), encoding: 'base64' };
+              }
+            }
+          }
+        } catch (error) {
+          console.error('[repos.getPageData] Error getting README:', error);
+        }
+      }
+
+      // Get cached language stats
+      const cachedStats = await repoModel.getLanguageStats(repoInfo.id);
+      let languages: LanguageStats[] = [];
+      if (cachedStats.stats && cachedStats.stats.length > 0) {
+        languages = cachedStats.stats as LanguageStats[];
+      } else if (bareRepo) {
+        // Compute if not cached (this will be slow but only happens once)
+        languages = await computeLanguageStats(repoInfo.diskPath, repoInfo.defaultBranch);
+        if (languages.length > 0) {
+          // Cache for next time
+          repoModel.updateLanguageStats(repoInfo.id, languages).catch(err => {
+            console.error('[repos.getPageData] Failed to cache language stats:', err);
+          });
+        }
+      }
+
+      // Get star/watch status for authenticated users
+      let isStarred = false;
+      let isWatching = false;
+      if (ctx.user) {
+        [isStarred, isWatching] = await Promise.all([
+          starModel.exists(repoInfo.id, ctx.user.id),
+          watchModel.exists(repoInfo.id, ctx.user.id),
+        ]);
+      }
+
+      return {
+        repo: repoInfo,
+        owner: ownerInfo,
+        branches,
+        tree: { entries: tree, error: treeError },
+        readme,
+        languages,
+        isStarred,
+        isWatching,
+      };
     }),
 
   /**
@@ -744,6 +1030,8 @@ export const reposRouter = router({
 
   /**
    * Get language statistics for a repository (GitHub-style)
+   * Uses cached stats from the database for fast response.
+   * Stats are updated on push events.
    */
   getLanguages: publicProcedure
     .input(
@@ -783,86 +1071,24 @@ export const reposRouter = router({
         }
       }
 
-      // Get the bare repository
-      const bareRepo = getRepoFromDisk(result.repo.diskPath);
-      if (!bareRepo) {
-        console.warn('[repos.getLanguages] Repository not found on disk:', result.repo.diskPath);
-        return [];
+      // Try to use cached language stats first
+      const cached = await repoModel.getLanguageStats(result.repo.id);
+      if (cached.stats && cached.stats.length > 0) {
+        return cached.stats as LanguageStats[];
       }
 
-      try {
-        // Resolve the ref to a commit - try multiple fallbacks
-        let commitHash = bareRepo.refs.resolve(input.ref);
-        
-        if (!commitHash && input.ref === 'HEAD') {
-          // Try the repo's configured default branch
-          const defaultBranch = result.repo.defaultBranch || 'main';
-          commitHash = bareRepo.refs.resolve(`refs/heads/${defaultBranch}`);
-          
-          if (!commitHash) {
-            // Try common default branch names
-            for (const branch of ['main', 'master', 'develop']) {
-              commitHash = bareRepo.refs.resolve(`refs/heads/${branch}`);
-              if (commitHash) break;
-            }
-          }
-        }
-        
-        if (!commitHash) {
-          console.warn('[repos.getLanguages] Could not resolve ref:', input.ref);
-          return [];
-        }
-
-        // Read the commit to get the tree
-        let commit;
-        try {
-          commit = bareRepo.objects.readCommit(commitHash);
-        } catch (commitError) {
-          console.warn('[repos.getLanguages] Could not read commit:', commitHash, commitError);
-          return [];
-        }
-        
-        // Recursively collect all files with their sizes
-        const files: Array<{ path: string; size: number }> = [];
-        
-        const collectFiles = (treeHash: string, prefix: string = ''): void => {
-          try {
-            const tree = bareRepo.objects.readTree(treeHash);
-            
-            for (const entry of tree.entries) {
-              const fullPath = prefix ? `${prefix}/${entry.name}` : entry.name;
-              
-              if (entry.mode === '40000') {
-                // Directory - check if should be ignored
-                if (!shouldIgnorePath(entry.name)) {
-                  collectFiles(entry.hash, fullPath);
-                }
-              } else {
-                // File - get its size
-                try {
-                  const blob = bareRepo.objects.readBlob(entry.hash);
-                  files.push({
-                    path: fullPath,
-                    size: blob.content.length,
-                  });
-                } catch {
-                  // Skip files we can't read
-                }
-              }
-            }
-          } catch {
-            // Skip trees we can't read
-          }
-        };
-        
-        collectFiles(commit.treeHash);
-        
-        // Calculate language statistics
-        return calculateLanguageStats(files);
-      } catch (error) {
-        console.error('[repos.getLanguages] Error:', error);
-        return [];
+      // If no cached stats, compute them (this is slow but only happens once)
+      // After the first computation, stats will be updated on push
+      const stats = await computeLanguageStats(result.repo.diskPath, result.repo.defaultBranch);
+      
+      // Cache the stats for future requests (fire and forget)
+      if (stats.length > 0) {
+        repoModel.updateLanguageStats(result.repo.id, stats).catch(err => {
+          console.error('[repos.getLanguages] Failed to cache language stats:', err);
+        });
       }
+      
+      return stats;
     }),
 
   /**
