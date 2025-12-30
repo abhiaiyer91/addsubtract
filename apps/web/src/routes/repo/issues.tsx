@@ -162,7 +162,11 @@ export function IssuesPage() {
     { enabled: authenticated && isInboxView && !!repoData?.repo.id }
   );
 
-
+  // Fetch accurate counts for issues
+  const { data: issueCounts } = trpc.issues.count.useQuery(
+    { repoId: repoData?.repo.id! },
+    { enabled: !!repoData?.repo.id }
+  );
 
   const isLoading = repoLoading || (viewMode === 'list' ? issuesLoading : viewMode === 'kanban' ? kanbanLoading : false);
 
@@ -178,10 +182,9 @@ export function IssuesPage() {
     );
   });
 
-  // Counts - use repo info for open count  
-  const openCount = repoData?.repo.openIssuesCount || 0;
-  // For closed count, use the filtered list length when viewing closed
-  const closedCount = currentState === 'closed' ? filteredIssues.length : 0;
+  // Counts - use accurate count endpoint
+  const openCount = issueCounts?.open || 0;
+  const closedCount = issueCounts?.closed || 0;
 
   // Group issues by status for list view
   const groupedByStatus = useMemo(() => {
