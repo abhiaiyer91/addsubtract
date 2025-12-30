@@ -29,16 +29,23 @@ import {
   AtSign,
   File,
   Target,
-  Shield,
-  Swords,
-  Flag,
-  Radio,
-  Crosshair,
-  Medal,
   Users,
-  MapPin,
-  Compass,
-  Activity,
+  Gem,
+  Lock,
+  Unlock,
+  Star,
+  Flame,
+  Coffee,
+  ThumbsUp,
+  PartyPopper,
+  Rocket,
+  Glasses,
+  KeyRound,
+  Vault,
+  Briefcase,
+  UserCheck,
+  Wrench,
+  Award,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -61,43 +68,43 @@ import { cn } from '@/lib/utils';
 // Types
 // =============================================================================
 
-type OperativeStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'skipped';
-type MissionPhase = 'idle' | 'reconnaissance' | 'strategic_planning' | 'deploying' | 'debriefing' | 'mission_complete' | 'mission_failed';
+type CrewMemberStatus = 'waiting' | 'on_it' | 'nailed_it' | 'hit_a_snag' | 'sat_out';
+type HeistPhase = 'chilling' | 'casing' | 'scheming' | 'making_moves' | 'wrapping_up' | 'pulled_it_off' | 'got_caught';
 
-interface Operative {
+interface CrewMember {
   id: string;
   title: string;
   description: string;
   priority: string;
   estimatedEffort?: string;
   targetFiles?: string[];
-  status: OperativeStatus;
+  status: CrewMemberStatus;
   result?: string;
   error?: string;
   duration?: number;
   filesModified?: string[];
 }
 
-interface Squad {
+interface Crew {
   id: string;
   name: string;
   executionOrder: number;
-  subtasks: Operative[];
+  subtasks: CrewMember[];
   isCompleted?: boolean;
   duration?: number;
 }
 
-interface BattlePlan {
+interface GamePlan {
   id: string;
   version: number;
   originalTask: string;
   summary: string;
-  parallelGroups: Squad[];
+  parallelGroups: Crew[];
   estimatedTotalEffort: string;
   riskAssessment?: string;
 }
 
-interface DebriefingReport {
+interface Debrief {
   overallSuccess: boolean;
   completedTasks: number;
   failedTasks: number;
@@ -113,7 +120,7 @@ interface DebriefingReport {
   summary: string;
 }
 
-interface CommandLogEntry {
+interface FeedEntry {
   id: string;
   timestamp: Date;
   type: 'info' | 'success' | 'warning' | 'error' | 'phase' | 'task';
@@ -130,12 +137,12 @@ interface IntelReport {
 }
 
 // Step to phase mapping
-const stepToPhase: Record<string, MissionPhase> = {
-  'analyze-task': 'reconnaissance',
-  'create-plan': 'strategic_planning',
-  'execute-plan': 'deploying',
-  'review-results': 'debriefing',
-  'aggregate-results': 'debriefing',
+const stepToPhase: Record<string, HeistPhase> = {
+  'analyze-task': 'casing',
+  'create-plan': 'scheming',
+  'execute-plan': 'making_moves',
+  'review-results': 'wrapping_up',
+  'aggregate-results': 'wrapping_up',
 };
 
 // Step to progress mapping
@@ -151,28 +158,28 @@ const stepToProgress: Record<string, number> = {
 // Status Configurations
 // =============================================================================
 
-const operativeStatusConfig: Record<OperativeStatus, { label: string; icon: typeof CheckCircle2; color: string }> = {
-  pending: { label: 'Awaiting Orders', icon: Clock, color: 'text-muted-foreground' },
-  in_progress: { label: 'Engaged', icon: Loader2, color: 'text-amber-500' },
-  completed: { label: 'Mission Success', icon: CheckCircle2, color: 'text-green-500' },
-  failed: { label: 'Casualty', icon: XCircle, color: 'text-red-500' },
-  skipped: { label: 'Stood Down', icon: Clock, color: 'text-yellow-500' },
+const crewStatusConfig: Record<CrewMemberStatus, { label: string; icon: typeof CheckCircle2; color: string }> = {
+  waiting: { label: 'Ready to roll', icon: Coffee, color: 'text-muted-foreground' },
+  on_it: { label: 'On it', icon: Loader2, color: 'text-violet-500' },
+  nailed_it: { label: 'Nailed it', icon: CheckCircle2, color: 'text-green-500' },
+  hit_a_snag: { label: 'Hit a snag', icon: XCircle, color: 'text-red-500' },
+  sat_out: { label: 'Sat this one out', icon: Coffee, color: 'text-yellow-500' },
 };
 
-const phaseConfig: Record<MissionPhase, { 
+const phaseConfig: Record<HeistPhase, { 
   label: string; 
   description: string;
   icon: typeof Brain; 
   color: string; 
   bgColor: string;
 }> = {
-  idle: { label: 'Awaiting Orders', description: 'Define your mission objective', icon: Target, color: 'text-muted-foreground', bgColor: 'bg-muted' },
-  reconnaissance: { label: 'Reconnaissance', description: 'Gathering intelligence on target...', icon: Search, color: 'text-purple-500', bgColor: 'bg-purple-500' },
-  strategic_planning: { label: 'Strategic Planning', description: 'Formulating battle plan...', icon: Compass, color: 'text-indigo-500', bgColor: 'bg-indigo-500' },
-  deploying: { label: 'Deploying Forces', description: 'Operatives engaging targets...', icon: Swords, color: 'text-amber-500', bgColor: 'bg-amber-500' },
-  debriefing: { label: 'Debriefing', description: 'Analyzing mission results...', icon: Eye, color: 'text-cyan-500', bgColor: 'bg-cyan-500' },
-  mission_complete: { label: 'Mission Complete', description: 'All objectives achieved', icon: Medal, color: 'text-green-500', bgColor: 'bg-green-500' },
-  mission_failed: { label: 'Mission Failed', description: 'Objectives not met', icon: XCircle, color: 'text-red-500', bgColor: 'bg-red-500' },
+  chilling: { label: 'Ready When You Are', description: 'What\'s the job, boss?', icon: Coffee, color: 'text-muted-foreground', bgColor: 'bg-muted' },
+  casing: { label: 'Casing the Joint', description: 'Scoping out the codebase...', icon: Search, color: 'text-purple-500', bgColor: 'bg-purple-500' },
+  scheming: { label: 'Cooking Up a Plan', description: 'The crew\'s putting heads together...', icon: Brain, color: 'text-indigo-500', bgColor: 'bg-indigo-500' },
+  making_moves: { label: 'Making Moves', description: 'The crew\'s in action...', icon: Zap, color: 'text-violet-500', bgColor: 'bg-violet-500' },
+  wrapping_up: { label: 'Checking the Loot', description: 'Making sure we got everything...', icon: Eye, color: 'text-cyan-500', bgColor: 'bg-cyan-500' },
+  pulled_it_off: { label: 'Clean Getaway', description: 'Job\'s done. We\'re legends.', icon: PartyPopper, color: 'text-green-500', bgColor: 'bg-green-500' },
+  got_caught: { label: 'Things Got Messy', description: 'We hit some trouble', icon: AlertCircle, color: 'text-red-500', bgColor: 'bg-red-500' },
 };
 
 // =============================================================================
@@ -360,7 +367,7 @@ function MentionTextarea({
         {/* Hint for @ mentions */}
         <div className="absolute bottom-2 right-2 flex items-center gap-1 text-xs text-muted-foreground pointer-events-none">
           <AtSign className="h-3 w-3" />
-          <span>to reference targets</span>
+          <span>to tag files</span>
         </div>
       </div>
 
@@ -374,11 +381,11 @@ function MentionTextarea({
           {filesLoading ? (
             <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Scanning targets...
+              Looking around...
             </div>
           ) : files.length === 0 ? (
             <div className="px-3 py-2 text-sm text-muted-foreground">
-              {mentionQuery ? `No targets matching "${mentionQuery}"` : 'Type to identify targets...'}
+              {mentionQuery ? `Nothing matching "${mentionQuery}"` : 'Start typing to find files...'}
             </div>
           ) : (
             <div className="py-1">
@@ -393,7 +400,7 @@ function MentionTextarea({
                       : 'hover:bg-muted'
                   )}
                 >
-                  <Crosshair className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <FileCode className="h-4 w-4 text-muted-foreground shrink-0" />
                   <span className="font-mono truncate">{file}</span>
                 </button>
               ))}
@@ -406,30 +413,30 @@ function MentionTextarea({
 }
 
 // =============================================================================
-// Component: MissionBriefing - Always visible mission context
+// Component: JobBriefing - Always visible job context
 // =============================================================================
 
-function MissionBriefing({ 
-  objective, 
+function JobBriefing({ 
+  theJob, 
   phase, 
   progress,
   onAbort,
   onRetry,
-  onNewMission,
+  onNewJob,
   startTime,
 }: { 
-  objective: string;
-  phase: MissionPhase;
+  theJob: string;
+  phase: HeistPhase;
   progress: number;
   onAbort?: () => void;
   onRetry?: () => void;
-  onNewMission?: () => void;
+  onNewJob?: () => void;
   startTime?: Date;
 }) {
   const config = phaseConfig[phase];
   const PhaseIcon = config.icon;
-  const isActive = !['idle', 'mission_complete', 'mission_failed'].includes(phase);
-  const isComplete = phase === 'mission_complete' || phase === 'mission_failed';
+  const isActive = !['chilling', 'pulled_it_off', 'got_caught'].includes(phase);
+  const isComplete = phase === 'pulled_it_off' || phase === 'got_caught';
   const [copied, setCopied] = useState(false);
   const [elapsed, setElapsed] = useState(0);
 
@@ -448,8 +455,8 @@ function MissionBriefing({
     return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
   };
 
-  const copyObjective = () => {
-    navigator.clipboard.writeText(objective);
+  const copyJob = () => {
+    navigator.clipboard.writeText(theJob);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -457,32 +464,32 @@ function MissionBriefing({
   return (
     <div className={cn(
       'rounded-xl border-2 transition-all duration-300 overflow-hidden',
-      isActive && 'border-amber-500/50 bg-gradient-to-br from-amber-500/5 to-orange-500/5',
-      phase === 'mission_complete' && 'border-green-500/50 bg-gradient-to-br from-green-500/5 to-emerald-500/5',
-      phase === 'mission_failed' && 'border-red-500/50 bg-gradient-to-br from-red-500/5 to-rose-500/5',
-      phase === 'idle' && 'border-border bg-card',
+      isActive && 'border-violet-500/50 bg-gradient-to-br from-violet-500/5 to-purple-500/5',
+      phase === 'pulled_it_off' && 'border-green-500/50 bg-gradient-to-br from-green-500/5 to-emerald-500/5',
+      phase === 'got_caught' && 'border-red-500/50 bg-gradient-to-br from-red-500/5 to-rose-500/5',
+      phase === 'chilling' && 'border-border bg-card',
     )}>
-      {/* Mission Objective Display */}
+      {/* The Job Display */}
       <div className="p-4 pb-3">
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-              <Target className="h-3 w-3" />
-              <span className="uppercase tracking-wider font-semibold">Mission Objective</span>
+              <Gem className="h-3 w-3" />
+              <span className="font-medium">The Job</span>
               <button 
-                onClick={copyObjective}
+                onClick={copyJob}
                 className="hover:text-foreground transition-colors"
-                title="Copy objective"
+                title="Copy"
               >
                 {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
               </button>
             </div>
-            <p className="text-sm font-medium leading-relaxed">{objective}</p>
+            <p className="text-sm font-medium leading-relaxed">{theJob}</p>
           </div>
           {isActive && onAbort && (
             <Button variant="destructive" size="sm" onClick={onAbort} className="shrink-0 gap-1.5">
               <Square className="h-3 w-3" />
-              Abort Mission
+              Call It Off
             </Button>
           )}
           {isComplete && (
@@ -490,13 +497,13 @@ function MissionBriefing({
               {onRetry && (
                 <Button variant="default" size="sm" onClick={onRetry} className="gap-1.5">
                   <RefreshCw className="h-3.5 w-3.5" />
-                  Retry Mission
+                  Run It Back
                 </Button>
               )}
-              {onNewMission && (
-                <Button variant="outline" size="sm" onClick={onNewMission} className="gap-1.5">
-                  <Flag className="h-3.5 w-3.5" />
-                  New Mission
+              {onNewJob && (
+                <Button variant="outline" size="sm" onClick={onNewJob} className="gap-1.5">
+                  <Plus className="h-3.5 w-3.5" />
+                  New Job
                 </Button>
               )}
             </div>
@@ -507,9 +514,9 @@ function MissionBriefing({
       {/* Status Bar */}
       <div className={cn(
         'px-4 py-3 border-t flex items-center justify-between gap-4',
-        isActive && 'bg-amber-500/5',
-        phase === 'mission_complete' && 'bg-green-500/5',
-        phase === 'mission_failed' && 'bg-red-500/5',
+        isActive && 'bg-violet-500/5',
+        phase === 'pulled_it_off' && 'bg-green-500/5',
+        phase === 'got_caught' && 'bg-red-500/5',
       )}>
         {/* Current Phase */}
         <div className="flex items-center gap-3">
@@ -524,7 +531,7 @@ function MissionBriefing({
             )} />
           </div>
           <div>
-            <div className={cn('font-semibold uppercase tracking-wide text-sm', config.color)}>
+            <div className={cn('font-semibold', config.color)}>
               {config.label}
             </div>
             <div className="text-xs text-muted-foreground">
@@ -537,7 +544,7 @@ function MissionBriefing({
         <div className="flex items-center gap-4">
           {startTime && (
             <div className="text-sm text-muted-foreground font-mono">
-              T+{formatTime(elapsed)}
+              {formatTime(elapsed)}
             </div>
           )}
           {isActive && (
@@ -553,16 +560,16 @@ function MissionBriefing({
               </span>
             </div>
           )}
-          {phase === 'mission_complete' && (
+          {phase === 'pulled_it_off' && (
             <Badge className="bg-green-500 text-white gap-1">
-              <Medal className="h-3 w-3" />
-              Victory
+              <PartyPopper className="h-3 w-3" />
+              Scored!
             </Badge>
           )}
-          {phase === 'mission_failed' && (
+          {phase === 'got_caught' && (
             <Badge variant="destructive" className="gap-1">
-              <XCircle className="h-3 w-3" />
-              Failed
+              <AlertCircle className="h-3 w-3" />
+              Busted
             </Badge>
           )}
         </div>
@@ -572,14 +579,14 @@ function MissionBriefing({
       {(isActive || isComplete) && (
         <div className="px-4 py-3 border-t bg-muted/30">
           <div className="flex items-center justify-between">
-            {(['reconnaissance', 'strategic_planning', 'deploying', 'debriefing'] as MissionPhase[]).map((p, index, arr) => {
+            {(['casing', 'scheming', 'making_moves', 'wrapping_up'] as HeistPhase[]).map((p, index, arr) => {
               const stepConfig = phaseConfig[p];
               const StepIcon = stepConfig.icon;
-              const currentIndex = ['reconnaissance', 'strategic_planning', 'deploying', 'debriefing'].indexOf(phase);
+              const currentIndex = ['casing', 'scheming', 'making_moves', 'wrapping_up'].indexOf(phase);
               const stepIndex = index;
               const isActiveStep = p === phase;
-              const isPast = stepIndex < currentIndex || phase === 'mission_complete';
-              const isFuture = stepIndex > currentIndex && phase !== 'mission_complete';
+              const isPast = stepIndex < currentIndex || phase === 'pulled_it_off';
+              const isFuture = stepIndex > currentIndex && phase !== 'pulled_it_off';
 
               return (
                 <div key={p} className="flex items-center">
@@ -630,14 +637,14 @@ function MissionBriefing({
 }
 
 // =============================================================================
-// Component: CommandLog - Real-time field communications
+// Component: CrewFeed - Real-time crew updates
 // =============================================================================
 
-function CommandLog({ 
+function CrewFeed({ 
   entries, 
   currentAction,
 }: { 
-  entries: CommandLogEntry[];
+  entries: FeedEntry[];
   currentAction?: string;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -648,36 +655,36 @@ function CommandLog({
     }
   }, [entries, currentAction]);
 
-  const getIcon = (type: CommandLogEntry['type']) => {
+  const getIcon = (type: FeedEntry['type']) => {
     switch (type) {
-      case 'success': return <CheckCircle2 className="h-4 w-4 text-green-500" />;
+      case 'success': return <ThumbsUp className="h-4 w-4 text-green-500" />;
       case 'warning': return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
       case 'error': return <XCircle className="h-4 w-4 text-red-500" />;
-      case 'phase': return <Flag className="h-4 w-4 text-blue-500" />;
-      case 'task': return <Swords className="h-4 w-4 text-amber-500" />;
-      default: return <Radio className="h-4 w-4 text-muted-foreground" />;
+      case 'phase': return <Flame className="h-4 w-4 text-violet-500" />;
+      case 'task': return <Zap className="h-4 w-4 text-amber-500" />;
+      default: return <Info className="h-4 w-4 text-muted-foreground" />;
     }
   };
 
   return (
     <div className="rounded-lg border bg-card overflow-hidden">
       <div className="px-4 py-2 border-b bg-muted/50 flex items-center justify-between">
-        <span className="text-sm font-semibold uppercase tracking-wider flex items-center gap-2">
-          <Radio className="h-4 w-4" />
-          Command Log
+        <span className="text-sm font-medium flex items-center gap-2">
+          <Users className="h-4 w-4" />
+          Crew Chat
         </span>
         {currentAction && (
-          <div className="flex items-center gap-2 text-sm text-amber-500">
-            <Activity className="h-3.5 w-3.5 animate-pulse" />
+          <div className="flex items-center gap-2 text-sm text-violet-500">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
             <span className="animate-pulse">{currentAction}</span>
           </div>
         )}
       </div>
       <ScrollArea ref={scrollRef} className="h-64">
-        <div className="p-3 space-y-2 font-mono text-xs">
+        <div className="p-3 space-y-2">
           {entries.length === 0 ? (
             <div className="text-muted-foreground text-center py-8 text-sm">
-              Awaiting transmissions...
+              Waiting for the crew to check in...
             </div>
           ) : (
             entries.map((entry) => (
@@ -687,7 +694,7 @@ function CommandLog({
                   'flex items-start gap-3 p-2 rounded-lg transition-colors',
                   entry.type === 'error' && 'bg-red-500/10',
                   entry.type === 'success' && 'bg-green-500/5',
-                  entry.type === 'phase' && 'bg-blue-500/5',
+                  entry.type === 'phase' && 'bg-violet-500/5',
                 )}
               >
                 <div className="mt-0.5 shrink-0">{getIcon(entry.type)}</div>
@@ -697,7 +704,7 @@ function CommandLog({
                     entry.type === 'error' && 'text-red-500',
                     entry.type === 'warning' && 'text-yellow-500',
                     entry.type === 'success' && 'text-green-600 dark:text-green-400',
-                    entry.type === 'phase' && 'text-blue-500 font-semibold uppercase',
+                    entry.type === 'phase' && 'text-violet-500 font-medium',
                   )}>
                     {entry.message}
                   </div>
@@ -720,23 +727,31 @@ function CommandLog({
 }
 
 // =============================================================================
-// Component: OperativeCard
+// Component: HomieCard
 // =============================================================================
 
-function OperativeCard({ operative, isExpanded, onToggle }: { 
-  operative: Operative; 
+function HomieCard({ homie, isExpanded, onToggle }: { 
+  homie: CrewMember; 
   isExpanded: boolean;
   onToggle: () => void;
 }) {
-  const config = operativeStatusConfig[operative.status];
+  const statusMap: Record<string, CrewMemberStatus> = {
+    pending: 'waiting',
+    in_progress: 'on_it',
+    completed: 'nailed_it',
+    failed: 'hit_a_snag',
+    skipped: 'sat_out',
+  };
+  const status = statusMap[homie.status] || homie.status as CrewMemberStatus;
+  const config = crewStatusConfig[status];
   const StatusIcon = config.icon;
   
   return (
     <div className={cn(
       'border rounded-lg transition-all',
-      operative.status === 'in_progress' && 'border-amber-500 bg-amber-500/5 shadow-sm shadow-amber-500/20',
-      operative.status === 'completed' && 'border-green-500/50',
-      operative.status === 'failed' && 'border-red-500/50 bg-red-500/5',
+      status === 'on_it' && 'border-violet-500 bg-violet-500/5 shadow-sm shadow-violet-500/20',
+      status === 'nailed_it' && 'border-green-500/50',
+      status === 'hit_a_snag' && 'border-red-500/50 bg-red-500/5',
     )}>
       <button
         onClick={onToggle}
@@ -745,24 +760,24 @@ function OperativeCard({ operative, isExpanded, onToggle }: {
         <StatusIcon className={cn(
           'h-5 w-5 shrink-0',
           config.color,
-          operative.status === 'in_progress' && 'animate-spin'
+          status === 'on_it' && 'animate-spin'
         )} />
         <div className="flex-1 min-w-0">
-          <div className="font-medium truncate">{operative.title}</div>
-          {operative.status === 'in_progress' && (
-            <div className="text-xs text-amber-500 animate-pulse mt-0.5">
-              Engaging target...
+          <div className="font-medium truncate">{homie.title}</div>
+          {status === 'on_it' && (
+            <div className="text-xs text-violet-500 animate-pulse mt-0.5">
+              Working their magic...
             </div>
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <Badge variant="outline" className={cn(
             "text-xs",
-            operative.priority === 'high' && 'border-red-500/50 text-red-500',
-            operative.priority === 'medium' && 'border-amber-500/50 text-amber-500',
-            operative.priority === 'low' && 'border-green-500/50 text-green-500',
+            homie.priority === 'high' && 'border-red-500/50 text-red-500',
+            homie.priority === 'medium' && 'border-amber-500/50 text-amber-500',
+            homie.priority === 'low' && 'border-green-500/50 text-green-500',
           )}>
-            {operative.priority}
+            {homie.priority}
           </Badge>
           {isExpanded ? (
             <ChevronDown className="h-4 w-4 text-muted-foreground" />
@@ -774,15 +789,15 @@ function OperativeCard({ operative, isExpanded, onToggle }: {
       
       {isExpanded && (
         <div className="px-3 pb-3 pt-0 border-t space-y-3">
-          <p className="text-sm text-muted-foreground pt-3">{operative.description}</p>
+          <p className="text-sm text-muted-foreground pt-3">{homie.description}</p>
           
-          {operative.targetFiles && operative.targetFiles.length > 0 && (
+          {homie.targetFiles && homie.targetFiles.length > 0 && (
             <div>
-              <div className="text-xs text-muted-foreground mb-1.5 uppercase tracking-wider">Target Files</div>
+              <div className="text-xs text-muted-foreground mb-1.5">Target files</div>
               <div className="flex flex-wrap gap-1.5">
-                {operative.targetFiles.map((file) => (
+                {homie.targetFiles.map((file) => (
                   <Badge key={file} variant="secondary" className="text-xs font-mono">
-                    <Crosshair className="h-3 w-3 mr-1" />
+                    <FileCode className="h-3 w-3 mr-1" />
                     {file}
                   </Badge>
                 ))}
@@ -790,26 +805,26 @@ function OperativeCard({ operative, isExpanded, onToggle }: {
             </div>
           )}
           
-          {operative.result && (
+          {homie.result && (
             <div className="p-2.5 rounded-lg bg-green-500/10 text-sm text-green-600 dark:text-green-400 border border-green-500/20">
-              <Medal className="h-4 w-4 inline mr-2" />
-              {operative.result}
+              <ThumbsUp className="h-4 w-4 inline mr-2" />
+              {homie.result}
             </div>
           )}
           
-          {operative.error && (
+          {homie.error && (
             <div className="p-2.5 rounded-lg bg-red-500/10 text-sm text-red-600 dark:text-red-400 border border-red-500/20">
               <XCircle className="h-4 w-4 inline mr-2" />
-              {operative.error}
+              {homie.error}
             </div>
           )}
           
           <div className="flex items-center gap-4 text-xs text-muted-foreground pt-1">
-            {operative.filesModified && operative.filesModified.length > 0 && (
-              <span>{operative.filesModified.length} targets modified</span>
+            {homie.filesModified && homie.filesModified.length > 0 && (
+              <span>{homie.filesModified.length} files touched</span>
             )}
-            {operative.duration !== undefined && (
-              <span>Duration: {(operative.duration / 1000).toFixed(1)}s</span>
+            {homie.duration !== undefined && (
+              <span>Took {(homie.duration / 1000).toFixed(1)}s</span>
             )}
           </div>
         </div>
@@ -819,100 +834,100 @@ function OperativeCard({ operative, isExpanded, onToggle }: {
 }
 
 // =============================================================================
-// Component: BattlePlanView
+// Component: GamePlanView
 // =============================================================================
 
-function BattlePlanView({ plan, expandedOperatives, onToggleOperative, phase }: {
-  plan: BattlePlan;
-  expandedOperatives: Set<string>;
-  onToggleOperative: (operativeId: string) => void;
-  phase: MissionPhase;
+function GamePlanView({ plan, expandedHomies, onToggleHomie, phase }: {
+  plan: GamePlan;
+  expandedHomies: Set<string>;
+  onToggleHomie: (homieId: string) => void;
+  phase: HeistPhase;
 }) {
-  const [expandedSquads, setExpandedSquads] = useState<Set<string>>(() => 
+  const [expandedCrews, setExpandedCrews] = useState<Set<string>>(() => 
     new Set(plan.parallelGroups.map(g => g.id))
   );
 
-  const toggleSquad = (squadId: string) => {
-    setExpandedSquads(prev => {
+  const toggleCrew = (crewId: string) => {
+    setExpandedCrews(prev => {
       const next = new Set(prev);
-      if (next.has(squadId)) {
-        next.delete(squadId);
+      if (next.has(crewId)) {
+        next.delete(crewId);
       } else {
-        next.add(squadId);
+        next.add(crewId);
       }
       return next;
     });
   };
 
-  const totalOperatives = plan.parallelGroups.reduce((sum, g) => sum + g.subtasks.length, 0);
-  const successfulOperatives = plan.parallelGroups.reduce(
+  const totalHomies = plan.parallelGroups.reduce((sum, g) => sum + g.subtasks.length, 0);
+  const homiesWhoNailedIt = plan.parallelGroups.reduce(
     (sum, g) => sum + g.subtasks.filter(t => t.status === 'completed').length,
     0
   );
-  const casualtyOperatives = plan.parallelGroups.reduce(
+  const homiesWhoHitSnags = plan.parallelGroups.reduce(
     (sum, g) => sum + g.subtasks.filter(t => t.status === 'failed').length,
     0
   );
-  const engagedOperatives = plan.parallelGroups.reduce(
+  const homiesOnIt = plan.parallelGroups.reduce(
     (sum, g) => sum + g.subtasks.filter(t => t.status === 'in_progress').length,
     0
   );
 
   return (
     <div className="space-y-4">
-      {/* Battle Plan Header */}
+      {/* Game Plan Header */}
       <div className="rounded-lg border bg-card overflow-hidden">
-        <div className="p-4 border-b bg-gradient-to-r from-indigo-500/10 to-purple-500/10">
+        <div className="p-4 border-b bg-gradient-to-r from-violet-500/10 to-purple-500/10">
           <div className="flex items-start justify-between gap-4">
             <div>
               <h3 className="font-bold text-lg flex items-center gap-2">
-                <Shield className="h-5 w-5 text-indigo-500" />
-                Battle Plan
+                <Briefcase className="h-5 w-5 text-violet-500" />
+                The Game Plan
               </h3>
               <p className="text-sm text-muted-foreground mt-1">{plan.summary}</p>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <Badge variant="outline" className="gap-1">
                 <Users className="h-3 w-3" />
-                {totalOperatives} operatives
+                {totalHomies} homies
               </Badge>
               <Badge variant="outline" className="gap-1">
                 <Clock className="h-3 w-3" />
-                {plan.estimatedTotalEffort}
+                ~{plan.estimatedTotalEffort}
               </Badge>
             </div>
           </div>
         </div>
 
-        {/* Force Status Bar */}
+        {/* Crew Status Bar */}
         <div className="p-4 bg-muted/30">
           <div className="flex items-center justify-between mb-2 text-sm">
-            <span className="text-muted-foreground uppercase tracking-wider text-xs font-semibold">Force Status</span>
+            <span className="text-muted-foreground text-xs font-medium">Crew Status</span>
             <div className="flex items-center gap-3">
-              {engagedOperatives > 0 && (
-                <span className="text-amber-500 flex items-center gap-1">
-                  <Swords className="h-3 w-3 animate-pulse" />
-                  {engagedOperatives} engaged
+              {homiesOnIt > 0 && (
+                <span className="text-violet-500 flex items-center gap-1">
+                  <Zap className="h-3 w-3 animate-pulse" />
+                  {homiesOnIt} making moves
                 </span>
               )}
-              <span className="text-green-500">{successfulOperatives} successful</span>
-              {casualtyOperatives > 0 && (
-                <span className="text-red-500">{casualtyOperatives} casualties</span>
+              <span className="text-green-500">{homiesWhoNailedIt} crushed it</span>
+              {homiesWhoHitSnags > 0 && (
+                <span className="text-red-500">{homiesWhoHitSnags} hit snags</span>
               )}
             </div>
           </div>
           <div className="h-3 bg-muted rounded-full overflow-hidden flex">
             <div 
               className="bg-green-500 transition-all duration-300"
-              style={{ width: `${(successfulOperatives / totalOperatives) * 100}%` }}
+              style={{ width: `${(homiesWhoNailedIt / totalHomies) * 100}%` }}
             />
             <div 
-              className="bg-amber-500 animate-pulse transition-all duration-300"
-              style={{ width: `${(engagedOperatives / totalOperatives) * 100}%` }}
+              className="bg-violet-500 animate-pulse transition-all duration-300"
+              style={{ width: `${(homiesOnIt / totalHomies) * 100}%` }}
             />
             <div 
               className="bg-red-500 transition-all duration-300"
-              style={{ width: `${(casualtyOperatives / totalOperatives) * 100}%` }}
+              style={{ width: `${(homiesWhoHitSnags / totalHomies) * 100}%` }}
             />
           </div>
         </div>
@@ -923,34 +938,34 @@ function BattlePlanView({ plan, expandedOperatives, onToggleOperative, phase }: 
         <div className="p-3 rounded-lg border border-yellow-500/30 bg-yellow-500/10 flex items-start gap-2">
           <AlertTriangle className="h-4 w-4 text-yellow-500 mt-0.5 shrink-0" />
           <div>
-            <div className="text-xs uppercase tracking-wider font-semibold text-yellow-600 dark:text-yellow-400 mb-1">Risk Assessment</div>
+            <div className="text-xs font-medium text-yellow-600 dark:text-yellow-400 mb-1">Heads up</div>
             <p className="text-sm text-yellow-600 dark:text-yellow-400">{plan.riskAssessment}</p>
           </div>
         </div>
       )}
 
-      {/* Squads */}
+      {/* Crews */}
       <div className="space-y-3">
         {plan.parallelGroups
           .sort((a, b) => a.executionOrder - b.executionOrder)
-          .map((squad) => {
-            const squadSuccess = squad.subtasks.filter(t => t.status === 'completed').length;
-            const squadCasualties = squad.subtasks.filter(t => t.status === 'failed').length;
-            const squadEngaged = squad.subtasks.filter(t => t.status === 'in_progress').length;
-            const isExpanded = expandedSquads.has(squad.id);
-            const allDone = squadSuccess + squadCasualties === squad.subtasks.length;
+          .map((crew) => {
+            const crewNailedIt = crew.subtasks.filter(t => t.status === 'completed').length;
+            const crewHitSnags = crew.subtasks.filter(t => t.status === 'failed').length;
+            const crewOnIt = crew.subtasks.filter(t => t.status === 'in_progress').length;
+            const isExpanded = expandedCrews.has(crew.id);
+            const allDone = crewNailedIt + crewHitSnags === crew.subtasks.length;
             
             return (
               <Collapsible
-                key={squad.id}
+                key={crew.id}
                 open={isExpanded}
-                onOpenChange={() => toggleSquad(squad.id)}
+                onOpenChange={() => toggleCrew(crew.id)}
               >
                 <div className={cn(
                   'rounded-lg border bg-card overflow-hidden transition-all',
-                  squadEngaged > 0 && 'border-amber-500 shadow-sm shadow-amber-500/20',
-                  allDone && squadCasualties === 0 && 'border-green-500/50',
-                  allDone && squadCasualties > 0 && 'border-red-500/50',
+                  crewOnIt > 0 && 'border-violet-500 shadow-sm shadow-violet-500/20',
+                  allDone && crewHitSnags === 0 && 'border-green-500/50',
+                  allDone && crewHitSnags > 0 && 'border-red-500/50',
                 )}>
                   <CollapsibleTrigger asChild>
                     <button className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors">
@@ -962,47 +977,47 @@ function BattlePlanView({ plan, expandedOperatives, onToggleOperative, phase }: 
                         )}
                         <div className={cn(
                           'w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold',
-                          squadEngaged > 0 && 'bg-amber-500 text-white',
-                          allDone && squadCasualties === 0 && 'bg-green-500 text-white',
-                          allDone && squadCasualties > 0 && 'bg-red-500 text-white',
-                          !squadEngaged && !allDone && 'bg-muted text-muted-foreground',
+                          crewOnIt > 0 && 'bg-violet-500 text-white',
+                          allDone && crewHitSnags === 0 && 'bg-green-500 text-white',
+                          allDone && crewHitSnags > 0 && 'bg-red-500 text-white',
+                          !crewOnIt && !allDone && 'bg-muted text-muted-foreground',
                         )}>
-                          <Users className="h-4 w-4" />
+                          {crew.executionOrder}
                         </div>
                         <div className="text-left">
-                          <div className="font-semibold">Squad {squad.executionOrder}: {squad.name}</div>
-                          {squadEngaged > 0 && (
-                            <div className="text-xs text-amber-500 animate-pulse">
-                              {squadEngaged} operative{squadEngaged > 1 ? 's' : ''} engaged...
+                          <div className="font-semibold">{crew.name}</div>
+                          {crewOnIt > 0 && (
+                            <div className="text-xs text-violet-500 animate-pulse">
+                              {crewOnIt} homie{crewOnIt > 1 ? 's' : ''} doing their thing...
                             </div>
                           )}
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
                         <div className="text-sm text-muted-foreground">
-                          <span className={squadSuccess > 0 ? 'text-green-500' : ''}>{squadSuccess}</span>
-                          {squadCasualties > 0 && (
-                            <span className="text-red-500">/{squadCasualties}</span>
+                          <span className={crewNailedIt > 0 ? 'text-green-500' : ''}>{crewNailedIt}</span>
+                          {crewHitSnags > 0 && (
+                            <span className="text-red-500">/{crewHitSnags}</span>
                           )}
-                          <span>/{squad.subtasks.length}</span>
+                          <span>/{crew.subtasks.length}</span>
                         </div>
-                        {allDone && squadCasualties === 0 && (
-                          <Medal className="h-5 w-5 text-green-500" />
+                        {allDone && crewHitSnags === 0 && (
+                          <Star className="h-5 w-5 text-green-500" />
                         )}
-                        {squadEngaged > 0 && (
-                          <Loader2 className="h-5 w-5 text-amber-500 animate-spin" />
+                        {crewOnIt > 0 && (
+                          <Loader2 className="h-5 w-5 text-violet-500 animate-spin" />
                         )}
                       </div>
                     </button>
                   </CollapsibleTrigger>
                   <CollapsibleContent>
                     <div className="border-t p-3 space-y-2 bg-muted/20">
-                      {squad.subtasks.map((operative) => (
-                        <OperativeCard
-                          key={operative.id}
-                          operative={operative}
-                          isExpanded={expandedOperatives.has(operative.id)}
-                          onToggle={() => onToggleOperative(operative.id)}
+                      {crew.subtasks.map((homie) => (
+                        <HomieCard
+                          key={homie.id}
+                          homie={homie}
+                          isExpanded={expandedHomies.has(homie.id)}
+                          onToggle={() => onToggleHomie(homie.id)}
                         />
                       ))}
                     </div>
@@ -1017,10 +1032,10 @@ function BattlePlanView({ plan, expandedOperatives, onToggleOperative, phase }: 
 }
 
 // =============================================================================
-// Component: DebriefingView
+// Component: DebriefView
 // =============================================================================
 
-function DebriefingView({ report }: { report: DebriefingReport }) {
+function DebriefView({ report }: { report: Debrief }) {
   return (
     <div className="space-y-4">
       {/* Overall Result */}
@@ -1033,19 +1048,19 @@ function DebriefingView({ report }: { report: DebriefingReport }) {
         <div className="flex items-center gap-3 mb-3">
           {report.overallSuccess ? (
             <div className="w-14 h-14 rounded-full bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center shadow-lg shadow-green-500/30">
-              <Medal className="h-7 w-7 text-white" />
+              <PartyPopper className="h-7 w-7 text-white" />
             </div>
           ) : (
             <div className="w-14 h-14 rounded-full bg-gradient-to-br from-red-500 to-rose-500 flex items-center justify-center shadow-lg shadow-red-500/30">
-              <XCircle className="h-7 w-7 text-white" />
+              <AlertCircle className="h-7 w-7 text-white" />
             </div>
           )}
           <div>
             <h3 className={cn(
-              'text-xl font-bold uppercase tracking-wide',
+              'text-xl font-bold',
               report.overallSuccess ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
             )}>
-              {report.overallSuccess ? 'Mission Accomplished!' : 'Mission Failed'}
+              {report.overallSuccess ? 'We pulled it off! 🎉' : 'We hit some bumps'}
             </h3>
             <p className="text-sm text-muted-foreground">{report.summary}</p>
           </div>
@@ -1053,19 +1068,19 @@ function DebriefingView({ report }: { report: DebriefingReport }) {
         
         <div className="flex gap-6 text-sm pt-2 border-t border-current/10">
           <div className="flex items-center gap-2">
-            <Medal className="h-4 w-4 text-green-500" />
-            <span><strong>{report.completedTasks}</strong> successful</span>
+            <ThumbsUp className="h-4 w-4 text-green-500" />
+            <span><strong>{report.completedTasks}</strong> nailed it</span>
           </div>
           {report.failedTasks > 0 && (
             <div className="flex items-center gap-2">
               <XCircle className="h-4 w-4 text-red-500" />
-              <span><strong>{report.failedTasks}</strong> casualties</span>
+              <span><strong>{report.failedTasks}</strong> hit snags</span>
             </div>
           )}
           {report.skippedTasks > 0 && (
             <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-yellow-500" />
-              <span><strong>{report.skippedTasks}</strong> stood down</span>
+              <Coffee className="h-4 w-4 text-yellow-500" />
+              <span><strong>{report.skippedTasks}</strong> sat out</span>
             </div>
           )}
         </div>
@@ -1075,7 +1090,7 @@ function DebriefingView({ report }: { report: DebriefingReport }) {
       {report.issues.length > 0 && (
         <div className="rounded-lg border bg-card">
           <div className="p-3 border-b bg-muted/50">
-            <h4 className="font-semibold uppercase tracking-wider text-sm">After Action Report ({report.issues.length} issues)</h4>
+            <h4 className="font-semibold text-sm">Things to know ({report.issues.length})</h4>
           </div>
           <div className="p-3 space-y-2">
             {report.issues.map((issue, i) => (
@@ -1097,7 +1112,7 @@ function DebriefingView({ report }: { report: DebriefingReport }) {
                 <p className="text-sm">{issue.issue}</p>
                 {issue.suggestion && (
                   <p className="text-xs text-muted-foreground mt-1">
-                    Tactical suggestion: {issue.suggestion}
+                    💡 {issue.suggestion}
                   </p>
                 )}
               </div>
@@ -1111,8 +1126,8 @@ function DebriefingView({ report }: { report: DebriefingReport }) {
         <div className="p-4 rounded-lg border border-amber-500/30 bg-amber-500/10">
           <div className="flex items-center gap-2 mb-2">
             <RefreshCw className="h-5 w-5 text-amber-500" />
-            <span className="font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wide">
-              Strategic Reassessment Required
+            <span className="font-semibold text-amber-600 dark:text-amber-400">
+              Might wanna take another crack at this
             </span>
           </div>
           <p className="text-sm text-muted-foreground">{report.replanningReason}</p>
@@ -1123,10 +1138,10 @@ function DebriefingView({ report }: { report: DebriefingReport }) {
 }
 
 // =============================================================================
-// Component: MissionResults
+// Component: LootSummary
 // =============================================================================
 
-function MissionResults({ 
+function LootSummary({ 
   branchCreated, 
   filesModified 
 }: { 
@@ -1138,14 +1153,14 @@ function MissionResults({
   return (
     <div className="rounded-lg border bg-card p-4">
       <h3 className="font-semibold mb-3 flex items-center gap-2">
-        <MapPin className="h-4 w-4" />
-        Mission Results
+        <Gem className="h-4 w-4 text-violet-500" />
+        The Loot
       </h3>
       <div className="space-y-2">
         {branchCreated && (
           <div className="flex items-center gap-2 text-sm">
             <GitBranch className="h-4 w-4 text-muted-foreground" />
-            <span>Forward Operating Base:</span>
+            <span>Stashed on:</span>
             <code className="px-2 py-0.5 rounded bg-muted font-mono text-xs">
               {branchCreated}
             </code>
@@ -1154,8 +1169,8 @@ function MissionResults({
         {filesModified.length > 0 && (
           <div className="text-sm">
             <div className="flex items-center gap-2 mb-2">
-              <Crosshair className="h-4 w-4 text-muted-foreground" />
-              <span>{filesModified.length} targets modified</span>
+              <FileCode className="h-4 w-4 text-muted-foreground" />
+              <span>{filesModified.length} files touched</span>
             </div>
             <div className="flex flex-wrap gap-1.5 pl-6">
               {filesModified.slice(0, 10).map((file) => (
@@ -1186,7 +1201,7 @@ export function PlanningPage() {
   const { data: session } = useSession();
   
   // Form state
-  const [missionObjective, setMissionObjective] = useState('');
+  const [theJob, setTheJob] = useState('');
   const [context, setContext] = useState('');
   const [dryRun, setDryRun] = useState(false);
   const [createBranch, setCreateBranch] = useState(true);
@@ -1196,20 +1211,20 @@ export function PlanningPage() {
   // Current run ID (either from URL or newly started)
   const [currentRunId, setCurrentRunId] = useState<string | null>(urlRunId || null);
   
-  // Mission state
+  // Heist state
   const [isRunning, setIsRunning] = useState(false);
-  const [phase, setPhase] = useState<MissionPhase>('idle');
+  const [phase, setPhase] = useState<HeistPhase>('chilling');
   const [progress, setProgress] = useState(0);
-  const [battlePlan, setBattlePlan] = useState<BattlePlan | null>(null);
-  const [debriefing, setDebriefing] = useState<DebriefingReport | null>(null);
+  const [gamePlan, setGamePlan] = useState<GamePlan | null>(null);
+  const [debrief, setDebrief] = useState<Debrief | null>(null);
   const [intelReport, setIntelReport] = useState<IntelReport | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [expandedOperatives, setExpandedOperatives] = useState<Set<string>>(new Set());
-  const [commandLog, setCommandLog] = useState<CommandLogEntry[]>([]);
+  const [expandedHomies, setExpandedHomies] = useState<Set<string>>(new Set());
+  const [crewFeed, setCrewFeed] = useState<FeedEntry[]>([]);
   const hasReceivedStartedRef = useRef(false);
   const [currentAction, setCurrentAction] = useState<string | undefined>();
   const [startTime, setStartTime] = useState<Date | undefined>();
-  const [submittedObjective, setSubmittedObjective] = useState('');
+  const [submittedJob, setSubmittedJob] = useState('');
   
   // Results state
   const [branchCreated, setBranchCreated] = useState<string | null>(null);
@@ -1228,9 +1243,9 @@ export function PlanningPage() {
     { enabled: !!repoData?.repo.id }
   ) as { data: { available: boolean; model: string; provider: string } | undefined };
 
-  // Fetch mission history
+  // Fetch job history
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: missionHistory, refetch: refetchHistory } = (trpc as any).planning?.listRuns?.useQuery(
+  const { data: jobHistory, refetch: refetchHistory } = (trpc as any).planning?.listRuns?.useQuery(
     { repoId: repoData?.repo.id!, limit: 20 },
     { enabled: !!repoData?.repo.id }
   ) as { 
@@ -1257,9 +1272,9 @@ export function PlanningPage() {
       task: string;
       context?: string;
       status: string;
-      plan?: BattlePlan;
+      plan?: GamePlan;
       groupResults?: Array<{ groupId: string; subtaskResults: Array<{ subtaskId: string; status: string; result?: string; error?: string }> }>;
-      review?: DebriefingReport;
+      review?: Debrief;
       error?: string;
       startedAt: string;
       completedAt?: string;
@@ -1271,13 +1286,13 @@ export function PlanningPage() {
     isLoading: boolean;
   };
 
-  // Command log helper
-  const addLog = useCallback((
-    type: CommandLogEntry['type'],
+  // Feed helper
+  const addToFeed = useCallback((
+    type: FeedEntry['type'],
     message: string,
     details?: string
   ) => {
-    setCommandLog(prev => [...prev, {
+    setCrewFeed(prev => [...prev, {
       id: crypto.randomUUID(),
       timestamp: new Date(),
       type,
@@ -1286,16 +1301,16 @@ export function PlanningPage() {
     }]);
   }, []);
 
-  // Update operative status
-  const updateOperative = useCallback((operativeId: string, updates: Partial<Operative>) => {
-    setBattlePlan(prev => {
+  // Update homie status
+  const updateHomie = useCallback((homieId: string, updates: Partial<CrewMember>) => {
+    setGamePlan(prev => {
       if (!prev) return null;
       return {
         ...prev,
-        parallelGroups: prev.parallelGroups.map(squad => ({
-          ...squad,
-          subtasks: squad.subtasks.map(operative =>
-            operative.id === operativeId ? { ...operative, ...updates } : operative
+        parallelGroups: prev.parallelGroups.map(crew => ({
+          ...crew,
+          subtasks: crew.subtasks.map(homie =>
+            homie.id === homieId ? { ...homie, ...updates } : homie
           ),
         })),
       };
@@ -1309,26 +1324,26 @@ export function PlanningPage() {
   const handleStreamEvent = useCallback((event: { runId?: string; stepId?: string; result?: any; error?: string; totalDuration?: number }) => {
     const { stepId, result, error: eventError, totalDuration } = event;
     
-    // Started event - only process once per mission
+    // Started event - only process once per job
     if (event.runId && !stepId && !totalDuration && !eventError) {
       if (hasReceivedStartedRef.current) {
         return;
       }
       hasReceivedStartedRef.current = true;
       setCurrentRunId(event.runId);
-      addLog('phase', 'Mission initiated');
-      setCurrentAction('Deploying reconnaissance...');
-      setPhase('reconnaissance');
+      addToFeed('phase', 'Alright crew, we\'re in 🎯');
+      setCurrentAction('Getting the lay of the land...');
+      setPhase('casing');
       setProgress(5);
       return;
     }
     
     // Complete event
     if (totalDuration !== undefined) {
-      setPhase('mission_complete');
+      setPhase('pulled_it_off');
       setProgress(100);
       setCurrentAction(undefined);
-      addLog('success', 'Mission accomplished - all objectives achieved');
+      addToFeed('success', 'Clean getaway! Job\'s done 🎉');
       setIsRunning(false);
       return;
     }
@@ -1336,9 +1351,9 @@ export function PlanningPage() {
     // Error event
     if (eventError && !stepId) {
       setError(eventError);
-      setPhase('mission_failed');
+      setPhase('got_caught');
       setCurrentAction(undefined);
-      addLog('error', `Mission compromised: ${eventError}`);
+      addToFeed('error', `Aw man, we hit a wall: ${eventError}`);
       setIsRunning(false);
       return;
     }
@@ -1352,11 +1367,11 @@ export function PlanningPage() {
           setPhase(newPhase);
           setProgress(stepToProgress[stepId] || 0);
           setCurrentAction(phaseConfig[newPhase]?.description);
-          addLog('phase', phaseConfig[newPhase]?.label);
+          addToFeed('phase', phaseConfig[newPhase]?.label);
         }
       } else if (eventError) {
         // step-error
-        addLog('error', `Operation failed: ${stepId}`, eventError);
+        addToFeed('error', `Ran into trouble at ${stepId}`, eventError);
         setCurrentAction(undefined);
       } else {
         // step-complete
@@ -1365,37 +1380,37 @@ export function PlanningPage() {
         if (stepId === 'analyze-task' && result) {
           if (result.projectInfo) {
             setIntelReport(result.projectInfo);
-            addLog('success', `Intel gathered: ${result.projectInfo.language} ${result.projectInfo.type} detected`);
+            addToFeed('success', `Scoped it out: ${result.projectInfo.language} ${result.projectInfo.type}`);
           }
           if (result.relevantFiles?.length) {
-            addLog('info', `${result.relevantFiles.length} strategic targets identified`);
+            addToFeed('info', `Found ${result.relevantFiles.length} files we need to hit`);
           }
         }
         
         if (stepId === 'create-plan' && result?.plan) {
-          setBattlePlan(result.plan);
-          const operativeCount = result.plan.parallelGroups?.reduce(
-            (sum: number, g: Squad) => sum + g.subtasks.length, 0
+          setGamePlan(result.plan);
+          const homieCount = result.plan.parallelGroups?.reduce(
+            (sum: number, g: Crew) => sum + g.subtasks.length, 0
           ) || 0;
-          addLog('success', `Battle plan formulated: ${operativeCount} operatives in ${result.plan.parallelGroups?.length || 0} squads`);
+          addToFeed('success', `Game plan ready: ${homieCount} homies across ${result.plan.parallelGroups?.length || 0} crews`);
         }
         
         if (stepId === 'execute-plan' && result) {
           if (result.groupResults) {
-            for (const squad of result.groupResults) {
-              for (const opResult of squad.subtaskResults) {
-                updateOperative(opResult.subtaskId, {
-                  status: opResult.status,
-                  result: opResult.result,
-                  error: opResult.error,
-                  duration: opResult.duration,
-                  filesModified: opResult.filesModified,
+            for (const crew of result.groupResults) {
+              for (const homieResult of crew.subtaskResults) {
+                updateHomie(homieResult.subtaskId, {
+                  status: homieResult.status,
+                  result: homieResult.result,
+                  error: homieResult.error,
+                  duration: homieResult.duration,
+                  filesModified: homieResult.filesModified,
                 });
                 
-                if (opResult.status === 'completed') {
-                  addLog('success', `Operative ${opResult.subtaskId}: Target secured`);
-                } else if (opResult.status === 'failed') {
-                  addLog('error', `Operative ${opResult.subtaskId}: Casualty`, opResult.error);
+                if (homieResult.status === 'completed') {
+                  addToFeed('success', `${homieResult.subtaskId} came through! ✨`);
+                } else if (homieResult.status === 'failed') {
+                  addToFeed('error', `${homieResult.subtaskId} hit a snag`, homieResult.error);
                 }
               }
             }
@@ -1405,19 +1420,19 @@ export function PlanningPage() {
         }
         
         if (stepId === 'review-results' && result?.review) {
-          setDebriefing(result.review);
-          addLog(
+          setDebrief(result.review);
+          addToFeed(
             result.review.overallSuccess ? 'success' : 'warning',
             result.review.summary
           );
         }
       }
     }
-  }, [addLog, updateOperative]);
+  }, [addToFeed, updateHomie]);
 
-  // Start streaming when mission begins
+  // Start streaming when job begins
   useEffect(() => {
-    if (!isRunning || !repoData?.repo.id || !submittedObjective) {
+    if (!isRunning || !repoData?.repo.id || !submittedJob) {
       return;
     }
 
@@ -1435,7 +1450,7 @@ export function PlanningPage() {
           credentials: 'include',
           body: JSON.stringify({
             repoId: repoData.repo.id,
-            task: submittedObjective.trim(),
+            task: submittedJob.trim(),
             context: context.trim() || undefined,
             dryRun,
             createBranch,
@@ -1487,10 +1502,10 @@ export function PlanningPage() {
           return;
         }
         setError((err as Error).message);
-        setPhase('mission_failed');
+        setPhase('got_caught');
         setCurrentAction(undefined);
         setIsRunning(false);
-        addLog('error', `Communications lost: ${(err as Error).message}`);
+        addToFeed('error', `Lost connection: ${(err as Error).message}`);
       }
     };
 
@@ -1500,39 +1515,39 @@ export function PlanningPage() {
       abortController.abort();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isRunning, repoData?.repo.id, submittedObjective, handleStreamEvent]);
+  }, [isRunning, repoData?.repo.id, submittedJob, handleStreamEvent]);
 
   // Load existing run data when navigating to a run URL
   useEffect(() => {
     if (!existingRun) return;
     
-    setSubmittedObjective(existingRun.task);
+    setSubmittedJob(existingRun.task);
     setCurrentRunId(existingRun.id);
     setStartTime(new Date(existingRun.startedAt));
     
     if (existingRun.plan) {
-      setBattlePlan(existingRun.plan);
+      setGamePlan(existingRun.plan);
     }
     if (existingRun.review) {
-      setDebriefing(existingRun.review);
+      setDebrief(existingRun.review);
     }
     if (existingRun.error) {
       setError(existingRun.error);
     }
     
-    const statusToPhase: Record<string, MissionPhase> = {
-      pending: 'reconnaissance',
-      planning: 'strategic_planning',
-      executing: 'deploying',
-      reviewing: 'debriefing',
-      completed: 'mission_complete',
-      failed: 'mission_failed',
+    const statusToPhase: Record<string, HeistPhase> = {
+      pending: 'casing',
+      planning: 'scheming',
+      executing: 'making_moves',
+      reviewing: 'wrapping_up',
+      completed: 'pulled_it_off',
+      failed: 'got_caught',
     };
-    setPhase(statusToPhase[existingRun.status] || 'idle');
+    setPhase(statusToPhase[existingRun.status] || 'chilling');
     
     if (['pending', 'planning', 'executing', 'reviewing'].includes(existingRun.status)) {
       setIsRunning(true);
-      setCurrentAction('Reconnecting to command...');
+      setCurrentAction('Catching up with the crew...');
       hasReceivedStartedRef.current = true;
       
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
@@ -1547,7 +1562,7 @@ export function PlanningPage() {
           });
           
           if (!response.ok) {
-            throw new Error(`Failed to observe mission: ${response.status}`);
+            throw new Error(`Couldn't catch up: ${response.status}`);
           }
           
           const reader = response.body?.getReader();
@@ -1577,7 +1592,7 @@ export function PlanningPage() {
           }
         } catch (err) {
           if ((err as Error).name !== 'AbortError') {
-            console.error('Observation error:', err);
+            console.error('Stream error:', err);
           }
         }
       };
@@ -1601,88 +1616,88 @@ export function PlanningPage() {
     }
   }, [currentRunId, urlRunId, owner, repo, navigate, refetchHistory]);
 
-  const handleLaunchMission = () => {
-    if (!missionObjective.trim() || !repoData?.repo.id) return;
+  const handleStartJob = () => {
+    if (!theJob.trim() || !repoData?.repo.id) return;
     
-    setSubmittedObjective(missionObjective.trim());
+    setSubmittedJob(theJob.trim());
     setIsRunning(true);
-    setPhase('reconnaissance');
+    setPhase('casing');
     setProgress(0);
-    setBattlePlan(null);
-    setDebriefing(null);
+    setGamePlan(null);
+    setDebrief(null);
     setIntelReport(null);
     setError(null);
-    setCommandLog([]);
+    setCrewFeed([]);
     setBranchCreated(null);
     setFilesModified([]);
-    setExpandedOperatives(new Set());
-    setCurrentAction('Initiating mission...');
+    setExpandedHomies(new Set());
+    setCurrentAction('Rallying the crew...');
     setStartTime(new Date());
     hasReceivedStartedRef.current = false;
     
-    addLog('phase', 'Mission parameters received - deploying forces...');
+    addToFeed('phase', 'Let\'s get this bread 🍞');
   };
 
-  const handleAbortMission = () => {
+  const handleAbortJob = () => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
     }
     setIsRunning(false);
-    setPhase('mission_failed');
+    setPhase('got_caught');
     setCurrentAction(undefined);
-    addLog('warning', 'Mission aborted by command');
+    addToFeed('warning', 'Job called off. We\'ll get \'em next time.');
   };
 
-  const handleRetryMission = () => {
-    if (!submittedObjective.trim() || !repoData?.repo.id) return;
+  const handleRetryJob = () => {
+    if (!submittedJob.trim() || !repoData?.repo.id) return;
     
     setIsRunning(true);
-    setPhase('reconnaissance');
+    setPhase('casing');
     setProgress(0);
-    setBattlePlan(null);
-    setDebriefing(null);
+    setGamePlan(null);
+    setDebrief(null);
     setIntelReport(null);
     setError(null);
-    setCommandLog([]);
+    setCrewFeed([]);
     setBranchCreated(null);
     setFilesModified([]);
-    setExpandedOperatives(new Set());
-    setCurrentAction('Retrying mission...');
+    setExpandedHomies(new Set());
+    setCurrentAction('Getting the crew back together...');
     setStartTime(new Date());
     hasReceivedStartedRef.current = false;
     
-    addLog('phase', 'Mission retry authorized...');
+    addToFeed('phase', 'Round two, let\'s go! 💪');
   };
 
-  const handleNewMission = () => {
-    setMissionObjective('');
-    setSubmittedObjective('');
+  const handleNewJob = () => {
+    setTheJob('');
+    setSubmittedJob('');
     setCurrentRunId(null);
     setIsRunning(false);
-    setPhase('idle');
+    setPhase('chilling');
     setProgress(0);
-    setBattlePlan(null);
-    setDebriefing(null);
+    setGamePlan(null);
+    setDebrief(null);
     setIntelReport(null);
     setError(null);
-    setCommandLog([]);
+    setCrewFeed([]);
     setBranchCreated(null);
     setFilesModified([]);
-    setExpandedOperatives(new Set());
+    setExpandedHomies(new Set());
     setCurrentAction(undefined);
     setStartTime(undefined);
     hasReceivedStartedRef.current = false;
     navigate(`/${owner}/${repo}/planning`);
   };
 
-  const toggleOperative = (operativeId: string) => {
-    setExpandedOperatives(prev => {
+  const toggleHomie = (homieId: string) => {
+    setExpandedHomies(prev => {
       const next = new Set(prev);
-      if (next.has(operativeId)) {
-        next.delete(operativeId);
+      if (next.has(homieId)) {
+        next.delete(homieId);
       } else {
-        next.add(operativeId);
+        next.add(homieId);
       }
       return next;
     });
@@ -1706,27 +1721,27 @@ export function PlanningPage() {
     );
   }
 
-  const isIdle = phase === 'idle';
-  const isComplete = phase === 'mission_complete' || phase === 'mission_failed';
-  const showMission = isRunning || isComplete;
+  const isChilling = phase === 'chilling';
+  const isComplete = phase === 'pulled_it_off' || phase === 'got_caught';
+  const showJob = isRunning || isComplete;
 
   return (
     <RepoLayout owner={owner!} repo={repo!} activeTab="planning">
       <div className="flex gap-6">
-        {/* Left Sidebar - Mission Archives */}
+        {/* Left Sidebar - Past Jobs */}
         <div className="w-64 shrink-0 hidden lg:block">
           <div className="sticky top-4 space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold uppercase tracking-wider flex items-center gap-2">
+              <h3 className="text-sm font-medium flex items-center gap-2">
                 <History className="h-4 w-4" />
-                Mission Archives
+                Past Jobs
               </h3>
-              {!isIdle && (
+              {!isChilling && (
                 <Button 
                   variant="ghost" 
                   size="sm" 
                   className="h-7 px-2"
-                  onClick={handleNewMission}
+                  onClick={handleNewJob}
                 >
                   <Plus className="h-3.5 w-3.5" />
                 </Button>
@@ -1735,35 +1750,35 @@ export function PlanningPage() {
             
             <ScrollArea className="h-[calc(100vh-200px)]">
               <div className="space-y-1 pr-4">
-                {missionHistory?.map((mission) => (
+                {jobHistory?.map((job) => (
                   <Link
-                    key={mission.id}
-                    to={`/${owner}/${repo}/planning/${mission.id}`}
+                    key={job.id}
+                    to={`/${owner}/${repo}/planning/${job.id}`}
                     className={cn(
                       'block p-3 rounded-lg border transition-colors hover:bg-accent',
-                      currentRunId === mission.id && 'bg-accent border-primary'
+                      currentRunId === job.id && 'bg-accent border-primary'
                     )}
                   >
                     <p className="text-sm font-medium line-clamp-2 mb-1">
-                      {mission.task.length > 60 ? mission.task.slice(0, 60) + '...' : mission.task}
+                      {job.task.length > 60 ? job.task.slice(0, 60) + '...' : job.task}
                     </p>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <Badge 
                         variant={
-                          mission.status === 'completed' ? 'default' : 
-                          mission.status === 'failed' ? 'destructive' : 
+                          job.status === 'completed' ? 'default' : 
+                          job.status === 'failed' ? 'destructive' : 
                           'secondary'
                         }
                         className={cn(
                           "text-[10px] px-1.5 py-0",
-                          mission.status === 'completed' && 'bg-green-500'
+                          job.status === 'completed' && 'bg-green-500'
                         )}
                       >
-                        {mission.status === 'completed' ? 'Victory' : 
-                         mission.status === 'failed' ? 'Failed' : mission.status}
+                        {job.status === 'completed' ? 'Scored' : 
+                         job.status === 'failed' ? 'Busted' : job.status}
                       </Badge>
                       <span>
-                        {new Date(mission.startedAt).toLocaleDateString(undefined, {
+                        {new Date(job.startedAt).toLocaleDateString(undefined, {
                           month: 'short',
                           day: 'numeric',
                           hour: '2-digit',
@@ -1774,9 +1789,9 @@ export function PlanningPage() {
                   </Link>
                 ))}
                 
-                {(!missionHistory || missionHistory.length === 0) && (
+                {(!jobHistory || jobHistory.length === 0) && (
                   <p className="text-sm text-muted-foreground text-center py-8">
-                    No missions logged
+                    No jobs yet
                   </p>
                 )}
               </div>
@@ -1791,23 +1806,23 @@ export function PlanningPage() {
             <div className="flex items-center gap-3">
               <div className={cn(
                 'p-2.5 rounded-xl transition-colors',
-                isRunning ? 'bg-amber-500/10' : 'bg-primary/10'
+                isRunning ? 'bg-violet-500/10' : 'bg-primary/10'
               )}>
-                <Target className={cn(
+                <Glasses className={cn(
                   'h-6 w-6',
-                  isRunning ? 'text-amber-500 animate-pulse' : 'text-primary'
+                  isRunning ? 'text-violet-500 animate-pulse' : 'text-primary'
                 )} />
               </div>
               <div>
-                <h1 className="text-2xl font-bold uppercase tracking-wide">Command Center</h1>
+                <h1 className="text-2xl font-bold">The Crew</h1>
                 <p className="text-sm text-muted-foreground">
-                  Deploy AI operatives to accomplish complex objectives
+                  Your AI homies ready to make moves
                 </p>
               </div>
             </div>
             {planningStatus?.available && (
               <Badge variant="outline" className="gap-1.5 py-1">
-                <Shield className="h-3.5 w-3.5" />
+                <Sparkles className="h-3.5 w-3.5" />
                 {planningStatus.provider}
               </Badge>
             )}
@@ -1819,10 +1834,10 @@ export function PlanningPage() {
               <AlertCircle className="h-5 w-5 text-yellow-500 shrink-0" />
               <div>
                 <p className="font-medium text-yellow-600 dark:text-yellow-400">
-                  Command systems offline
+                  Crew's not ready yet
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Configure AI credentials in repository settings to activate command center.
+                  Hook up an API key in settings to get the crew online.
                 </p>
               </div>
             </div>
@@ -1834,44 +1849,44 @@ export function PlanningPage() {
               <AlertCircle className="h-5 w-5 text-destructive shrink-0" />
               <div className="flex-1">
                 <p className="font-medium text-destructive">
-                  Mission record not found
+                  Can't find that job
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  This mission log may have been archived or deleted. Launch a new mission to continue.
+                  Might've been cleaned up. Start a fresh one?
                 </p>
               </div>
-              <Button variant="outline" size="sm" onClick={handleNewMission}>
-                <Flag className="h-4 w-4 mr-1" />
-                New Mission
+              <Button variant="outline" size="sm" onClick={handleNewJob}>
+                <Plus className="h-4 w-4 mr-1" />
+                New Job
               </Button>
             </div>
           )}
 
-          {/* Mission Briefing - Shows objective & progress when active */}
-          {showMission && submittedObjective && (
-            <MissionBriefing
-              objective={submittedObjective}
+          {/* Job Briefing - Shows the job & progress when active */}
+          {showJob && submittedJob && (
+            <JobBriefing
+              theJob={submittedJob}
               phase={phase}
               progress={progress}
-              onAbort={isRunning ? handleAbortMission : undefined}
-              onRetry={isComplete ? handleRetryMission : undefined}
-              onNewMission={isComplete ? handleNewMission : undefined}
+              onAbort={isRunning ? handleAbortJob : undefined}
+              onRetry={isComplete ? handleRetryJob : undefined}
+              onNewJob={isComplete ? handleNewJob : undefined}
               startTime={startTime}
             />
           )}
 
-          {/* Mission Input - Only shown when idle */}
-          {isIdle && (
+          {/* Job Input - Only shown when chilling */}
+          {isChilling && (
             <div className="space-y-4 p-6 rounded-xl border-2 border-dashed bg-gradient-to-br from-card to-muted/20">
               <div className="space-y-2">
-                <label className="text-sm font-semibold uppercase tracking-wider flex items-center gap-2">
-                  <Target className="h-4 w-4" />
-                  Mission Objective
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <Gem className="h-4 w-4 text-violet-500" />
+                  What's the job?
                 </label>
                 <MentionTextarea
-                  placeholder="Define your objective... Use @ to designate strategic targets (e.g., 'Implement secure authentication with JWT tokens')"
-                  value={missionObjective}
-                  onChange={setMissionObjective}
+                  placeholder="Tell the crew what we're doing... Use @ to point at specific files (e.g., 'Add JWT auth to the login flow')"
+                  value={theJob}
+                  onChange={setTheJob}
                   owner={owner!}
                   repo={repo!}
                   autoFocus
@@ -1879,9 +1894,9 @@ export function PlanningPage() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium text-muted-foreground">Strategic context (optional)</label>
+                <label className="text-sm font-medium text-muted-foreground">Extra context (optional)</label>
                 <MentionTextarea
-                  placeholder="Additional intelligence, constraints, or tactical considerations... Use @ to reference specific targets"
+                  placeholder="Anything else the crew should know? Use @ to reference files"
                   value={context}
                   onChange={setContext}
                   owner={owner!}
@@ -1899,7 +1914,7 @@ export function PlanningPage() {
                     onCheckedChange={(checked) => setDryRun(checked as boolean)}
                   />
                   <label htmlFor="dryRun" className="text-sm cursor-pointer">
-                    Simulation mode (dry run)
+                    Just scope it out (dry run)
                   </label>
                 </div>
                 <div className="flex items-center gap-2">
@@ -1909,7 +1924,7 @@ export function PlanningPage() {
                     onCheckedChange={(checked) => setCreateBranch(checked as boolean)}
                   />
                   <label htmlFor="createBranch" className="text-sm cursor-pointer">
-                    Establish forward operating base (branch)
+                    Work on a separate branch
                   </label>
                 </div>
               </div>
@@ -1919,14 +1934,14 @@ export function PlanningPage() {
                 <CollapsibleTrigger asChild>
                   <Button variant="ghost" size="sm" className="gap-1.5 -ml-2 text-muted-foreground">
                     {showAdvanced ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                    Advanced parameters
+                    More options
                   </Button>
                 </CollapsibleTrigger>
                 <CollapsibleContent className="pt-4">
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Custom base designation</label>
+                    <label className="text-sm font-medium">Custom branch name</label>
                     <Input
-                      placeholder="ops/mission-codename"
+                      placeholder="feature/cool-stuff"
                       value={branchName}
                       onChange={(e) => setBranchName(e.target.value)}
                       disabled={!createBranch}
@@ -1935,16 +1950,16 @@ export function PlanningPage() {
                 </CollapsibleContent>
               </Collapsible>
 
-              {/* Launch Button */}
+              {/* Start Button */}
               <div className="pt-4">
                 <Button
-                  onClick={handleLaunchMission}
-                  disabled={!missionObjective.trim() || !planningStatus?.available}
+                  onClick={handleStartJob}
+                  disabled={!theJob.trim() || !planningStatus?.available}
                   size="lg"
-                  className="gap-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg shadow-amber-500/25"
+                  className="gap-2 bg-gradient-to-r from-violet-500 to-purple-500 hover:from-violet-600 hover:to-purple-600 text-white shadow-lg shadow-violet-500/25"
                 >
-                  <Swords className="h-4 w-4" />
-                  Launch Mission
+                  <Rocket className="h-4 w-4" />
+                  Let's Go
                 </Button>
               </div>
             </div>
@@ -1955,64 +1970,64 @@ export function PlanningPage() {
             <div className="flex items-start gap-3 p-4 rounded-xl bg-red-500/10 border border-red-500/30">
               <XCircle className="h-5 w-5 text-red-500 mt-0.5 shrink-0" />
               <div>
-                <p className="font-semibold text-red-600 dark:text-red-400 uppercase tracking-wide">
-                  {phase === 'mission_failed' ? 'Mission Compromised' : 'Critical Error'}
+                <p className="font-semibold text-red-600 dark:text-red-400">
+                  {phase === 'got_caught' ? 'Things went sideways' : 'Uh oh'}
                 </p>
                 <p className="text-sm text-muted-foreground mt-1">{error}</p>
               </div>
             </div>
           )}
 
-          {/* Main Content - Two columns when mission is active */}
-          {showMission && (
+          {/* Main Content - Two columns when job is active */}
+          {showJob && (
             <div className="grid lg:grid-cols-5 gap-6">
-              {/* Left: Command Log */}
+              {/* Left: Crew Feed */}
               <div className="lg:col-span-2 space-y-4">
-                <CommandLog 
-                  entries={commandLog} 
+                <CrewFeed 
+                  entries={crewFeed} 
                   currentAction={isRunning ? currentAction : undefined}
                 />
                 
                 {/* Intel Report */}
                 {intelReport && (
                   <div className="rounded-lg border bg-card p-4">
-                    <h3 className="text-sm font-semibold mb-2 flex items-center gap-2 uppercase tracking-wider">
+                    <h3 className="text-sm font-medium mb-2 flex items-center gap-2">
                       <Search className="h-4 w-4" />
-                      Intel Report
+                      What we found
                     </h3>
                     <div className="flex flex-wrap gap-2">
                       <Badge variant="secondary">{intelReport.language}</Badge>
                       <Badge variant="secondary">{intelReport.type}</Badge>
-                      {intelReport.hasTests && <Badge variant="outline">Tests Detected</Badge>}
-                      {intelReport.hasLinting && <Badge variant="outline">Linting Active</Badge>}
+                      {intelReport.hasTests && <Badge variant="outline">Has tests</Badge>}
+                      {intelReport.hasLinting && <Badge variant="outline">Has linting</Badge>}
                     </div>
                   </div>
                 )}
 
-                {/* Mission Results */}
+                {/* Loot Summary */}
                 {isComplete && (
-                  <MissionResults 
+                  <LootSummary 
                     branchCreated={branchCreated} 
                     filesModified={filesModified} 
                   />
                 )}
               </div>
 
-              {/* Right: Battle Plan / Debriefing */}
+              {/* Right: Game Plan / Debrief */}
               <div className="lg:col-span-3">
-                {debriefing ? (
-                  <DebriefingView report={debriefing} />
-                ) : battlePlan ? (
-                  <BattlePlanView
-                    plan={battlePlan}
-                    expandedOperatives={expandedOperatives}
-                    onToggleOperative={toggleOperative}
+                {debrief ? (
+                  <DebriefView report={debrief} />
+                ) : gamePlan ? (
+                  <GamePlanView
+                    plan={gamePlan}
+                    expandedHomies={expandedHomies}
+                    onToggleHomie={toggleHomie}
                     phase={phase}
                   />
                 ) : (
                   <div className="rounded-lg border bg-card p-12 text-center">
-                    <Compass className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50 animate-pulse" />
-                    <p className="text-muted-foreground">Formulating battle plan...</p>
+                    <Brain className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50 animate-pulse" />
+                    <p className="text-muted-foreground">Cooking up a plan...</p>
                   </div>
                 )}
               </div>
@@ -2020,10 +2035,10 @@ export function PlanningPage() {
           )}
 
           {/* Empty State */}
-          {isIdle && !error && (
+          {isChilling && !error && (
             <div className="text-center py-8 text-muted-foreground">
               <p className="text-sm">
-                The AI command system will analyze the battlefield, formulate a battle plan, and deploy operatives in coordinated squads.
+                The crew will scope out the codebase, put together a game plan, and get to work.
               </p>
             </div>
           )}
