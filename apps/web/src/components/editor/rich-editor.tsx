@@ -185,12 +185,12 @@ export function RichEditor({
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'write' | 'preview')}>
         {/* Header with tabs and toolbar */}
         <div className="flex items-center justify-between border-b bg-muted/30 px-2">
-          <TabsList className="h-9 bg-transparent">
-            <TabsTrigger value="write" className="gap-1.5 text-xs">
+          <TabsList className="h-9 bg-transparent border-0 rounded-none p-0 gap-0">
+            <TabsTrigger value="write" className="gap-1.5 text-xs rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-3">
               <Edit3 className="h-3 w-3" />
               Write
             </TabsTrigger>
-            <TabsTrigger value="preview" className="gap-1.5 text-xs">
+            <TabsTrigger value="preview" className="gap-1.5 text-xs rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-3">
               <Eye className="h-3 w-3" />
               Preview
             </TabsTrigger>
