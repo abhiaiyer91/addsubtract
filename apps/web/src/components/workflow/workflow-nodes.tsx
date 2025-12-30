@@ -9,7 +9,6 @@ import { memo } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import {
   Play,
-  Cog,
   GitBranch,
   Shuffle,
   ArrowRightLeft,
@@ -17,7 +16,6 @@ import {
   Terminal,
   Box,
   Code,
-  Clock,
   GitPullRequest,
   Upload,
   Calendar,

@@ -5,7 +5,7 @@
  * Supports drag-and-drop, node connections, and real-time code generation.
  */
 
-import { useCallback, useRef, useMemo } from 'react';
+import { useCallback, useRef, useMemo, useEffect } from 'react';
 import ReactFlow, {
   Background,
   Controls,
@@ -45,7 +45,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
-import { useWorkflowStore, type WorkflowNode, type NodeType } from '@/lib/workflow-store';
+import { useWorkflowStore, type NodeType } from '@/lib/workflow-store';
 import { nodeTypes } from './workflow-nodes';
 import { cn } from '@/lib/utils';
 
@@ -116,6 +116,16 @@ export function VisualWorkflowCanvas({ onSave, onPreview, readOnly = false }: Vi
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+
+  // Sync nodes when workflow changes
+  useEffect(() => {
+    setNodes(initialNodes);
+  }, [initialNodes, setNodes]);
+
+  // Sync edges when workflow changes
+  useEffect(() => {
+    setEdges(initialEdges);
+  }, [initialEdges, setEdges]);
 
   // Handle node position changes
   const onNodeDragStop = useCallback(

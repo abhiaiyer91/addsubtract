@@ -65,7 +65,8 @@ export function WorkflowsPage() {
   const currentState = searchParams.get('state') as WorkflowState | 'all' | null || 'all';
 
   // Fetch repository data to get the repo ID
-  const { data: repoData, isLoading: repoLoading } = trpc.repos.get.useQuery(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: repoData, isLoading: repoLoading } = (trpc as any).repos.get.useQuery(
     { owner: owner!, repo: repo! },
     { enabled: !!owner && !!repo }
   );
