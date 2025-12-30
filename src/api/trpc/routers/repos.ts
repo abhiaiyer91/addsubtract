@@ -887,7 +887,30 @@ export const reposRouter = router({
 
       try {
         // Resolve the ref to a commit
-        const commitHash = bareRepo.refs.resolve(input.ref);
+        let refToResolve = input.ref;
+        
+        // If ref is HEAD and it doesn't resolve, try the repo's default branch
+        let commitHash = bareRepo.refs.resolve(refToResolve);
+        
+        if (!commitHash && refToResolve === 'HEAD') {
+          // Try the repo's configured default branch
+          const defaultBranch = result.repo.defaultBranch || 'main';
+          console.log(`[repos.getTree] HEAD didn't resolve, trying default branch: ${defaultBranch}`);
+          commitHash = bareRepo.refs.resolve(`refs/heads/${defaultBranch}`);
+          
+          if (!commitHash) {
+            // Try common default branch names
+            const fallbackBranches = ['main', 'master', 'develop'];
+            for (const branch of fallbackBranches) {
+              commitHash = bareRepo.refs.resolve(`refs/heads/${branch}`);
+              if (commitHash) {
+                console.log(`[repos.getTree] Found commit via fallback branch: ${branch}`);
+                break;
+              }
+            }
+          }
+        }
+        
         if (!commitHash) {
           // Ref not found - try to get available branches to suggest alternatives
           const branches = bareRepo.refs.listBranches();
@@ -950,6 +973,16 @@ export const reposRouter = router({
       } catch (error) {
         if (error instanceof TRPCError) throw error;
         console.error('[repos.getTree] Error:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        
+        // Provide more specific error messages
+        if (errorMessage.includes('not found') || errorMessage.includes('does not exist')) {
+          return { entries: [], error: 'Repository data not found. The import may have failed or is still in progress.' };
+        }
+        if (errorMessage.includes('corrupt') || errorMessage.includes('invalid')) {
+          return { entries: [], error: 'Repository data appears to be corrupted. Please try re-importing the repository.' };
+        }
+        
         return { entries: [], error: 'Failed to read repository tree. Please try again.' };
       }
     }),
