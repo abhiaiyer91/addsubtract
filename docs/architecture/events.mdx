@@ -3,8 +3,70 @@ title: 'Events System'
 description: 'Event-driven architecture for notifications, webhooks, and automation'
 ---
 
+wit uses an event-driven architecture to power notifications, webhooks, CI/CD triggers, and other automated workflows. The `src/events/` module provides a lightweight, in-process event bus.
 
-wit uses an event-driven architecture to power notifications, webhooks, CI/CD triggers, and other automated workflows.
+## Architecture
+
+```mermaid
+flowchart TB
+    subgraph Sources["Event Sources"]
+        git["Git Operations"]
+        api["API Endpoints"]
+        agent["AI Agent"]
+    end
+
+    subgraph Bus["Event Bus"]
+        emit["emit()"]
+        handlers["Handlers"]
+        log["Event Log"]
+    end
+
+    subgraph Handlers["Event Handlers"]
+        notif["Notification Handler"]
+        ci["CI Handler"]
+        triage["Triage Handler"]
+        queue["Merge Queue Handler"]
+        review["PR Review Handler"]
+        marketing["Marketing Handler"]
+    end
+
+    subgraph Outputs["Outputs"]
+        db["Database"]
+        webhooks["Webhooks"]
+        email["Email"]
+        ai["AI Workflows"]
+    end
+
+    git --> emit
+    api --> emit
+    agent --> emit
+    emit --> handlers
+    emit --> log
+    handlers --> notif
+    handlers --> ci
+    handlers --> triage
+    handlers --> queue
+    handlers --> review
+    handlers --> marketing
+    notif --> db
+    ci --> webhooks
+    review --> ai
+    marketing --> email
+```
+
+## Key Files
+
+| File | Purpose |
+|------|---------|
+| `events/index.ts` | Module exports |
+| `events/bus.ts` | Event bus implementation |
+| `events/types.ts` | Event type definitions (24+ types) |
+| `events/handlers/notifications.ts` | Notification handler |
+| `events/handlers/ci.ts` | CI/CD handler |
+| `events/handlers/triage.ts` | Issue triage handler |
+| `events/handlers/merge-queue.ts` | Merge queue handler |
+| `events/handlers/pr-review.ts` | PR review handler |
+| `events/handlers/marketing.ts` | Marketing content handler |
 
 ## Overview
 
@@ -13,6 +75,7 @@ The events system provides:
 - Handler registration for processing events
 - Integration with notifications, CI, and webhooks
 - Extensibility for custom event handling
+- Event logging for debugging
 
 ## Event Types
 

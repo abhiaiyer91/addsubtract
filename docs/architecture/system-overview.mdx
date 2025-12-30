@@ -1,0 +1,434 @@
+---
+title: "System Architecture"
+description: "Comprehensive guide to wit's architecture for contributors and self-hosters"
+---
+
+wit is a Git-compatible version control system with an integrated hosting platform, built in TypeScript. This document provides a comprehensive overview of the system architecture.
+
+## System Context
+
+```mermaid
+flowchart TB
+    subgraph Users["Users"]
+        dev["Developer"]
+        ci["CI System"]
+        web["Web Browser"]
+    end
+
+    subgraph WitPlatform["wit Platform"]
+        subgraph CLI["CLI"]
+            commands["Commands"]
+        end
+
+        subgraph Server["Server"]
+            http["HTTP (Hono)"]
+            ssh["SSH Server"]
+            ws["WebSocket"]
+        end
+
+        subgraph Core["Core"]
+            git["Git Engine"]
+            ai["AI System"]
+        end
+
+        subgraph Data["Data Layer"]
+            db["PostgreSQL"]
+            storage["Object Storage"]
+        end
+    end
+
+    subgraph External["External Services"]
+        llm["LLM Provider"]
+        github["GitHub API"]
+        sandbox["Sandbox Providers"]
+    end
+
+    dev -->|"wit commands"| CLI
+    dev -->|"git clone/push"| Server
+    web -->|"HTTP/WS"| Server
+    ci -->|"API calls"| Server
+
+    CLI --> Core
+    Server --> Core
+    Core --> Data
+    Core --> External
+```
+
+## High-Level Architecture
+
+wit consists of four main layers:
+
+| Layer | Purpose | Key Technologies |
+|-------|---------|-----------------|
+| **CLI** | Command-line interface | Commander.js, Ink |
+| **Server** | HTTP, SSH, WebSocket servers | Hono, ssh2 |
+| **Core** | Git implementation, AI features | Custom Git engine, Mastra |
+| **Data** | Persistence and storage | PostgreSQL, Drizzle ORM |
+
+## Directory Structure
+
+```
+src/
+├── cli.ts              # CLI entry point
+├── index.ts            # Library exports
+├── commands/           # CLI command handlers (75+ commands)
+├── core/               # Git implementation
+│   ├── repository.ts   # Main Repository class
+│   ├── object.ts       # Git objects (blob, tree, commit, tag)
+│   ├── object-store.ts # Object persistence
+│   ├── index.ts        # Staging area
+│   ├── refs.ts         # References (branches, tags)
+│   ├── protocol/       # Git protocols (Smart HTTP, SSH)
+│   └── storage/        # Storage backends
+├── server/             # Server infrastructure
+│   ├── routes/         # HTTP endpoints
+│   ├── ssh/            # SSH server
+│   ├── middleware/     # Auth, rate limiting
+│   └── sandbox/        # Code execution sandboxes
+├── api/                # tRPC API layer
+│   └── trpc/           # tRPC routers
+├── db/                 # Database schema
+│   ├── schema.ts       # Drizzle schema
+│   └── auth-schema.ts  # Authentication tables
+├── ai/                 # AI features
+│   ├── agent.ts        # AI coding agent
+│   ├── tools/          # Agent tools
+│   └── workflows/      # Multi-step workflows
+├── events/             # Event-driven architecture
+│   ├── bus.ts          # Event bus
+│   └── handlers/       # Event handlers
+├── ui/                 # Terminal and web UI
+├── search/             # Semantic code search
+├── primitives/         # Core abstractions
+└── ci/                 # CI/CD execution
+```
+
+## Component Diagram
+
+```mermaid
+flowchart LR
+    subgraph CLI["CLI Layer"]
+        cmds["Commands<br/>75+ handlers"]
+        tui["Terminal UI"]
+    end
+
+    subgraph Core["Core Layer"]
+        repo["Repository"]
+        objs["Objects"]
+        refs["Refs"]
+        idx["Index"]
+        merge["Merge"]
+        remote["Remote"]
+        journal["Journal"]
+    end
+
+    subgraph AI["AI Layer"]
+        agent["Agent"]
+        tools["Tools"]
+        workflows["Workflows"]
+    end
+
+    subgraph Server["Server Layer"]
+        http["HTTP Routes"]
+        trpc["tRPC API"]
+        sshsrv["SSH Server"]
+    end
+
+    subgraph Data["Data Layer"]
+        pg["PostgreSQL"]
+        files[".wit/objects"]
+    end
+
+    cmds --> repo
+    cmds --> agent
+    tui --> repo
+
+    repo --> objs
+    repo --> refs
+    repo --> idx
+    repo --> merge
+    repo --> remote
+    repo --> journal
+
+    agent --> tools
+    tools --> repo
+
+    http --> repo
+    trpc --> pg
+    sshsrv --> repo
+
+    objs --> files
+    refs --> files
+```
+
+## Key Architectural Decisions
+
+### 1. Repository-Centric Design
+
+The `Repository` class is the central abstraction for all Git operations:
+
+```typescript
+class Repository {
+  readonly gitDir: string;      // .wit directory
+  readonly workDir: string;     // Working directory
+  readonly objects: ObjectStore; // Git objects
+  readonly index: Index;         // Staging area
+  readonly refs: Refs;           // Branches, tags
+  readonly journal: Journal;     // Undo history
+  readonly mergeManager: MergeManager;
+  readonly remotes: RemoteManager;
+  // ... more managers
+}
+```
+
+All operations flow through this class, ensuring consistent behavior across CLI, server, and AI features.
+
+### 2. Event-Driven Architecture
+
+The platform uses an event bus for loose coupling between components:
+
+```mermaid
+flowchart LR
+    action["Git Operation"]
+    bus["Event Bus"]
+    notif["Notifications"]
+    ci["CI Triggers"]
+    hooks["Webhooks"]
+    activity["Activity Feed"]
+
+    action --> bus
+    bus --> notif
+    bus --> ci
+    bus --> hooks
+    bus --> activity
+```
+
+Events trigger notifications, CI pipelines, webhooks, and activity logging without tight coupling.
+
+### 3. Pluggable Storage
+
+Storage backends are abstracted behind interfaces:
+
+```typescript
+interface StorageBackend {
+  read(path: string): Promise<Buffer>;
+  write(path: string, data: Buffer): Promise<void>;
+  exists(path: string): Promise<boolean>;
+  delete(path: string): Promise<void>;
+  list(prefix: string): Promise<string[]>;
+}
+```
+
+Currently supports disk storage; S3 support planned.
+
+### 4. Type-Safe API
+
+The API layer uses tRPC for end-to-end type safety:
+
+```typescript
+// Server
+export const repoRouter = router({
+  get: protectedProcedure
+    .input(z.object({ owner: z.string(), name: z.string() }))
+    .query(async ({ input }) => { ... }),
+});
+
+// Client - fully typed
+const repo = await trpc.repo.get.query({ owner: 'user', name: 'repo' });
+```
+
+### 5. AI as First-Class Citizen
+
+AI features are deeply integrated, not bolted on:
+
+- **Commit messages**: AI-generated from diffs
+- **Code review**: Automated PR analysis
+- **Conflict resolution**: AI-suggested resolutions
+- **Semantic search**: Vector-based code understanding
+- **Coding agent**: Autonomous code changes
+
+## Data Flow Examples
+
+### Push Operation
+
+```mermaid
+sequenceDiagram
+    participant CLI
+    participant Repo as Repository
+    participant Remote as RemoteManager
+    participant Protocol as Smart HTTP
+    participant Server
+    participant DB as PostgreSQL
+
+    CLI->>Repo: push(remote, branch)
+    Repo->>Remote: getRemote(name)
+    Remote->>Protocol: push(refs, objects)
+    Protocol->>Server: POST /git-receive-pack
+    Server->>Server: Verify auth
+    Server->>Server: Check branch protection
+    Server->>Server: Write objects
+    Server->>DB: Update repo stats
+    Server->>Server: Emit 'push' event
+    Server-->>Protocol: OK
+    Protocol-->>CLI: Success
+```
+
+### Pull Request Creation
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant API as tRPC API
+    participant DB as PostgreSQL
+    participant Events as Event Bus
+    participant AI as AI Review
+    participant Notif as Notifications
+
+    User->>API: createPR(data)
+    API->>DB: Insert PR record
+    API->>Events: emit('pr.created')
+    Events->>AI: Trigger auto-review
+    Events->>Notif: Notify reviewers
+    AI->>DB: Save review comments
+    API-->>User: PR created
+```
+
+## Extension Points
+
+### Adding a New Command
+
+1. Create handler in `src/commands/`:
+```typescript
+export async function myCommand(options: MyOptions) {
+  const repo = await Repository.find(process.cwd());
+  // Implementation
+}
+```
+
+2. Register in CLI (Commander.js)
+3. Add to command index
+
+### Adding an AI Tool
+
+1. Create tool in `src/ai/tools/`:
+```typescript
+export const myTool = createTool({
+  id: 'my-tool',
+  description: 'Does something',
+  inputSchema: z.object({ ... }),
+  execute: async ({ input, context }) => { ... },
+});
+```
+
+2. Register in tools index
+3. Tool is automatically available to agents
+
+### Adding an Event Handler
+
+1. Create handler in `src/events/handlers/`:
+```typescript
+export function registerMyHandlers() {
+  eventBus.on('pr.created', async (event) => {
+    // Handle event
+  });
+}
+```
+
+2. Register in server startup
+
+### Adding an API Endpoint
+
+1. Create tRPC router in `src/api/trpc/routers/`:
+```typescript
+export const myRouter = router({
+  myProcedure: protectedProcedure
+    .input(schema)
+    .mutation(async ({ input, ctx }) => { ... }),
+});
+```
+
+2. Add to main app router
+
+## For Self-Hosters
+
+### Required Services
+
+| Service | Purpose | Required |
+|---------|---------|----------|
+| PostgreSQL | Platform data | Yes |
+| Redis | Caching (future) | No |
+| S3-compatible | Object storage (future) | No |
+| LLM API | AI features | No (for AI) |
+
+### Environment Variables
+
+```bash
+# Required
+DATABASE_URL=postgresql://user:pass@host:5432/wit
+
+# Optional - AI features
+ANTHROPIC_API_KEY=sk-...
+OPENAI_API_KEY=sk-...
+
+# Optional - External integrations
+GITHUB_CLIENT_ID=...
+GITHUB_CLIENT_SECRET=...
+
+# Optional - Sandbox providers
+E2B_API_KEY=...
+DAYTONA_API_KEY=...
+```
+
+### Deployment Architecture
+
+```mermaid
+flowchart TB
+    subgraph LoadBalancer["Load Balancer"]
+        lb["nginx/Caddy"]
+    end
+
+    subgraph AppServers["App Servers"]
+        app1["wit server"]
+        app2["wit server"]
+    end
+
+    subgraph DataLayer["Data Layer"]
+        pg["PostgreSQL"]
+        disk["Shared Storage"]
+    end
+
+    lb --> app1
+    lb --> app2
+    app1 --> pg
+    app2 --> pg
+    app1 --> disk
+    app2 --> disk
+```
+
+For horizontal scaling, ensure:
+- Shared storage for Git repositories
+- Database connection pooling
+- Session affinity for WebSocket connections
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card title="Core Git" icon="code-branch" href="/architecture/core">
+    Git implementation details
+  </Card>
+  <Card title="AI System" icon="robot" href="/architecture/ai">
+    AI agents, tools, and workflows
+  </Card>
+  <Card title="Server" icon="server" href="/architecture/server">
+    HTTP, SSH, and API architecture
+  </Card>
+  <Card title="Database" icon="database" href="/architecture/database">
+    Schema and data models
+  </Card>
+  <Card title="Events" icon="bell" href="/architecture/events">
+    Event-driven architecture
+  </Card>
+  <Card title="CLI" icon="terminal" href="/architecture/cli">
+    Command structure and patterns
+  </Card>
+</CardGroup>
