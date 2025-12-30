@@ -53,7 +53,8 @@ export function ReleasesPage() {
   }
 
   const releases = releasesData?.releases || [];
-  const canWrite = permissionData?.hasPermission ?? false;
+  const isOwner = repoData?.repo.ownerId === session?.user?.id;
+  const canWrite = isOwner || (permissionData?.hasPermission ?? false);
 
   return (
     <RepoLayout owner={owner!} repo={repo!}>
