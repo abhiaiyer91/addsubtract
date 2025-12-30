@@ -13,6 +13,7 @@ export { registerMergeQueueHandlers, mergeQueueHandler } from './handlers/merge-
 export { registerTriageHandlers } from './handlers/triage';
 export { registerPRReviewHandlers, triggerAsyncPRReview } from './handlers/pr-review';
 export { registerMarketingHandlers, triggerMarketingContent } from './handlers/marketing';
+export { registerSentinelHandlers, triggerSentinelScan, stopScheduledScan } from './handlers/sentinel';
 
 // Gamification event handlers
 export {

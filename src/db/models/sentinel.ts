@@ -183,6 +183,7 @@ export const sentinelScanModel = {
       infoCount: number;
       healthScore: number;
       summary: string;
+      recommendations?: string[];
       rawOutput?: unknown;
     }
   ): Promise<SentinelScan | undefined> {

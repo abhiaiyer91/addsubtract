@@ -60,6 +60,7 @@ CREATE TABLE IF NOT EXISTS "sentinel_scans" (
   "info_count" integer DEFAULT 0,
   "health_score" integer,
   "summary" text,
+  "recommendations" jsonb,
   "raw_output" jsonb,
   "error_message" text,
   "started_at" timestamp with time zone,

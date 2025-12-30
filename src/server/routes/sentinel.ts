@@ -271,6 +271,7 @@ export function createSentinelRoutes(): Hono {
         status: 'completed',
         summary: scanResult.summary,
         healthScore: scanResult.healthScore,
+        recommendations: scanResult.recommendations,
         findings: {
           critical: scanResult.severityCounts.critical,
           high: scanResult.severityCounts.high,
@@ -322,6 +323,7 @@ export function createSentinelRoutes(): Hono {
         commitSha: scan.commitSha,
         healthScore: scan.healthScore,
         summary: scan.summary,
+        recommendations: scan.recommendations,
         findings: {
           critical: scan.criticalCount,
           high: scan.highCount,
@@ -371,6 +373,7 @@ export function createSentinelRoutes(): Hono {
         commitSha: scan.commitSha,
         healthScore: scan.healthScore,
         summary: scan.summary,
+        recommendations: scan.recommendations,
         findings: {
           critical: scan.criticalCount,
           high: scan.highCount,

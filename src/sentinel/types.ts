@@ -105,6 +105,8 @@ export interface ScanResult {
   healthScore: number;
   /** Summary of findings */
   summary: string;
+  /** Actionable recommendations for improvement */
+  recommendations: string[];
   /** Error message if scan failed */
   error?: string;
   /** Total time taken in ms */

@@ -291,6 +291,9 @@ export async function runScan(options: ScannerOptions): Promise<{
     
     const healthScore = calculateHealthScore(severityCounts);
     
+    // Generate recommendations based on findings
+    const recommendations = generateRecommendations(allFindings, severityCounts);
+    
     const result: ScanResult = {
       success: true,
       findings: allFindings,
@@ -299,6 +302,7 @@ export async function runScan(options: ScannerOptions): Promise<{
       severityCounts,
       healthScore,
       summary: '',
+      recommendations,
       durationMs: Date.now() - startTime,
     };
     
@@ -357,6 +361,7 @@ export async function runScan(options: ScannerOptions): Promise<{
       infoCount: severityCounts.info,
       healthScore,
       summary: result.summary,
+      recommendations,
       rawOutput: analyzerResults.map(r => ({
         analyzer: r.analyzer,
         success: r.success,
