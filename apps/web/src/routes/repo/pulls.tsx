@@ -45,6 +45,9 @@ export function PullsPage() {
 
   const currentState = searchParams.get('state') || 'open';
   const viewMode = searchParams.get('view') || 'list'; // 'list' or 'inbox'
+  const authorFilter = searchParams.get('author') || '';
+  const labelFilter = searchParams.get('label') || '';
+  const sortBy = searchParams.get('sort') || 'newest';
 
   // Fetch repository data to get the repo ID
   const { data: repoData, isLoading: repoLoading } = trpc.repos.get.useQuery(
@@ -76,14 +79,55 @@ export function PullsPage() {
   // Get pull requests
   const pullRequests = pullsData || [];
 
-  // Filter by search query
-  const filteredPulls = pullRequests.filter((pr) => {
-    if (!searchQuery) return true;
-    return (
-      pr.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      `#${pr.number}`.includes(searchQuery)
-    );
-  });
+  // Get unique authors from pull requests
+  const uniqueAuthors = [...new Map(
+    pullRequests
+      .filter(pr => pr.author?.username)
+      .map(pr => [pr.author?.username, pr.author])
+  ).values()];
+
+  // Get unique labels from pull requests
+  const uniqueLabels = [...new Map(
+    pullRequests
+      .flatMap(pr => pr.labels || [])
+      .map(label => [label.name, label])
+  ).values()];
+
+  // Filter and sort pull requests
+  const filteredPulls = pullRequests
+    .filter((pr) => {
+      // Search filter
+      if (searchQuery) {
+        const matchesSearch = pr.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          `#${pr.number}`.includes(searchQuery);
+        if (!matchesSearch) return false;
+      }
+      
+      // Author filter
+      if (authorFilter) {
+        if (authorFilter === 'me' && pr.author?.id !== session?.user?.id) return false;
+        if (authorFilter !== 'me' && pr.author?.username !== authorFilter) return false;
+      }
+      
+      // Label filter
+      if (labelFilter) {
+        const hasLabel = pr.labels?.some(l => l.name === labelFilter);
+        if (!hasLabel) return false;
+      }
+      
+      return true;
+    })
+    .sort((a, b) => {
+      switch (sortBy) {
+        case 'oldest':
+          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        case 'recently-updated':
+          return new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime();
+        case 'newest':
+        default:
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      }
+    });
 
   // Count PRs by state - using accurate count endpoint
   const openCount = prCounts?.open || 0;
@@ -98,6 +142,32 @@ export function PullsPage() {
   const handleViewChange = (view: string) => {
     const params = new URLSearchParams(searchParams);
     params.set('view', view);
+    setSearchParams(params);
+  };
+
+  const handleAuthorFilter = (author: string) => {
+    const params = new URLSearchParams(searchParams);
+    if (author) {
+      params.set('author', author);
+    } else {
+      params.delete('author');
+    }
+    setSearchParams(params);
+  };
+
+  const handleLabelFilter = (label: string) => {
+    const params = new URLSearchParams(searchParams);
+    if (label) {
+      params.set('label', label);
+    } else {
+      params.delete('label');
+    }
+    setSearchParams(params);
+  };
+
+  const handleSortChange = (sort: string) => {
+    const params = new URLSearchParams(searchParams);
+    params.set('sort', sort);
     setSearchParams(params);
   };
 
@@ -246,34 +316,69 @@ export function PullsPage() {
               <div className="flex items-center gap-2">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground">
+                    <Button variant="ghost" size="sm" className={`gap-2 ${authorFilter ? 'text-foreground' : 'text-muted-foreground'}`}>
                       <User className="h-4 w-4" />
-                      Author
+                      {authorFilter === 'me' ? 'My PRs' : authorFilter || 'Author'}
                       <ChevronDown className="h-3 w-3" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start">
-                    <DropdownMenuItem>Created by me</DropdownMenuItem>
-                    <DropdownMenuItem>Review requested</DropdownMenuItem>
+                    {authenticated && (
+                      <DropdownMenuItem onClick={() => handleAuthorFilter('me')}>
+                        Created by me
+                      </DropdownMenuItem>
+                    )}
+                    {uniqueAuthors.length > 0 && (
+                      <>
+                        <DropdownMenuSeparator />
+                        {uniqueAuthors.slice(0, 10).map((author) => (
+                          <DropdownMenuItem 
+                            key={author?.username} 
+                            onClick={() => handleAuthorFilter(author?.username || '')}
+                          >
+                            {author?.username}
+                          </DropdownMenuItem>
+                        ))}
+                      </>
+                    )}
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem>All authors</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleAuthorFilter('')}>
+                      All authors
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
 
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground">
+                    <Button variant="ghost" size="sm" className={`gap-2 ${labelFilter ? 'text-foreground' : 'text-muted-foreground'}`}>
                       <Tag className="h-4 w-4" />
-                      Label
+                      {labelFilter || 'Label'}
                       <ChevronDown className="h-3 w-3" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start">
-                    <DropdownMenuItem>bug</DropdownMenuItem>
-                    <DropdownMenuItem>feature</DropdownMenuItem>
-                    <DropdownMenuItem>documentation</DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem>All labels</DropdownMenuItem>
+                    {uniqueLabels.length > 0 ? (
+                      <>
+                        {uniqueLabels.map((label) => (
+                          <DropdownMenuItem 
+                            key={label.id} 
+                            onClick={() => handleLabelFilter(label.name)}
+                          >
+                            <span 
+                              className="w-3 h-3 rounded-full mr-2" 
+                              style={{ backgroundColor: `#${label.color}` }} 
+                            />
+                            {label.name}
+                          </DropdownMenuItem>
+                        ))}
+                        <DropdownMenuSeparator />
+                      </>
+                    ) : (
+                      <DropdownMenuItem disabled>No labels in use</DropdownMenuItem>
+                    )}
+                    <DropdownMenuItem onClick={() => handleLabelFilter('')}>
+                      All labels
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
 
@@ -281,15 +386,20 @@ export function PullsPage() {
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground">
                       <SlidersHorizontal className="h-4 w-4" />
-                      Sort
+                      {sortBy === 'oldest' ? 'Oldest' : sortBy === 'recently-updated' ? 'Updated' : 'Newest'}
                       <ChevronDown className="h-3 w-3" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem>Newest</DropdownMenuItem>
-                    <DropdownMenuItem>Oldest</DropdownMenuItem>
-                    <DropdownMenuItem>Most commented</DropdownMenuItem>
-                    <DropdownMenuItem>Recently updated</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleSortChange('newest')}>
+                      Newest
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleSortChange('oldest')}>
+                      Oldest
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleSortChange('recently-updated')}>
+                      Recently updated
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
