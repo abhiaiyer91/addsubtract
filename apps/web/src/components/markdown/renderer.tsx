@@ -1,5 +1,6 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
 import { cn } from '@/lib/utils';
 
 interface MarkdownProps {
@@ -12,6 +13,7 @@ export function Markdown({ content, className }: MarkdownProps) {
     <div className={cn('prose prose-invert max-w-none', className)}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
+        rehypePlugins={[rehypeRaw]}
         components={{
           h1: ({ children }) => (
             <h1 className="text-2xl font-bold border-b border-border pb-2 mb-4">
@@ -94,6 +96,29 @@ export function Markdown({ content, className }: MarkdownProps) {
               className="max-w-full rounded-lg"
               loading="lazy"
             />
+          ),
+          // HTML elements passthrough with styling
+          div: ({ children, ...props }) => (
+            <div {...props} className={cn('', (props as any).className)}>
+              {children}
+            </div>
+          ),
+          span: ({ children, ...props }) => (
+            <span {...props}>{children}</span>
+          ),
+          br: () => <br />,
+          strong: ({ children }) => <strong className="font-bold">{children}</strong>,
+          em: ({ children }) => <em className="italic">{children}</em>,
+          del: ({ children }) => <del className="line-through">{children}</del>,
+          sup: ({ children }) => <sup>{children}</sup>,
+          sub: ({ children }) => <sub>{children}</sub>,
+          details: ({ children }) => (
+            <details className="mb-4 border border-border rounded-lg p-2">
+              {children}
+            </details>
+          ),
+          summary: ({ children }) => (
+            <summary className="cursor-pointer font-medium">{children}</summary>
           ),
         }}
       >
