@@ -1,0 +1,279 @@
+---
+title: "release"
+description: "Create and manage releases with AI-powered release notes"
+---
+
+# wit release
+
+Create, manage, and view releases with optional AI-powered release notes generation.
+
+## Overview
+
+Releases in wit are annotated tags with additional metadata. The `release` command provides:
+
+- Release creation and management
+- AI-generated release notes from commits
+- Multiple output formats
+- Release lifecycle management
+
+## Usage
+
+```bash
+# List all releases
+wit release
+
+# Create a release
+wit release create <tag> [options]
+
+# View release details
+wit release view <tag>
+
+# Generate release notes
+wit release notes <tag>
+
+# Delete a release
+wit release delete <tag>
+
+# Show latest release
+wit release latest
+```
+
+## Commands
+
+### List Releases
+
+```bash
+wit release
+```
+
+**Output:**
+```
+Releases
+
+v1.2.0 (latest)
+  lxk4m2 today
+  Bug fixes and performance improvements
+
+v1.1.0
+  abc123 2 weeks ago
+  Added authentication system
+
+v1.0.0
+  def456 1 month ago
+  Initial release
+```
+
+### Create Release
+
+```bash
+# Basic release
+wit release create v1.3.0
+
+# With AI-generated notes
+wit release create v1.3.0 --generate
+
+# With custom title and notes
+wit release create v1.3.0 -t "Performance Update" -m "Major performance improvements"
+
+# Draft release
+wit release create v2.0.0-beta.1 --draft --prerelease
+
+# Force overwrite existing
+wit release create v1.2.0 --force
+```
+
+### Options
+
+| Option | Alias | Description |
+|--------|-------|-------------|
+| `--title` | `-t` | Release title (defaults to tag name) |
+| `--body` | `-m` | Release notes body |
+| `--generate` | `-g` | Generate release notes from commits |
+| `--previous` | `-p` | Previous tag for comparison |
+| `--draft` | `-d` | Create as draft release |
+| `--prerelease` | | Mark as pre-release |
+| `--target` | | Target commit/branch for the tag |
+| `--style` | | Notes style: standard, detailed, minimal, changelog |
+| `--force` | `-f` | Overwrite existing release |
+
+### View Release
+
+```bash
+wit release view v1.2.0
+```
+
+**Output:**
+```
+Release v1.2.0
+
+Commit: abc12345
+Type: Annotated
+Author: John Doe <john@example.com>
+Date: 12/25/2024, 10:30:00 AM
+
+Release Notes
+
+## What's New
+- Added dark mode support
+- Improved search performance
+
+## Bug Fixes
+- Fixed login timeout issue
+- Resolved memory leak in dashboard
+```
+
+### Generate Release Notes
+
+Generate AI-powered release notes without creating a release:
+
+```bash
+# Standard format
+wit release notes v1.2.0
+
+# Detailed format
+wit release notes v1.2.0 --style detailed
+
+# JSON output
+wit release notes v1.2.0 --format json
+
+# Markdown output
+wit release notes v1.2.0 --format markdown
+
+# Compare with specific previous version
+wit release notes v1.2.0 --previous v1.0.0
+```
+
+**Output (standard):**
+```
+Release Notes for v1.2.0
+Changes since v1.1.0
+
+v1.2.0 - Performance Update
+
+## Features
+- feat: Add dark mode toggle (#123)
+- feat: Implement keyboard shortcuts (#125)
+
+## Bug Fixes
+- fix: Resolve memory leak in dashboard (#130)
+- fix: Fix login timeout issue (#128)
+
+## Documentation
+- docs: Update API reference (#132)
+
+## Statistics
+- 15 commits
+- 3 contributors
+- 12 files changed
+```
+
+### Notes Styles
+
+| Style | Description |
+|-------|-------------|
+| `standard` | Grouped by type (features, fixes, docs) |
+| `detailed` | Includes commit hashes and full descriptions |
+| `minimal` | Simple bullet list |
+| `changelog` | Keep a Changelog format |
+
+### Delete Release
+
+```bash
+wit release delete v1.2.0
+```
+
+### Latest Release
+
+```bash
+wit release latest
+```
+
+## AI-Generated Notes
+
+When using `--generate`, wit analyzes commits between releases and creates structured notes:
+
+1. **Categorizes commits** by type (feat, fix, docs, etc.)
+2. **Extracts breaking changes** from commit messages
+3. **Lists contributors** who made changes
+4. **Calculates statistics** (commits, files changed)
+
+### Commit Message Parsing
+
+For best results, use conventional commit messages:
+
+```
+feat: Add user authentication
+fix: Resolve login timeout (#123)
+docs: Update API documentation
+BREAKING CHANGE: Remove deprecated endpoints
+```
+
+## Examples
+
+### Standard Release Workflow
+
+```bash
+# 1. Create release with AI notes
+wit release create v1.2.0 --generate
+
+# 2. Review the release
+wit release view v1.2.0
+
+# 3. Push the tag
+wit push --tags
+```
+
+### Pre-release Workflow
+
+```bash
+# Create beta release
+wit release create v2.0.0-beta.1 --draft --prerelease --generate
+
+# Test the beta...
+
+# Promote to stable
+wit release create v2.0.0 --generate
+```
+
+### Generate Notes Only
+
+```bash
+# Preview notes before creating release
+wit release notes v1.2.0 --style detailed
+
+# If satisfied, create the release
+wit release create v1.2.0 --generate
+```
+
+## Semver Sorting
+
+Releases are sorted by semantic version when possible:
+
+1. `v2.0.0`
+2. `v1.2.0`
+3. `v1.1.0`
+4. `v1.0.0`
+5. `v1.0.0-beta.2`
+6. `v1.0.0-beta.1`
+
+Non-semver tags fall back to alphabetical sorting.
+
+## Tips
+
+<Tip>
+Use `--style changelog` to generate notes compatible with CHANGELOG.md files.
+</Tip>
+
+<Tip>
+The `--previous` flag is useful when you've skipped releases or want to include changes from multiple versions.
+</Tip>
+
+<Warning>
+Draft and publish states are primarily managed through the web UI or API when using wit's server platform.
+</Warning>
+
+## Related Commands
+
+- [`wit tag`](/commands/tags) - Create and manage tags
+- [`wit log`](/commands/history-rewriting) - View commit history
+- [`wit push --tags`](/commands/remotes) - Push tags to remote
