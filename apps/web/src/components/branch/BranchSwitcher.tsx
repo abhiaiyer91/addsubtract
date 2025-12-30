@@ -72,14 +72,14 @@ export function BranchSwitcher() {
   const { isOpen, close, isRepoPage, currentRef, owner, repo } = useBranchSwitcher();
   const [query, setQuery] = useState('');
 
-  // Fetch branches - using any to work around tRPC type issues
-  const { data: branchesData } = (trpc as any).repos?.branches?.useQuery?.(
+  // Fetch branches
+  const { data: branchesData } = trpc.repos.getBranches.useQuery(
     { owner: owner || '', repo: repo || '' },
     {
       staleTime: 60000,
-      enabled: isRepoPage && isOpen,
+      enabled: isRepoPage && isOpen && !!owner && !!repo,
     }
-  ) ?? { data: undefined };
+  );
 
   // Transform branches data
   const branches: Branch[] = useMemo(() => {

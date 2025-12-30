@@ -129,9 +129,10 @@ export function SearchModal() {
   const { searches: recentSearches, addSearch, clearSearches } = useRecentSearches();
 
   // Fetch repositories - only when user is logged in
+  const ownerName = session?.user?.username || session?.user?.name || '';
   const { data: repos, isLoading: reposLoading } = trpc.repos.list.useQuery(
-    { owner: session?.user?.name || '' },
-    { enabled: isOpen && !!session?.user?.name, staleTime: 60000 }
+    { owner: ownerName },
+    { enabled: isOpen && !!ownerName, staleTime: 60000 }
   );
 
   // Fetch search results when query changes
