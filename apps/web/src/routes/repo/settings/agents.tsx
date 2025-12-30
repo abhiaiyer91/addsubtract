@@ -34,7 +34,7 @@ import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Dialog,
   DialogContent,
@@ -710,38 +710,38 @@ export function AgentsSettingsPage() {
                         <TabsTrigger value="approved" className="text-xs">Approved</TabsTrigger>
                         <TabsTrigger value="posted" className="text-xs">Posted</TabsTrigger>
                       </TabsList>
-
-                      <TabsContent value={marketingTab} className="mt-3">
-                        {marketingLoading ? (
-                          <div className="flex justify-center py-4">
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          </div>
-                        ) : !marketingContent || marketingContent.length === 0 ? (
-                          <p className="text-xs text-muted-foreground text-center py-4">
-                            {marketingTab === 'pending' 
-                              ? 'No pending content. Merge a PR or publish a release!' 
-                              : `No ${marketingTab} content.`}
-                          </p>
-                        ) : (
-                          <div className="space-y-2 max-h-[300px] overflow-y-auto">
-                            {marketingContent.slice(0, 5).map((item: MarketingContent) => (
-                              <MarketingContentRow
-                                key={item.id}
-                                item={item}
-                                onApprove={() => handleApprove(item.id)}
-                                onReject={() => handleReject(item.id)}
-                                onMarkPosted={(url) => handleMarkPosted(item.id, url)}
-                                onDelete={() => handleDeleteContent(item.id)}
-                                onEdit={() => handleEditContent(item)}
-                                onCopy={(text) => handleCopy(text, item.id)}
-                                isCopied={copiedId === item.id}
-                                isUpdating={updateStatusMutation.isPending}
-                              />
-                            ))}
-                          </div>
-                        )}
-                      </TabsContent>
                     </Tabs>
+
+                    <div className="mt-3">
+                      {marketingLoading ? (
+                        <div className="flex justify-center py-4">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        </div>
+                      ) : !marketingContent || marketingContent.length === 0 ? (
+                        <p className="text-xs text-muted-foreground text-center py-4">
+                          {marketingTab === 'pending' 
+                            ? 'No pending content. Merge a PR or publish a release!' 
+                            : `No ${marketingTab} content.`}
+                        </p>
+                      ) : (
+                        <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                          {marketingContent.slice(0, 5).map((item: MarketingContent) => (
+                            <MarketingContentRow
+                              key={item.id}
+                              item={item}
+                              onApprove={() => handleApprove(item.id)}
+                              onReject={() => handleReject(item.id)}
+                              onMarkPosted={(url) => handleMarkPosted(item.id, url)}
+                              onDelete={() => handleDeleteContent(item.id)}
+                              onEdit={() => handleEditContent(item)}
+                              onCopy={(text) => handleCopy(text, item.id)}
+                              isCopied={copiedId === item.id}
+                              isUpdating={updateStatusMutation.isPending}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ) : (
                   <Alert>
