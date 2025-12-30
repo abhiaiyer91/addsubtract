@@ -13,7 +13,8 @@ export interface SyncResult {
   message?: string;
 }
 
-// Interface for repo managers that can list repos
+// Interface for repo managers that can list repos (used for type checking)
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 interface RepoLister {
   listRepos(): RepoInfo[];
 }
