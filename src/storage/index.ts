@@ -21,3 +21,14 @@ export {
   getCacheStats,
   migrateStorage,
 } from './factory';
+
+// Object Store Adapter
+export { StorageObjectStore, createStorageObjectStore } from './object-store-adapter';
+
+// Storage-Aware Repository Manager
+export {
+  StorageAwareBareRepository,
+  StorageAwareRepoManager,
+  RepoInfo,
+  StorageError,
+} from './repo-manager';

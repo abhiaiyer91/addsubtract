@@ -38,6 +38,10 @@ import { createPullRoutes } from './routes/pulls';
 import { createPublicApiV1 } from './routes/public-api';
 import { createStorageRoutes } from './routes/storage';
 import { RepoManager } from './storage/repos';
+import { StorageAwareRepoManager } from '../storage';
+
+// Union type for both repo manager types
+type AnyRepoManager = RepoManager | StorageAwareRepoManager;
 import { syncReposToDatabase } from './storage/sync';
 import { appRouter, createContext } from '../api/trpc';
 import * as fs from 'fs';
@@ -77,6 +81,8 @@ export interface ServerOptions {
   };
   /** Data directory for SSH keys and config */
   dataDir?: string;
+  /** Use storage-aware repository manager for cloud storage support */
+  useStorageAwareRepos?: boolean;
 }
 
 /**
@@ -88,7 +94,7 @@ export interface WitServer {
   /** The underlying HTTP server */
   server: ServerType;
   /** Repository manager */
-  repoManager: RepoManager;
+  repoManager: AnyRepoManager;
   /** SSH server (if enabled) */
   sshServer?: SSHServer;
   /** SSH key manager (if SSH enabled) */
@@ -100,7 +106,7 @@ export interface WitServer {
 /**
  * Create and configure the Hono app
  */
-export function createApp(repoManager: RepoManager, options: { verbose?: boolean } = {}): { app: Hono; injectWebSocket: (server: ServerType) => void } {
+export function createApp(repoManager: AnyRepoManager, options: { verbose?: boolean } = {}): { app: Hono; injectWebSocket: (server: ServerType) => void } {
   const app = new Hono();
   
   // Create WebSocket support
@@ -303,7 +309,14 @@ export function startServer(options: ServerOptions): WitServer {
   const absoluteReposDir = path.resolve(reposDir);
 
   // Create repository manager
-  const repoManager = new RepoManager(absoluteReposDir);
+  // Use storage-aware manager for cloud storage support, or legacy manager for local-only
+  const repoManager = options.useStorageAwareRepos
+    ? new StorageAwareRepoManager(absoluteReposDir)
+    : new RepoManager(absoluteReposDir);
+  
+  if (options.useStorageAwareRepos) {
+    logger.info('Using storage-aware repository manager (cloud storage enabled)');
+  }
 
   // Create app
   const { app, injectWebSocket } = createApp(repoManager, { verbose });
