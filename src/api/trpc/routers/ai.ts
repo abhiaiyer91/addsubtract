@@ -706,6 +706,133 @@ User question: ${input.message}`;
     }),
 
   /**
+   * Chat with AI about a specific Pull Request
+   */
+  chatWithPR: protectedProcedure
+    .input(z.object({
+      prId: z.string().uuid(),
+      message: z.string().min(1),
+      conversationId: z.string().optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      // Check AI availability
+      if (!isAIAvailable()) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'AI features are not available. Please configure an AI provider.',
+        });
+      }
+
+      // Get PR details
+      const pr = await prModel.findById(input.prId);
+      if (!pr) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Pull request not found',
+        });
+      }
+
+      // Get repo details
+      const repo = await repoModel.findById(pr.repoId);
+      if (!repo) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Repository not found',
+        });
+      }
+
+      // Check if user has read access
+      const isOwner = repo.ownerId === ctx.user.id;
+      const hasAccess = isOwner || 
+        (await collaboratorModel.hasPermission(pr.repoId, ctx.user.id, 'read'));
+
+      if (!hasAccess) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have access to this repository',
+        });
+      }
+
+      // Get the repository path and compute the diff
+      const repoPath = resolveDiskPath(repo.ownerId, repo.name);
+      if (!await exists(repoPath)) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Repository data not found on disk',
+        });
+      }
+
+      // Get diff between base and head
+      let diffContent = '';
+      let commits: Array<{ sha: string; message: string }> = [];
+      
+      if (pr.baseSha && pr.headSha) {
+        diffContent = getDiffBetweenRefs(repoPath, pr.baseSha, pr.headSha);
+        commits = getCommitsBetween(repoPath, pr.baseSha, pr.headSha);
+      }
+
+      // Truncate diff if too long (keep first 50k chars)
+      const maxDiffLength = 50000;
+      if (diffContent.length > maxDiffLength) {
+        diffContent = diffContent.substring(0, maxDiffLength) + '\n\n... (diff truncated for length)';
+      }
+
+      // Build context for the AI
+      const prContext = `
+## Pull Request: ${pr.title}
+
+**Repository:** ${repo.name}
+**PR Number:** #${pr.number}
+**State:** ${pr.state}
+**Source Branch:** ${pr.sourceBranch}
+**Target Branch:** ${pr.targetBranch}
+
+### Description
+${pr.body || 'No description provided.'}
+
+### Commits (${commits.length})
+${commits.map(c => `- ${c.sha.substring(0, 7)}: ${c.message.split('\n')[0]}`).join('\n') || 'No commits available.'}
+
+### Code Changes (Diff)
+\`\`\`diff
+${diffContent || 'No diff available.'}
+\`\`\`
+`;
+
+      // Use the AI agent to respond
+      try {
+        const agent = getTsgitAgent();
+        const prompt = `You are an AI code reviewer helping a developer understand a Pull Request in the repository "${repo.name}".
+
+Here is the context about the PR:
+${prContext}
+
+Based on the PR information and code changes above, please answer the following question:
+
+${input.message}
+
+Be helpful, concise, and provide specific references to files and line numbers when relevant. If the question is about code changes, refer to the diff provided. If you need to explain code logic, use the context from the PR description and commits.`;
+
+        const response = await agent.generate(prompt);
+
+        // Extract any file references from the response
+        const fileRefs = extractFileReferences(response.text || '');
+
+        return {
+          message: response.text || 'I could not generate a response.',
+          fileReferences: fileRefs,
+          conversationId: input.conversationId || crypto.randomUUID(),
+        };
+      } catch (error) {
+        console.error('[ai.chatWithPR] Error:', error);
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to generate response',
+        });
+      }
+    }),
+
+  /**
    * Semantic code search
    */
   semanticSearch: protectedProcedure

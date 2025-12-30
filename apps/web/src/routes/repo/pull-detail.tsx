@@ -275,6 +275,9 @@ export function PullDetailPage() {
     },
   });
 
+  // AI Chat mutation
+  const aiChatMutation = trpc.ai.chatWithPR.useMutation();
+
   const reviews = reviewsData || [];
   const comments = commentsData || [];
   const reviewers = reviewersData || [];
@@ -788,8 +791,12 @@ export function PullDetailPage() {
                         {/* AI Chat */}
                         <AiChat
                           prNumber={pr.number}
-                          onSendMessage={authenticated ? async () => {
-                            return "AI response coming soon! This feature will allow you to ask questions about the PR.";
+                          onSendMessage={authenticated ? async (message: string) => {
+                            const result = await aiChatMutation.mutateAsync({
+                              prId: pr.id,
+                              message,
+                            });
+                            return result.message;
                           } : undefined}
                         />
                       </div>
@@ -1058,8 +1065,12 @@ export function PullDetailPage() {
           {/* AI Chat */}
           <AiChat
             prNumber={pr.number}
-            onSendMessage={authenticated ? async () => {
-              return "AI response coming soon! This feature will allow you to ask questions about the PR.";
+            onSendMessage={authenticated ? async (message: string) => {
+              const result = await aiChatMutation.mutateAsync({
+                prId: pr.id,
+                message,
+              });
+              return result.message;
             } : undefined}
           />
 
