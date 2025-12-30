@@ -215,10 +215,11 @@ export const repoAiKeyModel = {
   },
 
   /**
-   * Get any available API key for a repository
+   * Get any available LLM API key for a repository
    * Prefers Anthropic (Claude Opus 4.5), then OpenAI (GPT 5.2)
+   * Note: Does not return CodeRabbit keys as they are not LLM providers
    */
-  async getAnyKey(repoId: string): Promise<{ provider: AiProvider; key: string } | null> {
+  async getAnyKey(repoId: string): Promise<{ provider: 'openai' | 'anthropic'; key: string } | null> {
     // Try Anthropic first (recommended - Claude Opus 4.5)
     const anthropicKey = await this.getDecryptedKey(repoId, 'anthropic');
     if (anthropicKey) {
@@ -322,6 +323,42 @@ export const repoAiKeyModel = {
       source: hasRepoKeys ? 'repository' : hasServerKeys ? 'server' : null,
       hasRepoKeys,
       hasServerKeys,
+    };
+  },
+
+  /**
+   * Get CodeRabbit API key for a repository
+   * Checks repo-level key first, then falls back to server-level env var
+   */
+  async getCodeRabbitKey(repoId: string): Promise<string | null> {
+    // Check repo-level key first
+    const repoKey = await this.getDecryptedKey(repoId, 'coderabbit');
+    if (repoKey) {
+      return repoKey;
+    }
+    
+    // Fall back to server-level key
+    return process.env.CODERABBIT_API_KEY || null;
+  },
+
+  /**
+   * Check CodeRabbit availability for a repository
+   */
+  async checkCodeRabbitAvailability(repoId: string): Promise<{
+    available: boolean;
+    source: 'repository' | 'server' | null;
+    hasRepoKey: boolean;
+    hasServerKey: boolean;
+  }> {
+    const repoKey = await this.getDecryptedKey(repoId, 'coderabbit');
+    const hasRepoKey = !!repoKey;
+    const hasServerKey = !!process.env.CODERABBIT_API_KEY;
+    
+    return {
+      available: hasRepoKey || hasServerKey,
+      source: hasRepoKey ? 'repository' : hasServerKey ? 'server' : null,
+      hasRepoKey,
+      hasServerKey,
     };
   },
 };

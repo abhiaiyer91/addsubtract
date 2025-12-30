@@ -1563,6 +1563,7 @@ export const agentFileChanges = pgTable('agent_file_changes', {
 export const aiProviderEnum = pgEnum('ai_provider', [
   'openai',
   'anthropic',
+  'coderabbit',
 ]);
 
 /**
