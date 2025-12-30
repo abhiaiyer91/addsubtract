@@ -1542,6 +1542,8 @@ export const notificationTypeEnum = pgEnum('notification_type', [
   'repo_forked',
   'ci_failed',
   'ci_passed',
+  'achievement_unlocked',
+  'level_up',
 ]);
 
 export const notifications = pgTable('notifications', {

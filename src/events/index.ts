@@ -14,6 +14,23 @@ export { registerTriageHandlers } from './handlers/triage';
 export { registerPRReviewHandlers, triggerAsyncPRReview } from './handlers/pr-review';
 export { registerMarketingHandlers, triggerMarketingContent } from './handlers/marketing';
 
+// Gamification event handlers
+export {
+  onCommit,
+  onPrOpened,
+  onPrMerged,
+  onReviewSubmitted,
+  onIssueOpened,
+  onIssueClosed,
+  onComment,
+  onRepoCreated,
+  onReleasePublished,
+  onRepoForked,
+  onStarReceived,
+  getGamificationProfile,
+  getLeaderboard,
+} from './gamification';
+
 /**
  * Helper to extract @mentions from text
  */
