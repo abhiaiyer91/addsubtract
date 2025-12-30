@@ -59,7 +59,7 @@ function CommitRow({
       <Avatar className="h-8 w-8 mt-0.5">
         <AvatarImage src={commit.author.avatarUrl} />
         <AvatarFallback className="text-xs">
-          {commit.author.name.slice(0, 2).toUpperCase()}
+          {(commit.author.name || 'UN').slice(0, 2).toUpperCase()}
         </AvatarFallback>
       </Avatar>
 

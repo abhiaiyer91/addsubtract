@@ -97,7 +97,7 @@ export function PrCard({ pr, owner, repo }: PrCardProps) {
             <Avatar className="h-6 w-6">
               <AvatarImage src={pr.author.avatarUrl || undefined} />
               <AvatarFallback className="text-xs">
-                {pr.author.username.slice(0, 2).toUpperCase()}
+                {(pr.author.username || 'UN').slice(0, 2).toUpperCase()}
               </AvatarFallback>
             </Avatar>
             {pr.commentsCount !== undefined && pr.commentsCount > 0 && (

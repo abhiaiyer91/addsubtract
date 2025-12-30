@@ -241,7 +241,7 @@ export function StackViewer({
                       <Avatar className="h-5 w-5">
                         <AvatarImage src={pr.author.avatarUrl || undefined} />
                         <AvatarFallback className="text-[10px]">
-                          {pr.author.username.slice(0, 2).toUpperCase()}
+                          {(pr.author.username || 'UN').slice(0, 2).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
                     )}

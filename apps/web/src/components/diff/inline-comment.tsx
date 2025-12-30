@@ -298,7 +298,7 @@ export function InlineCommentThread({
               <Avatar className="h-6 w-6 shrink-0">
                 <AvatarImage src={comment.author.avatarUrl || undefined} />
                 <AvatarFallback className="text-[10px]">
-                  {comment.author.username.slice(0, 2).toUpperCase()}
+                  {(comment.author.username || 'UN').slice(0, 2).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">

@@ -205,7 +205,7 @@ export function PrSidebar({
                         <Avatar className="h-5 w-5">
                           <AvatarImage src={reviewer.avatarUrl || undefined} />
                           <AvatarFallback className="text-[10px]">
-                            {reviewer.username.slice(0, 2).toUpperCase()}
+                            {(reviewer.username || 'UN').slice(0, 2).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
                       )}
@@ -230,7 +230,7 @@ export function PrSidebar({
                 <Avatar className="h-6 w-6">
                   <AvatarImage src={reviewer.avatarUrl || undefined} />
                   <AvatarFallback className="text-[10px]">
-                    {reviewer.username.slice(0, 2).toUpperCase()}
+                    {(reviewer.username || 'UN').slice(0, 2).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
                 <span className="flex-1">{reviewer.username}</span>

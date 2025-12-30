@@ -84,7 +84,7 @@ export function CommitDetailPage() {
             <div className="flex items-center gap-3">
               <Avatar className="h-8 w-8">
                 <AvatarFallback className="text-xs">
-                  {commitData.author.name.slice(0, 2).toUpperCase()}
+                  {(commitData.author.name || 'UN').slice(0, 2).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
               <div className="text-sm">

@@ -134,7 +134,7 @@ function CommentEvent({
           <Avatar className="h-6 w-6">
             <AvatarImage src={event.author.avatarUrl || undefined} />
             <AvatarFallback className="text-xs">
-              {event.author.username.slice(0, 2).toUpperCase()}
+              {(event.author.username || 'UN').slice(0, 2).toUpperCase()}
             </AvatarFallback>
           </Avatar>
           <span className="font-medium">{event.author.username}</span>
@@ -282,7 +282,7 @@ function ReviewEvent({
           <Avatar className="h-5 w-5">
             <AvatarImage src={event.author.avatarUrl || undefined} />
             <AvatarFallback className="text-xs">
-              {event.author.username.slice(0, 2).toUpperCase()}
+              {(event.author.username || 'UN').slice(0, 2).toUpperCase()}
             </AvatarFallback>
           </Avatar>
           <span className="font-medium">{event.author.username}</span>
