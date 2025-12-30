@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { CircleDot, CheckCircle2, ChevronRight, FolderKanban, RefreshCw, Settings2, X } from 'lucide-react';
+import { CircleDot, CheckCircle2, ChevronRight, FolderKanban, RefreshCw, Settings2, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
@@ -18,6 +18,14 @@ import { useSession } from '@/lib/auth-client';
 import { trpc } from '@/lib/trpc';
 import type { Label } from '@/lib/api-types';
 import { toastSuccess, toastError } from '@/components/ui/use-toast';
+import {
+  BottomSheet,
+  BottomSheetContent,
+  BottomSheetHeader,
+  BottomSheetTitle,
+  BottomSheetTrigger,
+} from '@/components/ui/bottom-sheet';
+import { useMobile } from '@/hooks/use-mobile';
 
 export function IssueDetailPage() {
   const { owner, repo, number } = useParams<{
@@ -27,6 +35,7 @@ export function IssueDetailPage() {
   }>();
   const [comment, setComment] = useState('');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const isMobile = useMobile();
   const { data: session } = useSession();
   const authenticated = !!session?.user;
   const currentUser = session?.user || null;
@@ -471,16 +480,89 @@ export function IssueDetailPage() {
             </Link>
           )}
 
-          {/* Mobile sidebar toggle */}
-          <Button
-            variant="outline"
-            size="sm"
-            className="md:hidden h-8"
-            onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
-          >
-            <Settings2 className="h-3.5 w-3.5 mr-1.5" />
-            <span className="text-xs">Details</span>
-          </Button>
+          {/* Mobile sidebar toggle - use BottomSheet */}
+          {isMobile && (
+            <BottomSheet open={isMobileSidebarOpen} onOpenChange={setIsMobileSidebarOpen}>
+              <BottomSheetTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="md:hidden h-8 gap-1.5"
+                >
+                  <Settings2 className="h-3.5 w-3.5" />
+                  <span className="text-xs">Details</span>
+                  <ChevronUp className="h-3 w-3 text-muted-foreground" />
+                </Button>
+              </BottomSheetTrigger>
+              <BottomSheetContent height="full" showHandle={true}>
+                <BottomSheetHeader>
+                  <BottomSheetTitle>Issue Details</BottomSheetTitle>
+                </BottomSheetHeader>
+                <div className="space-y-4 pb-20">
+                  {/* Labels */}
+                  <div>
+                    <LabelPicker
+                      availableLabels={availableLabels || []}
+                      selectedLabels={issue.labels || []}
+                      onLabelsChange={handleLabelsChange}
+                    />
+                  </div>
+
+                  <Separator />
+
+                  {/* Priority */}
+                  <PriorityPicker
+                    priority={issue.priority as IssuePriority}
+                    onPriorityChange={handlePriorityChange}
+                    isLoading={updatePriorityMutation.isPending}
+                  />
+
+                  <Separator />
+
+                  {/* Project */}
+                  <ProjectPicker
+                    availableProjects={availableProjects || []}
+                    selectedProject={project || null}
+                    onProjectChange={handleProjectChange}
+                    isLoading={assignToProjectMutation.isPending}
+                  />
+
+                  <Separator />
+
+                  {/* Assignee */}
+                  <div className="space-y-2">
+                    <span className="text-sm font-medium">Assignees</span>
+                    {issue.assignee ? (
+                      <div className="flex items-center gap-2">
+                        <Avatar className="h-6 w-6">
+                          <AvatarFallback className="text-xs">
+                            {issue.assignee.username?.slice(0, 2).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span>{issue.assignee.username}</span>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No one assigned</p>
+                    )}
+                  </div>
+
+                  <Separator />
+
+                  {/* Meta info */}
+                  <div className="space-y-2 text-sm text-muted-foreground">
+                    <div>
+                      <span className="font-medium text-foreground">Created:</span>{' '}
+                      {formatDate(new Date(issue.createdAt))}
+                    </div>
+                    <div>
+                      <span className="font-medium text-foreground">Updated:</span>{' '}
+                      {formatRelativeTime(new Date(issue.updatedAt))}
+                    </div>
+                  </div>
+                </div>
+              </BottomSheetContent>
+            </BottomSheet>
+          )}
         </div>
 
         {/* Author info - separate line for better mobile layout */}
@@ -591,25 +673,8 @@ export function IssueDetailPage() {
           )}
         </div>
 
-        {/* Sidebar - Responsive */}
-        <div className={cn(
-          "space-y-4 lg:space-y-6",
-          "md:block",
-          isMobileSidebarOpen ? "block" : "hidden"
-        )}>
-          {/* Mobile close button */}
-          <div className="flex items-center justify-between md:hidden mb-2">
-            <h3 className="font-semibold text-sm">Issue Details</h3>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => setIsMobileSidebarOpen(false)}
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-
+        {/* Sidebar - Desktop only (mobile uses BottomSheet above) */}
+        <div className="hidden md:block space-y-4 lg:space-y-6">
           {/* Labels */}
           <div>
             <LabelPicker

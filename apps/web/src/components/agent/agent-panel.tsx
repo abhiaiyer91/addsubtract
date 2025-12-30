@@ -31,7 +31,9 @@ import {
   MoreHorizontal,
   FileText,
   Diff,
+  X,
 } from 'lucide-react';
+import { useMobile, useLockBodyScroll, useKeyboardOpen } from '@/hooks/use-mobile';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -1585,6 +1587,11 @@ function PanelWrapper({
   owner?: string;
   repoName?: string;
 }) {
+  const isMobile = useMobile();
+  
+  // Lock body scroll on mobile when panel is open
+  useLockBodyScroll(isOpen && isMobile && !embedded);
+
   // Handle escape key to close panel
   useEffect(() => {
     if (!isOpen || embedded) return;
@@ -1607,6 +1614,61 @@ function PanelWrapper({
     );
   }
 
+  // On mobile, use a bottom sheet style instead of side panel
+  if (isMobile) {
+    return (
+      <>
+        {/* Backdrop */}
+        <div 
+          className={cn(
+            "fixed inset-0 bg-black/70 backdrop-blur-sm z-[55] transition-opacity duration-300",
+            isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+          )}
+          onClick={onClose}
+        />
+        
+        {/* Bottom sheet style panel for mobile */}
+        <div
+          className={cn(
+            "fixed inset-x-0 bottom-0 z-[60] flex flex-col",
+            "h-[90vh] max-h-[90vh]",
+            "bg-zinc-950 border-t border-zinc-800 rounded-t-2xl",
+            "shadow-2xl shadow-black/50",
+            "transform transition-transform duration-300 ease-out",
+            "safe-bottom",
+            isOpen ? "translate-y-0" : "translate-y-full"
+          )}
+        >
+          {/* Drag handle */}
+          <div className="flex justify-center py-2 touch-none">
+            <div className="w-10 h-1 bg-zinc-700 rounded-full" />
+          </div>
+          
+          {/* Panel header */}
+          <div className="flex items-center justify-between h-12 px-4 border-b border-zinc-800 flex-shrink-0 bg-zinc-900/50">
+            <div className="flex items-center gap-2.5">
+              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
+                <Sparkles className="h-4 w-4 text-white" />
+              </div>
+              <span className="font-semibold text-sm text-zinc-100">wit AI</span>
+            </div>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={onClose} 
+              className="h-10 w-10 touch-target text-zinc-400 hover:text-zinc-200"
+            >
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
+          
+          {children}
+        </div>
+      </>
+    );
+  }
+
+  // Desktop: side panel
   return (
     <>
       {/* Backdrop */}
@@ -1622,7 +1684,7 @@ function PanelWrapper({
       <div
         className={cn(
           "fixed inset-y-0 right-0 z-[60] flex flex-col",
-          "w-full sm:w-[500px] md:w-[560px]",
+          "w-[500px] md:w-[560px]",
           "bg-zinc-950 border-l border-zinc-800",
           "shadow-2xl shadow-black/50",
           "transform transition-transform duration-200 ease-out",

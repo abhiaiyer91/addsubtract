@@ -12,8 +12,8 @@ import {
   Loader2,
   Edit3,
   AlertTriangle,
-  PanelRightOpen,
-  PanelRightClose,
+  Settings2,
+  ChevronUp,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -35,11 +35,19 @@ import { ConflictResolver } from '@/components/pr/conflict-resolver';
 import { Markdown } from '@/components/markdown/renderer';
 import { RepoLayout } from './components/repo-layout';
 import { Loading } from '@/components/ui/loading';
-import { formatRelativeTime } from '@/lib/utils';
+import { formatRelativeTime, cn } from '@/lib/utils';
 import { useSession } from '@/lib/auth-client';
 import { trpc } from '@/lib/trpc';
 import { toastSuccess, toastError, toastInfo } from '@/components/ui/use-toast';
 import type { InlineCommentData } from '@/components/diff/inline-comment';
+import {
+  BottomSheet,
+  BottomSheetContent,
+  BottomSheetHeader,
+  BottomSheetTitle,
+  BottomSheetTrigger,
+} from '@/components/ui/bottom-sheet';
+import { useMobile } from '@/hooks/use-mobile';
 
 export function PullDetailPage() {
   const { owner, repo, number } = useParams<{
@@ -52,6 +60,7 @@ export function PullDetailPage() {
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [editedBody, setEditedBody] = useState('');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const isMobile = useMobile();
   const { data: session } = useSession();
   const authenticated = !!session?.user;
   const utils = trpc.useUtils();
@@ -688,20 +697,108 @@ export function PullDetailPage() {
               </div>
 
               <div className="flex items-center gap-2">
-                {/* Mobile sidebar toggle */}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="lg:hidden h-9"
-                  onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
-                >
-                  {isMobileSidebarOpen ? (
-                    <PanelRightClose className="h-4 w-4 mr-1.5" />
-                  ) : (
-                    <PanelRightOpen className="h-4 w-4 mr-1.5" />
-                  )}
-                  <span className="text-xs">Details</span>
-                </Button>
+                {/* Mobile sidebar toggle - use BottomSheet */}
+                {isMobile && (
+                  <BottomSheet open={isMobileSidebarOpen} onOpenChange={setIsMobileSidebarOpen}>
+                    <BottomSheetTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="lg:hidden h-9 gap-1.5"
+                      >
+                        <Settings2 className="h-4 w-4" />
+                        <span className="text-xs">Details</span>
+                        <ChevronUp className="h-3 w-3 text-muted-foreground" />
+                      </Button>
+                    </BottomSheetTrigger>
+                    <BottomSheetContent height="full" showHandle={true}>
+                      <BottomSheetHeader>
+                        <BottomSheetTitle>PR Details</BottomSheetTitle>
+                      </BottomSheetHeader>
+                      <div className="space-y-4 pb-20">
+                        <PrSidebar
+                          reviewers={sidebarReviewers}
+                          onRequestReview={authenticated ? handleRequestReview : undefined}
+                          onRemoveReviewer={authenticated && isAuthor ? handleRemoveReviewer : undefined}
+                          canManageReviewers={authenticated && (isAuthor || false)}
+                          checks={[]}
+                          labels={pr.labels || []}
+                          onAddLabel={authenticated ? handleAddLabel : undefined}
+                          onRemoveLabel={authenticated ? handleRemoveLabel : undefined}
+                          canManageLabels={authenticated}
+                        />
+
+                        {/* Merge Queue Card */}
+                        {repoData?.repo.id && (
+                          <MergeQueueCard
+                            prId={pr.id}
+                            repoId={repoData.repo.id}
+                            targetBranch={pr.targetBranch}
+                            prState={pr.state}
+                            owner={owner!}
+                            repo={repo!}
+                          />
+                        )}
+
+                        {/* AI Review Card */}
+                        <Card>
+                          <div className="flex items-center justify-between px-4 py-3 bg-muted/30 border-b">
+                            <div className="flex items-center gap-2">
+                              <Bot className="h-5 w-5 text-primary" />
+                              <span className="font-medium text-sm">AI Review</span>
+                              {aiReviewData?.state && (
+                                <Badge variant={aiReviewData.state === 'approved' ? 'success' : 'warning'} className="text-xs">
+                                  {aiReviewData.state === 'approved' ? 'Approved' : 'Changes'}
+                                </Badge>
+                              )}
+                            </div>
+                            {authenticated && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 touch-target"
+                                onClick={() => triggerReviewMutation.mutate({ prId: prData!.id })}
+                                disabled={triggerReviewMutation.isPending}
+                              >
+                                {triggerReviewMutation.isPending ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <RefreshCw className="h-4 w-4" />
+                                )}
+                              </Button>
+                            )}
+                          </div>
+                          <CardContent className="p-3">
+                            {aiReviewLoading ? (
+                              <div className="flex items-center justify-center py-4">
+                                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                              </div>
+                            ) : aiReviewData?.body ? (
+                              <div className="text-sm prose prose-sm dark:prose-invert max-w-none">
+                                <Markdown content={aiReviewData.body.slice(0, 300) + (aiReviewData.body.length > 300 ? '...' : '')} />
+                              </div>
+                            ) : (
+                              <div className="text-center py-4 text-muted-foreground">
+                                <Bot className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                                <p className="text-xs">
+                                  {authenticated ? 'Tap refresh to run AI review' : 'Sign in to run AI review'}
+                                </p>
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+
+                        {/* AI Chat */}
+                        <AiChat
+                          prNumber={pr.number}
+                          onSendMessage={authenticated ? async () => {
+                            return "AI response coming soon! This feature will allow you to ask questions about the PR.";
+                          } : undefined}
+                        />
+                      </div>
+                    </BottomSheetContent>
+                  </BottomSheet>
+                )}
 
                 {authenticated && pr.state === 'open' && (
                   <ReviewButton
@@ -924,32 +1021,14 @@ export function PullDetailPage() {
           </Tabs>
         </div>
 
-        {/* Sidebar - Responsive */}
-        <div className={cn(
-          "lg:w-64 shrink-0 space-y-4 lg:space-y-6 order-1 lg:order-2",
-          // Mobile: collapsible with slide animation
-          "lg:block",
-          isMobileSidebarOpen ? "block" : "hidden"
-        )}>
-          {/* Mobile close button */}
-          <div className="flex items-center justify-between lg:hidden mb-2">
-            <h3 className="font-semibold text-sm">PR Details</h3>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => setIsMobileSidebarOpen(false)}
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-          
+        {/* Sidebar - Desktop only (mobile uses BottomSheet above) */}
+        <div className="hidden lg:block lg:w-64 shrink-0 space-y-6 order-2">
           <PrSidebar
             reviewers={sidebarReviewers}
             onRequestReview={authenticated ? handleRequestReview : undefined}
             onRemoveReviewer={authenticated && isAuthor ? handleRemoveReviewer : undefined}
             canManageReviewers={authenticated && (isAuthor || false)}
-            checks={[]} // TODO: Add CI checks integration
+            checks={[]}
             labels={pr.labels || []}
             onAddLabel={authenticated ? handleAddLabel : undefined}
             onRemoveLabel={authenticated ? handleRemoveLabel : undefined}
@@ -1020,7 +1099,6 @@ export function PullDetailPage() {
           <AiChat
             prNumber={pr.number}
             onSendMessage={authenticated ? async () => {
-              // TODO: Integrate with actual AI endpoint
               return "AI response coming soon! This feature will allow you to ask questions about the PR.";
             } : undefined}
           />
