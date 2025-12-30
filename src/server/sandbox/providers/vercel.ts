@@ -294,7 +294,9 @@ class VercelSandboxSession extends BaseSandboxSession {
   }
 
   async setTimeout(timeoutMs: number): Promise<void> {
-    await this.sandbox.extendTimeout(timeoutMs);
+    // Vercel max timeout is 2700000ms (45 minutes)
+    const VERCEL_MAX_TIMEOUT_MS = 2700000;
+    await this.sandbox.extendTimeout(Math.min(timeoutMs, VERCEL_MAX_TIMEOUT_MS));
   }
 
   async getInfo(): Promise<SandboxInfo> {
@@ -424,10 +426,14 @@ export class VercelProvider extends BaseSandboxProvider {
 
     const mergedConfig = this.mergeWithDefaults(config);
 
+    // Vercel max timeout is 2700000ms (45 minutes)
+    const VERCEL_MAX_TIMEOUT_MS = 2700000;
+    const requestedTimeout = this.vercelConfig.options?.timeoutMs || 
+      (mergedConfig.resources?.timeoutSeconds || 300) * 1000;
+
     // Build sandbox creation options
     const sandboxOptions: Parameters<typeof this.vercelModule.Sandbox.create>[0] = {
-      timeout: this.vercelConfig.options?.timeoutMs || 
-        (mergedConfig.resources?.timeoutSeconds || 300) * 1000,
+      timeout: Math.min(requestedTimeout, VERCEL_MAX_TIMEOUT_MS),
       runtime: this.vercelConfig.options?.runtime || 'node22',
       ports: this.vercelConfig.options?.ports,
     };
