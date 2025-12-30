@@ -111,6 +111,13 @@ export function BlockEditor({
   const isInitialMount = useRef(true);
   // Use a ref to track the last value we processed to avoid sync loops
   const lastExternalValue = useRef<string>(value);
+  // Use a ref to store onChange to avoid infinite loops
+  const onChangeRef = useRef(onChange);
+
+  // Keep onChangeRef updated
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
 
   // DnD sensors
   const sensors = useSensors(
@@ -148,8 +155,8 @@ export function BlockEditor({
     const markdown = blocksToMarkdown(blocks);
     // Update the ref so we don't process our own changes
     lastExternalValue.current = markdown;
-    onChange(markdown);
-  }, [blocks, onChange]);
+    onChangeRef.current(markdown);
+  }, [blocks]);
 
   // Update blocks when external value changes
   useEffect(() => {
