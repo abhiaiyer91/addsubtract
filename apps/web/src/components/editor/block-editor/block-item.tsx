@@ -96,6 +96,12 @@ export function BlockItem({
   const [showLanguagePicker, setShowLanguagePicker] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement | HTMLInputElement>(null);
 
+  // Auto-resize textarea
+  const autoResize = useCallback((element: HTMLTextAreaElement) => {
+    element.style.height = 'auto';
+    element.style.height = element.scrollHeight + 'px';
+  }, []);
+
   // Focus the input when block is focused
   useEffect(() => {
     if (isFocused && inputRef.current) {
@@ -114,12 +120,6 @@ export function BlockItem({
       autoResize(inputRef.current);
     }
   }, [block.content, autoResize]);
-
-  // Auto-resize textarea
-  const autoResize = useCallback((element: HTMLTextAreaElement) => {
-    element.style.height = 'auto';
-    element.style.height = element.scrollHeight + 'px';
-  }, []);
 
   // Handle content change
   const handleContentChange = (value: string) => {
