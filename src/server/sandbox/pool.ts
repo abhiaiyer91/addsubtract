@@ -112,7 +112,16 @@ export class SandboxPool extends EventEmitter {
 
     // Check limits before creating new sandbox
     if (entries.length >= this.config.maxPerKey) {
-      throw new Error(`Maximum sandboxes (${this.config.maxPerKey}) reached for key: ${key}`);
+      // All sandboxes for this key are in use - try to force release the oldest one
+      // This handles cases where a previous session didn't clean up properly
+      const inUseEntry = entries.find(e => e.inUse);
+      if (inUseEntry) {
+        console.warn(`[SandboxPool] Forcing release of stale sandbox for key: ${key}`);
+        await this.remove(key, inUseEntry.sandbox.id);
+        // Now we can create a new one
+      } else {
+        throw new Error(`Maximum sandboxes (${this.config.maxPerKey}) reached for key: ${key}`);
+      }
     }
     if (this.totalCount >= this.config.maxTotal) {
       // Try to evict an idle sandbox from another key
