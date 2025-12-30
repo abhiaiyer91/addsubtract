@@ -145,7 +145,13 @@ export function RepoPage() {
       {/* Releases */}
       <div className={cn("border rounded-lg p-4 space-y-3", isMobile && "border-0 p-0 pt-4 border-t rounded-none")}>
         <div className="flex items-center justify-between">
-          <h3 className="font-semibold text-sm">Releases</h3>
+          <Link 
+            to={`/${owner}/${repo}/releases`}
+            className="font-semibold text-sm hover:text-primary"
+            onClick={() => setShowMobileInfo(false)}
+          >
+            Releases
+          </Link>
           {releases && releases.releases.length > 0 && (
             <Badge variant="secondary" className="text-xs">
               {releases.total}
@@ -172,8 +178,26 @@ export function RepoPage() {
               View all releases
             </Link>
           </div>
+        ) : isOwner ? (
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">
+              Create versioned releases of your software
+            </p>
+            <Link to={`/${owner}/${repo}/releases/new`} onClick={() => setShowMobileInfo(false)}>
+              <Button variant="outline" size="sm" className="w-full gap-2">
+                <Tag className="h-4 w-4" />
+                Create a release
+              </Button>
+            </Link>
+          </div>
         ) : (
-          <p className="text-sm text-muted-foreground">No releases yet</p>
+          <Link 
+            to={`/${owner}/${repo}/releases`}
+            className="text-sm text-muted-foreground hover:text-foreground"
+            onClick={() => setShowMobileInfo(false)}
+          >
+            No releases yet
+          </Link>
         )}
       </div>
 
