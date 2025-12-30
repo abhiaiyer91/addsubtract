@@ -44,13 +44,13 @@
     --popover: 240 10% 5%;
     --popover-foreground: 0 0% 95%;
     --primary: 160 84% 39%;
-    --primary-foreground: 0 0% 0%;
+    --primary-foreground: 160 50% 10%;
     --secondary: 240 6% 10%;
     --secondary-foreground: 0 0% 95%;
     --muted: 240 6% 10%;
     --muted-foreground: 240 5% 55%;
     --accent: 160 84% 39%;
-    --accent-foreground: 0 0% 0%;
+    --accent-foreground: 160 50% 10%;
     --destructive: 0 62% 55%;
     --destructive-foreground: 0 0% 100%;
     --border: 240 6% 15%;
@@ -59,7 +59,7 @@
 
     /* Semantic colors - dark mode */
     --success: 160 84% 39%;
-    --success-foreground: 0 0% 0%;
+    --success-foreground: 160 50% 10%;
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 0%;
     --info: 217 91% 60%;
