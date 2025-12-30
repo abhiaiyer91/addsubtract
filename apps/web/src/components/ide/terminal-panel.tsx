@@ -84,7 +84,8 @@ export function TerminalPanel({ height, repoId, owner, repo }: TerminalPanelProp
     setSandboxOutput((prev) => [...prev, `$ ${commandInput}`]);
     
     // Use REST API for now (WebSocket would be for interactive PTY)
-    fetch(`/api/sandbox/${repoId}/exec`, {
+    const apiUrl = import.meta.env.VITE_API_URL || '';
+    fetch(`${apiUrl}/api/sandbox/${repoId}/exec`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',

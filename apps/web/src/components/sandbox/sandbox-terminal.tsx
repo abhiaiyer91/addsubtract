@@ -127,8 +127,10 @@ export function SandboxTerminal({
 
     try {
       // Get WebSocket URL for sandbox
+      const apiUrl = import.meta.env.VITE_API_URL || '';
+      const apiHost = apiUrl ? new URL(apiUrl).host : window.location.host;
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/api/sandbox/ws/${repoId}`;
+      const wsUrl = `${protocol}//${apiHost}/api/sandbox/ws/${repoId}`;
 
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
