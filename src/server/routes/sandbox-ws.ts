@@ -552,6 +552,20 @@ async function executeCommand(
             error: 'Vercel Sandbox SDK not installed. Install with: npm install @vercel/sandbox',
           };
         }
+        // Handle API errors with better messages
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        if (errorMessage.includes('422') || errorMessage.includes('Unprocessable Entity')) {
+          return {
+            success: false,
+            error: 'Vercel sandbox request failed (422). The sandbox may have expired or the request was invalid. Try refreshing the sandbox.',
+          };
+        }
+        if (errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {
+          return {
+            success: false,
+            error: 'Vercel sandbox authentication failed. Please check your API key.',
+          };
+        }
         throw error;
       }
     }
@@ -793,6 +807,12 @@ async function createPtySession(
         const requestedTimeout = config.timeoutMinutes * 60 * 1000;
         const sandboxTimeout = Math.min(requestedTimeout, VERCEL_MAX_TIMEOUT_MS);
 
+        console.log('[vercel-pty] Creating sandbox for PTY session:', {
+          projectId: vercelProjectId,
+          teamId: vercelTeamId,
+          timeout: sandboxTimeout,
+        });
+
         const sandbox = await Sandbox.create({
           projectId: vercelProjectId,
           teamId: vercelTeamId,
@@ -801,36 +821,32 @@ async function createPtySession(
           runtime: (config.vercelRuntime as 'node22' | 'python3.13') || 'node22',
         });
 
-        // Start an interactive shell
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const shell = await (sandbox as any).shells.create();
-        
-        // Set up output streaming
-        shell.onOutput((data: string) => {
-          onData(data);
-        });
+        console.log('[vercel-pty] Sandbox created:', sandbox.sandboxId);
 
-        // Handle shell exit
-        shell.onExit((code: number) => {
-          onExit(code);
-        });
+        // Vercel Sandbox doesn't support interactive PTY shells
+        // Use command execution mode with simulated shell experience
+        onData('\x1b[33mVercel Sandbox - Command Execution Mode\x1b[0m\r\n');
+        onData('\x1b[33mNote: Interactive TUI applications may not work correctly.\x1b[0m\r\n\r\n');
+        onData('$ ');
 
-        // Resize terminal
-        await shell.resize({ cols, rows });
-
-        return {
-          sandboxId: sandbox.sandboxId,
-          sandbox: { sandbox, shell },
-          provider: 'vercel',
-          cleanup: async () => {
-            await shell.kill();
-            await sandbox.stop();
-          },
-        };
+        // Create a Vercel-specific session that uses runCommand
+        return createVercelCommandSession(sandbox, options, onData, onExit);
       } catch (error) {
         console.error('[vercel-pty] Failed to create PTY session:', error);
-        // Fall back to shell command execution
-        return createFallbackPtySession(provider, options, onData, onExit);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        
+        // Provide helpful error messages
+        if (errorMessage.includes('422') || errorMessage.includes('Unprocessable Entity')) {
+          onData('\x1b[31mError: Vercel sandbox creation failed (422).\x1b[0m\r\n');
+          onData('\x1b[31mPlease check your project/team configuration.\x1b[0m\r\n');
+        } else if (errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {
+          onData('\x1b[31mError: Vercel authentication failed.\x1b[0m\r\n');
+          onData('\x1b[31mPlease check your API key.\x1b[0m\r\n');
+        } else {
+          onData(`\x1b[31mError: ${errorMessage}\x1b[0m\r\n`);
+        }
+        
+        return null;
       }
     }
 
@@ -1011,6 +1027,66 @@ async function createDockerPtySession(
 }
 
 /**
+ * Vercel command session state container
+ * Uses the Vercel Sandbox runCommand API directly
+ */
+interface VercelCommandState {
+  inputBuffer: string;
+  cwd: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  sandbox: any;
+  onData: (data: string) => void;
+  isRunning: boolean;
+}
+
+/**
+ * Create a Vercel sandbox command session
+ * Uses runCommand API since Vercel doesn't support interactive PTY
+ */
+async function createVercelCommandSession(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  sandbox: any,
+  options: {
+    apiKey?: string;
+    config: NonNullable<Awaited<ReturnType<typeof sandboxConfigModel.getConfig>>>;
+    repoId: string;
+    userId: string;
+    cols: number;
+    rows: number;
+  },
+  onData: (data: string) => void,
+  _onExit: (code: number) => void
+): Promise<PtySession> {
+  const state: VercelCommandState = {
+    inputBuffer: '',
+    cwd: '/vercel/sandbox',
+    sandbox,
+    onData,
+    isRunning: false,
+  };
+
+  return {
+    sandboxId: sandbox.sandboxId,
+    sandbox: state,
+    provider: 'vercel',
+    cleanup: async () => {
+      try {
+        await sandbox.stop();
+      } catch (error) {
+        console.error('[vercel-pty] Failed to stop sandbox:', error);
+      }
+    },
+  };
+}
+
+/**
+ * Check if this is a Vercel command session
+ */
+function isVercelCommandSession(session: PtySession): boolean {
+  return session.provider === 'vercel' && 'sandbox' in session.sandbox && 'inputBuffer' in session.sandbox;
+}
+
+/**
  * Fallback PTY session state container
  * Using an object to ensure state is shared by reference, not copied
  */
@@ -1082,6 +1158,10 @@ async function createFallbackPtySession(
  */
 function isFallbackSession(session: PtySession): boolean {
   // Fallback sessions have specific properties in their sandbox object
+  // Exclude Vercel command sessions which also have inputBuffer
+  if (isVercelCommandSession(session)) {
+    return false;
+  }
   return 'inputBuffer' in session.sandbox && 'onData' in session.sandbox;
 }
 
@@ -1089,7 +1169,126 @@ function isFallbackSession(session: PtySession): boolean {
  * Send input to PTY session
  */
 async function sendPtyInput(session: PtySession, data: string): Promise<void> {
-  // Handle fallback mode first - this applies to any provider that fell back
+  // Handle Vercel command session (uses runCommand API)
+  if (isVercelCommandSession(session)) {
+    const state = session.sandbox as VercelCommandState;
+    
+    // Handle special characters
+    for (const char of data) {
+      // Check for Enter key (carriage return or newline)
+      if (char === '\r' || char === '\n') {
+        const command = state.inputBuffer.trim();
+        state.inputBuffer = '';
+        state.onData('\r\n');
+        
+        if (command && !state.isRunning) {
+          state.isRunning = true;
+          try {
+            // Handle cd command specially to track cwd
+            if (command.startsWith('cd ')) {
+              const newDir = command.slice(3).trim();
+              // Use absolute path or resolve relative path
+              const targetDir = newDir.startsWith('/') 
+                ? newDir 
+                : `${state.cwd}/${newDir}`.replace(/\/+/g, '/');
+              
+              // Verify the directory exists
+              const checkResult = await state.sandbox.runCommand('test', ['-d', targetDir]);
+              if (checkResult.exitCode === 0) {
+                state.cwd = targetDir;
+                state.onData(`\x1b[90m(changed to ${state.cwd})\x1b[0m\r\n`);
+              } else {
+                state.onData(`\x1b[31mcd: ${newDir}: No such directory\x1b[0m\r\n`);
+              }
+            } else {
+              // Run command in current working directory
+              const fullCommand = `cd ${state.cwd} && ${command}`;
+              console.log('[vercel-pty] Executing command:', fullCommand);
+              
+              const result = await state.sandbox.runCommand('sh', ['-c', fullCommand]);
+              
+              // Get stdout and stderr
+              let stdout = '';
+              let stderr = '';
+              
+              try {
+                if (typeof result.stdout === 'function') {
+                  stdout = await result.stdout();
+                }
+              } catch {
+                // Failed to read stdout
+              }
+              
+              try {
+                if (typeof result.stderr === 'function') {
+                  stderr = await result.stderr();
+                }
+              } catch {
+                // Failed to read stderr
+              }
+              
+              if (stdout && stdout.trim()) {
+                state.onData(stdout.replace(/\n/g, '\r\n'));
+                if (!stdout.endsWith('\n')) {
+                  state.onData('\r\n');
+                }
+              }
+              if (stderr && stderr.trim()) {
+                state.onData(`\x1b[31m${stderr.replace(/\n/g, '\r\n')}\x1b[0m`);
+                if (!stderr.endsWith('\n')) {
+                  state.onData('\r\n');
+                }
+              }
+              
+              // Show exit code if non-zero
+              if (result.exitCode !== 0) {
+                state.onData(`\x1b[90m(exit code: ${result.exitCode})\x1b[0m\r\n`);
+              }
+            }
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            console.error('[vercel-pty] Command failed:', error);
+            
+            // Provide helpful error messages
+            if (errorMessage.includes('422') || errorMessage.includes('Unprocessable Entity')) {
+              state.onData('\x1b[31mError: Sandbox may have expired. Please reconnect.\x1b[0m\r\n');
+            } else {
+              state.onData(`\x1b[31mError: ${errorMessage}\x1b[0m\r\n`);
+            }
+          } finally {
+            state.isRunning = false;
+          }
+        }
+        state.onData('$ ');
+      }
+      // Handle backspace (DEL character \x7f or backspace \x08)
+      else if (char === '\x7f' || char === '\x08') {
+        if (state.inputBuffer.length > 0) {
+          state.inputBuffer = state.inputBuffer.slice(0, -1);
+          state.onData('\b \b');
+        }
+      }
+      // Handle Ctrl+C
+      else if (char === '\x03') {
+        state.inputBuffer = '';
+        state.onData('^C\r\n$ ');
+      }
+      // Handle Ctrl+U (clear line)
+      else if (char === '\x15') {
+        const clearCount = state.inputBuffer.length;
+        state.inputBuffer = '';
+        state.onData('\r$ ' + ' '.repeat(clearCount) + '\r$ ');
+      }
+      // Regular character
+      else if (!state.isRunning) {
+        state.inputBuffer += char;
+        state.onData(char);
+      }
+    }
+    return;
+  }
+
+  // Handle fallback mode - this applies to any provider that fell back
   if (isFallbackSession(session)) {
     const state = session.sandbox as FallbackPtyState;
     
@@ -1162,8 +1361,12 @@ async function sendPtyInput(session: PtySession, data: string): Promise<void> {
   // Native PTY mode for each provider
   switch (session.provider) {
     case 'vercel': {
+      // This case is now handled by isVercelCommandSession above
+      // Keep for backwards compatibility if somehow we get here
       const { shell } = session.sandbox;
-      await shell.write(data);
+      if (shell?.write) {
+        await shell.write(data);
+      }
       break;
     }
 
