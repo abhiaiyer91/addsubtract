@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { router, publicProcedure, protectedProcedure } from '../trpc';
-import { releaseModel, releaseAssetModel } from '../../../db/models/releases';
+import { releaseModel, releaseAssetModel, repoModel } from '../../../db/models';
 import { generateReleaseNotesTool } from '../../../ai/tools/generate-release-notes.js';
+import { eventBus } from '../../../events';
 
 /**
  * Input validation schemas
@@ -56,6 +57,26 @@ export const releasesRouter = router({
         authorId: ctx.user.id,
         publishedAt: input.isDraft ? null : new Date(),
       });
+
+      // Emit release.published event if not a draft
+      if (!input.isDraft) {
+        const repo = await repoModel.findById(input.repoId);
+        if (repo) {
+          const ownerName = repo.diskPath?.split('/').slice(-2)[0] || 'unknown';
+          const repoFullName = `${ownerName}/${repo.name}`;
+          
+          await eventBus.emit('release.published', ctx.user.id, {
+            releaseId: release.id,
+            releaseTag: release.tagName,
+            releaseName: release.name || release.tagName,
+            releaseBody: release.body || '',
+            repoId: input.repoId,
+            repoFullName,
+            isPrerelease: input.isPrerelease || false,
+          });
+        }
+      }
+
       return release;
     }),
 
@@ -148,7 +169,7 @@ export const releasesRouter = router({
    */
   publish: protectedProcedure
     .input(z.object({ id: z.string().uuid() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const existing = await releaseModel.getById(input.id);
       if (!existing) {
         throw new TRPCError({
@@ -163,6 +184,26 @@ export const releasesRouter = router({
         });
       }
       const release = await releaseModel.publish(input.id);
+
+      // Emit release.published event
+      if (release) {
+        const repo = await repoModel.findById(existing.repoId);
+        if (repo) {
+          const ownerName = repo.diskPath?.split('/').slice(-2)[0] || 'unknown';
+          const repoFullName = `${ownerName}/${repo.name}`;
+          
+          await eventBus.emit('release.published', ctx.user.id, {
+            releaseId: release.id,
+            releaseTag: release.tagName,
+            releaseName: release.name || release.tagName,
+            releaseBody: release.body || '',
+            repoId: existing.repoId,
+            repoFullName,
+            isPrerelease: release.isPrerelease || false,
+          });
+        }
+      }
+
       return release;
     }),
 

@@ -36,6 +36,7 @@ import { oauthAppsRouter } from './oauth-apps';
 import { adminRouter } from './admin';
 import { sandboxRouter } from './sandbox';
 import { githubImportRouter } from './github-import';
+import { marketingRouter } from './marketing';
 
 /**
  * Main application router
@@ -79,6 +80,7 @@ export const appRouter = router({
   admin: adminRouter,
   sandbox: sandboxRouter,
   githubImport: githubImportRouter,
+  marketing: marketingRouter,
 });
 
 /**
@@ -124,4 +126,5 @@ export {
   adminRouter,
   sandboxRouter,
   githubImportRouter,
+  marketingRouter,
 };
