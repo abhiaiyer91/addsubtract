@@ -29,9 +29,33 @@ export function SettingsLayout({ children }: SettingsLayoutProps) {
   };
 
   return (
-    <div className="flex gap-8 -mt-2">
-      {/* Sidebar navigation */}
-      <nav className="w-56 flex-shrink-0">
+    <div className="flex flex-col lg:flex-row lg:gap-8 -mt-2">
+      {/* Mobile navigation - horizontal scrollable */}
+      <nav className="lg:hidden mb-4 -mx-4 px-4 overflow-x-auto">
+        <div className="flex gap-1 pb-2">
+          {settingsNav.map((item) => {
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.path}
+                to={`${basePath}${item.path}`}
+                className={cn(
+                  'flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors whitespace-nowrap',
+                  isActive(item.path)
+                    ? 'bg-muted text-foreground font-medium'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                )}
+              >
+                <Icon className="h-4 w-4" />
+                {item.label}
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
+
+      {/* Desktop sidebar navigation */}
+      <nav className="hidden lg:block w-56 flex-shrink-0">
         <div className="sticky top-4 space-y-1">
           {settingsNav.map((item) => {
             const Icon = item.icon;
