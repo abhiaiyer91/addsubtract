@@ -31,6 +31,8 @@ interface PRFormProps {
   branches: Branch[];
   defaultBranch: string;
   repoId?: string;
+  initialSourceBranch?: string;
+  initialTargetBranch?: string;
   onSubmit: (data: {
     title: string;
     body: string;
@@ -42,11 +44,11 @@ interface PRFormProps {
   error?: string | null;
 }
 
-export function PRForm({ branches, defaultBranch, repoId, onSubmit, isLoading, error }: PRFormProps) {
+export function PRForm({ branches, defaultBranch, repoId, initialSourceBranch, initialTargetBranch, onSubmit, isLoading, error }: PRFormProps) {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
-  const [sourceBranch, setSourceBranch] = useState('');
-  const [targetBranch, setTargetBranch] = useState(defaultBranch);
+  const [sourceBranch, setSourceBranch] = useState(initialSourceBranch || '');
+  const [targetBranch, setTargetBranch] = useState(initialTargetBranch || defaultBranch);
   const [isDraft, setIsDraft] = useState(false);
 
   // AI generation mutation

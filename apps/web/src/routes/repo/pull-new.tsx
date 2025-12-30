@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { PRForm } from '@/components/pr/pr-form';
 import { RepoLayout } from './components/repo-layout';
 import { Loading } from '@/components/ui/loading';
@@ -8,9 +8,14 @@ import { toastSuccess, toastError } from '@/components/ui/use-toast';
 
 export function NewPullPage() {
   const { owner, repo } = useParams<{ owner: string; repo: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { data: session } = useSession();
   const authenticated = !!session?.user;
+
+  // Get initial branches from query params (e.g., from Compare button on branches page)
+  const initialSourceBranch = searchParams.get('source') || undefined;
+  const initialTargetBranch = searchParams.get('target') || undefined;
 
   // Fetch repository data to get the repo ID
   const { data: repoData, isLoading: repoLoading } = trpc.repos.get.useQuery(
@@ -108,6 +113,8 @@ export function NewPullPage() {
           branches={branches}
           defaultBranch={repoData?.repo.defaultBranch || 'main'}
           repoId={repoData?.repo.id}
+          initialSourceBranch={initialSourceBranch}
+          initialTargetBranch={initialTargetBranch}
           onSubmit={handleSubmit}
           isLoading={createPRMutation.isPending}
           error={createPRMutation.error?.message}

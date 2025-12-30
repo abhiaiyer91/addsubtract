@@ -1317,6 +1317,79 @@ export const reposRouter = router({
     }),
 
   /**
+   * Delete a branch from a repository
+   */
+  deleteBranch: protectedProcedure
+    .input(
+      z.object({
+        owner: z.string(),
+        repo: z.string(),
+        name: z.string().min(1),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const result = await repoModel.findByPath(input.owner, input.repo);
+
+      if (!result) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Repository not found',
+        });
+      }
+
+      // Check write access
+      const isOwner = result.repo.ownerId === ctx.user.id;
+      const hasWriteAccess = isOwner || (await collaboratorModel.hasPermission(result.repo.id, ctx.user.id, 'write'));
+
+      if (!hasWriteAccess) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You do not have write access to this repository',
+        });
+      }
+
+      // Cannot delete default branch
+      if (input.name === result.repo.defaultBranch) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Cannot delete the default branch',
+        });
+      }
+
+      // Get the bare repository
+      const bareRepo = getRepoFromDisk(result.repo.diskPath);
+      if (!bareRepo) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Repository not found on disk',
+        });
+      }
+
+      try {
+        // Check if branch exists
+        const existingBranches = bareRepo.refs.listBranches();
+        if (!existingBranches.includes(input.name)) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: `Branch '${input.name}' does not exist`,
+          });
+        }
+
+        // Delete the branch
+        bareRepo.refs.deleteBranch(input.name);
+
+        return { success: true, name: input.name };
+      } catch (error) {
+        if (error instanceof TRPCError) throw error;
+        console.error('[repos.deleteBranch] Error:', error);
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: error instanceof Error ? error.message : 'Failed to delete branch',
+        });
+      }
+    }),
+
+  /**
    * Get commit history for a repository with PR associations and CI status
    */
   getCommits: publicProcedure

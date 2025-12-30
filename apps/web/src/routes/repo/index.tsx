@@ -274,7 +274,7 @@ export function RepoPage() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="rounded-l-none border-l h-8 sm:h-9 touch-target shrink-0"
+                  className="rounded-l-none rounded-r-md border-l bg-muted hover:bg-muted/80 h-8 sm:h-9 touch-target shrink-0"
                   onClick={handleCopyCloneUrl}
                 >
                   {copied ? (
