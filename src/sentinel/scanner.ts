@@ -101,6 +101,100 @@ function generateSummary(result: ScanResult): string {
 }
 
 /**
+ * Generate actionable recommendations based on findings
+ */
+function generateRecommendations(
+  findings: AnalyzerFinding[],
+  severityCounts: ScanResult['severityCounts']
+): string[] {
+  const recommendations: string[] = [];
+  
+  // Group findings by category
+  const categoryGroups = new Map<string, number>();
+  const analyzerGroups = new Map<string, number>();
+  
+  for (const finding of findings) {
+    categoryGroups.set(
+      finding.category,
+      (categoryGroups.get(finding.category) || 0) + 1
+    );
+    analyzerGroups.set(
+      finding.analyzer,
+      (analyzerGroups.get(finding.analyzer) || 0) + 1
+    );
+  }
+  
+  // Priority-based recommendations
+  if (severityCounts.critical > 0) {
+    recommendations.push(
+      `🚨 Address ${severityCounts.critical} critical issue(s) immediately - these pose significant security or reliability risks.`
+    );
+  }
+  
+  if (severityCounts.high > 0) {
+    recommendations.push(
+      `⚠️ Review and fix ${severityCounts.high} high-priority issue(s) in the next sprint.`
+    );
+  }
+  
+  // Category-based recommendations
+  const securityCount = categoryGroups.get('security') || 0;
+  if (securityCount > 0) {
+    recommendations.push(
+      `🔒 Found ${securityCount} security issue(s). Consider implementing a security review process for code changes.`
+    );
+  }
+  
+  const maintainabilityCount = categoryGroups.get('maintainability') || 0;
+  if (maintainabilityCount > 3) {
+    recommendations.push(
+      `🔧 Code complexity is high in ${maintainabilityCount} places. Consider refactoring for better maintainability.`
+    );
+  }
+  
+  const dependencyCount = categoryGroups.get('dependency') || 0;
+  if (dependencyCount > 0) {
+    recommendations.push(
+      `📦 Found ${dependencyCount} dependency issue(s). Run \`npm audit fix\` to address known vulnerabilities.`
+    );
+  }
+  
+  const performanceCount = categoryGroups.get('performance') || 0;
+  if (performanceCount > 0) {
+    recommendations.push(
+      `⚡ Found ${performanceCount} performance issue(s). Review async operations and consider optimization.`
+    );
+  }
+  
+  // Analyzer-specific recommendations
+  if (analyzerGroups.get('coderabbit') && (analyzerGroups.get('coderabbit') || 0) > 0) {
+    recommendations.push(
+      `🐰 CodeRabbit identified ${analyzerGroups.get('coderabbit')} issue(s). Review the AI-generated suggestions for improvements.`
+    );
+  }
+  
+  // General recommendations based on health score
+  if (findings.length === 0) {
+    recommendations.push(
+      '✅ Great job! No significant issues found. Continue following best practices.'
+    );
+  } else if (severityCounts.critical === 0 && severityCounts.high === 0) {
+    recommendations.push(
+      '💡 No critical or high-severity issues found. Address medium/low issues when convenient to maintain code quality.'
+    );
+  }
+  
+  // Suggest enabling CodeRabbit if not used
+  if (!analyzerGroups.has('coderabbit') && findings.length > 0) {
+    recommendations.push(
+      '🐰 Consider enabling CodeRabbit for AI-powered code review. Install with: curl -fsSL https://cli.coderabbit.ai/install.sh | sh'
+    );
+  }
+  
+  return recommendations;
+}
+
+/**
  * Scanner options
  */
 export interface ScannerOptions {

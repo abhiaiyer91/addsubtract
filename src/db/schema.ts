@@ -3005,6 +3005,9 @@ export const sentinelScans = pgTable('sentinel_scans', {
   /** Summary of findings */
   summary: text('summary'),
   
+  /** AI-generated recommendations for improvement */
+  recommendations: jsonb('recommendations').$type<string[]>(),
+  
   /** Raw output from analyzers (for debugging) */
   rawOutput: jsonb('raw_output'),
   
