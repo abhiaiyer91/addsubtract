@@ -7,6 +7,7 @@
  * - E2B: Firecracker microVM sandboxes (e2b.dev) - Best for production
  * - Daytona: Cloud dev environments (daytona.io) - Best for AI coding agents
  * - Docker: Local containers (self-hosted) - Best for development
+ * - Vercel: Ephemeral compute (vercel.com) - Best for AI agents and code generation
  *
  * @example
  * ```typescript
@@ -19,6 +20,19 @@
  *     type: 'e2b',
  *     options: {
  *       apiKey: process.env.E2B_API_KEY!,
+ *     },
+ *   },
+ * });
+ *
+ * // Or with Vercel Sandbox provider
+ * const vercelManager = createSandboxManager({
+ *   repoRoot: '/var/lib/wit/repos',
+ *   provider: {
+ *     type: 'vercel',
+ *     options: {
+ *       projectId: process.env.VERCEL_PROJECT_ID!,
+ *       accessToken: process.env.VERCEL_TOKEN,
+ *       teamId: process.env.VERCEL_TEAM_ID,
  *     },
  *   },
  * });
@@ -62,6 +76,7 @@ export type {
   E2BProviderConfig,
   DaytonaProviderConfig,
   DockerProviderConfig,
+  VercelProviderConfig,
   ProviderConfig,
   SandboxProvider,
   SandboxManagerConfig,
@@ -90,3 +105,4 @@ export {
 export { E2BProvider } from './providers/e2b';
 export { DaytonaProvider } from './providers/daytona';
 export { DockerProvider } from './providers/docker';
+export { VercelProvider } from './providers/vercel';

@@ -53,7 +53,7 @@ import { useSession } from '@/lib/auth-client';
 import { trpc } from '@/lib/trpc';
 
 // Sandbox provider types
-type SandboxProvider = 'e2b' | 'daytona' | 'docker';
+type SandboxProvider = 'e2b' | 'daytona' | 'docker' | 'vercel';
 
 interface ProviderInfo {
   value: SandboxProvider;
@@ -85,6 +85,15 @@ const SANDBOX_PROVIDERS: ProviderInfo[] = [
     features: ['Full PTY support', 'Git operations', 'LSP support', 'Snapshots'],
     docUrl: 'https://www.daytona.io/docs',
     apiKeyPlaceholder: 'dtn_...',
+  },
+  {
+    value: 'vercel',
+    label: 'Vercel Sandbox',
+    description: 'Ephemeral compute for AI agents with ~1s startup',
+    icon: Cloud,
+    features: ['Linux MicroVMs', 'Fast startup (~1s)', 'Code interpreter', 'AI agent optimized'],
+    docUrl: 'https://vercel.com/docs/vercel-sandbox',
+    apiKeyPlaceholder: 'vercel_...',
   },
   {
     value: 'docker',
@@ -134,6 +143,8 @@ export function SandboxSettingsPage() {
   const [daytonaSnapshot, setDaytonaSnapshot] = useState('');
   const [daytonaAutoStop, setDaytonaAutoStop] = useState(15);
   const [dockerImage, setDockerImage] = useState('wit-sandbox:latest');
+  const [vercelProjectId, setVercelProjectId] = useState('');
+  const [vercelRuntime, setVercelRuntime] = useState<'node22' | 'python3.13'>('node22');
 
   const utils = trpc.useUtils();
 
@@ -159,6 +170,8 @@ export function SandboxSettingsPage() {
       setDaytonaSnapshot(settings.daytonaSnapshot ?? '');
       setDaytonaAutoStop(settings.daytonaAutoStop ?? 15);
       setDockerImage(settings.dockerImage ?? 'wit-sandbox:latest');
+      setVercelProjectId(settings.vercelProjectId ?? '');
+      setVercelRuntime(settings.vercelRuntime ?? 'node22');
     }
   }, [settings]);
 
@@ -212,6 +225,8 @@ export function SandboxSettingsPage() {
         daytonaSnapshot: daytonaSnapshot || undefined,
         daytonaAutoStop,
         dockerImage,
+        vercelProjectId: vercelProjectId || undefined,
+        vercelRuntime,
       },
     });
   };
@@ -241,7 +256,7 @@ export function SandboxSettingsPage() {
 
     setApiKeyMutation.mutate({
       repoId: settings.repoId,
-      provider: selectedProvider as 'e2b' | 'daytona',
+      provider: selectedProvider as 'e2b' | 'daytona' | 'vercel',
       apiKey: apiKey.trim(),
     });
   };
@@ -604,6 +619,62 @@ export function SandboxSettingsPage() {
             </Card>
           )}
 
+          {selectedProvider === 'vercel' && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Vercel Sandbox Settings</CardTitle>
+                <CardDescription>Configure Vercel Sandbox-specific options.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="vercelProjectId">Project ID</Label>
+                  <Input
+                    id="vercelProjectId"
+                    placeholder="prj_xxxxx"
+                    value={vercelProjectId}
+                    onChange={(e) => setVercelProjectId(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Your Vercel Project ID. Find it in your{' '}
+                    <a
+                      href="https://vercel.com/dashboard"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline"
+                    >
+                      Vercel dashboard
+                    </a>{' '}
+                    under Project Settings.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Runtime</Label>
+                  <Select value={vercelRuntime} onValueChange={(v) => setVercelRuntime(v as 'node22' | 'python3.13')}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="node22">Node.js 22</SelectItem>
+                      <SelectItem value="python3.13">Python 3.13</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Runtime environment for sandbox execution.
+                  </p>
+                </div>
+
+                <Alert>
+                  <Info className="h-4 w-4" />
+                  <AlertDescription>
+                    Vercel Sandbox provides ephemeral Linux MicroVMs optimized for AI agents.
+                    Sandboxes automatically stop after timeout.
+                  </AlertDescription>
+                </Alert>
+              </CardContent>
+            </Card>
+          )}
+
           {selectedProvider === 'docker' && (
             <Card>
               <CardHeader>
@@ -796,8 +867,9 @@ export function SandboxSettingsPage() {
               <p>
                 <strong>E2B</strong> uses Firecracker microVMs for strong isolation with fast
                 startup times. <strong>Daytona</strong> provides full development environments
-                with IDE-like features. <strong>Docker</strong> offers self-hosted container
-                isolation.
+                with IDE-like features. <strong>Vercel Sandbox</strong> offers ephemeral
+                compute optimized for AI agents. <strong>Docker</strong> offers self-hosted
+                container isolation.
               </p>
               <p>
                 API keys are encrypted and stored securely. You are responsible for any usage

@@ -302,6 +302,58 @@ async function executeCommand(
         });
       });
     }
+
+    case 'vercel': {
+      try {
+        const { Sandbox } = await import('@vercel/sandbox');
+
+        // Get Vercel project ID from config
+        const vercelProjectId = (config as any).vercelProjectId;
+        if (!vercelProjectId) {
+          return {
+            success: false,
+            error: 'Vercel Project ID is not configured',
+          };
+        }
+
+        const sandbox = await Sandbox.create({
+          projectId: vercelProjectId,
+          accessToken: apiKey,
+          timeout: config.timeoutMinutes * 60 * 1000,
+          runtime: (config as any).vercelRuntime || 'node22',
+        });
+
+        try {
+          const result = await sandbox.runCommand(command, args, {
+            signal: AbortSignal.timeout(timeout),
+          });
+
+          return {
+            success: result.exitCode === 0,
+            exitCode: result.exitCode,
+            stdout: result.stdout,
+            stderr: result.stderr,
+          };
+        } finally {
+          await sandbox.stop();
+        }
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'MODULE_NOT_FOUND') {
+          return {
+            success: false,
+            error: 'Vercel Sandbox SDK not installed. Install with: npm install @vercel/sandbox',
+          };
+        }
+        throw error;
+      }
+    }
+
+    default: {
+      return {
+        success: false,
+        error: `Unknown sandbox provider: ${provider}`,
+      };
+    }
   }
 }
 

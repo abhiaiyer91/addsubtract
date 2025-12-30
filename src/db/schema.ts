@@ -2108,6 +2108,7 @@ export const sandboxProviderEnum = pgEnum('sandbox_provider', [
   'e2b',      // E2B Firecracker microVMs
   'daytona',  // Daytona cloud dev environments
   'docker',   // Self-hosted Docker containers
+  'vercel',   // Vercel Sandbox ephemeral compute
 ]);
 
 /**
@@ -2164,6 +2165,12 @@ export const repoSandboxConfig = pgTable('repo_sandbox_config', {
   // Docker-specific settings
   /** Docker image to use */
   dockerImage: text('docker_image').notNull().default('wit-sandbox:latest'),
+
+  // Vercel-specific settings
+  /** Vercel Project ID */
+  vercelProjectId: text('vercel_project_id'),
+  /** Vercel runtime */
+  vercelRuntime: text('vercel_runtime').default('node22'),
 
   /** User who last updated this config */
   updatedById: text('updated_by_id').notNull(),
