@@ -9,7 +9,7 @@ RUN apk add --no-cache git docker-cli curl bash
 RUN curl -fsSL https://cli.coderabbit.ai/install.sh | bash && \
     ln -sf /root/.local/bin/coderabbit /usr/local/bin/coderabbit && \
     ln -sf /root/.local/bin/coderabbit /usr/local/bin/cr && \
-    coderabbit --version
+    /usr/local/bin/coderabbit --version
 
 # Install dependencies
 COPY package*.json ./
