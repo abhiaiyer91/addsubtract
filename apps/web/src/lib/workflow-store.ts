@@ -1,8 +1,8 @@
 /**
- * Workflow Builder Store
+ * Workflow Builder Store - Simplified
  * 
- * Zustand store for managing the visual Mastra workflow builder state.
- * Handles workflow graph, nodes, edges, and code generation.
+ * Zustand store for managing the simplified workflow builder state.
+ * Focuses on a linear, easy-to-understand workflow model.
  */
 
 import { create } from 'zustand';
@@ -10,8 +10,47 @@ import { persist } from 'zustand/middleware';
 import { nanoid } from 'nanoid';
 
 // =============================================================================
-// Types for Visual Workflow Representation
+// Simplified Types
 // =============================================================================
+
+export type TriggerType = 'push' | 'pull_request' | 'manual' | 'schedule';
+
+export interface WorkflowTrigger {
+  type: TriggerType;
+  branches?: string[];
+  paths?: string[];
+  cron?: string;
+}
+
+export type StepType = 'command' | 'action' | 'ai';
+
+export interface WorkflowStep {
+  id: string;
+  name: string;
+  type: StepType;
+  command?: string;        // For command steps
+  actionRef?: string;      // For action steps (e.g., 'actions/checkout@v4')
+  actionWith?: Record<string, string>; // Action inputs
+  aiPrompt?: string;       // For AI steps
+  enabled: boolean;
+  condition?: string;      // Optional conditional expression
+}
+
+export interface SimpleWorkflow {
+  id: string;
+  name: string;
+  description: string;
+  trigger: WorkflowTrigger;
+  steps: WorkflowStep[];
+  env?: Record<string, string>;
+}
+
+// =============================================================================
+// Legacy Types (for backward compatibility)
+// =============================================================================
+
+// These types are kept for backward compatibility with the visual workflow canvas
+// They will be deprecated once the new simplified builder is fully adopted
 
 export type NodeType = 'trigger' | 'step' | 'parallel' | 'map' | 'condition';
 
@@ -34,9 +73,7 @@ export interface StepConfig {
   inputSchema: WorkflowSchema;
   outputSchema: WorkflowSchema;
   executeCode: string;
-  /** For action steps: reference to a pre-built action */
   actionRef?: string;
-  /** For run steps: shell command */
   runCommand?: string;
 }
 
@@ -55,21 +92,16 @@ export interface TriggerConfig {
 }
 
 export interface ParallelConfig {
-  /** IDs of steps to run in parallel */
   stepIds: string[];
 }
 
 export interface MapConfig {
-  /** Transformation code */
   transformCode: string;
 }
 
 export interface ConditionConfig {
-  /** Condition expression */
   expression: string;
-  /** Branch to take if true */
   trueBranch?: string;
-  /** Branch to take if false */
   falseBranch?: string;
 }
 
@@ -108,7 +140,10 @@ export interface WorkflowDefinition {
 // =============================================================================
 
 interface WorkflowState {
-  // Current workflow being edited
+  // Simplified workflow (new)
+  simpleWorkflow: SimpleWorkflow;
+  
+  // Legacy workflow (for backward compatibility)
   workflow: WorkflowDefinition;
   
   // Selection state
@@ -125,41 +160,35 @@ interface WorkflowState {
   history: WorkflowDefinition[];
   historyIndex: number;
   
-  // Actions
+  // Simple workflow actions
+  setSimpleWorkflow: (workflow: SimpleWorkflow) => void;
+  updateSimpleTrigger: (trigger: Partial<WorkflowTrigger>) => void;
+  addSimpleStep: (step: Omit<WorkflowStep, 'id'>, afterIndex?: number) => string;
+  updateSimpleStep: (stepId: string, updates: Partial<WorkflowStep>) => void;
+  deleteSimpleStep: (stepId: string) => void;
+  moveSimpleStep: (fromIndex: number, toIndex: number) => void;
+  
+  // Legacy actions (kept for backward compatibility)
   setWorkflow: (workflow: WorkflowDefinition) => void;
   updateWorkflowMeta: (updates: Partial<Pick<WorkflowDefinition, 'name' | 'description' | 'inputSchema' | 'outputSchema'>>) => void;
-  
-  // Node operations
   addNode: (type: NodeType, position: { x: number; y: number }, options?: { autoConnect?: boolean; afterNodeId?: string }) => string;
   addNodeAfter: (afterNodeId: string, type: NodeType) => string;
   updateNode: (nodeId: string, updates: Partial<WorkflowNode>) => void;
   deleteNode: (nodeId: string) => void;
   selectNode: (nodeId: string | null) => void;
-  
-  // Layout helpers
   getLastNodeInChain: () => WorkflowNode | null;
   getNextNodePosition: (afterNodeId?: string) => { x: number; y: number };
   autoLayout: () => void;
-  
-  // Edge operations
   addEdge: (source: string, target: string, sourceHandle?: string, targetHandle?: string) => string;
   updateEdge: (edgeId: string, updates: Partial<WorkflowEdge>) => void;
   deleteEdge: (edgeId: string) => void;
   selectEdge: (edgeId: string | null) => void;
-  
-  // Code generation
   generateCode: () => string;
   toggleCodePreview: () => void;
-  
-  // Validation
   validate: () => boolean;
-  
-  // History operations
   undo: () => void;
   redo: () => void;
   saveToHistory: () => void;
-  
-  // Reset
   reset: () => void;
   loadFromYaml: (yaml: string) => void;
 }
@@ -167,6 +196,14 @@ interface WorkflowState {
 // =============================================================================
 // Default Values
 // =============================================================================
+
+const createDefaultSimpleWorkflow = (): SimpleWorkflow => ({
+  id: nanoid(),
+  name: 'My Workflow',
+  description: '',
+  trigger: { type: 'manual' },
+  steps: [],
+});
 
 const createDefaultWorkflow = (): WorkflowDefinition => ({
   id: nanoid(),
@@ -214,6 +251,7 @@ const createDefaultStep = (position: { x: number; y: number }): WorkflowNode => 
 export const useWorkflowStore = create<WorkflowState>()(
   persist(
     (set, get) => ({
+      simpleWorkflow: createDefaultSimpleWorkflow(),
       workflow: createDefaultWorkflow(),
       selectedNodeId: null,
       selectedEdgeId: null,
@@ -223,6 +261,81 @@ export const useWorkflowStore = create<WorkflowState>()(
       isDirty: false,
       history: [],
       historyIndex: -1,
+
+      // =======================================================================
+      // Simple Workflow Actions
+      // =======================================================================
+      
+      setSimpleWorkflow: (workflow) => {
+        set({ simpleWorkflow: workflow, isDirty: false });
+      },
+
+      updateSimpleTrigger: (updates) => {
+        set((state) => ({
+          simpleWorkflow: {
+            ...state.simpleWorkflow,
+            trigger: { ...state.simpleWorkflow.trigger, ...updates },
+          },
+          isDirty: true,
+        }));
+      },
+
+      addSimpleStep: (step, afterIndex) => {
+        const id = `step-${nanoid(8)}`;
+        const newStep: WorkflowStep = { ...step, id };
+        
+        set((state) => {
+          const newSteps = [...state.simpleWorkflow.steps];
+          const insertIndex = afterIndex !== undefined ? afterIndex + 1 : newSteps.length;
+          newSteps.splice(insertIndex, 0, newStep);
+          
+          return {
+            simpleWorkflow: { ...state.simpleWorkflow, steps: newSteps },
+            isDirty: true,
+          };
+        });
+        
+        return id;
+      },
+
+      updateSimpleStep: (stepId, updates) => {
+        set((state) => ({
+          simpleWorkflow: {
+            ...state.simpleWorkflow,
+            steps: state.simpleWorkflow.steps.map((s) =>
+              s.id === stepId ? { ...s, ...updates } : s
+            ),
+          },
+          isDirty: true,
+        }));
+      },
+
+      deleteSimpleStep: (stepId) => {
+        set((state) => ({
+          simpleWorkflow: {
+            ...state.simpleWorkflow,
+            steps: state.simpleWorkflow.steps.filter((s) => s.id !== stepId),
+          },
+          isDirty: true,
+        }));
+      },
+
+      moveSimpleStep: (fromIndex, toIndex) => {
+        set((state) => {
+          const newSteps = [...state.simpleWorkflow.steps];
+          const [removed] = newSteps.splice(fromIndex, 1);
+          newSteps.splice(toIndex, 0, removed);
+          
+          return {
+            simpleWorkflow: { ...state.simpleWorkflow, steps: newSteps },
+            isDirty: true,
+          };
+        });
+      },
+
+      // =======================================================================
+      // Legacy Actions (for backward compatibility)
+      // =======================================================================
 
       setWorkflow: (workflow) => {
         set({ workflow, isDirty: false, validationErrors: [] });
@@ -240,23 +353,17 @@ export const useWorkflowStore = create<WorkflowState>()(
         const { workflow } = get();
         if (workflow.nodes.length === 0) return null;
         
-        // Find nodes that are targets of edges (have incoming edges)
         const targetNodes = new Set(workflow.edges.map(e => e.target));
-        // Find nodes that are sources of edges (have outgoing edges)  
         const sourceNodes = new Set(workflow.edges.map(e => e.source));
         
-        // Find the last node (a node that is a source but not a target of any edge, or has no outgoing edges)
-        // Prefer nodes that have incoming edges but no outgoing edges (end of chain)
         const endNodes = workflow.nodes.filter(n => 
           targetNodes.has(n.id) && !sourceNodes.has(n.id)
         );
         
         if (endNodes.length > 0) {
-          // Return the one with the highest x position (rightmost)
           return endNodes.reduce((a, b) => a.position.x > b.position.x ? a : b);
         }
         
-        // If no end nodes, find the rightmost node
         return workflow.nodes.reduce((a, b) => a.position.x > b.position.x ? a : b);
       },
 
@@ -275,7 +382,6 @@ export const useWorkflowStore = create<WorkflowState>()(
           }
         }
         
-        // Find the last node in the chain
         const lastNode = get().getLastNodeInChain();
         if (lastNode) {
           return {
@@ -284,7 +390,6 @@ export const useWorkflowStore = create<WorkflowState>()(
           };
         }
         
-        // Default position if no nodes exist
         return { x: 100, y: 200 };
       },
 
@@ -294,14 +399,11 @@ export const useWorkflowStore = create<WorkflowState>()(
         const START_X = 100;
         const START_Y = 200;
         
-        // Topological sort to get execution order
         const sorted = topologicalSort(workflow.nodes, workflow.edges);
         
-        // Position nodes in a horizontal flow
         const updatedNodes = workflow.nodes.map(node => {
           const sortIndex = sorted.findIndex(n => n.id === node.id);
           if (sortIndex === -1) {
-            // Disconnected node - put it below
             return {
               ...node,
               position: { x: START_X, y: START_Y + 150 },
@@ -330,13 +432,11 @@ export const useWorkflowStore = create<WorkflowState>()(
         const id = `${type}-${nanoid(8)}`;
         let node: WorkflowNode;
         
-        // Determine the node to connect from
         let connectFromNodeId: string | null = null;
         if (autoConnect && type !== 'trigger') {
           if (afterNodeId) {
             connectFromNodeId = afterNodeId;
           } else {
-            // Auto-connect to selected node or last node in chain
             const { selectedNodeId } = get();
             if (selectedNodeId) {
               connectFromNodeId = selectedNodeId;
@@ -399,7 +499,6 @@ export const useWorkflowStore = create<WorkflowState>()(
             throw new Error(`Unknown node type: ${type}`);
         }
 
-        // Build the new edges array - auto-connect if we have a source node
         let newEdges = get().workflow.edges;
         if (connectFromNodeId) {
           const edgeId = `edge-${nanoid(8)}`;
@@ -525,24 +624,20 @@ export const useWorkflowStore = create<WorkflowState>()(
         const { workflow } = get();
         const errors: Array<{ nodeId?: string; message: string }> = [];
 
-        // Check workflow has a name
         if (!workflow.name) {
           errors.push({ message: 'Workflow must have a name' });
         }
 
-        // Check for at least one trigger
         const triggers = workflow.nodes.filter((n) => n.type === 'trigger');
         if (triggers.length === 0) {
           errors.push({ message: 'Workflow must have at least one trigger' });
         }
 
-        // Check for at least one step
         const steps = workflow.nodes.filter((n) => n.type === 'step');
         if (steps.length === 0) {
           errors.push({ message: 'Workflow must have at least one step' });
         }
 
-        // Check that all steps are connected
         const connectedNodes = new Set<string>();
         for (const edge of workflow.edges) {
           connectedNodes.add(edge.source);
@@ -554,7 +649,6 @@ export const useWorkflowStore = create<WorkflowState>()(
           }
         }
 
-        // Check step configurations
         for (const node of workflow.nodes) {
           if (node.type === 'step') {
             const config = node.config as StepConfig;
@@ -596,15 +690,17 @@ export const useWorkflowStore = create<WorkflowState>()(
         const newHistory = history.slice(0, historyIndex + 1);
         newHistory.push(JSON.parse(JSON.stringify(workflow)));
         set({
-          history: newHistory.slice(-50), // Keep last 50 states
+          history: newHistory.slice(-50),
           historyIndex: newHistory.length - 1,
         });
       },
 
       reset: () => {
         const newWorkflow = createDefaultWorkflow();
+        const newSimpleWorkflow = createDefaultSimpleWorkflow();
         set({
           workflow: newWorkflow,
+          simpleWorkflow: newSimpleWorkflow,
           selectedNodeId: null,
           selectedEdgeId: null,
           isCodePreviewOpen: false,
@@ -618,31 +714,29 @@ export const useWorkflowStore = create<WorkflowState>()(
 
       loadFromYaml: (_yaml) => {
         // TODO: Parse YAML and convert to workflow definition
-        // This would convert GitHub Actions YAML to Mastra workflow
       },
     }),
     {
       name: 'wit-workflow-builder',
       partialize: (state) => ({
         workflow: state.workflow,
+        simpleWorkflow: state.simpleWorkflow,
       }),
     }
   )
 );
 
 // =============================================================================
-// Code Generation
+// Code Generation (Legacy)
 // =============================================================================
 
 function generateMastraCode(workflow: WorkflowDefinition): string {
   const lines: string[] = [];
 
-  // Imports
   lines.push("import { createWorkflow, createStep } from '@mastra/core/workflows';");
   lines.push("import { z } from 'zod';");
   lines.push('');
 
-  // Input Schema
   lines.push('// =============================================================================');
   lines.push('// Input/Output Schemas');
   lines.push('// =============================================================================');
@@ -657,7 +751,6 @@ function generateMastraCode(workflow: WorkflowDefinition): string {
   lines.push(`export type ${toPascalCase(workflow.name)}Input = z.infer<typeof ${toPascalCase(workflow.name)}InputSchema>;`);
   lines.push('');
 
-  // Output Schema
   lines.push(`export const ${toPascalCase(workflow.name)}OutputSchema = z.object({`);
   for (const field of workflow.outputSchema.fields) {
     const zodType = schemaFieldToZod(field);
@@ -668,14 +761,9 @@ function generateMastraCode(workflow: WorkflowDefinition): string {
   lines.push(`export type ${toPascalCase(workflow.name)}Output = z.infer<typeof ${toPascalCase(workflow.name)}OutputSchema>;`);
   lines.push('');
 
-  // Build execution order from edges
   const executionOrder = topologicalSort(workflow.nodes, workflow.edges);
   const stepNodes = executionOrder.filter((n) => n.type === 'step');
-  // Note: parallelNodes and mapNodes are reserved for future use
-  // const parallelNodes = executionOrder.filter((n) => n.type === 'parallel');
-  // const mapNodes = executionOrder.filter((n) => n.type === 'map');
 
-  // Generate step definitions
   lines.push('// =============================================================================');
   lines.push('// Steps');
   lines.push('// =============================================================================');
@@ -686,23 +774,19 @@ function generateMastraCode(workflow: WorkflowDefinition): string {
     lines.push(`const ${toCamelCase(config.id || node.id)}Step = createStep({`);
     lines.push(`  id: '${config.id || node.id}',`);
     
-    // Input schema
     lines.push('  inputSchema: z.object({');
     for (const field of config.inputSchema.fields) {
       lines.push(`    ${field.name}: ${schemaFieldToZod(field)},`);
     }
     lines.push('  }),');
     
-    // Output schema
     lines.push('  outputSchema: z.object({');
     for (const field of config.outputSchema.fields) {
       lines.push(`    ${field.name}: ${schemaFieldToZod(field)},`);
     }
     lines.push('  }),');
     
-    // Execute function
     if (config.runCommand) {
-      // Shell command step
       lines.push('  execute: async ({ inputData }) => {');
       lines.push("    const { spawn } = await import('child_process');");
       lines.push('    return new Promise((resolve) => {');
@@ -715,14 +799,12 @@ function generateMastraCode(workflow: WorkflowDefinition): string {
       lines.push('    });');
       lines.push('  },');
     } else if (config.actionRef) {
-      // Action reference step
       lines.push('  execute: async ({ inputData }) => {');
       lines.push(`    // Action: ${config.actionRef}`);
       lines.push('    // TODO: Implement action handler');
       lines.push('    return { success: true };');
       lines.push('  },');
     } else {
-      // Custom execute code
       lines.push(`  execute: ${config.executeCode},`);
     }
     
@@ -730,7 +812,6 @@ function generateMastraCode(workflow: WorkflowDefinition): string {
     lines.push('');
   }
 
-  // Generate workflow definition
   lines.push('// =============================================================================');
   lines.push('// Workflow Definition');
   lines.push('// =============================================================================');
@@ -741,7 +822,6 @@ function generateMastraCode(workflow: WorkflowDefinition): string {
   lines.push(`  outputSchema: ${toPascalCase(workflow.name)}OutputSchema,`);
   lines.push('})');
 
-  // Chain steps in execution order
   let isFirstStep = true;
   for (const node of executionOrder) {
     if (node.type === 'trigger') continue;
@@ -772,19 +852,16 @@ function topologicalSort(nodes: WorkflowNode[], edges: WorkflowEdge[]): Workflow
   const inDegree = new Map<string, number>();
   const adjacency = new Map<string, string[]>();
 
-  // Initialize
   for (const node of nodes) {
     inDegree.set(node.id, 0);
     adjacency.set(node.id, []);
   }
 
-  // Build adjacency list and count in-degrees
   for (const edge of edges) {
     adjacency.get(edge.source)?.push(edge.target);
     inDegree.set(edge.target, (inDegree.get(edge.target) || 0) + 1);
   }
 
-  // Find nodes with no incoming edges (starts with triggers)
   const queue: string[] = [];
   for (const [nodeId, degree] of inDegree) {
     if (degree === 0) {
