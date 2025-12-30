@@ -26,6 +26,7 @@ import { repoModel } from '../../db/models';
 import { createAuth } from '../../lib/auth';
 import { getSandboxPool, type PooledSandbox } from '../sandbox/pool';
 
+
 /**
  * Create sandbox REST routes
  */
@@ -488,15 +489,18 @@ async function executeCommand(
             useCount: 0,
             stop: () => instance.stop(),
             runCommand: async (cmd: string, cmdArgs?: string[], _opts?: { signal?: AbortSignal }) => {
-              // Vercel SDK expects an object with cmd/args, not positional arguments
-              const result = await instance.runCommand({
-                cmd,
-                args: cmdArgs || [],
-              });
+              // Use positional arguments to get CommandFinished (not Command | CommandFinished)
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const result = await instance.runCommand(cmd, cmdArgs || []) as any;
+              // output() method gets stdout/stderr as strings
+              const [stdoutStr, stderrStr] = await Promise.all([
+                result.output('stdout'),
+                result.output('stderr'),
+              ]);
               return {
-                exitCode: result.exitCode,
-                stdout: result.stdout,
-                stderr: result.stderr,
+                exitCode: result.exitCode as number,
+                stdout: stdoutStr as string,
+                stderr: stderrStr as string,
               };
             },
           };
