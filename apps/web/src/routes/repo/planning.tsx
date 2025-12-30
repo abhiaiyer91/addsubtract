@@ -1213,131 +1213,204 @@ export function PlanningPage() {
     });
   }, []);
 
-  // Streaming subscription
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (trpc as any).planning?.stream?.useSubscription(
-    {
-      repoId: repoData?.repo.id!,
-      task: submittedTask.trim(),
-      context: context.trim() || undefined,
-      dryRun,
-      createBranch,
-      branchName: branchName.trim() || undefined,
-      maxIterations: 3,
-      maxParallelTasks: 5,
-    },
-    {
-      enabled: isRunning && !!repoData?.repo.id && !!submittedTask,
-      onData: (event: { type: string; stepId?: string; result?: any; error?: string }) => {
-        const { type, stepId, result, error: eventError } = event;
-        
-        switch (type) {
-          case 'started':
-            addLog('phase', 'Workflow started');
-            setCurrentAction('Initializing...');
-            setPhase('analyzing');
-            setProgress(5);
-            break;
-            
-          case 'step-start':
-            if (stepId) {
-              const newPhase = stepToPhase[stepId];
-              if (newPhase) {
-                setPhase(newPhase);
-                setProgress(stepToProgress[stepId] || progress);
-                setCurrentAction(phaseConfig[newPhase]?.description);
-                addLog('phase', `${phaseConfig[newPhase]?.label}...`);
-              }
-            }
-            break;
-            
-          case 'step-complete':
-            if (stepId) {
-              setProgress(stepToProgress[stepId] ? stepToProgress[stepId] + 10 : progress + 10);
-              
-              if (stepId === 'analyze-task' && result) {
-                if (result.projectInfo) {
-                  setProjectInfo(result.projectInfo);
-                  addLog('success', `Detected ${result.projectInfo.language} ${result.projectInfo.type} project`);
-                }
-                if (result.relevantFiles?.length) {
-                  addLog('info', `Found ${result.relevantFiles.length} relevant files`);
-                }
-              }
-              
-              if (stepId === 'create-plan' && result?.plan) {
-                setPlan(result.plan);
-                const taskCount = result.plan.parallelGroups?.reduce(
-                  (sum: number, g: ParallelGroup) => sum + g.subtasks.length, 0
-                ) || 0;
-                addLog('success', `Created plan with ${taskCount} subtasks in ${result.plan.parallelGroups?.length || 0} groups`);
-              }
-              
-              if (stepId === 'execute-plan' && result) {
-                if (result.groupResults) {
-                  for (const group of result.groupResults) {
-                    for (const taskResult of group.subtaskResults) {
-                      updateSubtask(taskResult.subtaskId, {
-                        status: taskResult.status,
-                        result: taskResult.result,
-                        error: taskResult.error,
-                        duration: taskResult.duration,
-                        filesModified: taskResult.filesModified,
-                      });
-                      
-                      if (taskResult.status === 'completed') {
-                        addLog('success', `Completed: ${taskResult.subtaskId}`);
-                      } else if (taskResult.status === 'failed') {
-                        addLog('error', `Failed: ${taskResult.subtaskId}`, taskResult.error);
-                      }
-                    }
-                  }
-                }
-                if (result.branchName) setBranchCreated(result.branchName);
-                if (result.filesModified) setFilesModified(result.filesModified);
-              }
-              
-              if (stepId === 'review-results' && result?.review) {
-                setReview(result.review);
-                addLog(
-                  result.review.overallSuccess ? 'success' : 'warning',
-                  result.review.summary
-                );
-              }
-            }
-            break;
-            
-          case 'step-error':
-            addLog('error', `Step failed: ${stepId}`, eventError);
-            setCurrentAction(undefined);
-            break;
-            
-          case 'complete':
-            setPhase('completed');
-            setProgress(100);
-            setCurrentAction(undefined);
-            addLog('success', 'Workflow completed successfully');
-            setIsRunning(false);
-            break;
-            
-          case 'error':
-            setError(eventError || 'Unknown error');
-            setPhase('failed');
-            setCurrentAction(undefined);
-            addLog('error', eventError || 'Workflow failed');
-            setIsRunning(false);
-            break;
+  // Abort controller for cancellation
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Handle SSE events - defined before useEffect so it can be referenced
+  const handleStreamEvent = useCallback((event: { runId?: string; stepId?: string; result?: any; error?: string; totalDuration?: number }) => {
+    // Detect event type from the data structure
+    const { stepId, result, error: eventError, totalDuration } = event;
+    
+    // Started event
+    if (event.runId && !stepId && !totalDuration && !eventError) {
+      addLog('phase', 'Workflow started');
+      setCurrentAction('Initializing...');
+      setPhase('analyzing');
+      setProgress(5);
+      return;
+    }
+    
+    // Complete event
+    if (totalDuration !== undefined) {
+      setPhase('completed');
+      setProgress(100);
+      setCurrentAction(undefined);
+      addLog('success', 'Workflow completed successfully');
+      setIsRunning(false);
+      return;
+    }
+    
+    // Error event
+    if (eventError && !stepId) {
+      setError(eventError);
+      setPhase('failed');
+      setCurrentAction(undefined);
+      addLog('error', eventError);
+      setIsRunning(false);
+      return;
+    }
+    
+    // Step events
+    if (stepId) {
+      // Check if it's a step-start (no result) or step-complete (has result)
+      if (result === undefined && !eventError) {
+        // step-start
+        const newPhase = stepToPhase[stepId];
+        if (newPhase) {
+          setPhase(newPhase);
+          setProgress(stepToProgress[stepId] || 0);
+          setCurrentAction(phaseConfig[newPhase]?.description);
+          addLog('phase', `${phaseConfig[newPhase]?.label}...`);
         }
-      },
-      onError: (err: Error) => {
-        setError(err.message);
+      } else if (eventError) {
+        // step-error
+        addLog('error', `Step failed: ${stepId}`, eventError);
+        setCurrentAction(undefined);
+      } else {
+        // step-complete
+        setProgress(stepToProgress[stepId] ? stepToProgress[stepId] + 10 : 0);
+        
+        if (stepId === 'analyze-task' && result) {
+          if (result.projectInfo) {
+            setProjectInfo(result.projectInfo);
+            addLog('success', `Detected ${result.projectInfo.language} ${result.projectInfo.type} project`);
+          }
+          if (result.relevantFiles?.length) {
+            addLog('info', `Found ${result.relevantFiles.length} relevant files`);
+          }
+        }
+        
+        if (stepId === 'create-plan' && result?.plan) {
+          setPlan(result.plan);
+          const taskCount = result.plan.parallelGroups?.reduce(
+            (sum: number, g: ParallelGroup) => sum + g.subtasks.length, 0
+          ) || 0;
+          addLog('success', `Created plan with ${taskCount} subtasks in ${result.plan.parallelGroups?.length || 0} groups`);
+        }
+        
+        if (stepId === 'execute-plan' && result) {
+          if (result.groupResults) {
+            for (const group of result.groupResults) {
+              for (const taskResult of group.subtaskResults) {
+                updateSubtask(taskResult.subtaskId, {
+                  status: taskResult.status,
+                  result: taskResult.result,
+                  error: taskResult.error,
+                  duration: taskResult.duration,
+                  filesModified: taskResult.filesModified,
+                });
+                
+                if (taskResult.status === 'completed') {
+                  addLog('success', `Completed: ${taskResult.subtaskId}`);
+                } else if (taskResult.status === 'failed') {
+                  addLog('error', `Failed: ${taskResult.subtaskId}`, taskResult.error);
+                }
+              }
+            }
+          }
+          if (result.branchName) setBranchCreated(result.branchName);
+          if (result.filesModified) setFilesModified(result.filesModified);
+        }
+        
+        if (stepId === 'review-results' && result?.review) {
+          setReview(result.review);
+          addLog(
+            result.review.overallSuccess ? 'success' : 'warning',
+            result.review.summary
+          );
+        }
+      }
+    }
+  }, [addLog, updateSubtask]);
+
+  // Start streaming when workflow begins
+  useEffect(() => {
+    if (!isRunning || !repoData?.repo.id || !submittedTask) {
+      return;
+    }
+
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
+    const startStream = async () => {
+      try {
+        const response = await fetch(`${apiUrl}/api/planning/stream`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            repoId: repoData.repo.id,
+            task: submittedTask.trim(),
+            context: context.trim() || undefined,
+            dryRun,
+            createBranch,
+            branchName: branchName.trim() || undefined,
+            maxIterations: 3,
+            maxParallelTasks: 5,
+          }),
+          signal: abortController.signal,
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+          throw new Error(errorData.error || `HTTP ${response.status}`);
+        }
+
+        const reader = response.body?.getReader();
+        if (!reader) {
+          throw new Error('No response body');
+        }
+
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (line.startsWith('event: ')) {
+              // Event type line - we'll detect type from the data
+              continue;
+            }
+            if (line.startsWith('data: ')) {
+              const dataStr = line.slice(6);
+              try {
+                const data = JSON.parse(dataStr);
+                handleStreamEvent(data);
+              } catch {
+                // Ignore parse errors
+              }
+            }
+          }
+        }
+      } catch (err) {
+        if ((err as Error).name === 'AbortError') {
+          // Cancelled by user
+          return;
+        }
+        setError((err as Error).message);
         setPhase('failed');
         setCurrentAction(undefined);
         setIsRunning(false);
-        addLog('error', `Connection error: ${err.message}`);
-      },
-    }
-  );
+        addLog('error', `Connection error: ${(err as Error).message}`);
+      }
+    };
+
+    startStream();
+
+    return () => {
+      abortController.abort();
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isRunning, repoData?.repo.id, submittedTask, handleStreamEvent]);
 
   const handleStart = () => {
     if (!task.trim() || !repoData?.repo.id) return;
@@ -1362,6 +1435,11 @@ export function PlanningPage() {
   };
 
   const handleCancel = () => {
+    // Abort the stream
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
     setIsRunning(false);
     setPhase('failed');
     setCurrentAction(undefined);
