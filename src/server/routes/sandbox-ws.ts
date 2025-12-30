@@ -307,17 +307,25 @@ async function executeCommand(
       try {
         const { Sandbox } = await import('@vercel/sandbox');
 
-        // Get Vercel project ID from config
+        // Get Vercel project ID and team ID from config
         const vercelProjectId = (config as any).vercelProjectId;
+        const vercelTeamId = (config as any).vercelTeamId;
         if (!vercelProjectId) {
           return {
             success: false,
             error: 'Vercel Project ID is not configured',
           };
         }
+        if (!vercelTeamId) {
+          return {
+            success: false,
+            error: 'Vercel Team ID is not configured. This is required when using a personal access token.',
+          };
+        }
 
         const sandbox = await Sandbox.create({
           projectId: vercelProjectId,
+          teamId: vercelTeamId,
           accessToken: apiKey,
           timeout: config.timeoutMinutes * 60 * 1000,
           runtime: (config as any).vercelRuntime || 'node22',
