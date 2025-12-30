@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   Brain,
   Play,
@@ -13,6 +13,8 @@ import {
   FileCode,
   ListTodo,
   RefreshCw,
+  History,
+  Plus,
   Sparkles,
   AlertCircle,
   Search,
@@ -1140,7 +1142,8 @@ function ResultsSummary({
 // =============================================================================
 
 export function PlanningPage() {
-  const { owner, repo } = useParams<{ owner: string; repo: string }>();
+  const { owner, repo, runId: urlRunId } = useParams<{ owner: string; repo: string; runId?: string }>();
+  const navigate = useNavigate();
   const { data: session } = useSession();
   
   // Form state
@@ -1150,6 +1153,9 @@ export function PlanningPage() {
   const [createBranch, setCreateBranch] = useState(true);
   const [branchName, setBranchName] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
+  
+  // Current run ID (either from URL or newly started)
+  const [currentRunId, setCurrentRunId] = useState<string | null>(urlRunId || null);
   
   // Workflow state
   const [isRunning, setIsRunning] = useState(false);
@@ -1161,6 +1167,7 @@ export function PlanningPage() {
   const [error, setError] = useState<string | null>(null);
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [activityLog, setActivityLog] = useState<ActivityLogEntry[]>([]);
+  const hasReceivedStartedRef = useRef(false);
   const [currentAction, setCurrentAction] = useState<string | undefined>();
   const [startTime, setStartTime] = useState<Date | undefined>();
   const [submittedTask, setSubmittedTask] = useState('');
@@ -1181,6 +1188,47 @@ export function PlanningPage() {
     { repoId: repoData?.repo.id! },
     { enabled: !!repoData?.repo.id }
   ) as { data: { available: boolean; model: string; provider: string } | undefined };
+
+  // Fetch run history
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: runHistory, refetch: refetchHistory } = (trpc as any).planning?.listRuns?.useQuery(
+    { repoId: repoData?.repo.id!, limit: 20 },
+    { enabled: !!repoData?.repo.id }
+  ) as { 
+    data: Array<{
+      id: string;
+      task: string;
+      status: string;
+      startedAt: string;
+      completedAt?: string;
+      error?: string;
+    }> | undefined;
+    refetch: () => void;
+  };
+
+  // Fetch current run data if we have a runId
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: existingRun } = (trpc as any).planning?.getRun?.useQuery(
+    { runId: urlRunId! },
+    { enabled: !!urlRunId }
+  ) as { 
+    data: {
+      id: string;
+      repoId: string;
+      task: string;
+      context?: string;
+      status: string;
+      plan?: ExecutionPlan;
+      groupResults?: Array<{ groupId: string; subtaskResults: Array<{ subtaskId: string; status: string; result?: string; error?: string }> }>;
+      review?: ReviewResult;
+      error?: string;
+      startedAt: string;
+      completedAt?: string;
+      dryRun: boolean;
+      createBranch: boolean;
+      branchName?: string;
+    } | undefined;
+  };
 
   // Activity log helper
   const addLog = useCallback((
@@ -1221,8 +1269,14 @@ export function PlanningPage() {
     // Detect event type from the data structure
     const { stepId, result, error: eventError, totalDuration } = event;
     
-    // Started event
+    // Started event - only process once per workflow run
     if (event.runId && !stepId && !totalDuration && !eventError) {
+      if (hasReceivedStartedRef.current) {
+        return; // Skip duplicate started events
+      }
+      hasReceivedStartedRef.current = true;
+      // Capture runId for URL navigation
+      setCurrentRunId(event.runId);
       addLog('phase', 'Workflow started');
       setCurrentAction('Initializing...');
       setPhase('analyzing');
@@ -1412,6 +1466,110 @@ export function PlanningPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isRunning, repoData?.repo.id, submittedTask, handleStreamEvent]);
 
+  // Load existing run data when navigating to a run URL
+  useEffect(() => {
+    if (!existingRun) return;
+    
+    // Set state from existing run
+    setSubmittedTask(existingRun.task);
+    setCurrentRunId(existingRun.id);
+    setStartTime(new Date(existingRun.startedAt));
+    
+    if (existingRun.plan) {
+      setPlan(existingRun.plan);
+    }
+    if (existingRun.review) {
+      setReview(existingRun.review);
+    }
+    if (existingRun.error) {
+      setError(existingRun.error);
+    }
+    
+    // Set phase based on status
+    const statusToPhase: Record<string, WorkflowPhase> = {
+      pending: 'analyzing',
+      planning: 'planning',
+      executing: 'executing',
+      reviewing: 'reviewing',
+      completed: 'completed',
+      failed: 'failed',
+    };
+    setPhase(statusToPhase[existingRun.status] || 'idle');
+    
+    // If still running, set up observation via SSE
+    if (['pending', 'planning', 'executing', 'reviewing'].includes(existingRun.status)) {
+      setIsRunning(true);
+      setCurrentAction('Reconnecting...');
+      hasReceivedStartedRef.current = true; // Already started
+      
+      // Connect to observe stream
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      const abortController = new AbortController();
+      abortControllerRef.current = abortController;
+      
+      const observeStream = async () => {
+        try {
+          const response = await fetch(`${apiUrl}/api/planning/observe/${existingRun.id}`, {
+            credentials: 'include',
+            signal: abortController.signal,
+          });
+          
+          if (!response.ok) {
+            throw new Error(`Failed to observe run: ${response.status}`);
+          }
+          
+          const reader = response.body?.getReader();
+          if (!reader) return;
+          
+          const decoder = new TextDecoder();
+          let buffer = '';
+          
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+            
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                try {
+                  const data = JSON.parse(line.slice(6));
+                  handleStreamEvent(data);
+                } catch {
+                  // Ignore parse errors
+                }
+              }
+            }
+          }
+        } catch (err) {
+          if ((err as Error).name !== 'AbortError') {
+            console.error('Observe stream error:', err);
+          }
+        }
+      };
+      
+      observeStream();
+      
+      return () => {
+        abortController.abort();
+      };
+    } else {
+      setIsRunning(false);
+      // Set progress based on completion
+      setProgress(existingRun.status === 'completed' ? 100 : 0);
+    }
+  }, [existingRun, handleStreamEvent]);
+
+  // Update URL when currentRunId changes (but not on initial load from URL)
+  useEffect(() => {
+    if (currentRunId && currentRunId !== urlRunId) {
+      navigate(`/${owner}/${repo}/planning/${currentRunId}`, { replace: true });
+      refetchHistory?.();
+    }
+  }, [currentRunId, urlRunId, owner, repo, navigate, refetchHistory]);
+
   const handleStart = () => {
     if (!task.trim() || !repoData?.repo.id) return;
     
@@ -1430,6 +1588,7 @@ export function PlanningPage() {
     setExpandedTasks(new Set());
     setCurrentAction('Starting workflow...');
     setStartTime(new Date());
+    hasReceivedStartedRef.current = false; // Reset for new workflow run
     
     addLog('phase', 'Initializing workflow...');
   };
@@ -1463,6 +1622,7 @@ export function PlanningPage() {
     setExpandedTasks(new Set());
     setCurrentAction('Retrying workflow...');
     setStartTime(new Date());
+    hasReceivedStartedRef.current = false; // Reset for retry
     
     addLog('phase', 'Retrying workflow...');
   };
@@ -1470,6 +1630,7 @@ export function PlanningPage() {
   const handleNewTask = () => {
     setTask('');
     setSubmittedTask('');
+    setCurrentRunId(null);
     setIsRunning(false);
     setPhase('idle');
     setProgress(0);
@@ -1483,6 +1644,9 @@ export function PlanningPage() {
     setExpandedTasks(new Set());
     setCurrentAction(undefined);
     setStartTime(undefined);
+    hasReceivedStartedRef.current = false; // Reset for new task
+    // Navigate to base planning URL
+    navigate(`/${owner}/${repo}/planning`);
   };
 
   const toggleTask = (taskId: string) => {
@@ -1521,223 +1685,293 @@ export function PlanningPage() {
 
   return (
     <RepoLayout owner={owner!} repo={repo!} activeTab="planning">
-      <div className="max-w-5xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className={cn(
-              'p-2.5 rounded-xl transition-colors',
-              isRunning ? 'bg-blue-500/10' : 'bg-primary/10'
-            )}>
-              <Brain className={cn(
-                'h-6 w-6',
-                isRunning ? 'text-blue-500 animate-pulse' : 'text-primary'
-              )} />
+      <div className="flex gap-6">
+        {/* Left Sidebar - Run History */}
+        <div className="w-64 shrink-0 hidden lg:block">
+          <div className="sticky top-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-medium flex items-center gap-2">
+                <History className="h-4 w-4" />
+                Run History
+              </h3>
+              {!isIdle && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-7 px-2"
+                  onClick={handleNewTask}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </Button>
+              )}
             </div>
-            <div>
-              <h1 className="text-2xl font-bold">AI Planning</h1>
-              <p className="text-sm text-muted-foreground">
-                Break down complex tasks into parallel subtasks
-              </p>
-            </div>
+            
+            <ScrollArea className="h-[calc(100vh-200px)]">
+              <div className="space-y-1 pr-4">
+                {runHistory?.map((run) => (
+                  <Link
+                    key={run.id}
+                    to={`/${owner}/${repo}/planning/${run.id}`}
+                    className={cn(
+                      'block p-3 rounded-lg border transition-colors hover:bg-accent',
+                      currentRunId === run.id && 'bg-accent border-primary'
+                    )}
+                  >
+                    <p className="text-sm font-medium line-clamp-2 mb-1">
+                      {run.task.length > 60 ? run.task.slice(0, 60) + '...' : run.task}
+                    </p>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Badge 
+                        variant={
+                          run.status === 'completed' ? 'default' : 
+                          run.status === 'failed' ? 'destructive' : 
+                          'secondary'
+                        }
+                        className="text-[10px] px-1.5 py-0"
+                      >
+                        {run.status}
+                      </Badge>
+                      <span>
+                        {new Date(run.startedAt).toLocaleDateString(undefined, {
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </span>
+                    </div>
+                  </Link>
+                ))}
+                
+                {(!runHistory || runHistory.length === 0) && (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    No runs yet
+                  </p>
+                )}
+              </div>
+            </ScrollArea>
           </div>
-          {planningStatus?.available && (
-            <Badge variant="outline" className="gap-1.5 py-1">
-              <Sparkles className="h-3.5 w-3.5" />
-              {planningStatus.provider}
-            </Badge>
-          )}
         </div>
 
-        {/* AI Not Available Warning */}
-        {planningStatus && !planningStatus.available && (
-          <div className="flex items-center gap-3 p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/30">
-            <AlertCircle className="h-5 w-5 text-yellow-500 shrink-0" />
-            <div>
-              <p className="font-medium text-yellow-600 dark:text-yellow-400">
-                AI not configured
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Add an API key in repository settings to use AI planning.
-              </p>
+        {/* Main Content */}
+        <div className="flex-1 min-w-0 max-w-4xl space-y-6">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className={cn(
+                'p-2.5 rounded-xl transition-colors',
+                isRunning ? 'bg-blue-500/10' : 'bg-primary/10'
+              )}>
+                <Brain className={cn(
+                  'h-6 w-6',
+                  isRunning ? 'text-blue-500 animate-pulse' : 'text-primary'
+                )} />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold">AI Planning</h1>
+                <p className="text-sm text-muted-foreground">
+                  Break down complex tasks into parallel subtasks
+                </p>
+              </div>
             </div>
+            {planningStatus?.available && (
+              <Badge variant="outline" className="gap-1.5 py-1">
+                <Sparkles className="h-3.5 w-3.5" />
+                {planningStatus.provider}
+              </Badge>
+            )}
           </div>
-        )}
 
-        {/* Workflow Header - Shows task & progress when running */}
-        {showWorkflow && submittedTask && (
-          <WorkflowHeader
-            task={submittedTask}
-            phase={phase}
-            progress={progress}
-            onCancel={isRunning ? handleCancel : undefined}
-            onRetry={isComplete ? handleRetry : undefined}
-            onNewTask={isComplete ? handleNewTask : undefined}
-            startTime={startTime}
-          />
-        )}
-
-        {/* Task Input - Only shown when idle */}
-        {isIdle && (
-          <div className="space-y-4 p-6 rounded-xl border-2 border-dashed bg-card">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">What do you want to build?</label>
-              <MentionTextarea
-                placeholder="Describe the task you want to accomplish... Use @ to reference files (e.g., 'Add user authentication with JWT tokens')"
-                value={task}
-                onChange={setTask}
-                owner={owner!}
-                repo={repo!}
-                autoFocus
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Additional context (optional)</label>
-              <MentionTextarea
-                placeholder="Any additional requirements, constraints, or context... Use @ to reference specific files"
-                value={context}
-                onChange={setContext}
-                owner={owner!}
-                repo={repo!}
-                className="min-h-[60px]"
-              />
-            </div>
-
-            {/* Options */}
-            <div className="flex flex-wrap items-center gap-6 pt-2">
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="dryRun"
-                  checked={dryRun}
-                  onCheckedChange={(checked) => setDryRun(checked as boolean)}
-                />
-                <label htmlFor="dryRun" className="text-sm cursor-pointer">
-                  Preview only (dry run)
-                </label>
-              </div>
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="createBranch"
-                  checked={createBranch}
-                  onCheckedChange={(checked) => setCreateBranch(checked as boolean)}
-                />
-                <label htmlFor="createBranch" className="text-sm cursor-pointer">
-                  Create feature branch
-                </label>
+          {/* AI Not Available Warning */}
+          {planningStatus && !planningStatus.available && (
+            <div className="flex items-center gap-3 p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/30">
+              <AlertCircle className="h-5 w-5 text-yellow-500 shrink-0" />
+              <div>
+                <p className="font-medium text-yellow-600 dark:text-yellow-400">
+                  AI not configured
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Add an API key in repository settings to use AI planning.
+                </p>
               </div>
             </div>
+          )}
 
-            {/* Advanced Options */}
-            <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
-              <CollapsibleTrigger asChild>
-                <Button variant="ghost" size="sm" className="gap-1.5 -ml-2 text-muted-foreground">
-                  {showAdvanced ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                  Advanced options
-                </Button>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="pt-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Custom branch name</label>
-                  <Input
-                    placeholder="ai-planning/my-feature"
-                    value={branchName}
-                    onChange={(e) => setBranchName(e.target.value)}
-                    disabled={!createBranch}
+          {/* Workflow Header - Shows task & progress when running */}
+          {showWorkflow && submittedTask && (
+            <WorkflowHeader
+              task={submittedTask}
+              phase={phase}
+              progress={progress}
+              onCancel={isRunning ? handleCancel : undefined}
+              onRetry={isComplete ? handleRetry : undefined}
+              onNewTask={isComplete ? handleNewTask : undefined}
+              startTime={startTime}
+            />
+          )}
+
+          {/* Task Input - Only shown when idle */}
+          {isIdle && (
+            <div className="space-y-4 p-6 rounded-xl border-2 border-dashed bg-card">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">What do you want to build?</label>
+                <MentionTextarea
+                  placeholder="Describe the task you want to accomplish... Use @ to reference files (e.g., 'Add user authentication with JWT tokens')"
+                  value={task}
+                  onChange={setTask}
+                  owner={owner!}
+                  repo={repo!}
+                  autoFocus
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-muted-foreground">Additional context (optional)</label>
+                <MentionTextarea
+                  placeholder="Any additional requirements, constraints, or context... Use @ to reference specific files"
+                  value={context}
+                  onChange={setContext}
+                  owner={owner!}
+                  repo={repo!}
+                  className="min-h-[60px]"
+                />
+              </div>
+
+              {/* Options */}
+              <div className="flex flex-wrap items-center gap-6 pt-2">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="dryRun"
+                    checked={dryRun}
+                    onCheckedChange={(checked) => setDryRun(checked as boolean)}
                   />
+                  <label htmlFor="dryRun" className="text-sm cursor-pointer">
+                    Preview only (dry run)
+                  </label>
                 </div>
-              </CollapsibleContent>
-            </Collapsible>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="createBranch"
+                    checked={createBranch}
+                    onCheckedChange={(checked) => setCreateBranch(checked as boolean)}
+                  />
+                  <label htmlFor="createBranch" className="text-sm cursor-pointer">
+                    Create feature branch
+                  </label>
+                </div>
+              </div>
 
-            {/* Start Button */}
-            <div className="pt-4">
-              <Button
-                onClick={handleStart}
-                disabled={!task.trim() || !planningStatus?.available}
-                size="lg"
-                className="gap-2"
-              >
-                <Play className="h-4 w-4" />
-                Start Planning
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* Error Display */}
-        {error && (
-          <div className="flex items-start gap-3 p-4 rounded-xl bg-red-500/10 border border-red-500/30">
-            <XCircle className="h-5 w-5 text-red-500 mt-0.5 shrink-0" />
-            <div>
-              <p className="font-medium text-red-600 dark:text-red-400">
-                {phase === 'failed' ? 'Workflow failed' : 'Error'}
-              </p>
-              <p className="text-sm text-muted-foreground mt-1">{error}</p>
-            </div>
-          </div>
-        )}
-
-        {/* Main Content - Two columns when running */}
-        {showWorkflow && (
-          <div className="grid lg:grid-cols-5 gap-6">
-            {/* Left: Activity Feed */}
-            <div className="lg:col-span-2 space-y-4">
-              <LiveActivityFeed 
-                entries={activityLog} 
-                currentAction={isRunning ? currentAction : undefined}
-              />
-              
-              {/* Project Info */}
-              {projectInfo && (
-                <div className="rounded-lg border bg-card p-4">
-                  <h3 className="text-sm font-medium mb-2">Project Detected</h3>
-                  <div className="flex flex-wrap gap-2">
-                    <Badge variant="secondary">{projectInfo.language}</Badge>
-                    <Badge variant="secondary">{projectInfo.type}</Badge>
-                    {projectInfo.hasTests && <Badge variant="outline">Has Tests</Badge>}
-                    {projectInfo.hasLinting && <Badge variant="outline">Has Linting</Badge>}
+              {/* Advanced Options */}
+              <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" size="sm" className="gap-1.5 -ml-2 text-muted-foreground">
+                    {showAdvanced ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    Advanced options
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="pt-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Custom branch name</label>
+                    <Input
+                      placeholder="ai-planning/my-feature"
+                      value={branchName}
+                      onChange={(e) => setBranchName(e.target.value)}
+                      disabled={!createBranch}
+                    />
                   </div>
-                </div>
-              )}
+                </CollapsibleContent>
+              </Collapsible>
 
-              {/* Results Summary */}
-              {isComplete && (
-                <ResultsSummary 
-                  branchCreated={branchCreated} 
-                  filesModified={filesModified} 
-                />
-              )}
+              {/* Start Button */}
+              <div className="pt-4">
+                <Button
+                  onClick={handleStart}
+                  disabled={!task.trim() || !planningStatus?.available}
+                  size="lg"
+                  className="gap-2"
+                >
+                  <Play className="h-4 w-4" />
+                  Start Planning
+                </Button>
+              </div>
             </div>
+          )}
 
-            {/* Right: Plan/Review */}
-            <div className="lg:col-span-3">
-              {review ? (
-                <ReviewView review={review} />
-              ) : plan ? (
-                <ExecutionPlanView
-                  plan={plan}
-                  expandedTasks={expandedTasks}
-                  onToggleTask={toggleTask}
-                  phase={phase}
-                />
-              ) : (
-                <div className="rounded-lg border bg-card p-12 text-center">
-                  <Brain className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50 animate-pulse" />
-                  <p className="text-muted-foreground">Creating execution plan...</p>
-                </div>
-              )}
+          {/* Error Display */}
+          {error && (
+            <div className="flex items-start gap-3 p-4 rounded-xl bg-red-500/10 border border-red-500/30">
+              <XCircle className="h-5 w-5 text-red-500 mt-0.5 shrink-0" />
+              <div>
+                <p className="font-medium text-red-600 dark:text-red-400">
+                  {phase === 'failed' ? 'Workflow failed' : 'Error'}
+                </p>
+                <p className="text-sm text-muted-foreground mt-1">{error}</p>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Empty State */}
-        {isIdle && !error && (
-          <div className="text-center py-8 text-muted-foreground">
-            <p className="text-sm">
-              The AI will analyze your codebase, create an execution plan, and run tasks in parallel.
-            </p>
-          </div>
-        )}
+          {/* Main Content - Two columns when running */}
+          {showWorkflow && (
+            <div className="grid lg:grid-cols-5 gap-6">
+              {/* Left: Activity Feed */}
+              <div className="lg:col-span-2 space-y-4">
+                <LiveActivityFeed 
+                  entries={activityLog} 
+                  currentAction={isRunning ? currentAction : undefined}
+                />
+                
+                {/* Project Info */}
+                {projectInfo && (
+                  <div className="rounded-lg border bg-card p-4">
+                    <h3 className="text-sm font-medium mb-2">Project Detected</h3>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant="secondary">{projectInfo.language}</Badge>
+                      <Badge variant="secondary">{projectInfo.type}</Badge>
+                      {projectInfo.hasTests && <Badge variant="outline">Has Tests</Badge>}
+                      {projectInfo.hasLinting && <Badge variant="outline">Has Linting</Badge>}
+                    </div>
+                  </div>
+                )}
+
+                {/* Results Summary */}
+                {isComplete && (
+                  <ResultsSummary 
+                    branchCreated={branchCreated} 
+                    filesModified={filesModified} 
+                  />
+                )}
+              </div>
+
+              {/* Right: Plan/Review */}
+              <div className="lg:col-span-3">
+                {review ? (
+                  <ReviewView review={review} />
+                ) : plan ? (
+                  <ExecutionPlanView
+                    plan={plan}
+                    expandedTasks={expandedTasks}
+                    onToggleTask={toggleTask}
+                    phase={phase}
+                  />
+                ) : (
+                  <div className="rounded-lg border bg-card p-12 text-center">
+                    <Brain className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50 animate-pulse" />
+                    <p className="text-muted-foreground">Creating execution plan...</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Empty State */}
+          {isIdle && !error && (
+            <div className="text-center py-8 text-muted-foreground">
+              <p className="text-sm">
+                The AI will analyze your codebase, create an execution plan, and run tasks in parallel.
+              </p>
+            </div>
+          )}
+        </div>
       </div>
     </RepoLayout>
   );
