@@ -159,7 +159,7 @@ export async function getStorageBackend(
     repoId: repo.id,
     owner: repo.ownerId,
     repo: repo.name,
-    backendType: forceType || repo.storageBackend,
+    backendType: forceType || repo.storageBackend || 'local',
     config: repo.storageConfig || {},
   };
   
