@@ -71,6 +71,8 @@ export function JournalPageDetail() {
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastLoadedPageId = useRef<string | null>(null);
   const lastSavedContent = useRef<string>('');
+  const pageRef = useRef(page);
+  const updateMutationRef = useRef(updateMutation);
 
   // Fetch repository data
   const { data: repoData, isLoading: repoLoading } = trpc.repos.get.useQuery(
@@ -140,6 +142,12 @@ export function JournalPageDetail() {
     }
   }, [page]);
 
+  // Keep refs updated
+  useEffect(() => {
+    pageRef.current = page;
+    updateMutationRef.current = updateMutation;
+  }, [page, updateMutation]);
+
   // Derive actual content to use - prioritize edited content, fall back to page content
   const currentContent = editedContent ?? page?.content ?? '';
   const currentTitle = editedTitle ?? page?.title ?? '';
@@ -157,11 +165,12 @@ export function JournalPageDetail() {
 
       // Set new timeout for auto-save
       saveTimeoutRef.current = setTimeout(() => {
+        const currentPage = pageRef.current;
         // Compare with last saved content to avoid unnecessary saves
-        if (page && newContent !== lastSavedContent.current) {
+        if (currentPage && newContent !== lastSavedContent.current) {
           lastSavedContent.current = newContent;
-          updateMutation.mutate({
-            pageId: page.id,
+          updateMutationRef.current.mutate({
+            pageId: currentPage.id,
             content: newContent,
           });
           // Note: setPendingContent(null) is called in onSuccess/onError handlers
@@ -171,7 +180,7 @@ export function JournalPageDetail() {
         }
       }, 1000); // Save after 1 second of inactivity
     },
-    [page, updateMutation]
+    [] // No dependencies - uses refs for stable values
   );
 
   // Cleanup timeout on unmount
