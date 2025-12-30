@@ -11,7 +11,7 @@ import { repoModel, prModel, collaboratorModel } from '../../../db/models';
 import { resolveDiskPath, BareRepository } from '../../../server/storage/repos';
 import { exists } from '../../../utils/fs';
 import { generatePRDescriptionTool } from '../../../ai/tools/generate-pr-description';
-import { getTsgitAgent, isAIAvailable } from '../../../ai/mastra';
+import { getTsgitAgent, isAIAvailable, isAIAvailableForRepo } from '../../../ai/mastra';
 import { diff, createHunks, formatUnifiedDiff, FileDiff } from '../../../core/diff';
 
 /**
@@ -250,19 +250,20 @@ export const aiRouter = router({
       existingDescription: z.string().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
-      // Check AI availability
-      if (!isAIAvailable()) {
-        throw new TRPCError({
-          code: 'PRECONDITION_FAILED',
-          message: 'AI features are not available. Please configure an AI provider.',
-        });
-      }
-
       const repo = await repoModel.findById(input.repoId);
       if (!repo) {
         throw new TRPCError({
           code: 'NOT_FOUND',
           message: 'Repository not found',
+        });
+      }
+
+      // Check AI availability (server-level or repo-level keys)
+      const aiAvailable = await isAIAvailableForRepo(input.repoId);
+      if (!aiAvailable) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'AI features are not available. Please configure an AI provider.',
         });
       }
 
@@ -333,14 +334,6 @@ export const aiRouter = router({
       filePath: z.string(),
     }))
     .mutation(async ({ input, ctx }) => {
-      // Check AI availability
-      if (!isAIAvailable()) {
-        throw new TRPCError({
-          code: 'PRECONDITION_FAILED',
-          message: 'AI features are not available. Please configure an AI provider.',
-        });
-      }
-
       const pr = await prModel.findById(input.prId);
       if (!pr) {
         throw new TRPCError({
@@ -354,6 +347,15 @@ export const aiRouter = router({
         throw new TRPCError({
           code: 'NOT_FOUND',
           message: 'Repository not found',
+        });
+      }
+
+      // Check AI availability (server-level or repo-level keys)
+      const aiAvailable = await isAIAvailableForRepo(pr.repoId);
+      if (!aiAvailable) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'AI features are not available. Please configure an AI provider.',
         });
       }
 
@@ -435,14 +437,6 @@ Keep the explanation clear and helpful for code reviewers.`;
       baseContent: z.string().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
-      // Check AI availability
-      if (!isAIAvailable()) {
-        throw new TRPCError({
-          code: 'PRECONDITION_FAILED',
-          message: 'AI features are not available. Please configure an AI provider.',
-        });
-      }
-
       const pr = await prModel.findById(input.prId);
       if (!pr) {
         throw new TRPCError({
@@ -456,6 +450,15 @@ Keep the explanation clear and helpful for code reviewers.`;
         throw new TRPCError({
           code: 'NOT_FOUND',
           message: 'Repository not found',
+        });
+      }
+
+      // Check AI availability (server-level or repo-level keys)
+      const aiAvailable = await isAIAvailableForRepo(pr.repoId);
+      if (!aiAvailable) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'AI features are not available. Please configure an AI provider.',
         });
       }
 
@@ -529,14 +532,6 @@ EXPLANATION:
       prId: z.string().uuid(),
     }))
     .mutation(async ({ input, ctx }) => {
-      // Check AI availability
-      if (!isAIAvailable()) {
-        throw new TRPCError({
-          code: 'PRECONDITION_FAILED',
-          message: 'AI features are not available. Please configure an AI provider.',
-        });
-      }
-
       const pr = await prModel.findById(input.prId);
       if (!pr) {
         throw new TRPCError({
@@ -550,6 +545,15 @@ EXPLANATION:
         throw new TRPCError({
           code: 'NOT_FOUND',
           message: 'Repository not found',
+        });
+      }
+
+      // Check AI availability (server-level or repo-level keys)
+      const aiAvailable = await isAIAvailableForRepo(pr.repoId);
+      if (!aiAvailable) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'AI features are not available. Please configure an AI provider.',
         });
       }
 
@@ -651,19 +655,20 @@ Respond with ONLY the commit message, no additional commentary.`;
       conversationId: z.string().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
-      // Check AI availability
-      if (!isAIAvailable()) {
-        throw new TRPCError({
-          code: 'PRECONDITION_FAILED',
-          message: 'AI features are not available. Please configure an AI provider.',
-        });
-      }
-
       const repo = await repoModel.findById(input.repoId);
       if (!repo) {
         throw new TRPCError({
           code: 'NOT_FOUND',
           message: 'Repository not found',
+        });
+      }
+
+      // Check AI availability (server-level or repo-level keys)
+      const aiAvailable = await isAIAvailableForRepo(input.repoId);
+      if (!aiAvailable) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'AI features are not available. Please configure an AI provider.',
         });
       }
 
@@ -715,15 +720,7 @@ User question: ${input.message}`;
       conversationId: z.string().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
-      // Check AI availability
-      if (!isAIAvailable()) {
-        throw new TRPCError({
-          code: 'PRECONDITION_FAILED',
-          message: 'AI features are not available. Please configure an AI provider.',
-        });
-      }
-
-      // Get PR details
+      // Get PR details first (needed to check repo-level AI keys)
       const pr = await prModel.findById(input.prId);
       if (!pr) {
         throw new TRPCError({
@@ -738,6 +735,15 @@ User question: ${input.message}`;
         throw new TRPCError({
           code: 'NOT_FOUND',
           message: 'Repository not found',
+        });
+      }
+
+      // Check AI availability (server-level or repo-level keys)
+      const aiAvailable = await isAIAvailableForRepo(pr.repoId);
+      if (!aiAvailable) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'AI features are not available. Please configure an AI provider.',
         });
       }
 
