@@ -197,7 +197,7 @@ export function RepoPage() {
             )}
           </div>
         ) : isOwner ? (
-          <>
+          <div className="space-y-2">
             <p className="text-sm text-muted-foreground">
               Publish this repo as an npm package
             </p>
@@ -207,7 +207,7 @@ export function RepoPage() {
                 Enable Package Registry
               </Button>
             </Link>
-          </>
+          </div>
         ) : (
           <p className="text-sm text-muted-foreground">No package published</p>
         )}
