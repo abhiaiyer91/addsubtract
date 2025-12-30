@@ -472,11 +472,27 @@ Not grep. Understanding.
 | ESM/CommonJS configuration cleanup | P1 | TODO |
 | Error message audit | P1 | Complete |
 | Dogfood: use wit to build wit | P0 | Ongoing |
-| **Inline AI Edit (⌘K)** | P0 | ✅ Complete |
-| Selection actions menu | P1 | In Progress |
-| Agent plan visualization | P1 | TODO |
 
 **Success metric:** All tests pass, daily development uses wit.
+
+### IDE & Agent Greatness ✨
+
+We're building the best IDE and coding agent ever. Here's what's done:
+
+| Feature | Status | Description |
+|---------|--------|-------------|
+| **Inline AI (⌘K)** | ✅ | AI code edits right in the editor |
+| **Selection Actions** | ✅ | Quick actions on text selection |
+| **Agent Plan Visualization** | ✅ | See the agent's plan in real-time |
+| **Undo Agent Changes** | ✅ | Full history with undo/redo |
+| **Slash Commands** | ✅ | /fix, /explain, /test, /refactor |
+| **File Mentions (@)** | ✅ | @file, @codebase, @selection |
+| **Diff Viewer** | ✅ | Beautiful side-by-side diffs |
+| **Code Lens Hints** | ✅ | AI suggestions inline in code |
+| **Agentic Mode** | ✅ | Configurable autonomy levels |
+| **Keyboard Shortcuts** | ✅ | 60+ shortcuts with ? panel |
+| **Smart Chat Input** | ✅ | Commands, mentions, context |
+| **Editor Context** | ✅ | Agent knows what you're viewing |
 
 > 💡 See [IDE & Agent Vision](./docs/IDE_AND_AGENT_VISION.mdx) for the full roadmap to IDE greatness.
 

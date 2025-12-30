@@ -5,6 +5,7 @@ import { Loader2, Sparkles, Wand2 } from 'lucide-react';
 import { trpc } from '@/lib/trpc';
 import { getLanguageFromPath, shouldTriggerCompletion } from '@/lib/completion-service';
 import { InlineAICommand, useInlineAICommand } from './inline-ai-command';
+import { SelectionActions, useSelectionActions } from './selection-actions';
 
 interface CodeEditorProps {
   content: string;
@@ -87,6 +88,9 @@ export function CodeEditor({
   // Inline AI command state
   const inlineAI = useInlineAICommand();
   
+  // Selection actions state
+  const selectionActions = useSelectionActions();
+  
   // Get the completion mutation from tRPC (using any to bypass type check during development)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const completionMutation = (trpc as any).completion?.getCompletion?.useMutation?.() as CompletionMutation | undefined;
@@ -122,11 +126,52 @@ export function CodeEditor({
       const selectedText = model.getValueInRange(selection);
       const position = selection.getStartPosition();
       
+      // Dismiss selection actions when opening inline AI
+      selectionActions.dismiss();
+      
       inlineAI.open(selectedText, {
         lineNumber: position.lineNumber,
         column: position.column,
       });
     });
+
+    // Track selection changes for selection actions
+    const selectionDisposable = editorInstance.onDidChangeCursorSelection((e) => {
+      const selection = e.selection;
+      const model = editorInstance.getModel();
+      
+      if (!model || selection.isEmpty()) {
+        selectionActions.dismiss();
+        return;
+      }
+      
+      // Get selected text
+      const selectedText = model.getValueInRange(selection);
+      
+      // Only show for meaningful selections (more than 5 chars, not just whitespace)
+      if (selectedText.trim().length < 5) {
+        selectionActions.dismiss();
+        return;
+      }
+      
+      // Get screen position for the end of selection
+      const endPosition = selection.getEndPosition();
+      const coords = editorInstance.getScrolledVisiblePosition(endPosition);
+      
+      if (coords) {
+        const editorDom = editorInstance.getDomNode();
+        if (editorDom) {
+          const rect = editorDom.getBoundingClientRect();
+          selectionActions.showAt(
+            rect.left + coords.left,
+            rect.top + coords.top + coords.height,
+            selectedText
+          );
+        }
+      }
+    });
+    
+    disposablesRef.current.push(selectionDisposable);
 
     // Register inline completion provider for AI completions
     if (aiCompletionEnabled && completionMutation) {
@@ -144,11 +189,40 @@ export function CodeEditor({
 
     // Focus the editor
     editorInstance.focus();
-  }, [onSave, aiCompletionEnabled, path, completionMutation, inlineAI]);
+  }, [onSave, aiCompletionEnabled, path, completionMutation, inlineAI, selectionActions]);
 
   const handleChange: OnChange = useCallback((value) => {
     onChange(value || '');
   }, [onChange]);
+
+  // Handle selection action - opens inline AI with the prompt
+  const handleSelectionAction = useCallback((prompt: string) => {
+    const editor = editorRef.current;
+    const model = editor?.getModel();
+    
+    if (!editor || !model) return;
+    
+    const selection = editor.getSelection();
+    if (!selection) return;
+    
+    const selectedText = model.getValueInRange(selection);
+    const position = selection.getStartPosition();
+    
+    if (prompt === '') {
+      // Empty prompt means open the full inline AI dialog
+      inlineAI.open(selectedText, {
+        lineNumber: position.lineNumber,
+        column: position.column,
+      });
+    } else {
+      // Pre-fill the prompt and trigger immediately
+      inlineAI.open(selectedText, {
+        lineNumber: position.lineNumber,
+        column: position.column,
+      });
+      // TODO: Auto-submit with the prompt
+    }
+  }, [inlineAI]);
 
   // Handle applying AI-generated code
   const handleApplyAIEdit = useCallback((newCode: string) => {
@@ -256,6 +330,16 @@ export function CodeEditor({
           <Wand2 className="h-3 w-3" />
           <span>Press <kbd className="px-1 py-0.5 bg-zinc-700 rounded text-[10px]">⌘K</kbd> for AI edit</span>
         </div>
+      )}
+      
+      {/* Selection Actions Toolbar */}
+      {repoId && (
+        <SelectionActions
+          position={selectionActions.position}
+          selectedText={selectionActions.selectedText}
+          onAction={handleSelectionAction}
+          onDismiss={selectionActions.dismiss}
+        />
       )}
       
       {/* Inline AI Command Modal */}
