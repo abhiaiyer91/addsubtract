@@ -116,7 +116,7 @@ describe('amend command', () => {
       createTestFile(testDir!, 'forjournal.txt', 'journal test content');
       repo.add(path.join(testDir!, 'forjournal.txt'));
       
-      const newHash = amend({ message: 'Journal test commit' });
+      amend({ message: 'Journal test commit' });
       
       // Reload repo to get fresh journal
       const freshRepo = Repository.find(testDir);

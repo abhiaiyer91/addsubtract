@@ -403,6 +403,7 @@ function categorizeCommits(commits: Array<{
         } else {
           categories.other.push(entry);
         }
+        break;
     }
   }
   
@@ -661,9 +662,9 @@ function formatChangeEntry(entry: ChangeEntry, style: string): string {
  * This is a utility function that can be used by the release command
  */
 export async function getCommitsBetweenRefs(
-  repo: any, // Repository instance
+  repo: unknown, // Repository instance
   fromRef: string,
-  toRef: string = 'HEAD'
+  _toRef: string = 'HEAD'
 ): Promise<Array<{
   sha: string;
   shortSha: string;

@@ -240,7 +240,7 @@ describe('Repository', () => {
         timestamp: Math.floor(Date.now() / 1000),
         timezone: '+0000',
       };
-      const commitHash = repo.commit('Commit with author', author);
+      repo.commit('Commit with author', author);
 
       const commits = repo.log('HEAD', 1);
       expect(commits[0].author.name).toBe('Test Author');
@@ -267,7 +267,7 @@ describe('Repository', () => {
 
       createTestFile(testDir, 'newfile.txt', 'content\n');
       repo.add(path.join(testDir, 'newfile.txt'));
-      const secondCommit = repo.commit('Second commit');
+      repo.commit('Second commit');
 
       const commits = repo.log('HEAD', 1);
       expect(commits[0].parentHashes).toContain(firstCommit);
@@ -293,7 +293,7 @@ describe('Repository', () => {
 
       createTestFile(testDir, 'initial.txt', 'initial content\n');
       repo.add(path.join(testDir, 'initial.txt'));
-      const commitHash = repo.commit('Initial commit');
+      repo.commit('Initial commit');
 
       const commits = repo.log('HEAD', 1);
       expect(commits[0].parentHashes.length).toBe(0);
@@ -790,7 +790,7 @@ describe('Repository', () => {
       // Create and commit initial file
       createTestFile(testDir, 'initial.txt', 'initial content\n');
       repo.add(path.join(testDir, 'initial.txt'));
-      const initialCommit = repo.commit('Initial commit');
+      repo.commit('Initial commit');
 
       // Create feature branch
       repo.createBranch('feature');
@@ -827,11 +827,11 @@ describe('Repository', () => {
 
       createTestFile(testDir, 'f1.txt', 'f1\n');
       repo.add(path.join(testDir, 'f1.txt'));
-      const featureCommit1 = repo.commit('Feature 1');
+      repo.commit('Feature 1');
 
       createTestFile(testDir, 'f2.txt', 'f2\n');
       repo.add(path.join(testDir, 'f2.txt'));
-      const featureCommit2 = repo.commit('Feature 2');
+      repo.commit('Feature 2');
 
       // Switch to main and back
       repo.checkout('main');

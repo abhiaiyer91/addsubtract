@@ -7,15 +7,12 @@ import * as path from 'path';
 import * as fs from 'fs';
 import {
   createRepoWithCommit,
-  createRepoWithMultipleCommits,
   createRepoWithBranches,
-  createTestFile,
   cleanupTempDir,
   restoreCwd,
   suppressConsole,
 } from './test-utils';
 import { Repository } from '../core/repository';
-import { Refs, PackedRef } from '../core/refs';
 
 describe('packed-refs', () => {
   let testDir: string | undefined;

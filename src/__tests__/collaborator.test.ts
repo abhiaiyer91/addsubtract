@@ -5,7 +5,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   CollaboratorManager,
-  CollaboratorRole,
   ROLE_PERMISSIONS,
   ROLE_HIERARCHY,
 } from '../core/collaborators';
@@ -75,7 +74,7 @@ describe('CollaboratorManager', () => {
 
     it('should reject duplicate invitations for active collaborators', () => {
       // First invite
-      const { collaborator, invitation } = manager.invite(
+      const { invitation } = manager.invite(
         'user@example.com',
         'contributor',
         'owner@example.com'

@@ -27,13 +27,8 @@ import { Repository } from '../core/repository';
 import {
   CollaboratorManager,
   CollaboratorRole,
-  Collaborator,
-  Invitation,
-  Team,
-  ROLE_HIERARCHY,
-  ROLE_PERMISSIONS,
 } from '../core/collaborators';
-import { EmailService, createEmailService } from '../core/email';
+import { createEmailService } from '../core/email';
 import { TsgitError, ErrorCode } from '../core/errors';
 
 const colors = {
@@ -199,7 +194,7 @@ export async function addCollaborator(
                       process.env.GIT_AUTHOR_NAME;
   
   // Invite the collaborator
-  const { collaborator, invitation } = manager.invite(email, role, inviterEmail, {
+  const { invitation } = manager.invite(email, role, inviterEmail, {
     name: options.name,
     message: options.message,
     skipEmail: options.skipEmail,
@@ -278,7 +273,7 @@ export function updateCollaboratorRole(email: string, newRole: CollaboratorRole)
                        process.env.GIT_AUTHOR_EMAIL || 
                        'unknown@example.com';
   
-  const collaborator = manager.updateRole(email, newRole, updaterEmail);
+  manager.updateRole(email, newRole, updaterEmail);
   
   console.log(colors.green('✓') + ` Updated ${email} to ${roleBadge(newRole)}`);
 }

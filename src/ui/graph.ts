@@ -476,7 +476,6 @@ export function renderGraphHTML(graph: CommitGraph): string {
       } else {
         // Beautiful S-curve for merge/branch (GitKraken style)
         const midY = cy + (ROW_HEIGHT - cy) / 2 + 4;
-        const ctrlOffset = Math.abs(x2 - x1) * 0.4;
         paths += `<path d="M${x1} ${cy + NODE_RADIUS} 
                           C${x1} ${midY}, ${x2} ${midY}, ${x2} ${ROW_HEIGHT}" 
                   fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round"/>`;

@@ -246,7 +246,7 @@ export {
 // Utility: Get All UI Styles
 // =============================================================================
 
-import { generateThemeCSS, githubDark } from './themes';
+import { generateThemeCSS } from './themes';
 import { getCommandPaletteStyles } from './command-palette';
 import { getDiffStyles, getWordDiffStyles } from './diff-viewer';
 import { getFileTreeStyles } from './file-tree';

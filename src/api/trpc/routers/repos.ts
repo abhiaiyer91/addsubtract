@@ -12,11 +12,9 @@ import {
   activityHelpers,
   orgModel,
   orgMemberModel,
-  prModel,
-  workflowRunModel,
 } from '../../../db/models';
 import { pullRequests, prComments, workflowRuns } from '../../../db/schema';
-import { and, eq, or, sql, desc, count } from 'drizzle-orm';
+import { and, eq, or, desc, count } from 'drizzle-orm';
 import { BareRepository, forkRepository, getRepoDiskPath, RepoManager, resolveDiskPath, initBareRepository } from '../../../server/storage/repos';
 import { exists, mkdirp } from '../../../utils/fs';
 import { eventBus } from '../../../events';
@@ -925,9 +923,6 @@ export const reposRouter = router({
       }
 
       try {
-        // Resolve the ref to a commit
-        let refToResolve = input.ref;
-        
         // Log available refs for debugging
         const allBranches = bareRepo.refs.listBranches();
         console.log(`[repos.getTree] Attempting to resolve ref '${refToResolve}', available branches: ${allBranches.join(', ') || '(none)'}`);
@@ -1245,7 +1240,7 @@ export const reposRouter = router({
       z.object({
         owner: z.string(),
         repo: z.string(),
-        name: z.string().min(1).max(255).regex(/^[a-zA-Z0-9._\/-]+$/, 'Invalid branch name'),
+        name: z.string().min(1).max(255).regex(/^[a-zA-Z0-9._/-]+$/, 'Invalid branch name'),
         fromRef: z.string().default('HEAD'),
       })
     )
@@ -1962,7 +1957,7 @@ export const reposRouter = router({
 
       try {
         // Import wit core classes
-        const { Blob, Tree, Commit } = await import('../../../core/object');
+        const { Tree, Commit } = await import('../../../core/object');
 
         // Get user info for commit author
         const user = await userModel.findById(ctx.user.id);
@@ -2653,14 +2648,13 @@ export const reposRouter = router({
 
       // Check if old path exists before attempting to move
       if (exists(oldAbsolutePath)) {
+        const fs = await import('fs');
         try {
           // Move the repository directory
-          const fs = await import('fs');
           fs.renameSync(oldAbsolutePath, newAbsolutePath);
-        } catch (moveError) {
+        } catch {
           // If rename fails (cross-device), try copy + delete
           try {
-            const fs = await import('fs');
             fs.cpSync(oldAbsolutePath, newAbsolutePath, { recursive: true });
             fs.rmSync(oldAbsolutePath, { recursive: true, force: true });
           } catch (copyError) {

@@ -8,10 +8,7 @@ import {
   calculateFilenameSimilarity,
   detectRenames,
   processRenames,
-  diff,
-  createHunks,
   FileDiff,
-  RenameDetectionOptions,
 } from '../core/diff';
 import {
   createTestRepo,
@@ -288,7 +285,7 @@ describe('Rename Detection', () => {
         },
       ];
 
-      const getContent = (path: string, isOld: boolean): string => content;
+      const getContent = (_path: string, _isOld: boolean): string => content;
 
       const processed = processRenames(fileDiffs, getContent);
 

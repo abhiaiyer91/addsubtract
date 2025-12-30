@@ -5,7 +5,7 @@
  * using Mastra Memory as the single source of truth.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as crypto from 'crypto';
 
 // Mock Mastra Memory

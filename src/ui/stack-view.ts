@@ -4,7 +4,7 @@
  */
 
 import { Repository } from '../core/repository';
-import { StackManager, StackMetadata, StackNode } from '../core/stack';
+import { StackManager } from '../core/stack';
 
 /**
  * Stack entry for UI display

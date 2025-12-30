@@ -80,11 +80,12 @@ function blocksToMarkdown(blocks: Block[]): string {
           return block.caption
             ? `![${block.caption}](${block.url})`
             : `![](${block.url})`;
-        case 'toggle':
+        case 'toggle': {
           const childContent = block.children
             ? blocksToMarkdown(block.children)
             : '';
           return `<details>\n<summary>${block.content}</summary>\n\n${childContent}\n</details>`;
+        }
         default:
           return block.content;
       }

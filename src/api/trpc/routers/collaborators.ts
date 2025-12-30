@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { router, protectedProcedure } from '../trpc';
-import { collaboratorModel, repoModel, userModel } from '../../../db/models';
+import { collaboratorModel, repoModel } from '../../../db/models';
 import { getGlobalEmailService } from '../../../core/email';
 import { getDb } from '../../../db';
 import { user } from '../../../db/auth-schema';

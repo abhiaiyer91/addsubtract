@@ -9,7 +9,6 @@ import {
   cleanupTempDir,
   createTestFile,
   readTestFile,
-  fileExists,
   suppressConsole,
   restoreCwd,
 } from './test-utils';

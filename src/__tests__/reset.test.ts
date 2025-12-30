@@ -315,8 +315,6 @@ describe('reset command', () => {
     });
 
     it('should reset to a short commit hash', () => {
-      const shortHash = commits[1].slice(0, 8);
-
       // Need to use full hash since parseRevision expects resolvable ref
       const result = reset(repo, commits[1], { mode: 'soft' });
 

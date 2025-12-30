@@ -15,13 +15,9 @@
  */
 
 import * as path from 'path';
-import * as fs from 'fs';
-import type { MergeQueueEntry, MergeQueueBatch, MergeQueueConfig, PullRequest } from '../db/schema';
 import { BareRepository } from '../server/storage/repos';
-import { exists, mkdirp } from '../utils/fs';
-import { Commit, Tree, Blob } from './object';
+import { Commit, Tree } from './object';
 import { Author, TreeEntry } from './types';
-import { diff } from './diff';
 
 // ============ TYPES ============
 

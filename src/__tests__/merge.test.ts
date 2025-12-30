@@ -4,7 +4,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as path from 'path';
-import { MergeManager, MergeResult, MergeState, FileConflict, formatMergeResult, formatConflict } from '../core/merge';
+import { MergeResult, FileConflict, formatMergeResult, formatConflict } from '../core/merge';
 import { 
   createRepoWithCommit, 
   cleanupTempDir, 
@@ -81,7 +81,6 @@ describe('merge', () => {
       const result = createRepoWithCommit();
       testDir = result.dir;
       repo = result.repo;
-      const baseCommit = result.commitHash;
 
       // Add a file on main first, then create feature from there
       createTestFile(testDir, 'main-file.txt', 'main content\n');
@@ -121,7 +120,7 @@ describe('merge', () => {
       // Add commit to main
       createTestFile(testDir, 'main.txt', 'main content\n');
       repo.add(path.join(testDir, 'main.txt'));
-      const mainCommit = repo.commit('Main commit');
+      repo.commit('Main commit');
 
       // Create feature from base with different file
       repo.checkout(baseCommit);
@@ -289,7 +288,6 @@ describe('merge', () => {
       const result = createRepoWithCommit();
       testDir = result.dir;
       repo = result.repo;
-      const baseCommit = result.commitHash;
 
       // Create base file with multiple lines
       createTestFile(testDir, 'multi.txt', 'line1\nline2\nline3\nline4\nline5\n');

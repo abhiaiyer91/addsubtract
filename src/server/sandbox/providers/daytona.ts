@@ -12,10 +12,8 @@
  * @see https://www.daytona.io/docs
  */
 
-import { EventEmitter } from 'events';
-import { PassThrough, Duplex } from 'stream';
+import { PassThrough } from 'stream';
 import type {
-  SandboxProvider,
   SandboxSession,
   SandboxSessionConfig,
   SandboxState,
@@ -212,7 +210,7 @@ class DaytonaSandboxSession extends BaseSandboxSession {
     }
   }
 
-  async runCode(code: string, language?: string): Promise<CommandResult> {
+  async runCode(code: string, _language?: string): Promise<CommandResult> {
     try {
       const result = await this.sandbox.process.codeRun(code);
 

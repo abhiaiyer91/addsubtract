@@ -6,15 +6,14 @@
  */
 
 import { z } from 'zod';
-import { router, protectedProcedure, publicProcedure } from '../trpc';
+import { router, protectedProcedure } from '../trpc';
 import { TRPCError } from '@trpc/server';
-import * as path from 'path';
-import { VirtualRepository, VirtualRepositoryManager } from '../../../primitives/virtual-repository';
-import { setVirtualRepo, getVirtualRepo, clearVirtualRepo } from '../../../ai/tools/virtual-write-file';
+import { VirtualRepositoryManager } from '../../../primitives/virtual-repository';
+import { setVirtualRepo, clearVirtualRepo } from '../../../ai/tools/virtual-write-file';
 import { getRepoDiskPath, resolveDiskPath } from '../../../server/storage/repos';
 import { getDb } from '../../../db';
 import { repositories } from '../../../db/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { exists } from '../../../utils/fs';
 
 // Session manager for IDE sessions
@@ -60,7 +59,7 @@ export const ideRouter = router({
       repo: z.string(),
       branch: z.string().optional().default('main'),
     }))
-    .mutation(async ({ input, ctx }) => {
+    .mutation(async ({ input }) => {
       const { owner, repo, branch } = input;
 
       // Get repository path

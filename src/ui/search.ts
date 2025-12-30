@@ -4,7 +4,6 @@
  */
 
 import { Repository } from '../core/repository';
-import { Commit, Blob } from '../core/object';
 
 /**
  * Search result types

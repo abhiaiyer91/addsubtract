@@ -12,13 +12,10 @@
  * @see https://e2b.dev/docs
  */
 
-import { EventEmitter } from 'events';
 import { PassThrough } from 'stream';
 import type {
-  SandboxProvider,
   SandboxSession,
   SandboxSessionConfig,
-  SandboxState,
   SandboxStats,
   SandboxInfo,
   CommandResult,
@@ -198,7 +195,7 @@ class E2BSandboxSession extends BaseSandboxSession {
     this._stdin.write(data);
   }
 
-  async resize(cols: number, rows: number): Promise<void> {
+  async resize(_cols: number, _rows: number): Promise<void> {
     // E2B doesn't support PTY resize
     // This is a no-op
   }

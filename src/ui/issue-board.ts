@@ -3,7 +3,7 @@
  * Linear-inspired kanban board for the web UI
  */
 
-import { Issue, IssueStatus, IssuePriority, IssueManager, STATUS_CONFIG, PRIORITY_CONFIG, Cycle, CustomStage } from '../core/issues';
+import { Issue, IssueStatus, IssueManager, STATUS_CONFIG, PRIORITY_CONFIG, Cycle, CustomStage } from '../core/issues';
 
 /**
  * Extended issue with Linear-style fields
@@ -465,12 +465,9 @@ export function renderIssueList(issues: Issue[], manager: IssueManager): string 
  */
 export function renderIssueDetail(issue: Issue, manager: IssueManager): string {
   const displayId = manager.getDisplayId(issue);
-  const statusConfig = STATUS_CONFIG[issue.status];
-  const priorityConfig = PRIORITY_CONFIG[issue.priority];
   const extIssue = issue as IssueWithExtras;
   
   const comments = manager.getComments(issue.id);
-  const activity = manager.getActivity(issue.id);
   
   const commentsHtml = comments.map(comment => `
     <div class="comment">

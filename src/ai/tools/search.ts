@@ -76,7 +76,7 @@ export const searchTool = createTool({
         totalResults: results.totalCount,
         searchTime: results.searchTime,
       };
-    } catch (error) {
+    } catch {
       return {
         commits: [],
         files: [],
@@ -123,7 +123,7 @@ export const globSearchTool = createTool({
         totalFiles: results.length,
         searchTime: Date.now() - startTime,
       };
-    } catch (error) {
+    } catch {
       return {
         files: [],
         totalFiles: 0,
@@ -187,7 +187,7 @@ export const contentSearchTool = createTool({
         totalMatches: results.content.length,
         searchTime: Date.now() - startTime,
       };
-    } catch (error) {
+    } catch {
       return {
         matches: [],
         totalMatches: 0,

@@ -8,7 +8,7 @@
 
 import * as crypto from 'crypto';
 import { Memory } from '@mastra/memory';
-import { getMemory, getStorage } from '../mastra.js';
+import { getMemory } from '../mastra.js';
 
 export interface ConversationThread {
   id: string;

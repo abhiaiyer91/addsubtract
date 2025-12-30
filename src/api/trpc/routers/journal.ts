@@ -9,7 +9,6 @@ import {
   collaboratorModel,
   JOURNAL_PAGE_STATUSES,
 } from '../../../db/models';
-import type { JournalPageStatus } from '../../../db/schema';
 
 // Zod schemas
 const journalPageStatusSchema = z.enum(['draft', 'published', 'archived']);

@@ -60,8 +60,7 @@ function getRepoDiskPath(ownerUsername: string, repoName: string): string {
 /**
  * Planning workflow status types
  */
-const PlanningStatusSchema = z.enum(['pending', 'planning', 'executing', 'reviewing', 'completed', 'failed']);
-type PlanningStatus = z.infer<typeof PlanningStatusSchema>;
+type PlanningStatus = 'pending' | 'planning' | 'executing' | 'reviewing' | 'completed' | 'failed';
 
 /**
  * Planning workflow run record (in-memory for now, could be persisted)

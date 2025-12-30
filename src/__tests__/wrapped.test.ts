@@ -2,7 +2,7 @@
  * Tests for Wrapped feature (monthly activity insights)
  */
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { wrappedModel } from '../db/models/wrapped';
 
 describe('Wrapped Model', () => {

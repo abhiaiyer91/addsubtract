@@ -18,7 +18,6 @@ import {
 import {
   createTempDir,
   cleanupTempDir,
-  createTestFile,
   suppressConsole,
   restoreCwd,
 } from './test-utils';
@@ -132,7 +131,7 @@ describe('Git Migration', () => {
       testDir = createTempDir();
       createMinimalGitRepo(testDir);
       
-      const { canMigrate, issues } = canMigrateGitRepo(path.join(testDir, '.git'));
+      const { canMigrate } = canMigrateGitRepo(path.join(testDir, '.git'));
       
       expect(canMigrate).toBe(true);
     });
@@ -191,8 +190,8 @@ describe('Git Migration', () => {
       const gitDir = path.join(testDir, '.git');
       
       // Create some objects
-      const blob1 = createGitBlob(gitDir, 'content 1');
-      const blob2 = createGitBlob(gitDir, 'content 2');
+      createGitBlob(gitDir, 'content 1');
+      createGitBlob(gitDir, 'content 2');
       
       const stats = await getMigrationStats(gitDir);
       

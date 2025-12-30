@@ -3,12 +3,10 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import * as path from 'path';
 import { analyzeBranches, deleteBranches } from '../commands/cleanup';
 import { 
   createRepoWithBranches, 
   cleanupTempDir,
-  createTestFile,
   suppressConsole,
   restoreCwd,
 } from './test-utils';

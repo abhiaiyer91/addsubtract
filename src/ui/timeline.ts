@@ -68,7 +68,6 @@ export function calculateStats(repo: Repository, maxCommits: number = 500): Repo
 
   const authorMap = new Map<string, AuthorStats>();
   const activityMap = new Map<string, ActivityData>();
-  const fileChanges = new Map<string, number>();
   const monthlyCommits = new Map<string, number>();
 
   try {
@@ -227,7 +226,7 @@ export function generateHeatmapData(activityByDay: ActivityData[], weeks: number
  * Render contribution heatmap HTML
  */
 export function renderHeatmapHTML(activityByDay: ActivityData[]): string {
-  const { weeks, maxCommits } = generateHeatmapData(activityByDay);
+  const { weeks } = generateHeatmapData(activityByDay);
 
   const dayLabels = ['Sun', '', 'Tue', '', 'Thu', '', 'Sat'];
   const monthLabels = generateMonthLabels(weeks);

@@ -73,7 +73,7 @@ describe('revert command', () => {
       expect(readTestFile(testDir, 'README.md')).toBe('# Test Project\n');
     });
 
-    it('should revert a commit that deleted a file', () => {
+    it('should revert a commit that deleted a file', async () => {
       const result = createRepoWithCommit();
       testDir = result.dir;
       repo = result.repo;
@@ -84,7 +84,8 @@ describe('revert command', () => {
       repo.commit('Add file to delete');
       
       // Delete it
-      require('fs').unlinkSync(path.join(testDir, 'toDelete.txt'));
+      const fs = await import('fs');
+      fs.unlinkSync(path.join(testDir, 'toDelete.txt'));
       repo.index.remove('toDelete.txt');
       repo.index.save();
       const deleteCommit = repo.commit('Delete file');
@@ -156,7 +157,6 @@ describe('revert command', () => {
       const result = createRepoWithCommit();
       testDir = result.dir;
       repo = result.repo;
-      const headBefore = repo.refs.resolve('HEAD');
       
       // Add a file
       createTestFile(testDir, 'file.txt', 'content\n');
@@ -194,7 +194,7 @@ describe('revert command', () => {
       // Create a file
       createTestFile(testDir, 'file.txt', 'original\n');
       repo.add(path.join(testDir, 'file.txt'));
-      const addCommit = repo.commit('Add file');
+      repo.commit('Add file');
       
       // Modify file
       createTestFile(testDir, 'file.txt', 'modified\n');
@@ -226,7 +226,7 @@ describe('revert command', () => {
       // Create conflict situation
       createTestFile(testDir, 'file.txt', 'v1\n');
       repo.add(path.join(testDir, 'file.txt'));
-      const v1Commit = repo.commit('Version 1');
+      repo.commit('Version 1');
       
       createTestFile(testDir, 'file.txt', 'v2\n');
       repo.add(path.join(testDir, 'file.txt'));

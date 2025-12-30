@@ -20,7 +20,7 @@ export interface StashEntry {
 /**
  * Get stash list (mock implementation - would be backed by actual stash functionality)
  */
-export function getStashList(repo: Repository): StashEntry[] {
+export function getStashList(_repo: Repository): StashEntry[] {
   // This would be implemented with actual stash support
   // For now, return empty array as placeholder
   return [];

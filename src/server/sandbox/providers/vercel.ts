@@ -12,13 +12,10 @@
  * @see https://vercel.com/docs/vercel-sandbox
  */
 
-import { EventEmitter } from 'events';
 import { PassThrough } from 'stream';
 import type {
-  SandboxProvider,
   SandboxSession,
   SandboxSessionConfig,
-  SandboxState,
   SandboxStats,
   SandboxInfo,
   CommandResult,
@@ -179,8 +176,8 @@ class VercelSandboxSession extends BaseSandboxSession {
       // Wrap the command in a shell to support shell built-ins (echo, cd, etc.)
       // and shell features (pipes, redirects, etc.)
       // Vercel SDK's runCommand expects executable and args separately
-      let executable = '/bin/sh';
-      let execArgs = ['-c', args && args.length > 0 ? `${command} ${args.join(' ')}` : command];
+      const executable = '/bin/sh';
+      const execArgs = ['-c', args && args.length > 0 ? `${command} ${args.join(' ')}` : command];
 
       try {
         const result = await this.sandbox.runCommand(executable, execArgs, {
@@ -256,7 +253,7 @@ class VercelSandboxSession extends BaseSandboxSession {
     this._stdin.write(data);
   }
 
-  async resize(cols: number, rows: number): Promise<void> {
+  async resize(_cols: number, _rows: number): Promise<void> {
     // Vercel Sandbox doesn't support PTY resize
     // This is a no-op
   }

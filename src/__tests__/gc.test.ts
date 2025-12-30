@@ -9,7 +9,6 @@ import { GarbageCollector } from '../commands/gc';
 import {
   createRepoWithCommit,
   createRepoWithMultipleCommits,
-  createTestFile,
   cleanupTempDir,
   restoreCwd,
   suppressConsole,
