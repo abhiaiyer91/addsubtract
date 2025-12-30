@@ -58,6 +58,9 @@ export * from './ui';
 // AI Integration
 export * from './ai';
 
+// Sentinel - Proactive Code Scanning
+export * from './sentinel';
+
 // Primitives
 export * from './primitives';
 

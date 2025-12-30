@@ -31,6 +31,7 @@ import { createSandboxRoutes, createSandboxWsRoutes } from './routes/sandbox-ws'
 import { createRepoRoutes } from './routes/repos';
 import { createPullRoutes } from './routes/pulls';
 import { createPublicApiV1 } from './routes/public-api';
+import { createSentinelRoutes } from './routes/sentinel';
 import { RepoManager } from './storage/repos';
 import { syncReposToDatabase } from './storage/sync';
 import { appRouter, createContext } from '../api/trpc';
@@ -183,12 +184,14 @@ export function createApp(repoManager: RepoManager, options: { verbose?: boolean
   const oauthRoutes = createOAuthRoutes();
   const sandboxRoutes = createSandboxRoutes();
   const sandboxWsRoutes = createSandboxWsRoutes(upgradeWebSocket);
+  const sentinelRoutes = createSentinelRoutes();
   
   app.route('/api/repos', repoRoutes);
   app.route('/api/repos', issueRoutes);
   app.route('/api/repos', projectRoutes);
   app.route('/api/repos', cycleRoutes);
   app.route('/api/repos', pullRoutes);
+  app.route('/api/repos', sentinelRoutes);
   app.route('/api/agent', agentStreamRoutes);
   app.route('/api/planning', planningStreamRoutes);
   app.route('/api/sandbox', sandboxRoutes);
