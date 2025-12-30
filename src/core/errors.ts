@@ -535,4 +535,155 @@ export const Errors = {
       { hook: hookName, output }
     );
   },
+
+  // PR-related errors
+  prNumberRequired(command: string): TsgitError {
+    return new TsgitError(
+      `PR number required for '${command}'`,
+      ErrorCode.INVALID_ARGUMENT,
+      [
+        `wit pr ${command} 123    # ${command} PR #123`,
+        'wit pr list             # List all PRs to find the number',
+      ]
+    );
+  },
+
+  prNotOpen(prNumber: number, state: string): TsgitError {
+    const suggestions: string[] = [];
+    if (state === 'closed') {
+      suggestions.push(`wit pr reopen ${prNumber}    # Reopen the PR first`);
+    } else if (state === 'merged') {
+      suggestions.push('This PR has already been merged');
+    }
+    suggestions.push(`wit pr view ${prNumber}    # View PR details`);
+
+    return new TsgitError(
+      `PR #${prNumber} is not open (current state: ${state})`,
+      ErrorCode.OPERATION_FAILED,
+      suggestions,
+      { prNumber, state }
+    );
+  },
+
+  // Server connection errors
+  serverNotRunning(url?: string): TsgitError {
+    return new TsgitError(
+      `Cannot connect to wit server${url ? ` at ${url}` : ''}`,
+      ErrorCode.OPERATION_FAILED,
+      [
+        'wit serve              # Start the wit server',
+        'wit up                 # Start wit platform (server + database)',
+        'Check if the server is running on the expected port',
+      ],
+      { url }
+    );
+  },
+
+  // Invalid branch name
+  invalidBranchName(name: string, reason: string, suggestion?: string): TsgitError {
+    const suggestions: string[] = [];
+    if (suggestion) {
+      suggestions.push(`Try: wit branch ${suggestion}`);
+    }
+    suggestions.push('wit branch --help    # See naming rules');
+
+    return new TsgitError(
+      `Branch name '${name}' is invalid: ${reason}`,
+      ErrorCode.INVALID_ARGUMENT,
+      suggestions,
+      { branch: name, reason }
+    );
+  },
+
+  // Merge-related errors
+  noMergeInProgress(action: string): TsgitError {
+    return new TsgitError(
+      `No merge in progress to ${action}`,
+      ErrorCode.OPERATION_FAILED,
+      [
+        'wit status    # Check repository status',
+        'wit merge <branch>    # Start a new merge',
+      ]
+    );
+  },
+
+  unresolvedConflicts(files: string[]): TsgitError {
+    const fileList = files.slice(0, 5).join(', ');
+    const moreCount = files.length > 5 ? ` (+${files.length - 5} more)` : '';
+
+    return new TsgitError(
+      `Cannot continue: ${files.length} unresolved conflict(s)`,
+      ErrorCode.MERGE_CONFLICT,
+      [
+        `Unresolved: ${fileList}${moreCount}`,
+        'wit merge --conflicts    # View all conflicts',
+        'wit merge --resolve <file>    # Mark file as resolved',
+        'wit merge --abort    # Cancel the merge',
+      ],
+      { files }
+    );
+  },
+
+  // Rebase errors
+  noRebaseInProgress(action: string): TsgitError {
+    return new TsgitError(
+      `No rebase in progress to ${action}`,
+      ErrorCode.OPERATION_FAILED,
+      [
+        'wit status    # Check repository status',
+        'wit rebase <branch>    # Start a new rebase',
+      ]
+    );
+  },
+
+  // Stash errors
+  noStashEntries(): TsgitError {
+    return new TsgitError(
+      'No stash entries found',
+      ErrorCode.OPERATION_FAILED,
+      [
+        'wit stash list    # List all stashes (empty)',
+        'wit stash         # Create a new stash first',
+      ]
+    );
+  },
+
+  stashNotFound(stashId: string): TsgitError {
+    return new TsgitError(
+      `Stash '${stashId}' not found`,
+      ErrorCode.OPERATION_FAILED,
+      [
+        'wit stash list    # List available stashes',
+        'wit stash pop     # Pop the most recent stash',
+      ],
+      { stashId }
+    );
+  },
+
+  // Index/staging errors
+  pathOutsideRepository(path: string): TsgitError {
+    return new TsgitError(
+      `Path '${path}' is outside the repository`,
+      ErrorCode.SCOPE_VIOLATION,
+      [
+        'Check that you are in the correct directory',
+        'Use a path relative to the repository root',
+        'wit status    # See files in the repository',
+      ],
+      { path }
+    );
+  },
+
+  pathspecNotFound(pathspec: string): TsgitError {
+    return new TsgitError(
+      `pathspec '${pathspec}' did not match any files`,
+      ErrorCode.FILE_NOT_FOUND,
+      [
+        'ls                    # Check files in current directory',
+        'wit status            # See tracked and untracked files',
+        'Check spelling and path case sensitivity',
+      ],
+      { pathspec }
+    );
+  },
 };

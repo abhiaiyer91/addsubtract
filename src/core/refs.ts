@@ -1,6 +1,7 @@
 import * as path from 'path';
 import * as fs from 'fs';
 import { exists, readFileText, writeFile, readDir, isDirectory, mkdirp } from '../utils/fs';
+import { TsgitError, ErrorCode, findSimilar } from './errors';
 
 /**
  * Represents a reference stored in packed-refs file
@@ -216,11 +217,84 @@ export class Refs {
    * Create a new branch
    */
   createBranch(name: string, hash: string): void {
+    // Validate branch name
+    const validation = this.validateBranchName(name);
+    if (!validation.valid) {
+      throw new TsgitError(
+        `Branch name '${name}' is invalid: ${validation.reason}`,
+        ErrorCode.INVALID_ARGUMENT,
+        [
+          `Try: wit branch ${this.suggestValidBranchName(name)}`,
+          'wit branch --help    # See naming rules',
+        ],
+        { branch: name }
+      );
+    }
+
     const branchPath = path.join(this.headsDir, name);
-    if (exists(branchPath)) {
-      throw new Error(`Branch '${name}' already exists`);
+    if (exists(branchPath) || this.getPackedRef(`refs/heads/${name}`)) {
+      throw new TsgitError(
+        `Branch '${name}' already exists`,
+        ErrorCode.BRANCH_EXISTS,
+        [
+          `wit checkout ${name}    # Switch to existing branch`,
+          `wit branch -d ${name}   # Delete it first if you want to recreate`,
+        ],
+        { branch: name }
+      );
     }
     writeFile(branchPath, hash + '\n');
+  }
+
+  /**
+   * Validate a branch name according to Git rules
+   */
+  private validateBranchName(name: string): { valid: boolean; reason?: string } {
+    if (!name || name.trim() === '') {
+      return { valid: false, reason: 'branch name cannot be empty' };
+    }
+    if (name.startsWith('-')) {
+      return { valid: false, reason: 'branch name cannot start with a hyphen' };
+    }
+    if (name.startsWith('.') || name.endsWith('.')) {
+      return { valid: false, reason: 'branch name cannot start or end with a dot' };
+    }
+    if (name.includes('..')) {
+      return { valid: false, reason: 'branch name cannot contain consecutive dots (..)' };
+    }
+    if (name.includes(' ')) {
+      return { valid: false, reason: 'branch name cannot contain spaces' };
+    }
+    if (name.includes('~') || name.includes('^') || name.includes(':') || name.includes('?') || name.includes('*') || name.includes('[')) {
+      return { valid: false, reason: 'branch name cannot contain ~ ^ : ? * [' };
+    }
+    if (name.includes('\\')) {
+      return { valid: false, reason: 'branch name cannot contain backslashes' };
+    }
+    if (name.endsWith('.lock')) {
+      return { valid: false, reason: 'branch name cannot end with .lock' };
+    }
+    if (name.includes('@{')) {
+      return { valid: false, reason: 'branch name cannot contain @{' };
+    }
+    if (name === '@') {
+      return { valid: false, reason: 'branch name cannot be just @' };
+    }
+    return { valid: true };
+  }
+
+  /**
+   * Suggest a valid branch name from an invalid one
+   */
+  private suggestValidBranchName(name: string): string {
+    return name
+      .replace(/\s+/g, '-')           // Replace spaces with hyphens
+      .replace(/[~^:?*\[\]\\]/g, '')  // Remove invalid chars
+      .replace(/\.{2,}/g, '.')        // Replace multiple dots with single
+      .replace(/^[-.]|[-.]$/g, '')    // Remove leading/trailing hyphen or dot
+      .replace(/\.lock$/i, '')        // Remove .lock suffix
+      .replace(/@\{/g, '')            // Remove @{
+      || 'new-branch';
   }
 
   /**
@@ -230,21 +304,43 @@ export class Refs {
     const branchPath = path.join(this.headsDir, name);
     const looseExists = exists(branchPath);
     const packedRef = this.getPackedRef(`refs/heads/${name}`);
-    
+
     if (!looseExists && !packedRef) {
-      throw new Error(`Branch '${name}' not found`);
+      const existingBranches = this.listBranches();
+      const similar = findSimilar(name, existingBranches);
+      const suggestions: string[] = [];
+
+      if (similar.length > 0) {
+        suggestions.push(`Did you mean: ${similar.join(', ')}?`);
+      }
+      suggestions.push('wit branch    # List all branches');
+
+      throw new TsgitError(
+        `Branch '${name}' not found`,
+        ErrorCode.BRANCH_NOT_FOUND,
+        suggestions,
+        { branch: name, similarBranches: similar }
+      );
     }
 
     const current = this.getCurrentBranch();
     if (current === name) {
-      throw new Error(`Cannot delete the current branch '${name}'`);
+      throw new TsgitError(
+        `Cannot delete branch '${name}' - you are currently on it`,
+        ErrorCode.CANNOT_DELETE_CURRENT_BRANCH,
+        [
+          'wit checkout main       # Switch to main branch first',
+          'wit checkout <branch>   # Switch to another branch first',
+        ],
+        { branch: name, currentBranch: current }
+      );
     }
 
     // Delete loose ref if it exists
     if (looseExists) {
       require('fs').unlinkSync(branchPath);
     }
-    
+
     // Remove from packed-refs if it exists there
     if (packedRef) {
       this.removeFromPackedRefs(`refs/heads/${name}`);
@@ -303,8 +399,16 @@ export class Refs {
    */
   createTag(name: string, hash: string): void {
     const tagPath = path.join(this.tagsDir, name);
-    if (exists(tagPath)) {
-      throw new Error(`Tag '${name}' already exists`);
+    if (exists(tagPath) || this.getPackedRef(`refs/tags/${name}`)) {
+      throw new TsgitError(
+        `Tag '${name}' already exists`,
+        ErrorCode.TAG_EXISTS,
+        [
+          `wit show ${name}       # View existing tag`,
+          `wit tag -d ${name}     # Delete it first to recreate`,
+        ],
+        { tag: name }
+      );
     }
     writeFile(tagPath, hash + '\n');
   }
@@ -314,10 +418,36 @@ export class Refs {
    */
   deleteTag(name: string): void {
     const tagPath = path.join(this.tagsDir, name);
-    if (!exists(tagPath)) {
-      throw new Error(`Tag '${name}' not found`);
+    const looseExists = exists(tagPath);
+    const packedRef = this.getPackedRef(`refs/tags/${name}`);
+
+    if (!looseExists && !packedRef) {
+      const existingTags = this.listTags();
+      const similar = findSimilar(name, existingTags);
+      const suggestions: string[] = [];
+
+      if (similar.length > 0) {
+        suggestions.push(`Did you mean: ${similar.join(', ')}?`);
+      }
+      suggestions.push('wit tag    # List all tags');
+
+      throw new TsgitError(
+        `Tag '${name}' not found`,
+        ErrorCode.TAG_NOT_FOUND,
+        suggestions,
+        { tag: name, similarTags: similar }
+      );
     }
-    require('fs').unlinkSync(tagPath);
+
+    // Delete loose ref if it exists
+    if (looseExists) {
+      require('fs').unlinkSync(tagPath);
+    }
+
+    // Remove from packed-refs if it exists there
+    if (packedRef) {
+      this.removeFromPackedRefs(`refs/tags/${name}`);
+    }
   }
 
   /**
