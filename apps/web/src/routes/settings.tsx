@@ -13,8 +13,8 @@ import { useSession } from '@/lib/auth-client';
 import { trpc } from '@/lib/trpc';
 
 export function SettingsPage() {
-  const { data: session, isPending } = useSession();
-  const user = session?.user;
+  const { data: session, isPending, refetch: refetchSession } = useSession();
+  const sessionUser = session?.user;
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -24,10 +24,23 @@ export function SettingsPage() {
     avatarUrl: '',
   });
 
+  // Fetch full user profile data from tRPC
+  const utils = trpc.useUtils();
+  const { data: userProfile } = trpc.users.me.useQuery(undefined, {
+    enabled: !!sessionUser,
+  });
+
+  // Use profile data if available, otherwise fall back to session user
+  const user = userProfile || sessionUser;
+
   const updateProfile = trpc.users.update.useMutation({
-    onSuccess: () => {
+    onSuccess: async () => {
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
+      // Invalidate and refetch user data
+      await utils.users.me.invalidate();
+      // Also try to refetch the session
+      refetchSession?.();
     },
   });
 
@@ -39,7 +52,7 @@ export function SettingsPage() {
         bio: (user as any).bio || '',
         location: (user as any).location || '',
         website: (user as any).website || '',
-        avatarUrl: user.image || '',
+        avatarUrl: (user as any).avatarUrl || (user as any).image || '',
       });
     }
   }, [user]);

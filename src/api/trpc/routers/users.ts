@@ -5,6 +5,32 @@ import { userModel, repoModel, starModel, watchModel, orgMemberModel } from '../
 
 export const usersRouter = router({
   /**
+   * Get current authenticated user's full profile
+   */
+  me: protectedProcedure.query(async ({ ctx }) => {
+    const user = await userModel.findById(ctx.user.id);
+
+    if (!user) {
+      throw new TRPCError({
+        code: 'NOT_FOUND',
+        message: 'User not found',
+      });
+    }
+
+    return {
+      id: user.id,
+      username: user.username,
+      name: user.name,
+      email: user.email,
+      avatarUrl: user.avatarUrl,
+      bio: user.bio,
+      location: user.location,
+      website: user.website,
+      createdAt: user.createdAt,
+    };
+  }),
+
+  /**
    * Get a user by username
    */
   get: publicProcedure
