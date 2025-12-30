@@ -26,15 +26,22 @@ export function CommitsPage() {
     { enabled: !!owner && !!repo }
   );
 
-  const commits: Commit[] = commitsData?.map(c => ({
+  const commits: Commit[] = commitsData?.commits?.map(c => ({
     sha: c.sha,
     message: c.message,
     author: {
       name: c.author,
       email: c.authorEmail,
+      username: c.authorUsername,
+      avatarUrl: c.authorAvatarUrl,
     },
     date: new Date(c.date),
+    pr: c.pr,
+    commentCount: c.commentCount,
+    ciStatus: c.ciStatus,
   })) || [];
+
+  const totalCount = commitsData?.totalCount || 0;
 
   const branches = branchesData?.map(b => ({
     name: b.name,
@@ -66,7 +73,7 @@ export function CommitsPage() {
           </div>
         </div>
 
-        <CommitList commits={commits} owner={owner!} repo={repo!} />
+        <CommitList commits={commits} owner={owner!} repo={repo!} totalCount={totalCount} />
       </div>
     </RepoLayout>
   );
