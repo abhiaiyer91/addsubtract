@@ -294,6 +294,7 @@ export const sandboxConfigModel = {
     provider: SandboxProvider | null;
     hasApiKey: boolean;
     ready: boolean;
+    dockerAvailable?: boolean;
   }> {
     const config = await this.getConfig(repoId);
 
@@ -307,18 +308,35 @@ export const sandboxConfigModel = {
       };
     }
 
-    // Docker doesn't need an API key
+    // Docker doesn't need an API key but needs Docker to be available
     let hasApiKey = config.provider === 'docker';
+    let dockerAvailable: boolean | undefined;
+    
+    if (config.provider === 'docker') {
+      // Check if Docker is available
+      try {
+        const { execSync } = await import('child_process');
+        execSync('docker version', { stdio: 'ignore', timeout: 5000 });
+        dockerAvailable = true;
+      } catch {
+        dockerAvailable = false;
+      }
+    }
+    
     if (!hasApiKey) {
       hasApiKey = await sandboxKeyModel.hasKey(repoId, config.provider);
     }
+
+    // For Docker, also require Docker to be available
+    const isReady = config.enabled && hasApiKey && (config.provider !== 'docker' || dockerAvailable === true);
 
     return {
       configured: true,
       enabled: config.enabled,
       provider: config.provider,
       hasApiKey,
-      ready: config.enabled && hasApiKey,
+      ready: isReady,
+      dockerAvailable,
     };
   },
 };

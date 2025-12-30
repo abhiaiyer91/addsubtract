@@ -48,8 +48,12 @@ services:
       HOST: 0.0.0.0
       REPOS_PATH: /repos
       NODE_ENV: production
+      # Docker sandbox support (users can also configure E2B or Daytona per-repo)
+      DOCKER_SOCKET_PATH: /var/run/docker.sock
     volumes:
       - repos_data:/repos
+      # Mount Docker socket for sandbox functionality
+      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       db:
         condition: service_healthy
