@@ -162,6 +162,13 @@
       "when": 1767125100000,
       "tag": "0022_sentinel",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1767125200000,
+      "tag": "0023_add_storage_backend",
+      "breakpoints": true
     }
   ]
 }
