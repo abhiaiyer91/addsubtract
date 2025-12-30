@@ -3,12 +3,16 @@ FROM node:20-alpine
 WORKDIR /app
 
 # Install git for any git operations, docker CLI for sandbox, and curl for CodeRabbit CLI
-RUN apk add --no-cache git docker-cli curl bash
+# Also install gcompat for glibc compatibility (needed for CodeRabbit CLI binary)
+RUN apk add --no-cache git docker-cli curl bash gcompat libstdc++
 
 # Install CodeRabbit CLI for AI code reviews
+# Note: The CLI binary requires glibc, gcompat provides compatibility layer
 RUN curl -fsSL https://cli.coderabbit.ai/install.sh | bash && \
+    ls -la /root/.local/bin/ && \
     ln -sf /root/.local/bin/coderabbit /usr/local/bin/coderabbit && \
     ln -sf /root/.local/bin/coderabbit /usr/local/bin/cr && \
+    ls -la /usr/local/bin/coderabbit && \
     /usr/local/bin/coderabbit --version
 
 # Install dependencies
