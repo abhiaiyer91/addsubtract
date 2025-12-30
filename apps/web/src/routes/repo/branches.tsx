@@ -61,9 +61,6 @@ export function BranchesPage() {
     });
   };
 
-  // Find the default branch name
-  const defaultBranch = branches?.find(b => b.isDefault)?.name || 'main';
-
   return (
     <RepoLayout owner={owner!} repo={repo!}>
       <div className="space-y-4">
@@ -126,13 +123,6 @@ export function BranchesPage() {
                   </div>
 
                   <div className="flex items-center gap-2">
-                    {!branch.isDefault && (
-                      <Link to={`/${owner}/${repo}/pulls/new?source=${encodeURIComponent(branch.name)}&target=${encodeURIComponent(defaultBranch)}`}>
-                        <Button variant="outline" size="sm">
-                          Compare
-                        </Button>
-                      </Link>
-                    )}
                     {authenticated && !branch.isDefault && (
                       <Button 
                         variant="ghost" 
