@@ -6,14 +6,14 @@
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Terminal as XTerm } from 'xterm';
-import { FitAddon } from 'xterm-addon-fit';
-import { WebLinksAddon } from 'xterm-addon-web-links';
+import { Terminal as XTerm } from '@xterm/xterm';
+import { FitAddon } from '@xterm/addon-fit';
+import { WebLinksAddon } from '@xterm/addon-web-links';
 import { Terminal, Power, PowerOff, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import 'xterm/css/xterm.css';
+import '@xterm/xterm/css/xterm.css';
 
 interface SandboxTerminalProps {
   repoId: string;

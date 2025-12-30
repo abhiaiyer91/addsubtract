@@ -15,6 +15,7 @@ dotenv.config({ path: path.join(__dirname, '../../.env') }); // Try project root
 
 import { Hono } from 'hono';
 import { serve, ServerType } from '@hono/node-server';
+import { createNodeWebSocket } from '@hono/node-ws';
 import { logger } from 'hono/logger';
 import { cors } from 'hono/cors';
 import { trpcServer } from '@hono/trpc-server';
@@ -25,7 +26,7 @@ import { createCycleRoutes } from './routes/cycles';
 import { createAgentStreamRoutes } from './routes/agent-stream';
 import { createPackageRoutes } from './routes/packages';
 import { createOAuthRoutes } from './routes/oauth';
-import { createSandboxRoutes } from './routes/sandbox-ws';
+import { createSandboxRoutes, createSandboxWsRoutes } from './routes/sandbox-ws';
 import { createRepoRoutes } from './routes/repos';
 import { RepoManager } from './storage/repos';
 import { syncReposToDatabase } from './storage/sync';
@@ -90,8 +91,11 @@ export interface WitServer {
 /**
  * Create and configure the Hono app
  */
-export function createApp(repoManager: RepoManager, options: { verbose?: boolean } = {}): Hono {
+export function createApp(repoManager: RepoManager, options: { verbose?: boolean } = {}): { app: Hono; injectWebSocket: (server: ServerType) => void } {
   const app = new Hono();
+  
+  // Create WebSocket support
+  const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app });
 
   // Add logger middleware if verbose
   if (options.verbose) {
@@ -173,6 +177,7 @@ export function createApp(repoManager: RepoManager, options: { verbose?: boolean
   const agentStreamRoutes = createAgentStreamRoutes();
   const oauthRoutes = createOAuthRoutes();
   const sandboxRoutes = createSandboxRoutes();
+  const sandboxWsRoutes = createSandboxWsRoutes(upgradeWebSocket);
   
   app.route('/api/repos', repoRoutes);
   app.route('/api/repos', issueRoutes);
@@ -180,6 +185,7 @@ export function createApp(repoManager: RepoManager, options: { verbose?: boolean
   app.route('/api/repos', cycleRoutes);
   app.route('/api/agent', agentStreamRoutes);
   app.route('/api/sandbox', sandboxRoutes);
+  app.route('/api/sandbox', sandboxWsRoutes);
   app.route('/oauth', oauthRoutes);
 
   // Package registry routes (npm-compatible)
@@ -203,7 +209,7 @@ export function createApp(repoManager: RepoManager, options: { verbose?: boolean
     return c.json({ error: err.message }, 500);
   });
 
-  return app;
+  return { app, injectWebSocket };
 }
 
 /**
@@ -241,7 +247,7 @@ export function startServer(options: ServerOptions): WitServer {
   const repoManager = new RepoManager(absoluteReposDir);
 
   // Create app
-  const app = createApp(repoManager, { verbose });
+  const { app, injectWebSocket } = createApp(repoManager, { verbose });
 
   // Start HTTP server
   const server = serve({
@@ -249,6 +255,9 @@ export function startServer(options: ServerOptions): WitServer {
     port,
     hostname: host,
   });
+  
+  // Inject WebSocket support into the server
+  injectWebSocket(server);
 
   // Initialize SSH server if enabled
   let sshServer: SSHServer | undefined;
