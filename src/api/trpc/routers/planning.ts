@@ -12,8 +12,9 @@ import { TRPCError } from '@trpc/server';
 import { observable } from '@trpc/server/observable';
 import { router, protectedProcedure } from '../trpc';
 import { repoModel, repoAiKeyModel } from '../../../db/models';
-import { isAIAvailable, getAIInfo } from '../../../ai/mastra';
+import { isAIAvailable, getAIInfo, getStorage } from '../../../ai/mastra';
 import { runMultiAgentPlanningWorkflow, streamMultiAgentPlanningWorkflow } from '../../../ai/mastra';
+import type { WorkflowRunState } from '@mastra/core/workflows';
 import type { 
   MultiAgentPlanningInput, 
   MultiAgentPlanningOutput,
@@ -97,9 +98,108 @@ const planningRuns = new Map<string, PlanningRun>();
 
 /**
  * Get a planning run by ID (for use by observe endpoint)
+ * Only returns in-memory runs (active runs that can be observed)
  */
 export function getPlanningRun(runId: string): PlanningRun | undefined {
   return planningRuns.get(runId);
+}
+
+/**
+ * Get a planning run from Mastra storage by ID
+ * Used for fetching completed/persisted runs
+ */
+export async function getPlanningRunFromStorage(runId: string, userId: string): Promise<{
+  id: string;
+  repoId: string;
+  task: string;
+  context?: string;
+  status: PlanningStatus;
+  plan?: ExecutionPlan;
+  groupResults?: GroupResult[];
+  review?: ReviewResult;
+  error?: string;
+  startedAt: Date;
+  completedAt?: Date;
+  dryRun: boolean;
+  createBranch: boolean;
+  branchName?: string;
+  autoCommit: boolean;
+} | null> {
+  try {
+    const storage = getStorage();
+    const workflowsStore = await storage.getStore('workflows');
+    
+    if (!workflowsStore) {
+      return null;
+    }
+
+    const mastraRun = await workflowsStore.getWorkflowRunById({
+      runId,
+      workflowName: 'multiAgentPlanning',
+    });
+
+    if (!mastraRun) {
+      return null;
+    }
+
+    // Parse snapshot
+    const snapshot = typeof mastraRun.snapshot === 'string' 
+      ? JSON.parse(mastraRun.snapshot) as WorkflowRunState
+      : mastraRun.snapshot as WorkflowRunState;
+
+    // Extract input from snapshot
+    const workflowInput = snapshot?.context?.input as MultiAgentPlanningInput | undefined;
+    
+    // Verify ownership
+    if (workflowInput?.userId !== userId) {
+      return null;
+    }
+
+    // Extract step results
+    const planResult = snapshot?.context?.['create-plan'] as { output?: { plan?: ExecutionPlan } } | undefined;
+    const execResult = snapshot?.context?.['execute-plan'] as { output?: { groupResults?: GroupResult[] } } | undefined;
+    const reviewResult = snapshot?.context?.['review-results'] as { output?: { review?: ReviewResult } } | undefined;
+
+    // Map Mastra status to our status
+    // Mastra uses: 'running' | 'success' | 'failed' | 'tripwire' | 'suspended' | 'waiting' | 'pending' | 'canceled' | 'bailed' | 'paused'
+    let status: PlanningStatus = 'pending';
+    if (snapshot?.status === 'success') {
+      status = 'completed';
+    } else if (snapshot?.status === 'failed' || snapshot?.status === 'canceled' || snapshot?.status === 'bailed') {
+      status = 'failed';
+    } else if (snapshot?.status === 'running') {
+      if (reviewResult) {
+        status = 'reviewing';
+      } else if (execResult) {
+        status = 'executing';
+      } else if (planResult) {
+        status = 'planning';
+      }
+    }
+
+    return {
+      id: mastraRun.runId,
+      repoId: workflowInput?.repoId || '',
+      task: workflowInput?.task || 'Unknown task',
+      context: workflowInput?.context,
+      status,
+      plan: planResult?.output?.plan,
+      groupResults: execResult?.output?.groupResults,
+      review: reviewResult?.output?.review,
+      error: snapshot?.error?.message,
+      startedAt: mastraRun.createdAt,
+      completedAt: (snapshot?.status === 'success' || snapshot?.status === 'failed')
+        ? mastraRun.updatedAt
+        : undefined,
+      dryRun: workflowInput?.dryRun || false,
+      createBranch: workflowInput?.createBranch ?? true,
+      branchName: workflowInput?.branchName,
+      autoCommit: workflowInput?.autoCommit ?? true,
+    };
+  } catch (error) {
+    console.error('[Planning] Failed to fetch run from Mastra storage:', error);
+    return null;
+  }
 }
 
 /**
@@ -357,52 +457,140 @@ export const planningRouter = router({
 
   /**
    * Get the status of a planning run
+   * Checks in-memory first, then falls back to Mastra storage
    */
   getRun: protectedProcedure
     .input(z.object({ runId: z.string().uuid() }))
     .query(async ({ input, ctx }) => {
+      // First check in-memory for active runs
       const run = planningRuns.get(input.runId);
       
-      if (!run) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Planning run not found',
-        });
+      if (run) {
+        // Verify ownership
+        if (run.userId !== ctx.user.id) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Not authorized to view this run',
+          });
+        }
+
+        return {
+          id: run.id,
+          repoId: run.repoId,
+          task: run.task,
+          context: run.context,
+          status: run.status,
+          plan: run.plan,
+          groupResults: run.groupResults,
+          review: run.review,
+          error: run.error,
+          startedAt: run.startedAt,
+          completedAt: run.completedAt,
+          duration: run.completedAt 
+            ? run.completedAt.getTime() - run.startedAt.getTime()
+            : Date.now() - run.startedAt.getTime(),
+          // Configuration
+          dryRun: run.dryRun,
+          createBranch: run.createBranch,
+          branchName: run.branchName,
+          autoCommit: run.autoCommit,
+        };
       }
 
-      // Verify ownership
-      if (run.userId !== ctx.user.id) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'Not authorized to view this run',
-        });
+      // Not in memory, try Mastra storage
+      try {
+        const storage = getStorage();
+        const workflowsStore = await storage.getStore('workflows');
+        
+        if (workflowsStore) {
+          const mastraRun = await workflowsStore.getWorkflowRunById({
+            runId: input.runId,
+            workflowName: 'multiAgentPlanning',
+          });
+
+          if (mastraRun) {
+            // Parse snapshot
+            const snapshot = typeof mastraRun.snapshot === 'string' 
+              ? JSON.parse(mastraRun.snapshot) as WorkflowRunState
+              : mastraRun.snapshot as WorkflowRunState;
+
+            // Extract input and results from snapshot
+            const workflowInput = snapshot?.context?.input as MultiAgentPlanningInput | undefined;
+            
+            // Verify ownership
+            if (workflowInput?.userId !== ctx.user.id) {
+              throw new TRPCError({
+                code: 'FORBIDDEN',
+                message: 'Not authorized to view this run',
+              });
+            }
+
+            // Extract step results
+            const planResult = snapshot?.context?.['create-plan'] as { output?: { plan?: ExecutionPlan } } | undefined;
+            const execResult = snapshot?.context?.['execute-plan'] as { output?: { groupResults?: GroupResult[] } } | undefined;
+            const reviewResult = snapshot?.context?.['review-results'] as { output?: { review?: ReviewResult } } | undefined;
+
+            // Map Mastra status to our status
+            // Mastra uses: 'running' | 'success' | 'failed' | 'tripwire' | 'suspended' | 'waiting' | 'pending' | 'canceled' | 'bailed' | 'paused'
+            let status: PlanningStatus = 'pending';
+            if (snapshot?.status === 'success') {
+              status = 'completed';
+            } else if (snapshot?.status === 'failed' || snapshot?.status === 'canceled' || snapshot?.status === 'bailed') {
+              status = 'failed';
+            } else if (snapshot?.status === 'running') {
+              if (reviewResult) {
+                status = 'reviewing';
+              } else if (execResult) {
+                status = 'executing';
+              } else if (planResult) {
+                status = 'planning';
+              }
+            }
+
+            const startedAt = mastraRun.createdAt;
+            const completedAt = (snapshot?.status === 'success' || snapshot?.status === 'failed')
+              ? mastraRun.updatedAt
+              : undefined;
+
+            return {
+              id: mastraRun.runId,
+              repoId: workflowInput?.repoId || '',
+              task: workflowInput?.task || 'Unknown task',
+              context: workflowInput?.context,
+              status,
+              plan: planResult?.output?.plan,
+              groupResults: execResult?.output?.groupResults,
+              review: reviewResult?.output?.review,
+              error: snapshot?.error?.message,
+              startedAt,
+              completedAt,
+              duration: completedAt 
+                ? completedAt.getTime() - startedAt.getTime()
+                : Date.now() - startedAt.getTime(),
+              // Configuration
+              dryRun: workflowInput?.dryRun || false,
+              createBranch: workflowInput?.createBranch || true,
+              branchName: workflowInput?.branchName,
+              autoCommit: workflowInput?.autoCommit || true,
+            };
+          }
+        }
+      } catch (error) {
+        if (error instanceof TRPCError) {
+          throw error;
+        }
+        console.error('[Planning] Failed to fetch run from Mastra storage:', error);
       }
 
-      return {
-        id: run.id,
-        repoId: run.repoId,
-        task: run.task,
-        context: run.context,
-        status: run.status,
-        plan: run.plan,
-        groupResults: run.groupResults,
-        review: run.review,
-        error: run.error,
-        startedAt: run.startedAt,
-        completedAt: run.completedAt,
-        duration: run.completedAt 
-          ? run.completedAt.getTime() - run.startedAt.getTime()
-          : Date.now() - run.startedAt.getTime(),
-        // Configuration
-        dryRun: run.dryRun,
-        createBranch: run.createBranch,
-        branchName: run.branchName,
-        autoCommit: run.autoCommit,
-      };
+      throw new TRPCError({
+        code: 'NOT_FOUND',
+        message: 'Planning run not found',
+      });
     }),
 
   /**
    * List planning runs for a repository
+   * Fetches from Mastra workflow storage for persistence across server restarts
    */
   listRuns: protectedProcedure
     .input(z.object({
@@ -410,25 +598,101 @@ export const planningRouter = router({
       limit: z.number().min(1).max(50).default(10),
     }))
     .query(async ({ input, ctx }) => {
-      const runs: PlanningRun[] = [];
+      // First check in-memory for active runs
+      const inMemoryRuns: Array<{
+        id: string;
+        task: string;
+        status: PlanningStatus;
+        startedAt: Date;
+        completedAt?: Date;
+        error?: string;
+      }> = [];
       
       for (const run of planningRuns.values()) {
         if (run.repoId === input.repoId && run.userId === ctx.user.id) {
-          runs.push(run);
+          inMemoryRuns.push({
+            id: run.id,
+            task: run.task,
+            status: run.status,
+            startedAt: run.startedAt,
+            completedAt: run.completedAt,
+            error: run.error,
+          });
         }
       }
 
-      // Sort by start time descending
-      runs.sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime());
+      // Also fetch from Mastra storage for persisted runs
+      try {
+        const storage = getStorage();
+        const workflowsStore = await storage.getStore('workflows');
+        
+        if (workflowsStore) {
+          const { runs: mastraRuns } = await workflowsStore.listWorkflowRuns({
+            workflowName: 'multiAgentPlanning',
+            resourceId: input.repoId,
+            perPage: input.limit,
+            page: 0,
+          });
 
-      return runs.slice(0, input.limit).map(run => ({
-        id: run.id,
-        task: run.task,
-        status: run.status,
-        startedAt: run.startedAt,
-        completedAt: run.completedAt,
-        error: run.error,
-      }));
+          for (const mastraRun of mastraRuns) {
+            // Skip if already in memory (active run)
+            if (inMemoryRuns.some(r => r.id === mastraRun.runId)) {
+              continue;
+            }
+
+            // Parse snapshot to get task details
+            const snapshot = typeof mastraRun.snapshot === 'string' 
+              ? JSON.parse(mastraRun.snapshot) as WorkflowRunState
+              : mastraRun.snapshot as WorkflowRunState;
+
+            // Extract input from snapshot context
+            const workflowInput = snapshot?.context?.input as MultiAgentPlanningInput | undefined;
+            
+            // Only include runs for this user
+            if (workflowInput?.userId !== ctx.user.id) {
+              continue;
+            }
+
+            // Map Mastra status to our status
+            // Mastra uses: 'running' | 'success' | 'failed' | 'tripwire' | 'suspended' | 'waiting' | 'pending' | 'canceled' | 'bailed' | 'paused'
+            let status: PlanningStatus = 'pending';
+            if (snapshot?.status === 'success') {
+              status = 'completed';
+            } else if (snapshot?.status === 'failed' || snapshot?.status === 'canceled' || snapshot?.status === 'bailed') {
+              status = 'failed';
+            } else if (snapshot?.status === 'running') {
+              // Check step results to determine phase
+              const stepResults = snapshot?.context || {};
+              if (stepResults['review-results']) {
+                status = 'reviewing';
+              } else if (stepResults['execute-plan']) {
+                status = 'executing';
+              } else if (stepResults['create-plan']) {
+                status = 'planning';
+              }
+            }
+
+            inMemoryRuns.push({
+              id: mastraRun.runId,
+              task: workflowInput?.task || 'Unknown task',
+              status,
+              startedAt: mastraRun.createdAt,
+              completedAt: snapshot?.status === 'success' || snapshot?.status === 'failed' 
+                ? mastraRun.updatedAt 
+                : undefined,
+              error: snapshot?.error?.message,
+            });
+          }
+        }
+      } catch (error) {
+        // Log but don't fail - in-memory runs will still be returned
+        console.error('[Planning] Failed to fetch runs from Mastra storage:', error);
+      }
+
+      // Sort by start time descending
+      inMemoryRuns.sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime());
+
+      return inMemoryRuns.slice(0, input.limit);
     }),
 
   /**
