@@ -5,7 +5,6 @@ import {
   HandHeart,
   Sparkles,
   CircleDot,
-  GitFork,
   Search,
   Tag,
   Signal,
@@ -14,9 +13,7 @@ import {
   ChevronRight,
   Users,
   Rocket,
-  Code,
   FileText,
-  CheckCircle2,
   Github,
   Copy,
   Check,
@@ -25,13 +22,10 @@ import {
   BookOpen,
   TestTube,
   Zap,
-  GitBranch,
   Layout,
   Shield,
-  Globe,
   Server,
   Gamepad2,
-  Filter,
   X,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -40,7 +34,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -2374,18 +2367,75 @@ export function ContributePage() {
     <div className="container max-w-7xl mx-auto px-4 py-6 sm:py-8 space-y-6">
       {/* Header */}
       <div className="space-y-4">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-gradient-to-br from-pink-500/20 to-purple-500/20">
-            <Heart className="h-8 w-8 text-pink-500" />
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-gradient-to-br from-pink-500/20 to-purple-500/20">
+              <Heart className="h-8 w-8 text-pink-500" />
+            </div>
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold">Contribute to Wit</h1>
+              <p className="text-muted-foreground">
+                {CONTRIBUTION_PROMPTS.length} actionable tasks ready for AI-powered contributions
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold">Contribute to Wit</h1>
-            <p className="text-muted-foreground">
-              {CONTRIBUTION_PROMPTS.length} actionable tasks ready for AI-powered contributions
-            </p>
+          <div className="flex gap-2">
+            <a 
+              href="https://github.com/abhiaiyer91/wit" 
+              target="_blank" 
+              rel="noopener noreferrer"
+            >
+              <Button className="gap-2">
+                <Github className="h-4 w-4" />
+                View on GitHub
+              </Button>
+            </a>
+            <a 
+              href="https://github.com/abhiaiyer91/wit/blob/main/CONTRIBUTING.md" 
+              target="_blank" 
+              rel="noopener noreferrer"
+            >
+              <Button variant="outline" className="gap-2">
+                <FileText className="h-4 w-4" />
+                Guide
+              </Button>
+            </a>
           </div>
         </div>
       </div>
+
+      {/* How It Works - Above the fold */}
+      <Card className="bg-gradient-to-r from-emerald-500/5 via-teal-500/5 to-cyan-500/5 border-emerald-500/20">
+        <CardContent className="p-4 sm:p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Bot className="h-5 w-5 text-emerald-500" />
+            <h2 className="font-semibold">How AI-Powered Contributing Works</h2>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500 font-bold">1</div>
+              <div>
+                <div className="font-medium">Copy a Prompt</div>
+                <div className="text-sm text-muted-foreground">Find a task and click "Copy Prompt"</div>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500 font-bold">2</div>
+              <div>
+                <div className="font-medium">Paste into AI Agent</div>
+                <div className="text-sm text-muted-foreground">Use Claude, Cursor, Copilot, etc.</div>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500 font-bold">3</div>
+              <div>
+                <div className="font-medium">Open a PR</div>
+                <div className="text-sm text-muted-foreground">Submit your contribution!</div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Main Tabs */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'wit' | 'repos')} className="w-full">
@@ -2594,79 +2644,6 @@ export function ContributePage() {
                 </div>
               )}
 
-              {/* How It Works */}
-              <Card className="bg-gradient-to-r from-emerald-500/5 via-teal-500/5 to-cyan-500/5 border-emerald-500/20">
-                <CardHeader>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Bot className="h-5 w-5 text-emerald-500" />
-                    How AI-Powered Contributing Works
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="flex items-start gap-3">
-                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500 font-bold">1</div>
-                      <div>
-                        <div className="font-medium">Copy a Prompt</div>
-                        <div className="text-sm text-muted-foreground">Find a task and click "Copy Prompt"</div>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-3">
-                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500 font-bold">2</div>
-                      <div>
-                        <div className="font-medium">Paste into AI Agent</div>
-                        <div className="text-sm text-muted-foreground">Use Claude, Cursor, Copilot, etc.</div>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-3">
-                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500 font-bold">3</div>
-                      <div>
-                        <div className="font-medium">Open a PR</div>
-                        <div className="text-sm text-muted-foreground">Submit your contribution!</div>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* CTA */}
-              <Card className="bg-gradient-to-r from-primary/5 via-purple-500/5 to-pink-500/5 border-primary/20">
-                <CardContent className="p-6">
-                  <div className="flex flex-col sm:flex-row items-center gap-4">
-                    <div className="p-3 rounded-full bg-primary/10">
-                      <GitFork className="h-6 w-6 text-primary" />
-                    </div>
-                    <div className="flex-1 text-center sm:text-left">
-                      <h3 className="text-lg font-semibold">Ready to contribute?</h3>
-                      <p className="text-muted-foreground text-sm">
-                        Fork the repository and start building!
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      <a 
-                        href="https://github.com/abhiaiyer91/wit" 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                      >
-                        <Button className="gap-2">
-                          <Github className="h-4 w-4" />
-                          View on GitHub
-                        </Button>
-                      </a>
-                      <a 
-                        href="https://github.com/abhiaiyer91/wit/blob/main/CONTRIBUTING.md" 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                      >
-                        <Button variant="outline" className="gap-2">
-                          <FileText className="h-4 w-4" />
-                          Guide
-                        </Button>
-                      </a>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
             </div>
           </div>
         </TabsContent>
