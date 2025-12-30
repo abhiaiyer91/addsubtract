@@ -186,9 +186,9 @@ export const sandboxRouter = router({
         daytonaSnapshot: config.daytonaSnapshot ?? undefined,
         daytonaAutoStop: config.daytonaAutoStop,
         dockerImage: config.dockerImage,
-        vercelProjectId: (config as any).vercelProjectId ?? undefined,
-        vercelTeamId: (config as any).vercelTeamId ?? undefined,
-        vercelRuntime: (config as any).vercelRuntime ?? 'node22',
+        vercelProjectId: config.vercelProjectId ?? undefined,
+        vercelTeamId: config.vercelTeamId ?? undefined,
+        vercelRuntime: config.vercelRuntime ?? 'node22',
         dockerAvailable,
       };
     }),
@@ -436,7 +436,14 @@ export const sandboxRouter = router({
         if (!apiKey) {
           throw new TRPCError({
             code: 'BAD_REQUEST',
-            message: 'Sandbox API key not found',
+            message: `Sandbox API key not found for provider: ${config.provider}`,
+          });
+        }
+        // Validate the key is not empty/whitespace
+        if (!apiKey.trim()) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: `Sandbox API key is empty for provider: ${config.provider}`,
           });
         }
       }
@@ -501,8 +508,8 @@ export const sandboxRouter = router({
             const { Sandbox } = await import('@vercel/sandbox');
 
             // Get Vercel project ID and team ID from config
-            const vercelProjectId = (config as any).vercelProjectId;
-            const vercelTeamId = (config as any).vercelTeamId;
+            const vercelProjectId = config.vercelProjectId;
+            const vercelTeamId = config.vercelTeamId;
             if (!vercelProjectId) {
               throw new TRPCError({
                 code: 'BAD_REQUEST',
@@ -515,28 +522,55 @@ export const sandboxRouter = router({
                 message: 'Vercel Team ID is not configured. This is required when using a personal access token.',
               });
             }
-
-            const sandbox = await Sandbox.create({
-              projectId: vercelProjectId,
-              teamId: vercelTeamId,
-              accessToken: apiKey,
-              timeout: config.timeoutMinutes * 60 * 1000,
-              runtime: (config as any).vercelRuntime || 'node22',
-            });
+            if (!apiKey) {
+              throw new TRPCError({
+                code: 'BAD_REQUEST',
+                message: 'Vercel access token is not configured',
+              });
+            }
 
             try {
-              const result = await sandbox.runCommand(input.command, input.args || [], {
-                signal: AbortSignal.timeout(input.timeout),
+              // Debug: Log that we're attempting to create sandbox (without exposing full key)
+              console.log('[Vercel Sandbox] Creating sandbox with:', {
+                projectId: vercelProjectId,
+                teamId: vercelTeamId,
+                hasAccessToken: !!apiKey,
+                accessTokenLength: apiKey?.length,
+                accessTokenPrefix: apiKey?.substring(0, 10) + '...',
+                timeout: config.timeoutMinutes * 60 * 1000,
+                runtime: config.vercelRuntime || 'node22',
               });
 
-              return {
-                success: result.exitCode === 0,
-                exitCode: result.exitCode,
-                stdout: result.stdout,
-                stderr: result.stderr,
-              };
-            } finally {
-              await sandbox.stop();
+              const sandbox = await Sandbox.create({
+                projectId: vercelProjectId,
+                teamId: vercelTeamId,
+                accessToken: apiKey,
+                timeout: config.timeoutMinutes * 60 * 1000,
+                runtime: (config.vercelRuntime as 'node22' | 'python3.13') || 'node22',
+              });
+
+              try {
+                const result = await sandbox.runCommand(input.command, input.args || [], {
+                  signal: AbortSignal.timeout(input.timeout),
+                });
+
+                return {
+                  success: result.exitCode === 0,
+                  exitCode: result.exitCode,
+                  stdout: result.stdout,
+                  stderr: result.stderr,
+                };
+              } finally {
+                await sandbox.stop();
+              }
+            } catch (vercelError) {
+              // Wrap Vercel SDK errors with more context
+              const errorMsg = vercelError instanceof Error ? vercelError.message : String(vercelError);
+              throw new TRPCError({
+                code: 'INTERNAL_SERVER_ERROR',
+                message: `Vercel Sandbox error: ${errorMsg}`,
+                cause: vercelError,
+              });
             }
           }
 

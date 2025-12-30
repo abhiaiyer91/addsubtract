@@ -170,6 +170,9 @@ async function executeInSandbox(
       case 'docker': {
         return await executeInDocker(command, args, { cwd, timeout, env });
       }
+      case 'vercel': {
+        return await executeInVercel(command, args, { apiKey: apiKey!, repoId, cwd, timeout, env });
+      }
       default:
         return {
           success: false,
@@ -385,11 +388,104 @@ async function executeInDocker(
   });
 }
 
+/**
+ * Execute in Vercel Sandbox
+ */
+async function executeInVercel(
+  command: string,
+  args: string[],
+  options: { apiKey: string; repoId: string; cwd: string; timeout: number; env?: Record<string, string> }
+): Promise<{
+  success: boolean;
+  exitCode?: number;
+  stdout?: string;
+  stderr?: string;
+  errorMessage?: string;
+  timedOut?: boolean;
+  sandbox: boolean;
+}> {
+  try {
+    // Dynamic import to avoid requiring vercel sandbox if not used
+    const { Sandbox } = await import('@vercel/sandbox');
+    
+    // Get Vercel config from database
+    const config = await sandboxConfigModel.getConfig(options.repoId);
+    if (!config) {
+      return {
+        success: false,
+        errorMessage: 'Sandbox configuration not found',
+        sandbox: true,
+      };
+    }
+
+    const vercelProjectId = config.vercelProjectId;
+    const vercelTeamId = config.vercelTeamId;
+    
+    if (!vercelProjectId) {
+      return {
+        success: false,
+        errorMessage: 'Vercel Project ID is not configured',
+        sandbox: true,
+      };
+    }
+    
+    if (!vercelTeamId) {
+      return {
+        success: false,
+        errorMessage: 'Vercel Team ID is not configured. This is required when using a personal access token.',
+        sandbox: true,
+      };
+    }
+
+    if (!options.apiKey) {
+      return {
+        success: false,
+        errorMessage: 'Vercel access token is not configured',
+        sandbox: true,
+      };
+    }
+
+    const sandbox = await Sandbox.create({ 
+      projectId: vercelProjectId,
+      teamId: vercelTeamId,
+      accessToken: options.apiKey,
+      timeout: options.timeout,
+      runtime: (config.vercelRuntime as 'node22' | 'python3.13') || 'node22',
+    });
+
+    try {
+      const result = await sandbox.runCommand(command, args, {
+        signal: AbortSignal.timeout(options.timeout),
+      });
+
+      return {
+        success: result.exitCode === 0,
+        exitCode: result.exitCode,
+        stdout: result.stdout,
+        stderr: result.stderr,
+        sandbox: true,
+      };
+    } finally {
+      await sandbox.stop();
+    }
+  } catch (error) {
+    // If Vercel SDK is not available, return error
+    if ((error as NodeJS.ErrnoException).code === 'MODULE_NOT_FOUND') {
+      return {
+        success: false,
+        errorMessage: 'Vercel Sandbox SDK not installed. Install with: npm install @vercel/sandbox',
+        sandbox: true,
+      };
+    }
+    throw error;
+  }
+}
+
 export const runCommandTool = createTool({
   id: 'wit-run-command',
   description: `Execute a shell command in the repository directory.
 This tool executes commands safely:
-- When sandbox is configured: Commands run in an isolated sandbox environment (E2B, Daytona, or Docker)
+- When sandbox is configured: Commands run in an isolated sandbox environment (E2B, Daytona, Docker, or Vercel)
 - Without sandbox: Commands run locally with safety restrictions
 
 Use this for:
