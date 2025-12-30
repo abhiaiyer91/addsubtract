@@ -6,7 +6,7 @@
 
 [build]
 builder = "nixpacks"
-buildCommand = "npm ci && npm run build"
+buildCommand = "npm ci && npm run build && npm run db:push"
 
 [deploy]
 startCommand = "node dist/cli.js serve --repos /data/repos"
