@@ -8,6 +8,17 @@ let db: Database | null = null;
 let pool: Pool | null = null;
 
 /**
+ * Default pool configuration for production
+ */
+const DEFAULT_POOL_CONFIG = {
+  max: parseInt(process.env.DB_POOL_MAX || '20', 10),
+  min: parseInt(process.env.DB_POOL_MIN || '5', 10),
+  idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT || '30000', 10),
+  connectionTimeoutMillis: parseInt(process.env.DB_CONNECT_TIMEOUT || '5000', 10),
+  allowExitOnIdle: false,
+};
+
+/**
  * Initialize the database connection
  * @param connectionString PostgreSQL connection string or pool config
  * @returns Drizzle database instance
@@ -15,12 +26,75 @@ let pool: Pool | null = null;
 export function initDatabase(connectionString: string | PoolConfig): Database {
   const config =
     typeof connectionString === 'string'
-      ? { connectionString }
-      : connectionString;
+      ? { connectionString, ...DEFAULT_POOL_CONFIG }
+      : { ...DEFAULT_POOL_CONFIG, ...connectionString };
 
   pool = new Pool(config);
+  
+  // Handle pool errors gracefully
+  pool.on('error', (err) => {
+    console.error('[db] Pool error:', err.message);
+  });
+  
+  pool.on('connect', () => {
+    console.debug('[db] New client connected to pool');
+  });
+  
   db = drizzle(pool, { schema });
   return db;
+}
+
+/**
+ * Initialize database with auto-retry for container environments
+ * Useful when DB might not be ready immediately (e.g., Railway cold starts)
+ */
+export async function initDatabaseWithRetry(
+  connectionString: string,
+  options: {
+    maxRetries?: number;
+    retryDelay?: number;
+    onRetry?: (attempt: number, error: Error) => void;
+  } = {}
+): Promise<Database> {
+  const { 
+    maxRetries = 5, 
+    retryDelay = 3000,
+    onRetry = (attempt, error) => {
+      console.warn(`[db] Connection attempt ${attempt} failed: ${error.message}`);
+    }
+  } = options;
+
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const database = initDatabase(connectionString);
+      
+      // Verify connection works
+      const { ok } = await healthCheck();
+      if (!ok) {
+        throw new Error('Health check failed');
+      }
+      
+      console.log(`[db] Connected successfully (attempt ${attempt})`);
+      return database;
+    } catch (error) {
+      lastError = error as Error;
+      onRetry(attempt, lastError);
+      
+      if (attempt < maxRetries) {
+        // Close failed pool before retry
+        if (pool) {
+          await pool.end().catch(() => {});
+          pool = null;
+          db = null;
+        }
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+      }
+    }
+  }
+
+  throw new Error(`Failed to connect after ${maxRetries} attempts: ${lastError?.message}`);
 }
 
 /**
