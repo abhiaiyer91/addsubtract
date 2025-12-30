@@ -28,19 +28,40 @@ export function Markdown({ content, className }: MarkdownProps) {
           h3: ({ children }) => (
             <h3 className="text-lg font-bold mt-6 mb-3">{children}</h3>
           ),
-          p: ({ children }) => (
-            <p className="mb-4 leading-relaxed">{children}</p>
-          ),
-          a: ({ href, children }) => (
-            <a
-              href={href}
-              className="text-primary hover:underline"
-              target={href?.startsWith('http') ? '_blank' : undefined}
-              rel={href?.startsWith('http') ? 'noopener noreferrer' : undefined}
-            >
-              {children}
-            </a>
-          ),
+          p: ({ children }) => {
+            // Check if paragraph only contains images/badges - if so, make them inline
+            const childArray = Array.isArray(children) ? children : [children];
+            const onlyImages = childArray.every((child: any) => 
+              child?.type === 'img' || 
+              child?.type === 'a' ||
+              child?.props?.src ||
+              typeof child === 'string' && child.trim() === ''
+            );
+            return (
+              <p className={cn('mb-4 leading-relaxed', onlyImages && '[&>a]:inline-block [&>a]:mx-0.5 [&>img]:inline-block')}>
+                {children}
+              </p>
+            );
+          },
+          a: ({ href, children }) => {
+            // Check if the link contains an image (badge link)
+            const hasImage = Array.isArray(children) 
+              ? children.some((child: any) => child?.type === 'img' || child?.props?.src)
+              : (children as any)?.type === 'img' || (children as any)?.props?.src;
+            return (
+              <a
+                href={href}
+                className={cn(
+                  'text-primary hover:underline',
+                  hasImage && 'inline-block'
+                )}
+                target={href?.startsWith('http') ? '_blank' : undefined}
+                rel={href?.startsWith('http') ? 'noopener noreferrer' : undefined}
+              >
+                {children}
+              </a>
+            );
+          },
           code: ({ className, children }) => {
             const isInline = !className;
             if (isInline) {
@@ -89,20 +110,33 @@ export function Markdown({ content, className }: MarkdownProps) {
             <td className="border border-border px-4 py-2">{children}</td>
           ),
           hr: () => <hr className="border-border my-6" />,
-          img: ({ src, alt }) => (
-            <img
-              src={src}
-              alt={alt}
-              className="max-w-full rounded-lg"
-              loading="lazy"
-            />
-          ),
+          img: ({ src, alt }) => {
+            // Check if this looks like a badge (shields.io, badge URLs, small images)
+            const isBadge = src?.includes('shields.io') || 
+                           src?.includes('badge') || 
+                           src?.includes('img.shields') ||
+                           src?.includes('badgen.net') ||
+                           src?.includes('github.com') && src?.includes('/badge');
+            return (
+              <img
+                src={src}
+                alt={alt}
+                className={isBadge ? 'inline-block h-auto' : 'max-w-full rounded-lg'}
+                loading="lazy"
+              />
+            );
+          },
           // HTML elements passthrough with styling
-          div: ({ children, ...props }) => (
-            <div {...props} className={cn('', (props as any).className)}>
-              {children}
-            </div>
-          ),
+          div: ({ children, ...props }) => {
+            const align = (props as any).align;
+            const alignClass = align === 'center' ? 'text-center [&>*]:mx-auto [&>a]:inline-block [&>img]:inline-block' : 
+                               align === 'right' ? 'text-right' : '';
+            return (
+              <div {...props} className={cn(alignClass, (props as any).className)}>
+                {children}
+              </div>
+            );
+          },
           span: ({ children, ...props }) => (
             <span {...props}>{children}</span>
           ),
