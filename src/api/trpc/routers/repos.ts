@@ -64,9 +64,13 @@ export const reposRouter = router({
       z.object({
         owner: z.string().min(1),
         ownerType: z.enum(['user', 'organization']).default('user'),
-      })
+      }).optional()
     )
     .query(async ({ input, ctx }) => {
+      // Handle undefined input (when called without arguments)
+      if (!input || !input.owner) {
+        return [];
+      }
       // Find the owner based on type
       if (input.ownerType === 'organization') {
         const org = await orgModel.findByName(input.owner);
