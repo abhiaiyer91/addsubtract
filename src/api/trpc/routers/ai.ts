@@ -754,7 +754,7 @@ User question: ${input.message}`;
       }
 
       // Get the repository path and compute the diff
-      const repoPath = resolveDiskPath(repo.ownerId, repo.name);
+      const repoPath = resolveDiskPath(repo.diskPath);
       if (!await exists(repoPath)) {
         throw new TRPCError({
           code: 'NOT_FOUND',
