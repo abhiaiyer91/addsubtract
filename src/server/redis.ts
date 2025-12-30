@@ -5,7 +5,7 @@
  * health checks, and graceful shutdown support.
  */
 
-// @ts-ignore - redis may not be installed in all environments
+// @ts-expect-error - redis may not be installed in all environments
 import { createClient, RedisClientType, RedisFunctions, RedisModules, RedisScripts } from 'redis';
 import { setRateLimitStore, RedisStore, RedisClient } from './middleware/rate-limit';
 
