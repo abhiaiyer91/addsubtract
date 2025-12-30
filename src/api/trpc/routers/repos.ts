@@ -889,8 +889,17 @@ export const reposRouter = router({
           });
         }
 
-        const isOwner = result.repo.ownerId === ctx.user.id;
-        const hasAccess = isOwner || (await collaboratorModel.hasPermission(result.repo.id, ctx.user.id, 'read'));
+        let hasAccess = result.repo.ownerId === ctx.user.id;
+        
+        // Check collaborator access
+        if (!hasAccess) {
+          hasAccess = await collaboratorModel.hasPermission(result.repo.id, ctx.user.id, 'read');
+        }
+        
+        // Check org membership for org-owned repos
+        if (!hasAccess && result.repo.ownerType === 'organization') {
+          hasAccess = await orgMemberModel.isMember(result.repo.ownerId, ctx.user.id);
+        }
 
         if (!hasAccess) {
           throw new TRPCError({
@@ -1041,8 +1050,17 @@ export const reposRouter = router({
           });
         }
 
-        const isOwner = result.repo.ownerId === ctx.user.id;
-        const hasAccess = isOwner || (await collaboratorModel.hasPermission(result.repo.id, ctx.user.id, 'read'));
+        let hasAccess = result.repo.ownerId === ctx.user.id;
+        
+        // Check collaborator access
+        if (!hasAccess) {
+          hasAccess = await collaboratorModel.hasPermission(result.repo.id, ctx.user.id, 'read');
+        }
+        
+        // Check org membership for org-owned repos
+        if (!hasAccess && result.repo.ownerType === 'organization') {
+          hasAccess = await orgMemberModel.isMember(result.repo.ownerId, ctx.user.id);
+        }
 
         if (!hasAccess) {
           throw new TRPCError({

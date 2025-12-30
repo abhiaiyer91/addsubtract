@@ -97,6 +97,7 @@ interface ParsedArgs {
   repo: string;
   name?: string;
   description?: string;
+  org?: string;
   private: boolean;
   token?: string;
   import: {
@@ -139,6 +140,8 @@ function parseArgs(args: string[]): ParsedArgs {
       result.name = args[++i];
     } else if (arg === '--description' || arg === '-d') {
       result.description = args[++i];
+    } else if (arg === '--org' || arg === '-o') {
+      result.org = args[++i];
     } else if (arg === '--private' || arg === '-p') {
       result.private = true;
     } else if (arg === '--token' || arg === '-t') {
@@ -216,6 +219,7 @@ ${colors.bold('Arguments:')}
 ${colors.bold('Options:')}
   -n, --name <name>    Use a different name for the imported repository
   -d, --description    Override the repository description
+  -o, --org <org>      Import into an organization (uses personal account if not provided)
   -p, --private        Make the imported repository private
   -t, --token <token>  GitHub access token (uses stored credentials if not provided)
   -y, --yes            Skip confirmation prompts
@@ -236,6 +240,7 @@ ${colors.bold('Examples:')}
   wit github import facebook/react
   wit github import https://github.com/vercel/next.js
   wit github import owner/repo --name my-fork
+  wit github import owner/repo --org my-company
   wit github import owner/repo --issues-only
   wit github import owner/repo --preview
   wit github import owner/private-repo --token ghp_xxxx
@@ -437,8 +442,8 @@ export async function handleGitHubImport(args: string[]): Promise<void> {
     // Clone repository if needed
     const repoName = parsed.name || data.repo.name;
     const reposDir = process.env.REPOS_DIR || './repos';
-    const username = process.env.USER || 'user'; // In CLI mode, use system username
-    const targetPath = path.join(reposDir, username, `${repoName}.git`);
+    const ownerName = parsed.org || process.env.USER || 'user'; // Use org if provided, otherwise system username
+    const targetPath = path.join(reposDir, ownerName, `${repoName}.git`);
 
     if (parsed.import.repository) {
       spinner.start('Cloning repository...');
