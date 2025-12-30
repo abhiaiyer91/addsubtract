@@ -106,8 +106,6 @@ import {
   handleWrapped,
   // Repository management
   handleRepo,
-  // Deploy command
-  handleDeploy,
 } from './commands';
 import { handleHooks } from './core/hooks';
 import { handleSubmodule } from './core/submodule';
@@ -285,14 +283,6 @@ Self-Hosting (run your own GitHub):
   up                    Start the wit platform (database + server + web UI)
   down                  Stop all wit services
   platform-status       Show status of running services
-
-Deployment:
-  deploy                Deploy wit to Railway (default)
-  deploy railway        Deploy to Railway
-  deploy docker         Build Docker image
-  deploy check          Run pre-deployment checks
-  deploy init           Generate deployment config files
-  deploy config         Show current configuration
 
 Authentication:
   token create <name>   Create a personal access token
@@ -507,8 +497,6 @@ const COMMANDS = [
   'wrapped',
   // Repository management
   'repo',
-  // Deploy
-  'deploy',
   'help',
 ];
 
@@ -1231,18 +1219,6 @@ function main(): void {
       // Repository management (transfer, etc.)
       case 'repo':
         handleRepo(args.slice(args.indexOf('repo') + 1)).catch((error: Error) => {
-          if (error instanceof TsgitError) {
-            console.error((error as TsgitError).format());
-          } else {
-            console.error(`error: ${error.message}`);
-          }
-          process.exit(1);
-        });
-        return;
-
-      // Deploy to Railway/Fly/Docker
-      case 'deploy':
-        handleDeploy(args.slice(args.indexOf('deploy') + 1)).catch((error: Error) => {
           if (error instanceof TsgitError) {
             console.error((error as TsgitError).format());
           } else {
