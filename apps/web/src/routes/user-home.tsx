@@ -380,17 +380,17 @@ export function UserHomePage() {
               </CardHeader>
               <CardContent>
                 <div className="flex flex-wrap gap-3">
-                  {orgsData.map((org: any) => (
-                    <Link key={org.id} to={`/org/${org.name}`} className="group">
+                  {orgsData.map((membership: any) => (
+                    <Link key={membership.orgId} to={`/org/${membership.org?.name}`} className="group">
                       <div className="flex items-center gap-2 p-2 rounded-lg hover:bg-accent/50 transition-colors">
                         <Avatar className="h-8 w-8">
-                          <AvatarImage src={org.avatarUrl || undefined} />
+                          <AvatarImage src={membership.org?.avatarUrl || undefined} />
                           <AvatarFallback className="text-xs">
-                            {(org.name || 'O').slice(0, 2).toUpperCase()}
+                            {(membership.org?.name || 'O').slice(0, 2).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
                         <span className="text-sm font-medium group-hover:text-primary">
-                          {org.name}
+                          {membership.org?.name}
                         </span>
                       </div>
                     </Link>
