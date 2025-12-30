@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Loader2, Check, Key, Ticket, ChevronRight, AppWindow, Shield, Bell, Sparkles } from 'lucide-react';
+import { Loader2, Check, Key, Ticket, ChevronRight, AppWindow, Shield, Bell, Sparkles, Keyboard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -177,12 +177,29 @@ export function SettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Notifications</CardTitle>
+          <CardTitle>Preferences</CardTitle>
           <CardDescription>
-            Configure how and when you receive notifications.
+            Customize your experience.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">
+          <Link
+            to="/settings/keyboard"
+            className="flex items-center justify-between p-3 rounded-lg hover:bg-muted transition-colors group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-muted rounded-md group-hover:bg-background">
+                <Keyboard className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <div>
+                <div className="font-medium">Keyboard Shortcuts</div>
+                <div className="text-sm text-muted-foreground">
+                  Customize keyboard shortcuts for your workflow
+                </div>
+              </div>
+            </div>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          </Link>
           <Link
             to="/settings/notifications"
             className="flex items-center justify-between p-3 rounded-lg hover:bg-muted transition-colors group"

@@ -6,6 +6,7 @@ import { Toaster } from './components/ui/toaster';
 import { CommandPalette, ShortcutsModal } from './components/command';
 import { SearchModal } from './components/search';
 import { BranchSwitcher } from './components/branch';
+import { ShortcutContextProvider } from './lib/keyboard-shortcuts';
 
 // Routes
 import { HomePage } from './routes/index';
@@ -63,6 +64,7 @@ import { UserAIKeysPage } from './routes/settings/ai-keys';
 import { OAuthAppsPage } from './routes/settings/oauth-apps';
 import { OAuthAppDetailPage } from './routes/settings/oauth-app-detail';
 import { AuthorizedAppsPage } from './routes/settings/authorized-apps';
+import { KeyboardShortcutsPage } from './routes/settings/keyboard';
 import { OAuthAuthorizePage } from './routes/oauth/authorize';
 import { NewRepoPage } from './routes/new';
 import { ImportPage } from './routes/import';
@@ -93,12 +95,13 @@ export function App() {
   return (
     <TRPCProvider>
       <BrowserRouter>
-        <ScrollToTop />
-        {/* Global keyboard-first components */}
-        <SearchModal />
-        <CommandPalette />
-        <ShortcutsModal />
-        <BranchSwitcher />
+        <ShortcutContextProvider>
+          <ScrollToTop />
+          {/* Global keyboard-first components */}
+          <SearchModal />
+          <CommandPalette />
+          <ShortcutsModal />
+          <BranchSwitcher />
         
         <Routes>
           <Route element={<Layout />}>
@@ -119,6 +122,7 @@ export function App() {
             <Route path="/settings/oauth-apps" element={<OAuthAppsPage />} />
             <Route path="/settings/oauth-apps/:id" element={<OAuthAppDetailPage />} />
             <Route path="/settings/authorized-apps" element={<AuthorizedAppsPage />} />
+            <Route path="/settings/keyboard" element={<KeyboardShortcutsPage />} />
             <Route path="/oauth/authorize" element={<OAuthAuthorizePage />} />
             <Route path="/new" element={<NewRepoPage />} />
             <Route path="/import" element={<ImportPage />} />
@@ -207,6 +211,7 @@ export function App() {
           </Route>
         </Routes>
         <Toaster />
+        </ShortcutContextProvider>
       </BrowserRouter>
     </TRPCProvider>
   );

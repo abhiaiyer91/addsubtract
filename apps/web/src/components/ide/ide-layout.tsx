@@ -1,4 +1,5 @@
 import { useRef, useCallback, useEffect, useState } from 'react';
+import { useHotkeys } from 'react-hotkeys-hook';
 import { useIDEStore } from '@/lib/ide-store';
 import { FileTabs } from './file-tabs';
 import { CodeEditor } from './code-editor';
@@ -10,6 +11,11 @@ import { QuickOpen } from './quick-open';
 import { Breadcrumb } from './breadcrumb';
 import { AgentPanel } from '@/components/agent/agent-panel';
 import { trpc } from '@/lib/trpc';
+import {
+  useShortcutStore,
+  useRegisterShortcutContext,
+  registerStoreActions,
+} from '@/lib/keyboard-shortcuts';
 import { toastSuccess, toastError } from '@/components/ui/use-toast';
 import {
   PanelLeft,
@@ -135,7 +141,7 @@ export function IDELayout({ owner, repo, repoId, defaultRef }: IDELayoutProps) {
   // Handle save
   const handleSave = useCallback(() => {
     if (!activeFile || !activeFile.isDirty) return;
-    
+
     saveFile.mutate({
       owner,
       repo,
@@ -146,78 +152,158 @@ export function IDELayout({ owner, repo, repoId, defaultRef }: IDELayoutProps) {
     });
   }, [activeFile, owner, repo, currentRef, saveFile]);
 
-  // Keyboard shortcuts
+  // Register IDE context for keyboard shortcuts
+  useRegisterShortcutContext('ide', true);
+  useRegisterShortcutContext('editor', true);
+
+  // Get shortcut keys from store
+  const { getEffectiveKeys, isShortcutDisabled } = useShortcutStore();
+
+  // Register IDE store actions for keyboard shortcuts system
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const isMod = e.metaKey || e.ctrlKey;
+    const toggleFileTree = () => setShowFileTree(!showFileTree);
+    const toggleTerminal = () => setShowTerminal(!showTerminal);
+    const exitIDEMode = () => setIDEMode(false);
 
-      // Cmd/Ctrl + P - Quick Open
-      if (isMod && e.key === 'p') {
-        e.preventDefault();
-        setQuickOpenVisible(true);
-        return;
-      }
+    const cleanup = registerStoreActions('ide', {
+      toggleFileTree,
+      toggleTerminal,
+      exitIDEMode,
+    });
 
-      // Cmd/Ctrl + S - Save
-      if (isMod && e.key === 's') {
-        e.preventDefault();
-        handleSave();
-        return;
-      }
+    return cleanup;
+  }, [showFileTree, setShowFileTree, showTerminal, setShowTerminal, setIDEMode]);
 
-      // Cmd/Ctrl + B - Toggle sidebar
-      if (isMod && e.key === 'b') {
-        e.preventDefault();
-        setShowFileTree(!showFileTree);
-        return;
-      }
+  // Cmd/Ctrl + P - Quick Open
+  useHotkeys(
+    getEffectiveKeys('palette.files') || 'mod+p',
+    (e) => {
+      e.preventDefault();
+      setQuickOpenVisible(true);
+    },
+    { enabled: !isShortcutDisabled('palette.files') }
+  );
 
-      // Cmd/Ctrl + ` - Toggle terminal
-      if (isMod && e.key === '`') {
-        e.preventDefault();
-        setShowTerminal(!showTerminal);
-        return;
-      }
+  // Cmd/Ctrl + S - Save
+  useHotkeys(
+    getEffectiveKeys('editor.save') || 'mod+s',
+    (e) => {
+      e.preventDefault();
+      handleSave();
+    },
+    { enabled: !isShortcutDisabled('editor.save') },
+    [handleSave]
+  );
 
-      // Cmd/Ctrl + W - Close current tab
-      if (isMod && e.key === 'w' && activeFilePath) {
-        e.preventDefault();
-        closeFile(activeFilePath);
-        return;
-      }
+  // Cmd/Ctrl + B - Toggle sidebar
+  useHotkeys(
+    getEffectiveKeys('ide.toggleSidebar') || 'mod+b',
+    (e) => {
+      e.preventDefault();
+      setShowFileTree(!showFileTree);
+    },
+    { enabled: !isShortcutDisabled('ide.toggleSidebar') },
+    [showFileTree, setShowFileTree]
+  );
 
-      // Cmd/Ctrl + Tab - Next tab
-      if (isMod && e.key === 'Tab' && openFiles.length > 1) {
-        e.preventDefault();
+  // Cmd/Ctrl + ` - Toggle terminal
+  useHotkeys(
+    getEffectiveKeys('ide.toggleTerminal') || 'mod+`',
+    (e) => {
+      e.preventDefault();
+      setShowTerminal(!showTerminal);
+    },
+    { enabled: !isShortcutDisabled('ide.toggleTerminal') },
+    [showTerminal, setShowTerminal]
+  );
+
+  // Cmd/Ctrl + J - Toggle terminal (alternative)
+  useHotkeys(
+    getEffectiveKeys('ide.toggleTerminalAlt') || 'mod+j',
+    (e) => {
+      e.preventDefault();
+      setShowTerminal(!showTerminal);
+    },
+    { enabled: !isShortcutDisabled('ide.toggleTerminalAlt') },
+    [showTerminal, setShowTerminal]
+  );
+
+  // Cmd/Ctrl + W - Close current tab
+  useHotkeys(
+    getEffectiveKeys('editor.closeTab') || 'mod+w',
+    (e) => {
+      e.preventDefault();
+      if (activeFilePath) closeFile(activeFilePath);
+    },
+    { enabled: !!activeFilePath && !isShortcutDisabled('editor.closeTab') },
+    [activeFilePath, closeFile]
+  );
+
+  // Cmd/Ctrl + Tab - Next tab
+  useHotkeys(
+    getEffectiveKeys('editor.nextTab') || 'mod+tab',
+    (e) => {
+      e.preventDefault();
+      if (openFiles.length > 1) {
         const currentIndex = openFiles.findIndex((f) => f.path === activeFilePath);
-        const nextIndex = e.shiftKey
-          ? (currentIndex - 1 + openFiles.length) % openFiles.length
-          : (currentIndex + 1) % openFiles.length;
+        const nextIndex = (currentIndex + 1) % openFiles.length;
         setActiveFile(openFiles[nextIndex].path);
-        return;
       }
+    },
+    { enabled: openFiles.length > 1 && !isShortcutDisabled('editor.nextTab') },
+    [openFiles, activeFilePath, setActiveFile]
+  );
 
-      // Escape - Exit IDE mode
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        setIDEMode(false);
-        return;
+  // Cmd/Ctrl + Shift + Tab - Previous tab
+  useHotkeys(
+    getEffectiveKeys('editor.prevTab') || 'mod+shift+tab',
+    (e) => {
+      e.preventDefault();
+      if (openFiles.length > 1) {
+        const currentIndex = openFiles.findIndex((f) => f.path === activeFilePath);
+        const prevIndex = (currentIndex - 1 + openFiles.length) % openFiles.length;
+        setActiveFile(openFiles[prevIndex].path);
       }
-    };
+    },
+    { enabled: openFiles.length > 1 && !isShortcutDisabled('editor.prevTab') },
+    [openFiles, activeFilePath, setActiveFile]
+  );
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [
-    handleSave,
-    showFileTree,
-    setShowFileTree,
-    showTerminal,
-    setShowTerminal,
-    activeFilePath,
-    closeFile,
-    openFiles,
-    setActiveFile,
-  ]);
+  // Cmd/Ctrl + 1-9 - Switch to tab N
+  const switchToTab = useCallback(
+    (index: number) => {
+      if (index === -1) {
+        // Last tab
+        if (openFiles.length > 0) {
+          setActiveFile(openFiles[openFiles.length - 1].path);
+        }
+      } else if (index < openFiles.length) {
+        setActiveFile(openFiles[index].path);
+      }
+    },
+    [openFiles, setActiveFile]
+  );
+
+  useHotkeys('mod+1', () => switchToTab(0), { enabled: openFiles.length > 0 }, [switchToTab]);
+  useHotkeys('mod+2', () => switchToTab(1), { enabled: openFiles.length > 1 }, [switchToTab]);
+  useHotkeys('mod+3', () => switchToTab(2), { enabled: openFiles.length > 2 }, [switchToTab]);
+  useHotkeys('mod+4', () => switchToTab(3), { enabled: openFiles.length > 3 }, [switchToTab]);
+  useHotkeys('mod+5', () => switchToTab(4), { enabled: openFiles.length > 4 }, [switchToTab]);
+  useHotkeys('mod+6', () => switchToTab(5), { enabled: openFiles.length > 5 }, [switchToTab]);
+  useHotkeys('mod+7', () => switchToTab(6), { enabled: openFiles.length > 6 }, [switchToTab]);
+  useHotkeys('mod+8', () => switchToTab(7), { enabled: openFiles.length > 7 }, [switchToTab]);
+  useHotkeys('mod+9', () => switchToTab(-1), { enabled: openFiles.length > 0 }, [switchToTab]);
+
+  // Escape - Exit IDE mode
+  useHotkeys(
+    getEffectiveKeys('ide.exit') || 'escape',
+    (e) => {
+      e.preventDefault();
+      setIDEMode(false);
+    },
+    { enabled: !isShortcutDisabled('ide.exit') },
+    [setIDEMode]
+  );
 
   // Resizer handlers
   const handleMouseDown = useCallback(
