@@ -1080,7 +1080,10 @@ export async function runMultiAgentPlanningWorkflow(
     };
   }
   
-  const run = await workflow.createRun();
+  // Use repoId as resourceId for filtering runs by repository
+  const run = await workflow.createRun({
+    resourceId: input.repoId,
+  });
   const result = await run.start({ inputData: input });
   
   if (result.status === 'failed') {
@@ -1111,7 +1114,10 @@ export async function* streamMultiAgentPlanningWorkflow(input: MultiAgentPlannin
     return;
   }
   
-  const run = await workflow.createRun();
+  // Use repoId as resourceId for filtering runs by repository
+  const run = await workflow.createRun({
+    resourceId: input.repoId,
+  });
   const result = await run.stream({ inputData: input });
   
   for await (const chunk of result.fullStream) {
