@@ -11,7 +11,6 @@ describe('Dual-Push', () => {
   let repoDir: string;
   let remote1Dir: string;
   let remote2Dir: string;
-  let repo: Repository;
 
   beforeEach(() => {
     // Create temp directory structure
@@ -53,7 +52,8 @@ describe('Dual-Push', () => {
 \tbare = true
 `);
 
-    repo = new Repository(repoDir);
+    // Initialize repository to ensure it's in a valid state
+    new Repository(repoDir);
   });
 
   afterEach(() => {

@@ -11,20 +11,16 @@
  * - Error handling and recovery
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import * as path from 'path';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs';
+import * as path from 'path';
 import {
   createRepoWithCommit,
   cleanupTempDir,
-  createTestFile,
-  readTestFile,
   suppressConsole,
   restoreCwd,
 } from './test-utils';
 import {
-  TaskPriority,
-  TaskStatus,
   type ExecutionPlan,
   type Subtask,
   type ParallelGroup,
@@ -35,7 +31,6 @@ import {
   type MultiAgentPlanningOutput,
 } from '../ai/workflows/multi-agent-planning.workflow';
 import {
-  findFilesInRepo,
   createBranch,
   stageFiles,
   createCommit,
@@ -702,6 +697,9 @@ describe('Multi-Agent Planning E2E', () => {
         ],
       });
 
+      // Verify plan structure
+      expect(plan.parallelGroups[0].subtasks.length).toBe(3);
+
       // Step 2: Execute with one failure
       const results: SubtaskResult[] = [
         createTestResult('task-add', 'completed', { filesModified: ['src/add.ts'] }),
@@ -715,6 +713,10 @@ describe('Multi-Agent Planning E2E', () => {
         allSucceeded: false,
         duration: 5000,
       }];
+
+      // Verify group results
+      expect(groupResults[0].allSucceeded).toBe(false);
+      expect(groupResults[0].subtaskResults.filter(r => r.status === 'completed').length).toBe(2);
 
       // Step 3: Review detects failure
       const review = createTestReview(2, 1, 0, {

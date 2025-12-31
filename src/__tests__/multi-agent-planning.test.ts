@@ -7,7 +7,7 @@
  * - Type definitions and enums
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import {
   TaskPriority,
   TaskStatus,
@@ -19,14 +19,6 @@ import {
   ReviewResultSchema,
   MultiAgentPlanningInputSchema,
   MultiAgentPlanningOutputSchema,
-  type Subtask,
-  type ParallelGroup,
-  type ExecutionPlan,
-  type SubtaskResult,
-  type GroupResult,
-  type ReviewResult,
-  type MultiAgentPlanningInput,
-  type MultiAgentPlanningOutput,
 } from '../ai/workflows/multi-agent-planning.workflow';
 
 describe('Multi-Agent Planning Workflow', () => {
