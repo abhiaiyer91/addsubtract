@@ -47,36 +47,84 @@
       "group": "Commands",
       "pages": [
         "commands/overview",
-        "commands/basic-workflow",
-        "commands/branches",
-        "commands/remotes",
-        "commands/merge",
-        "commands/stash",
-        "commands/history-rewriting",
-        "commands/tags",
-        "commands/undo-history",
-        "commands/quality-of-life",
-        "commands/debugging",
-        "commands/advanced",
-        "commands/pr",
-        "commands/issue",
-        "commands/ci",
-        "commands/stack",
-        "commands/search",
-        "commands/review",
-        "commands/agent",
-        "commands/plan",
-        "commands/release",
-        "commands/snapshot",
-        "commands/cleanup",
-        "commands/github-import",
-        "commands/platform-status",
-        "commands/dashboard",
-        "commands/wrapped",
-        "commands/journal",
-        "commands/project",
-        "commands/cycle",
-        "commands/fsck"
+        {
+          "group": "Git Basics",
+          "pages": [
+            "commands/basic-workflow",
+            "commands/branches",
+            "commands/remotes",
+            "commands/merge",
+            "commands/stash",
+            "commands/worktree"
+          ]
+        },
+        {
+          "group": "History & Undo",
+          "pages": [
+            "commands/history-rewriting",
+            "commands/tags",
+            "commands/undo-history"
+          ]
+        },
+        {
+          "group": "Productivity",
+          "pages": [
+            "commands/quality-of-life",
+            "commands/debugging",
+            "commands/advanced",
+            "commands/cleanup",
+            "commands/snapshot"
+          ]
+        },
+        {
+          "group": "AI Features",
+          "pages": [
+            "commands/ai",
+            "commands/agent",
+            "commands/search",
+            "commands/review",
+            "commands/plan"
+          ]
+        },
+        {
+          "group": "Platform",
+          "pages": [
+            "commands/up-down",
+            "commands/serve",
+            "commands/pr",
+            "commands/issue",
+            "commands/ci",
+            "commands/stack",
+            "commands/merge-queue",
+            "commands/release"
+          ]
+        },
+        {
+          "group": "Team & Access",
+          "pages": [
+            "commands/collaborator",
+            "commands/token",
+            "commands/repo"
+          ]
+        },
+        {
+          "group": "Project Management",
+          "pages": [
+            "commands/project",
+            "commands/cycle",
+            "commands/journal",
+            "commands/dashboard",
+            "commands/wrapped"
+          ]
+        },
+        {
+          "group": "Integrations",
+          "pages": [
+            "commands/github-import",
+            "commands/platform-status",
+            "commands/fsck"
+          ]
+        }
       ]
     },
     {

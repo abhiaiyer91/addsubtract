@@ -1,0 +1,473 @@
+---
+title: Merge Queue
+description: "Manage the merge queue for automated PR merging"
+---
+
+The `wit merge-queue` command provides automated merge queue management for pull requests. The merge queue ensures PRs are tested against the latest base branch before merging, preventing broken builds.
+
+## Overview
+
+```bash
+wit merge-queue <command> [options]
+```
+
+## Why Use a Merge Queue?
+
+Without a merge queue, this can happen:
+
+1. PR #1 passes CI on `main` at commit A
+2. PR #2 passes CI on `main` at commit A
+3. PR #1 merges, `main` is now at commit B
+4. PR #2 merges without retesting against B
+5. `main` is now broken because #2 conflicts with #1's changes
+
+With a merge queue:
+
+1. PRs are queued for merging
+2. Each PR is rebased on the latest `main` and tested
+3. Only PRs that pass against the current `main` are merged
+4. Your main branch stays green
+
+---
+
+## Commands
+
+### add
+
+Add a pull request to the merge queue.
+
+```bash
+wit merge-queue add [<pr-number>] [options]
+```
+
+#### Options
+
+| Option | Description |
+|--------|-------------|
+| `-b, --branch <branch>` | Target branch (default: main) |
+| `-p, --priority <0-100>` | Priority level (higher = more urgent) |
+
+#### Examples
+
+```bash
+# Add current branch's PR to the queue
+wit merge-queue add
+
+# Add specific PR
+wit merge-queue add 123
+
+# Add with high priority
+wit merge-queue add 123 --priority 80
+
+# Add to a different target branch
+wit merge-queue add 123 --branch develop
+```
+
+<Note>
+This command requires the server-side merge queue API to be implemented.
+</Note>
+
+---
+
+### remove
+
+Remove a pull request from the merge queue.
+
+```bash
+wit merge-queue remove [<pr-number>]
+```
+
+#### Examples
+
+```bash
+# Remove current branch's PR
+wit merge-queue remove
+
+# Remove specific PR
+wit merge-queue remove 123
+```
+
+---
+
+### status
+
+Check the queue position and status of a pull request.
+
+```bash
+wit merge-queue status [<pr-number>]
+```
+
+#### Examples
+
+```bash
+# Check status of current branch's PR
+wit merge-queue status
+
+# Check status of specific PR
+wit merge-queue status 123
+```
+
+#### Example Output
+
+```
+Merge Queue Status - PR #123
+
+Position:   3 of 7
+State:      pending
+Priority:   50
+Added:      2 hours ago
+ETA:        ~15 minutes
+
+Target:     main
+Checks:     Waiting for 2 PRs ahead
+```
+
+---
+
+### list
+
+List all pull requests in the merge queue.
+
+```bash
+wit merge-queue list [options]
+```
+
+#### Options
+
+| Option | Description |
+|--------|-------------|
+| `-b, --branch <branch>` | Filter by target branch |
+| `--json` | Output in JSON format |
+
+#### Examples
+
+```bash
+# List all queued PRs
+wit merge-queue list
+
+# List PRs targeting develop
+wit merge-queue list --branch develop
+
+# Output as JSON for scripting
+wit merge-queue list --json
+```
+
+#### Example Output
+
+```
+Merge Queue (7 PRs)
+
+Position  PR      Title                          State       Priority
+────────────────────────────────────────────────────────────────────────
+   1      #120    Fix authentication bug         testing     90
+   2      #118    Add user dashboard             preparing   50
+   3      #123    Update API endpoints           pending     50
+   4      #125    Refactor database layer        pending     40
+   5      #121    Add unit tests                 pending     30
+   6      #127    Documentation updates          pending     20
+   7      #126    Fix typos                      pending     10
+
+Currently testing: #120 (ETA: ~5 minutes)
+```
+
+---
+
+### stats
+
+Show merge queue statistics.
+
+```bash
+wit merge-queue stats [options]
+```
+
+#### Options
+
+| Option | Description |
+|--------|-------------|
+| `--json` | Output in JSON format |
+
+#### Example Output
+
+```
+Merge Queue Statistics
+
+Today
+  PRs merged:           12
+  PRs failed:           2
+  Average wait time:    8 minutes
+  Longest wait:         23 minutes
+
+This Week
+  PRs merged:           67
+  Success rate:         94%
+  Average wait time:    11 minutes
+
+Queue Health
+  Current depth:        7 PRs
+  Estimated clear:      ~35 minutes
+  Throughput:           4.2 PRs/hour
+```
+
+---
+
+### config
+
+View or update merge queue configuration.
+
+```bash
+wit merge-queue config [options]
+```
+
+#### Options
+
+| Option | Description |
+|--------|-------------|
+| `--strategy <type>` | Merge strategy: `sequential`, `parallel`, `adaptive` |
+| `--batch-size <n>` | Max PRs to test together (for parallel/adaptive) |
+| `--timeout <minutes>` | Max time to wait for CI |
+| `--required-checks <checks>` | Comma-separated required check names |
+
+#### Strategies
+
+| Strategy | Description |
+|----------|-------------|
+| `sequential` | Test and merge one PR at a time |
+| `parallel` | Test multiple PRs together, bisect on failure |
+| `adaptive` | Start parallel, fall back to sequential on failures |
+
+#### Examples
+
+```bash
+# View current configuration
+wit merge-queue config
+
+# Set merge strategy
+wit merge-queue config --strategy adaptive
+
+# Set batch size for parallel testing
+wit merge-queue config --batch-size 5
+
+# Set CI timeout
+wit merge-queue config --timeout 30
+
+# Set required checks
+wit merge-queue config --required-checks "build,test,lint"
+```
+
+#### Example Output
+
+```
+Merge Queue Configuration
+
+Strategy:           adaptive
+Batch Size:         3
+CI Timeout:         30 minutes
+Required Checks:    build, test, lint
+
+Branch Rules
+  main:             enabled
+  develop:          enabled
+  release/*:        disabled
+```
+
+---
+
+### enable
+
+Enable the merge queue for a branch.
+
+```bash
+wit merge-queue enable [options]
+```
+
+#### Options
+
+| Option | Description |
+|--------|-------------|
+| `-b, --branch <branch>` | Branch to enable (default: main) |
+
+#### Examples
+
+```bash
+# Enable for main
+wit merge-queue enable
+
+# Enable for develop
+wit merge-queue enable --branch develop
+```
+
+---
+
+### disable
+
+Disable the merge queue for a branch.
+
+```bash
+wit merge-queue disable [options]
+```
+
+#### Options
+
+| Option | Description |
+|--------|-------------|
+| `-b, --branch <branch>` | Branch to disable (default: main) |
+
+#### Examples
+
+```bash
+# Disable for main
+wit merge-queue disable
+
+# Disable for develop
+wit merge-queue disable --branch develop
+```
+
+---
+
+## Queue States
+
+PRs in the merge queue go through these states:
+
+| State | Description |
+|-------|-------------|
+| `pending` | Waiting in queue |
+| `preparing` | Rebasing onto target branch |
+| `testing` | CI checks running |
+| `ready` | All checks passed, ready to merge |
+| `merging` | Merge in progress |
+| `completed` | Successfully merged |
+| `failed` | CI checks failed |
+| `cancelled` | Removed from queue |
+
+---
+
+## Workflow Examples
+
+### Basic Merge Queue Workflow
+
+```bash
+# Create and push your PR
+wit pr create -t "Add new feature"
+
+# Add to merge queue
+wit merge-queue add
+
+# Check status
+wit merge-queue status
+
+# If you need to update your PR
+git push origin feature-branch
+
+# PR will be automatically retested
+wit merge-queue status
+```
+
+### Priority Handling
+
+```bash
+# Hotfix needs to merge first
+wit merge-queue add 456 --priority 100
+
+# Regular features
+wit merge-queue add 123 --priority 50
+
+# Low priority cleanup
+wit merge-queue add 789 --priority 10
+```
+
+### Monitoring the Queue
+
+```bash
+# Watch the queue
+watch -n 30 wit merge-queue list
+
+# Get stats for reporting
+wit merge-queue stats --json > queue-stats.json
+```
+
+---
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Keep PRs small">
+    Smaller PRs reduce queue time and are less likely to conflict:
+    - Faster CI runs
+    - Lower chance of conflicts with other PRs
+    - Easier to review and merge
+  </Accordion>
+
+  <Accordion title="Use priorities wisely">
+    Reserve high priorities for urgent fixes:
+    - 80-100: Critical hotfixes
+    - 50-79: Important features
+    - 20-49: Normal work
+    - 0-19: Low priority cleanup
+  </Accordion>
+
+  <Accordion title="Monitor queue health">
+    Regularly check queue statistics:
+    ```bash
+    wit merge-queue stats
+    ```
+    High wait times may indicate CI bottlenecks.
+  </Accordion>
+
+  <Accordion title="Choose the right strategy">
+    - `sequential`: Best for small teams or repos with flaky tests
+    - `parallel`: Best for large teams with reliable CI
+    - `adaptive`: Best default choice for most teams
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="PR stuck in queue">
+    Check the status and CI logs:
+    ```bash
+    wit merge-queue status 123
+    wit ci status 123
+    ```
+    The PR may be waiting for CI or have failing checks.
+  </Accordion>
+
+  <Accordion title="Queue processing slowly">
+    Check if CI is the bottleneck:
+    ```bash
+    wit merge-queue stats
+    ```
+    Consider:
+    - Switching to `parallel` strategy
+    - Increasing batch size
+    - Optimizing CI pipeline
+  </Accordion>
+
+  <Accordion title="Frequent failures in parallel mode">
+    PRs may be conflicting with each other. Try:
+    ```bash
+    wit merge-queue config --strategy adaptive
+    wit merge-queue config --batch-size 2
+    ```
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Requirements
+
+The merge queue requires:
+
+1. A running wit server with merge queue enabled
+2. CI integration configured for the repository
+3. Appropriate permissions to add/remove PRs
+
+---
+
+## Related Commands
+
+- [`wit pr`](/commands/pr) - Manage pull requests
+- [`wit ci`](/commands/ci) - View CI status
+- [`wit stack`](/commands/stack) - Stacked diffs workflow

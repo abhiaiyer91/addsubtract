@@ -1,0 +1,231 @@
+---
+title: Server
+description: "Start the wit Git server and platform"
+---
+
+The `wit serve` command starts a Git HTTP server for hosting repositories. For a complete platform setup including database and web UI, use `wit up` instead.
+
+## Overview
+
+```bash
+wit serve [options]
+```
+
+## Options
+
+| Option | Description |
+|--------|-------------|
+| `--port <number>` | Port to listen on (default: 3000) |
+| `--repos <path>` | Directory to store repositories (default: ./repos) |
+| `--host <hostname>` | Hostname to bind to (default: 0.0.0.0) |
+| `--verbose` | Enable verbose logging |
+| `-h, --help` | Show help message |
+
+## Examples
+
+```bash
+# Start server with defaults
+wit serve
+
+# Start on custom port
+wit serve --port 8080
+
+# Start with custom repos directory
+wit serve --repos /var/git/repos
+
+# Bind to localhost only
+wit serve --host 127.0.0.1
+
+# Verbose mode for debugging
+wit serve --verbose
+```
+
+## Example Output
+
+```
+Starting wit server...
+
+  Port:     3000
+  Repos:    /path/to/repos
+  Host:     0.0.0.0
+
+Server is running at http://localhost:3000
+
+Clone repositories:
+  wit clone http://localhost:3000/owner/repo.git
+
+API endpoints:
+  Health: http://localhost:3000/health
+  tRPC:   http://localhost:3000/trpc
+```
+
+---
+
+## Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `PORT` | Server port | 3000 |
+| `REPOS_DIR` | Repository storage directory | ./repos |
+| `HOST` | Hostname to bind | 0.0.0.0 |
+| `DATABASE_URL` | PostgreSQL connection string | Required |
+| `BETTER_AUTH_SECRET` | Auth secret (production) | Required in prod |
+
+---
+
+## What wit serve Provides
+
+The server exposes:
+
+### Git HTTP Protocol
+- Clone: `wit clone http://localhost:3000/owner/repo.git`
+- Push: `wit push origin main`
+- Fetch: `wit fetch origin`
+
+### REST API
+- Repository management
+- User authentication
+- Pull request operations
+
+### tRPC API
+- Full platform functionality
+- Real-time updates
+- Type-safe client access
+
+---
+
+## Use Cases
+
+### Development Server
+
+Run a local server for development:
+
+```bash
+# Start server
+wit serve --port 3000 --repos ./dev-repos
+
+# In another terminal, clone a repo
+wit clone http://localhost:3000/myuser/myrepo.git
+```
+
+### CI/CD Integration
+
+Use as a Git server in CI pipelines:
+
+```bash
+# Start server in background
+wit serve --port 3000 &
+
+# Run tests that need Git access
+npm test
+
+# Cleanup
+kill %1
+```
+
+### Self-Hosted Git Server
+
+Run a persistent Git server:
+
+```bash
+# Production-like setup
+DATABASE_URL=postgresql://... \
+REPOS_DIR=/var/git/repos \
+  wit serve --port 3000 --host 0.0.0.0
+```
+
+---
+
+## wit serve vs wit up
+
+| Feature | wit serve | wit up |
+|---------|-----------|--------|
+| API Server | Yes | Yes |
+| Database | External only | Auto-starts PostgreSQL |
+| Web UI | No | Yes |
+| Migrations | Manual | Automatic |
+| Background | Foreground | Daemonized |
+| Use case | Production, custom setup | Development, quick start |
+
+**Use `wit serve` when:**
+- You have an external database
+- You only need the API server
+- You're deploying to production with custom orchestration
+
+**Use `wit up` when:**
+- You want everything started automatically
+- You're developing locally
+- You need the web UI
+
+---
+
+## Graceful Shutdown
+
+The server handles shutdown signals properly:
+
+```bash
+# Stop with Ctrl+C or SIGTERM
+^C
+Shutting down server...
+```
+
+This ensures:
+- In-flight requests complete
+- Database connections close cleanly
+- Resources are released
+
+---
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Port already in use">
+    ```
+    Error: listen EADDRINUSE: address already in use :::3000
+    ```
+
+    Either stop the other process or use a different port:
+    ```bash
+    wit serve --port 3001
+    ```
+
+    Find what's using the port:
+    ```bash
+    lsof -i :3000
+    ```
+  </Accordion>
+
+  <Accordion title="Database connection failed">
+    ```
+    Error: Failed to connect to database
+    ```
+
+    Ensure `DATABASE_URL` is set and the database is running:
+    ```bash
+    export DATABASE_URL=postgresql://user:pass@localhost:5432/wit
+    wit serve
+    ```
+  </Accordion>
+
+  <Accordion title="Permission denied on repos directory">
+    ```
+    Error: EACCES: permission denied
+    ```
+
+    Ensure the repos directory exists and is writable:
+    ```bash
+    mkdir -p ./repos
+    chmod 755 ./repos
+    wit serve --repos ./repos
+    ```
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Related Commands
+
+- [`wit up`](/commands/up-down) - Start full platform (recommended for local development)
+- [`wit down`](/commands/up-down) - Stop the platform
+- [`wit clone`](/commands/remotes#clone) - Clone from the server
+- [`wit push`](/commands/remotes#push) - Push to the server

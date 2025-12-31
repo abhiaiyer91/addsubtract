@@ -1,0 +1,365 @@
+---
+title: Tokens
+description: "Manage Personal Access Tokens for API and CLI authentication"
+---
+
+The `wit token` command lets you create and manage Personal Access Tokens (PATs) for authenticating with the wit platform API and CLI.
+
+## Overview
+
+```bash
+wit token <command> [options]
+```
+
+Personal Access Tokens are used to:
+- Authenticate CLI commands with the wit server
+- Access the wit API programmatically
+- Automate tasks in CI/CD pipelines
+- Grant limited access to third-party tools
+
+## Commands
+
+### create
+
+Create a new personal access token.
+
+```bash
+wit token create <name> [options]
+```
+
+#### Options
+
+| Option | Description |
+|--------|-------------|
+| `--expires, -e <days>` | Token expires in N days (default: never) |
+| `--scopes, -s <scopes>` | Comma-separated scopes (default: repo:read,repo:write) |
+
+#### Examples
+
+```bash
+# Create a basic token
+wit token create "My Token"
+
+# Create a token that expires in 30 days
+wit token create "CI Token" --expires 30
+
+# Create a token with specific scopes
+wit token create "Read Only" --scopes repo:read
+
+# Create a token with multiple scopes
+wit token create "Full Access" --scopes repo:read,repo:write,repo:admin
+
+# Create a deploy key with limited access
+wit token create "Deploy Key" -e 90 -s repo:read
+```
+
+#### Example Output
+
+```
+Created personal access token
+
+Token:
+
+  wit_a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0
+
+Make sure to copy your token now.
+You will not be able to see it again!
+
+Name:    CI Token
+Scopes:  repo:read, repo:write
+Expires: 2024-04-15
+
+Use this token in the Authorization header:
+  Authorization: Bearer wit_a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0
+```
+
+<Warning>
+Save your token immediately after creation. For security reasons, the full token is only shown once and cannot be retrieved later.
+</Warning>
+
+---
+
+### list
+
+List all your personal access tokens.
+
+```bash
+wit token list
+wit token ls
+```
+
+#### Example Output
+
+```
+Personal Access Tokens (3)
+
+wit_a1b2...  CI Token
+  ID: abc12345  Scopes: repo:read, repo:write
+  Last used: 2 hours ago  •  Expires: Apr 15, 2024
+
+wit_c3d4...  [EXPIRED] Old Deploy Key
+  ID: def67890  Scopes: repo:read
+  Never used  •  Expired: Mar 1, 2024
+
+wit_e5f6...  Local Development
+  ID: ghi11223  Scopes: repo:read, repo:write, user:read
+  Last used: 5 minutes ago  •  Expires: Never
+```
+
+---
+
+### revoke
+
+Revoke (delete) a personal access token.
+
+```bash
+wit token revoke <id>
+wit token delete <id>
+wit token rm <id>
+```
+
+#### Arguments
+
+| Argument | Description |
+|----------|-------------|
+| `id` | Token ID or prefix (from `wit token list`) |
+
+#### Examples
+
+```bash
+# Revoke by full ID
+wit token revoke abc12345-6789-...
+
+# Revoke by ID prefix
+wit token revoke abc12
+
+# Revoke by token prefix
+wit token revoke wit_a1b2
+```
+
+#### Example Output
+
+```
+Revoked token: CI Token
+  wit_a1b2...
+```
+
+---
+
+### scopes
+
+List all available token scopes and their descriptions.
+
+```bash
+wit token scopes
+```
+
+#### Example Output
+
+```
+Available Token Scopes
+
+repo:read
+  Clone and pull repositories
+
+repo:write
+  Push to repositories
+
+repo:admin
+  Manage repository settings, collaborators, and deletion
+
+user:read
+  Read your profile information
+
+user:write
+  Update your profile
+```
+
+---
+
+## Token Scopes
+
+Scopes limit what a token can do. Always use the minimum scopes needed.
+
+| Scope | Description | Use Cases |
+|-------|-------------|-----------|
+| `repo:read` | Clone, pull, fetch repositories | CI builds, read-only tools |
+| `repo:write` | Push to repositories | CI deployments, automation |
+| `repo:admin` | Manage settings, collaborators, delete repos | Admin scripts, setup automation |
+| `user:read` | Read profile information | Integrations, analytics |
+| `user:write` | Update profile | Profile automation |
+
+### Scope Combinations
+
+Common scope combinations for different use cases:
+
+```bash
+# CI/CD Pipeline (pull and push)
+wit token create "CI Pipeline" -s repo:read,repo:write
+
+# Read-only monitoring
+wit token create "Monitor" -s repo:read,user:read
+
+# Full administrative access
+wit token create "Admin Tool" -s repo:read,repo:write,repo:admin,user:read,user:write
+
+# Minimal deployment key
+wit token create "Deploy" -e 7 -s repo:read
+```
+
+---
+
+## Using Tokens
+
+### Environment Variable
+
+Set the `WIT_TOKEN` environment variable:
+
+```bash
+export WIT_TOKEN=wit_a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0
+```
+
+### Authorization Header
+
+Use the token in API requests:
+
+```bash
+curl -H "Authorization: Bearer wit_a1b2c3d4..." \
+  https://your-wit-server.com/api/repos
+```
+
+### Git Credential Helper
+
+Configure git to use your token:
+
+```bash
+# In your .gitconfig or via git config
+git config --global credential.helper store
+
+# Then use your token as the password when prompted
+# Username: your-email@example.com
+# Password: wit_a1b2c3d4...
+```
+
+---
+
+## Security Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use short-lived tokens">
+    Set expiration dates for tokens, especially those used in CI/CD:
+    ```bash
+    wit token create "CI" --expires 30
+    ```
+  </Accordion>
+
+  <Accordion title="Use minimal scopes">
+    Only grant the permissions the token actually needs:
+    ```bash
+    # Bad: Full access when you only need to read
+    wit token create "Read" -s repo:read,repo:write,repo:admin
+
+    # Good: Only the required scope
+    wit token create "Read" -s repo:read
+    ```
+  </Accordion>
+
+  <Accordion title="Rotate tokens regularly">
+    Create new tokens and revoke old ones periodically:
+    ```bash
+    wit token create "New CI Token" --expires 30
+    wit token revoke old-token-id
+    ```
+  </Accordion>
+
+  <Accordion title="Never commit tokens">
+    Use environment variables or secret management tools instead of hardcoding tokens in code.
+  </Accordion>
+
+  <Accordion title="Revoke unused tokens">
+    Regularly audit and revoke tokens that are no longer needed:
+    ```bash
+    wit token list
+    wit token revoke unused-token-id
+    ```
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Workflow Examples
+
+### CI/CD Setup
+
+```bash
+# Create a CI token with 90-day expiration
+wit token create "GitHub Actions" --expires 90 --scopes repo:read,repo:write
+
+# Save the token as a GitHub secret: WIT_TOKEN
+
+# In your workflow:
+# env:
+#   WIT_TOKEN: ${{ secrets.WIT_TOKEN }}
+```
+
+### Automation Script
+
+```bash
+#!/bin/bash
+# deploy.sh
+
+# Token is set via environment
+if [ -z "$WIT_TOKEN" ]; then
+  echo "Error: WIT_TOKEN not set"
+  exit 1
+fi
+
+# Use token for API calls
+curl -H "Authorization: Bearer $WIT_TOKEN" \
+  https://wit.example.com/api/repos/myorg/myrepo/releases
+```
+
+### Token Rotation
+
+```bash
+# Create new token
+wit token create "CI Token v2" -e 30 -s repo:read,repo:write
+
+# Update your CI secrets with the new token
+
+# List tokens to find the old one
+wit token list
+
+# Revoke the old token
+wit token revoke old-token-id
+```
+
+---
+
+## Requirements
+
+The token command requires:
+
+1. **Database connection**: Set `DATABASE_URL` environment variable
+2. **User authentication**: Set `WIT_USER_ID` environment variable
+
+```bash
+# Example setup
+export DATABASE_URL=postgresql://wit:wit@localhost:5432/wit
+export WIT_USER_ID=your-user-id
+
+# Now token commands will work
+wit token create "My Token"
+```
+
+<Note>
+When using `wit up` to start the platform, these are configured automatically. The `WIT_USER_ID` can be obtained from the web UI after logging in.
+</Note>
+
+---
+
+## Related Commands
+
+- [`wit collaborator`](/commands/collaborator) - Manage repository collaborators
+- [`wit up`](/commands/up-down) - Start the wit platform
+- [`wit serve`](/commands/serve) - Start the API server

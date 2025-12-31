@@ -1,0 +1,424 @@
+---
+title: AI Commands
+description: "AI-powered git assistant for commits, reviews, and more"
+---
+
+The `wit ai` command provides AI-powered features for your development workflow, including natural language commands, automatic commit message generation, code review, and conflict resolution assistance.
+
+## Overview
+
+```bash
+wit ai <command> [options]
+```
+
+## Commands
+
+### chat / ask
+
+Interact with the AI assistant using natural language.
+
+```bash
+wit ai "your question or command"
+wit ai chat <query>
+wit ai ask <query>
+```
+
+#### Examples
+
+```bash
+# Ask questions about your code
+wit ai "what files have changed?"
+wit ai "show me the last 5 commits"
+wit ai "explain what this repository does"
+
+# Execute commands via natural language
+wit ai "create a branch for the login feature"
+wit ai "stage all TypeScript files"
+```
+
+---
+
+### commit
+
+Generate an AI-powered commit message and optionally create the commit.
+
+```bash
+wit ai commit [options]
+```
+
+#### Options
+
+| Option | Description |
+|--------|-------------|
+| `-a, --all` | Stage all tracked files before committing |
+| `--dry-run` | Preview the commit message without creating the commit |
+
+#### Examples
+
+```bash
+# Generate message and create commit (default behavior)
+wit ai commit
+
+# Stage all files first, then commit
+wit ai commit -a
+
+# Preview the message without committing
+wit ai commit --dry-run
+
+# Stage all and preview
+wit ai commit -a --dry-run
+```
+
+#### Commit Message Format
+
+The AI generates conventional commit messages following best practices:
+
+```
+feat: Add user authentication
+
+- Implement JWT tokens
+- Add login/logout endpoints
+- Add session management
+
+Signed-off-by: Your Name <email@example.com>
+```
+
+Supported prefixes:
+- `feat:` - New feature
+- `fix:` - Bug fix
+- `refactor:` - Code refactoring
+- `docs:` - Documentation changes
+- `test:` - Adding/updating tests
+- `chore:` - Maintenance tasks
+- `perf:` - Performance improvements
+- `style:` - Formatting, whitespace
+
+---
+
+### review
+
+Get an AI-powered code review of your changes.
+
+```bash
+wit ai review [options]
+```
+
+#### Options
+
+| Option | Description |
+|--------|-------------|
+| `--staged` | Review only staged changes |
+
+#### Examples
+
+```bash
+# Review all changes (staged + unstaged)
+wit ai review
+
+# Review only staged changes
+wit ai review --staged
+```
+
+#### What the AI Reviews
+
+The AI analyzes your code changes for:
+
+1. **Potential bugs or issues** - Logic errors, edge cases
+2. **Security concerns** - Injection vulnerabilities, exposed secrets
+3. **Code quality** - Readability, maintainability
+4. **Best practices** - Design patterns, conventions
+
+#### Example Output
+
+```
+Code Review Results
+────────────────────────────────────────────────────
+
+src/auth.ts:42
+  ⚠️  SECURITY: Password is logged in plain text
+  Consider removing or masking sensitive data in logs.
+
+src/api/handler.ts:15-20
+  💡 SUGGESTION: Error handling could be more specific
+  Catching all errors with a generic handler may hide issues.
+
+src/utils/helpers.ts:8
+  ✓ GOOD: Nice use of early returns for readability
+
+Overall: 2 issues, 1 suggestion
+```
+
+---
+
+### explain
+
+Get an AI explanation of a commit or range of commits.
+
+```bash
+wit ai explain [ref]
+```
+
+#### Arguments
+
+| Argument | Description |
+|----------|-------------|
+| `ref` | Commit reference to explain (default: HEAD) |
+
+#### Examples
+
+```bash
+# Explain the last commit
+wit ai explain
+
+# Explain a specific commit
+wit ai explain abc1234
+
+# Explain a tagged release
+wit ai explain v1.0.0
+
+# Explain a commit from 3 commits ago
+wit ai explain HEAD~3
+```
+
+#### Example Output
+
+```
+Explaining commit abc1234...
+
+This commit adds user authentication to the application.
+
+What it does:
+  - Implements JWT-based authentication
+  - Adds login and logout API endpoints
+  - Creates middleware for protected routes
+
+Why it was made:
+  - Adds security to the application
+  - Enables user-specific features
+  - Required for the upcoming user dashboard
+
+Files affected:
+  - src/auth.ts (new)
+  - src/middleware/auth.ts (new)
+  - src/routes/index.ts (modified)
+```
+
+---
+
+### resolve
+
+Get AI assistance for resolving merge conflicts.
+
+```bash
+wit ai resolve [file]
+```
+
+#### Arguments
+
+| Argument | Description |
+|----------|-------------|
+| `file` | Specific file to resolve (optional, resolves all if omitted) |
+
+#### Examples
+
+```bash
+# Get help resolving all conflicts
+wit ai resolve
+
+# Resolve a specific file
+wit ai resolve src/config.ts
+```
+
+#### Example Output
+
+```
+Resolving: src/config.ts
+
+Analysis:
+  Our version (main):
+    - Sets timeout to 30 seconds
+    - Uses new API endpoint format
+
+  Their version (feature-branch):
+    - Sets timeout to 60 seconds
+    - Adds retry configuration
+
+Suggestion:
+  The feature branch's longer timeout and retry logic
+  complement the main branch's API changes. Recommend
+  merging both changes.
+
+RESOLVED:
+```typescript
+export const config = {
+  timeout: 60,  // Longer timeout from feature branch
+  apiEndpoint: '/api/v2',  // New format from main
+  retries: 3,  // New from feature branch
+  retryDelay: 1000,
+};
+```
+
+---
+
+### status
+
+Check the AI configuration and availability.
+
+```bash
+wit ai status
+```
+
+#### Example Output
+
+```
+wit AI Status
+
+Available: Yes
+Model: openai/gpt-4o
+Provider: openai
+
+Environment Variables:
+  OPENAI_API_KEY: Set
+  ANTHROPIC_API_KEY: Not set
+  WIT_AI_MODEL: (not set, using default)
+```
+
+---
+
+## Configuration
+
+### API Keys
+
+The AI features require an API key from a supported provider:
+
+```bash
+# OpenAI (GPT models)
+export OPENAI_API_KEY=sk-...
+
+# Anthropic (Claude models)
+export ANTHROPIC_API_KEY=sk-ant-...
+```
+
+### Model Selection
+
+Override the default model:
+
+```bash
+# Use a specific model
+export WIT_AI_MODEL=openai/gpt-4o-mini
+export WIT_AI_MODEL=anthropic/claude-3-sonnet
+```
+
+---
+
+## Workflow Examples
+
+### Feature Development with AI
+
+```bash
+# Create a feature branch
+wit switch -c feature/user-auth
+
+# Make changes...
+
+# Review your changes before committing
+wit ai review
+
+# Generate commit message and commit
+wit ai commit -a
+
+# Explain what you did (for PR description)
+wit ai explain HEAD
+```
+
+### Handling Merge Conflicts
+
+```bash
+# Start a merge
+wit merge feature-branch
+
+# Conflict detected! Get AI help
+wit ai resolve
+
+# Review the AI's suggestions, then mark resolved
+wit add .
+wit merge --continue
+```
+
+### Quick Status Check
+
+```bash
+# Ask the AI about your current state
+wit ai "what's my current status?"
+wit ai "summarize my recent commits"
+wit ai "what branches do I have?"
+```
+
+---
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Review AI suggestions">
+    Always review AI-generated content before committing or merging. The AI provides suggestions, not absolute answers.
+  </Accordion>
+
+  <Accordion title="Provide context">
+    More specific questions get better answers:
+    ```bash
+    # Less specific
+    wit ai "fix bugs"
+
+    # More specific
+    wit ai "fix the null check in UserService.getById()"
+    ```
+  </Accordion>
+
+  <Accordion title="Use dry-run for commits">
+    Preview commit messages with `--dry-run` before creating actual commits:
+    ```bash
+    wit ai commit --dry-run
+    ```
+  </Accordion>
+
+  <Accordion title="Stage selectively">
+    Stage only related changes before using `wit ai commit` for more focused commit messages.
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="AI features require an API key">
+    If you see this error, set one of the supported API keys:
+    ```bash
+    export OPENAI_API_KEY=sk-your-key-here
+    # or
+    export ANTHROPIC_API_KEY=sk-ant-your-key-here
+    ```
+  </Accordion>
+
+  <Accordion title="Model errors">
+    If you encounter model-specific errors, try a different model:
+    ```bash
+    export WIT_AI_MODEL=openai/gpt-4o-mini
+    ```
+  </Accordion>
+
+  <Accordion title="Context limits">
+    For very large diffs, the AI may truncate or summarize. Consider:
+    - Staging fewer files at once
+    - Breaking large changes into smaller commits
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Related Commands
+
+- [`wit agent`](/commands/agent) - Interactive AI coding assistant
+- [`wit search`](/commands/search) - AI-powered semantic search
+- [`wit review`](/commands/review) - AI code review for PRs
+- [`wit commit`](/commands/basic-workflow#commit) - Standard commit command

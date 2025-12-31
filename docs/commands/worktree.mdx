@@ -1,0 +1,360 @@
+---
+title: Worktrees
+description: "Work on multiple branches simultaneously with multiple working directories"
+---
+
+The `wit worktree` command lets you check out multiple branches simultaneously in separate directories. This is useful when you need to work on different branches without constantly switching.
+
+## Overview
+
+```bash
+wit worktree <command> [options]
+```
+
+Worktrees allow you to:
+- Work on a feature while also working on a hotfix
+- Compare different branches side by side
+- Run tests on one branch while developing on another
+- Avoid stashing/committing in-progress work when switching contexts
+
+---
+
+## Commands
+
+### add
+
+Create a new worktree for a branch.
+
+```bash
+wit worktree add <path> <branch>
+```
+
+#### Arguments
+
+| Argument | Description |
+|----------|-------------|
+| `path` | Directory path for the new worktree |
+| `branch` | Branch to check out (can be existing or new) |
+
+#### Examples
+
+```bash
+# Create worktree for an existing branch
+wit worktree add ../feature-worktree feature-branch
+
+# Create worktree with a new branch
+wit worktree add ../hotfix-worktree -b hotfix/urgent-fix
+
+# Create worktree in a subdirectory
+wit worktree add worktrees/experiment experiment-branch
+```
+
+#### Example Output
+
+```
+Preparing worktree (checking out 'feature-branch')
+HEAD is now at abc1234 Add user authentication
+
+Worktree created at: /path/to/project/../feature-worktree
+```
+
+---
+
+### list
+
+List all worktrees for the repository.
+
+```bash
+wit worktree list
+```
+
+#### Example Output
+
+```
+/path/to/project           abc1234 [main]
+/path/to/feature-worktree  def5678 [feature-branch]
+/path/to/hotfix-worktree   ghi9012 [hotfix/urgent-fix]
+```
+
+---
+
+### remove
+
+Remove a worktree.
+
+```bash
+wit worktree remove <path>
+```
+
+#### Arguments
+
+| Argument | Description |
+|----------|-------------|
+| `path` | Path to the worktree to remove |
+
+#### Examples
+
+```bash
+# Remove a worktree
+wit worktree remove ../feature-worktree
+
+# Force remove (if worktree has uncommitted changes)
+wit worktree remove --force ../feature-worktree
+```
+
+<Warning>
+Removing a worktree deletes the working directory but does not delete the branch.
+</Warning>
+
+---
+
+### prune
+
+Remove stale worktree entries.
+
+```bash
+wit worktree prune
+```
+
+Removes worktree entries where the directory no longer exists (e.g., was manually deleted).
+
+#### Example Output
+
+```
+Pruning stale worktree entries...
+Removed: /path/to/deleted-worktree (directory not found)
+Pruned 1 worktree(s)
+```
+
+---
+
+## Use Cases
+
+### Hotfix While Developing
+
+You're working on a feature when an urgent bug needs fixing:
+
+```bash
+# You're in your project, working on feature-branch
+# Don't stop what you're doing - create a new worktree
+
+wit worktree add ../hotfix main
+cd ../hotfix
+
+# Create and fix the hotfix branch
+wit switch -c hotfix/critical-bug
+# ... make your fixes ...
+wit commit -a -m "Fix critical bug"
+wit push -u origin hotfix/critical-bug
+
+# Create PR, get it reviewed and merged
+
+# Go back to your feature work
+cd ../project
+# Your changes are exactly as you left them!
+
+# Clean up the hotfix worktree
+wit worktree remove ../hotfix
+```
+
+### Side-by-Side Comparison
+
+Compare code across branches:
+
+```bash
+# Create worktrees for different versions
+wit worktree add ../v1 v1.0.0
+wit worktree add ../v2 v2.0.0
+
+# Now you can diff, compare, or run tests on both
+diff ../v1/src/api.ts ../v2/src/api.ts
+
+# Clean up when done
+wit worktree remove ../v1
+wit worktree remove ../v2
+```
+
+### Run Tests While Developing
+
+Run tests on one branch while continuing to develop:
+
+```bash
+# Create a worktree for testing
+wit worktree add ../test-runner main
+
+# In terminal 1: Run continuous tests
+cd ../test-runner
+npm run test:watch
+
+# In terminal 2: Continue development
+cd ../project
+# Make changes, tests run automatically in the other terminal
+```
+
+### Code Review
+
+Review a colleague's PR without switching branches:
+
+```bash
+# Create worktree for the PR branch
+wit worktree add ../pr-review feature/their-feature
+
+cd ../pr-review
+# Review the code, run it, test it
+
+# When done, clean up
+cd ../project
+wit worktree remove ../pr-review
+```
+
+---
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use sibling directories">
+    Keep worktrees as siblings to your main project:
+    ```
+    projects/
+      myproject/        # main worktree
+      myproject-hotfix/ # hotfix worktree
+      myproject-review/ # review worktree
+    ```
+    This keeps them organized and easy to find.
+  </Accordion>
+
+  <Accordion title="Name worktrees descriptively">
+    Use clear names that indicate purpose:
+    ```bash
+    # Good
+    wit worktree add ../project-hotfix main
+    wit worktree add ../project-pr-123 feature-branch
+
+    # Less clear
+    wit worktree add ../wt1 main
+    ```
+  </Accordion>
+
+  <Accordion title="Clean up when done">
+    Remove worktrees you're no longer using:
+    ```bash
+    wit worktree list     # See what you have
+    wit worktree remove ../old-worktree
+    wit worktree prune    # Clean up stale entries
+    ```
+  </Accordion>
+
+  <Accordion title="Don't forget about them">
+    Periodically check for forgotten worktrees:
+    ```bash
+    wit worktree list
+    ```
+    Old worktrees take up disk space and can be confusing.
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## How Worktrees Work
+
+### Shared Objects
+
+All worktrees share the same `.wit` (or `.git`) directory:
+
+```
+project/
+  .wit/                    # Shared repository data
+  worktrees/               # Worktree metadata
+    feature-worktree/      # Links to the feature worktree
+  src/                     # Main worktree files
+
+project-feature/           # Feature worktree
+  .wit -> ../project/.wit  # Link back to shared data
+  src/                     # Feature branch files
+```
+
+This means:
+- Objects, refs, and history are shared (saves disk space)
+- Commits made in any worktree are immediately visible to all
+- Each worktree has its own index and HEAD
+
+### Linked vs Main Worktree
+
+- **Main worktree**: The original directory where you cloned/initialized
+- **Linked worktrees**: Additional worktrees created with `wit worktree add`
+
+The main worktree cannot be removed with `wit worktree remove`.
+
+---
+
+## Comparison with Other Approaches
+
+| Approach | Pros | Cons |
+|----------|------|------|
+| **Worktrees** | No stashing, instant switch, parallel work | More directories to manage |
+| **Stashing** | Single directory | Requires remembering to pop, can conflict |
+| **Branch switching** | Simple | Loses unsaved work, slower for large repos |
+| **Multiple clones** | Complete isolation | Wastes disk space, separate fetch needed |
+
+---
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Branch is already checked out">
+    If you see "fatal: 'branch' is already checked out":
+    ```bash
+    # Check which worktree has the branch
+    wit worktree list
+
+    # Either remove that worktree or use a different branch
+    wit worktree remove ../other-worktree
+    # or
+    wit worktree add ../new-worktree different-branch
+    ```
+    A branch can only be checked out in one worktree at a time.
+  </Accordion>
+
+  <Accordion title="Worktree directory exists">
+    If the target directory already exists:
+    ```bash
+    # Remove or rename the existing directory
+    rm -rf ../existing-dir
+    # or
+    mv ../existing-dir ../existing-dir-backup
+
+    # Then create the worktree
+    wit worktree add ../existing-dir my-branch
+    ```
+  </Accordion>
+
+  <Accordion title="Stale worktree after manual deletion">
+    If you deleted a worktree directory manually:
+    ```bash
+    # Clean up the stale reference
+    wit worktree prune
+    ```
+  </Accordion>
+
+  <Accordion title="Uncommitted changes in worktree">
+    If `wit worktree remove` fails due to uncommitted changes:
+    ```bash
+    # Either commit/stash the changes
+    cd ../worktree-to-remove
+    wit stash
+    cd ../main-project
+    wit worktree remove ../worktree-to-remove
+
+    # Or force remove (loses changes!)
+    wit worktree remove --force ../worktree-to-remove
+    ```
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Related Commands
+
+- [`wit switch`](/commands/branches#switch) - Switch branches in current worktree
+- [`wit stash`](/commands/stash) - Temporarily save changes
+- [`wit clone`](/commands/remotes#clone) - Clone a repository
