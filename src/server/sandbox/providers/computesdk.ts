@@ -273,7 +273,7 @@ export class ComputeSDKProvider extends BaseSandboxProvider {
 
     // Dynamically import ComputeSDK
     try {
-      // @ts-ignore - computesdk is an optional dependency
+      // @ts-expect-error - computesdk is an optional dependency
       const computesdk = await import('computesdk');
       this.computeModule = computesdk.compute as unknown as ComputeModule;
     } catch {
@@ -311,7 +311,7 @@ export class ComputeSDKProvider extends BaseSandboxProvider {
 
     switch (providerType) {
       case 'e2b': {
-        // @ts-ignore - optional dependency
+        // @ts-expect-error - optional dependency
         providerModule = await import('@computesdk/e2b');
         const apiKey =
           this.computeSDKConfig.options?.providerApiKey ||
@@ -324,7 +324,7 @@ export class ComputeSDKProvider extends BaseSandboxProvider {
         break;
       }
       case 'daytona': {
-        // @ts-ignore - optional dependency
+        // @ts-expect-error - optional dependency
         providerModule = await import('@computesdk/daytona');
         const apiKey =
           this.computeSDKConfig.options?.providerApiKey ||
@@ -339,7 +339,7 @@ export class ComputeSDKProvider extends BaseSandboxProvider {
         break;
       }
       case 'modal': {
-        // @ts-ignore - optional dependency
+        // @ts-expect-error - optional dependency
         providerModule = await import('@computesdk/modal');
         const tokenId =
           process.env.MODAL_TOKEN_ID;
@@ -355,7 +355,7 @@ export class ComputeSDKProvider extends BaseSandboxProvider {
         break;
       }
       case 'codesandbox': {
-        // @ts-ignore - optional dependency
+        // @ts-expect-error - optional dependency
         providerModule = await import('@computesdk/codesandbox');
         const token =
           this.computeSDKConfig.options?.providerApiKey ||
