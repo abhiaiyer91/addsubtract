@@ -19,16 +19,32 @@ import { c } from '../utils/colors';
 
 // Lazy load search modules to avoid dependency issues
 let _semanticSearch: typeof import('../search') | null = null;
+let _aiPackageMissing = false;
 
 async function getSemanticSearch() {
+  if (_aiPackageMissing) {
+    return null;
+  }
+
   if (!_semanticSearch) {
     try {
       _semanticSearch = await import('../search');
+
+      // Check if the AI package is available
+      if (!_semanticSearch.isAIPackageAvailable()) {
+        _aiPackageMissing = true;
+        return null;
+      }
     } catch {
+      _aiPackageMissing = true;
       return null;
     }
   }
   return _semanticSearch;
+}
+
+function isAIPackageMissing(): boolean {
+  return _aiPackageMissing;
 }
 
 function hasApiKey(): boolean {
@@ -126,16 +142,26 @@ function escapeRegex(str: string): string {
  */
 async function handleIndex(repo: Repository, args: string[]): Promise<void> {
   const searchModule = await getSemanticSearch();
-  
+
   if (!searchModule) {
-    console.log(`  ${c('red', '✗')} Semantic search module not available`);
-    console.log(`  ${c('dim', 'Install dependencies: npm install ai @ai-sdk/openai')}`);
+    console.log();
+    console.log(`  ${c('red', '✗')} Semantic search requires the 'ai' package`);
+    console.log();
+    console.log(`  ${c('dim', 'To install, run:')}`);
+    console.log(`    ${c('cyan', 'npm install ai @ai-sdk/openai')}`);
+    console.log();
+    console.log(`  ${c('dim', 'This is an optional dependency for AI-powered features.')}`);
+    console.log();
     return;
   }
-  
+
   if (!hasApiKey()) {
+    console.log();
     console.log(`  ${c('red', '✗')} No API key found`);
-    console.log(`  ${c('dim', 'Set OPENAI_API_KEY environment variable')}`);
+    console.log();
+    console.log(`  ${c('dim', 'Set the OPENAI_API_KEY environment variable:')}`);
+    console.log(`    ${c('cyan', 'export OPENAI_API_KEY=sk-...')}`);
+    console.log();
     return;
   }
   
@@ -180,14 +206,19 @@ async function handleIndex(repo: Repository, args: string[]): Promise<void> {
  */
 async function handleStatus(repo: Repository): Promise<void> {
   const searchModule = await getSemanticSearch();
-  
+
   console.log();
   console.log(`  ${c('cyan', 'wit search status')} ${c('dim', '· Index health')}`);
   console.log();
-  
+
   if (!searchModule) {
-    console.log(`  ${c('yellow', '!')} Semantic search module not available`);
-    console.log(`  ${c('dim', 'Text search is always available')}`);
+    console.log(`  ${c('yellow', '!')} Semantic search not available`);
+    if (isAIPackageMissing()) {
+      console.log(`  ${c('dim', 'The \'ai\' package is not installed.')}`);
+      console.log(`  ${c('dim', 'Install it with:')} ${c('cyan', 'npm install ai @ai-sdk/openai')}`);
+    }
+    console.log();
+    console.log(`  ${c('green', '✓')} Text search is always available`);
     console.log();
     return;
   }

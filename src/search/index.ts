@@ -22,6 +22,8 @@ export {
   generateCodeEmbeddings,
   detectLanguage,
   cosineSimilarity,
+  isAIPackageAvailable,
+  AIPackageNotAvailableError,
   EMBEDDING_DIMENSIONS,
   type CodeContext,
 } from './embeddings.js';
