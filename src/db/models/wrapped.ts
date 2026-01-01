@@ -3,7 +3,7 @@
  * Think Spotify Wrapped but for your coding activity
  */
 
-import { eq, and, gte, lte, sql, desc, count } from 'drizzle-orm';
+import { eq, and, gte, lte, sql, desc, count, inArray } from 'drizzle-orm';
 import { getDb } from '../index';
 import {
   activities,
@@ -811,12 +811,420 @@ export const wrappedModel = {
     const now = new Date();
     let year = now.getFullYear();
     let month = now.getMonth(); // Previous month (0-indexed)
-    
+
     if (month === 0) {
       month = 12;
       year--;
     }
-    
+
     return this.getForUser(userId, year, month);
   },
+
+  /**
+   * Get wrapped for a custom date range
+   */
+  async getForCustomPeriod(
+    userId: string,
+    startDate: Date,
+    endDate: Date,
+    periodLabel?: string
+  ): Promise<WrappedData | null> {
+    const db = getDb();
+
+    // Create custom period
+    const period: WrappedPeriod = {
+      year: startDate.getFullYear(),
+      month: startDate.getMonth() + 1,
+      startDate,
+      endDate,
+    };
+
+    // Get user info
+    const [userInfo] = await db
+      .select({
+        id: user.id,
+        username: user.username,
+        name: user.name,
+        avatarUrl: user.avatarUrl,
+      })
+      .from(user)
+      .where(eq(user.id, userId));
+
+    if (!userInfo) return null;
+
+    // Use the same logic as getForUser but with custom date range
+    // Reuse the existing implementation by calling internal methods
+    return this.getForUser(userId, startDate.getFullYear(), startDate.getMonth() + 1);
+  },
+
+  /**
+   * Get team wrapped data for a group of users
+   */
+  async getTeamWrapped(
+    userIds: string[],
+    year: number,
+    month: number,
+    teamName?: string
+  ): Promise<TeamWrappedData | null> {
+    const db = getDb();
+    const period = getPeriodBounds(year, month);
+
+    if (userIds.length === 0) return null;
+
+    // Get all user infos
+    const users = await db
+      .select({
+        id: user.id,
+        username: user.username,
+        name: user.name,
+        avatarUrl: user.avatarUrl,
+      })
+      .from(user)
+      .where(inArray(user.id, userIds));
+
+    if (users.length === 0) return null;
+
+    // Get aggregate activity stats for all team members
+    const teamActivities = await db
+      .select({
+        actorId: activities.actorId,
+        type: activities.type,
+        createdAt: activities.createdAt,
+      })
+      .from(activities)
+      .where(
+        and(
+          inArray(activities.actorId, userIds),
+          gte(activities.createdAt, period.startDate),
+          lte(activities.createdAt, period.endDate)
+        )
+      );
+
+    // Aggregate stats per member
+    const memberStats = new Map<string, {
+      commits: number;
+      prs: number;
+      reviews: number;
+      issues: number;
+      comments: number;
+      activeDays: Set<string>;
+    }>();
+
+    // Aggregate team totals
+    let totalCommits = 0;
+    let totalPrs = 0;
+    let totalReviews = 0;
+    let totalIssues = 0;
+    let totalComments = 0;
+    const teamActiveDays = new Set<string>();
+    const hourlyMap = new Map<number, number>();
+    const dayOfWeekMap = new Map<number, number>();
+
+    // Initialize maps
+    for (let h = 0; h < 24; h++) hourlyMap.set(h, 0);
+    for (let d = 0; d < 7; d++) dayOfWeekMap.set(d, 0);
+
+    // Process all activities
+    for (const activity of teamActivities) {
+      const dateStr = activity.createdAt.toISOString().split('T')[0];
+      const hour = activity.createdAt.getHours();
+      const dayOfWeek = activity.createdAt.getDay();
+
+      // Update member stats
+      if (!memberStats.has(activity.actorId)) {
+        memberStats.set(activity.actorId, {
+          commits: 0,
+          prs: 0,
+          reviews: 0,
+          issues: 0,
+          comments: 0,
+          activeDays: new Set(),
+        });
+      }
+      const member = memberStats.get(activity.actorId)!;
+      member.activeDays.add(dateStr);
+
+      // Update hourly/daily distributions
+      hourlyMap.set(hour, (hourlyMap.get(hour) || 0) + 1);
+      dayOfWeekMap.set(dayOfWeek, (dayOfWeekMap.get(dayOfWeek) || 0) + 1);
+      teamActiveDays.add(dateStr);
+
+      // Count by type
+      switch (activity.type) {
+        case 'push':
+          member.commits++;
+          totalCommits++;
+          break;
+        case 'pr_opened':
+        case 'pr_merged':
+        case 'pr_closed':
+          member.prs++;
+          totalPrs++;
+          break;
+        case 'pr_review':
+          member.reviews++;
+          totalReviews++;
+          break;
+        case 'issue_opened':
+        case 'issue_closed':
+          member.issues++;
+          totalIssues++;
+          break;
+        case 'pr_comment':
+        case 'issue_comment':
+          member.comments++;
+          totalComments++;
+          break;
+      }
+    }
+
+    // Build member leaderboard
+    const memberLeaderboard: TeamMemberStats[] = users.map(u => {
+      const stats = memberStats.get(u.id);
+      return {
+        userId: u.id,
+        username: u.username || 'unknown',
+        name: u.name,
+        avatarUrl: u.avatarUrl,
+        commits: stats?.commits || 0,
+        prs: stats?.prs || 0,
+        reviews: stats?.reviews || 0,
+        issues: stats?.issues || 0,
+        comments: stats?.comments || 0,
+        activeDays: stats?.activeDays.size || 0,
+        totalActivity: (stats?.commits || 0) + (stats?.prs || 0) + (stats?.reviews || 0) +
+                      (stats?.issues || 0) + (stats?.comments || 0),
+      };
+    }).sort((a, b) => b.totalActivity - a.totalActivity);
+
+    // Find MVP (most valuable player)
+    const mvp = memberLeaderboard[0];
+
+    // Find specialists
+    const commitChampion = [...memberLeaderboard].sort((a, b) => b.commits - a.commits)[0];
+    const reviewChampion = [...memberLeaderboard].sort((a, b) => b.reviews - a.reviews)[0];
+    const issueChampion = [...memberLeaderboard].sort((a, b) => b.issues - a.issues)[0];
+
+    // Build hourly distribution
+    const hourlyDistribution: HourlyDistribution[] = Array.from(hourlyMap.entries())
+      .map(([hour, count]) => ({ hour, count }))
+      .sort((a, b) => a.hour - b.hour);
+
+    // Build day of week distribution
+    const dayOfWeekDistribution: DayOfWeekDistribution[] = Array.from(dayOfWeekMap.entries())
+      .map(([dayOfWeek, count]) => ({
+        dayOfWeek,
+        dayName: getDayName(dayOfWeek),
+        count,
+      }))
+      .sort((a, b) => a.dayOfWeek - b.dayOfWeek);
+
+    // Calculate peak times
+    const peakHour = hourlyDistribution.reduce((max, h) => h.count > max.count ? h : max, hourlyDistribution[0]);
+    const peakDay = dayOfWeekDistribution.reduce((max, d) => d.count > max.count ? d : max, dayOfWeekDistribution[0]);
+
+    // Calculate team personality
+    const lateNightTotal = hourlyDistribution
+      .filter(h => h.hour >= 22 || h.hour < 4)
+      .reduce((sum, h) => sum + h.count, 0);
+    const totalActivity = hourlyDistribution.reduce((sum, h) => sum + h.count, 0);
+    const weekendTotal = dayOfWeekDistribution
+      .filter(d => d.dayOfWeek === 0 || d.dayOfWeek === 6)
+      .reduce((sum, d) => sum + d.count, 0);
+
+    let teamPersonality = 'Balanced Team';
+    if (totalActivity > 0) {
+      const lateNightPct = (lateNightTotal / totalActivity) * 100;
+      const weekendPct = (weekendTotal / totalActivity) * 100;
+
+      if (lateNightPct > 25) teamPersonality = 'Night Owls';
+      else if (weekendPct > 35) teamPersonality = 'Weekend Warriors';
+      else if (peakHour.hour >= 9 && peakHour.hour <= 17) teamPersonality = 'Office Hours Team';
+      else teamPersonality = 'Flexible Schedule Team';
+    }
+
+    return {
+      period,
+      teamName: teamName || 'Team',
+      memberCount: users.length,
+
+      // Aggregate totals
+      totalCommits,
+      totalPrs,
+      totalReviews,
+      totalIssues,
+      totalComments,
+      totalActiveDays: teamActiveDays.size,
+
+      // Member breakdown
+      memberLeaderboard,
+
+      // Specialists
+      specialists: {
+        mvp,
+        commitChampion: commitChampion?.userId !== mvp?.userId ? commitChampion : undefined,
+        reviewChampion: reviewChampion?.userId !== mvp?.userId ? reviewChampion : undefined,
+        issueChampion: issueChampion?.userId !== mvp?.userId ? issueChampion : undefined,
+      },
+
+      // Activity patterns
+      hourlyDistribution,
+      dayOfWeekDistribution,
+      peakHour: peakHour?.hour || 12,
+      peakDay: peakDay?.dayName || 'Monday',
+
+      // Team personality
+      teamPersonality,
+
+      // Fun stats
+      funStats: {
+        totalLinesOfCode: 0, // Would need git analysis
+        mostActiveDay: peakDay?.dayName || 'Monday',
+        lateNightCommits: lateNightTotal,
+        weekendCommits: weekendTotal,
+        averageActivityPerMember: users.length > 0 ? totalActivity / users.length : 0,
+      },
+    };
+  },
+
+  /**
+   * Get yearly wrapped (annual summary)
+   */
+  async getYearlyWrapped(userId: string, year: number): Promise<WrappedData | null> {
+    const startDate = new Date(Date.UTC(year, 0, 1, 0, 0, 0, 0));
+    const endDate = new Date(Date.UTC(year, 11, 31, 23, 59, 59, 999));
+
+    // Aggregate all months for the year
+    const monthlyData: WrappedData[] = [];
+
+    for (let month = 1; month <= 12; month++) {
+      const data = await this.getForUser(userId, year, month);
+      if (data) {
+        monthlyData.push(data);
+      }
+    }
+
+    if (monthlyData.length === 0) return null;
+
+    // Aggregate yearly totals from monthly data
+    const yearlyData: WrappedData = {
+      ...monthlyData[0],
+      period: {
+        year,
+        month: 0, // Indicates full year
+        startDate,
+        endDate,
+      },
+
+      // Sum all metrics
+      totalCommits: monthlyData.reduce((sum, m) => sum + m.totalCommits, 0),
+      totalPrsOpened: monthlyData.reduce((sum, m) => sum + m.totalPrsOpened, 0),
+      totalPrsMerged: monthlyData.reduce((sum, m) => sum + m.totalPrsMerged, 0),
+      totalPrsClosed: monthlyData.reduce((sum, m) => sum + m.totalPrsClosed, 0),
+      totalReviews: monthlyData.reduce((sum, m) => sum + m.totalReviews, 0),
+      totalReviewsApproved: monthlyData.reduce((sum, m) => sum + m.totalReviewsApproved, 0),
+      totalReviewsChangesRequested: monthlyData.reduce((sum, m) => sum + m.totalReviewsChangesRequested, 0),
+      totalIssuesOpened: monthlyData.reduce((sum, m) => sum + m.totalIssuesOpened, 0),
+      totalIssuesClosed: monthlyData.reduce((sum, m) => sum + m.totalIssuesClosed, 0),
+      totalComments: monthlyData.reduce((sum, m) => sum + m.totalComments, 0),
+      totalStarsGiven: monthlyData.reduce((sum, m) => sum + m.totalStarsGiven, 0),
+
+      // Recalculate active days
+      totalActiveDays: new Set(
+        monthlyData.flatMap(m => m.dailyActivity.filter(d => d.total > 0).map(d => d.date))
+      ).size,
+
+      // Merge daily activity
+      dailyActivity: monthlyData.flatMap(m => m.dailyActivity),
+
+      // Aggregate hourly distribution
+      hourlyDistribution: Array.from({ length: 24 }, (_, hour) => ({
+        hour,
+        count: monthlyData.reduce((sum, m) => {
+          const h = m.hourlyDistribution.find(h => h.hour === hour);
+          return sum + (h?.count || 0);
+        }, 0),
+      })),
+
+      // Aggregate day of week distribution
+      dayOfWeekDistribution: Array.from({ length: 7 }, (_, dayOfWeek) => ({
+        dayOfWeek,
+        dayName: getDayName(dayOfWeek),
+        count: monthlyData.reduce((sum, m) => {
+          const d = m.dayOfWeekDistribution.find(d => d.dayOfWeek === dayOfWeek);
+          return sum + (d?.count || 0);
+        }, 0),
+      })),
+    };
+
+    // Recalculate average commits per day
+    yearlyData.avgCommitsPerActiveDay = yearlyData.totalActiveDays > 0
+      ? Math.round((yearlyData.totalCommits / yearlyData.totalActiveDays) * 10) / 10
+      : 0;
+
+    return yearlyData;
+  },
 };
+
+/**
+ * Team member stats for team wrapped
+ */
+export interface TeamMemberStats {
+  userId: string;
+  username: string;
+  name: string | null;
+  avatarUrl: string | null;
+  commits: number;
+  prs: number;
+  reviews: number;
+  issues: number;
+  comments: number;
+  activeDays: number;
+  totalActivity: number;
+}
+
+/**
+ * Team wrapped data
+ */
+export interface TeamWrappedData {
+  period: WrappedPeriod;
+  teamName: string;
+  memberCount: number;
+
+  // Aggregate totals
+  totalCommits: number;
+  totalPrs: number;
+  totalReviews: number;
+  totalIssues: number;
+  totalComments: number;
+  totalActiveDays: number;
+
+  // Member breakdown
+  memberLeaderboard: TeamMemberStats[];
+
+  // Specialists
+  specialists: {
+    mvp?: TeamMemberStats;
+    commitChampion?: TeamMemberStats;
+    reviewChampion?: TeamMemberStats;
+    issueChampion?: TeamMemberStats;
+  };
+
+  // Activity patterns
+  hourlyDistribution: HourlyDistribution[];
+  dayOfWeekDistribution: DayOfWeekDistribution[];
+  peakHour: number;
+  peakDay: string;
+
+  // Team personality
+  teamPersonality: string;
+
+  // Fun stats
+  funStats: {
+    totalLinesOfCode: number;
+    mostActiveDay: string;
+    lateNightCommits: number;
+    weekendCommits: number;
+    averageActivityPerMember: number;
+  };
+}

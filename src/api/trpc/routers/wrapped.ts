@@ -70,4 +70,58 @@ export const wrappedRouter = router({
     .query(async ({ input }) => {
       return wrappedModel.getAvailablePeriods(input.userId);
     }),
+
+  /**
+   * Get yearly wrapped summary for authenticated user
+   */
+  yearlyWrapped: protectedProcedure
+    .input(
+      z.object({
+        year: z.number().min(2020).max(2100),
+      })
+    )
+    .query(async ({ input, ctx }) => {
+      return wrappedModel.getYearlyWrapped(ctx.user.id, input.year);
+    }),
+
+  /**
+   * Get team wrapped data for a group of users
+   */
+  teamWrapped: protectedProcedure
+    .input(
+      z.object({
+        userIds: z.array(z.string()).min(1).max(50),
+        year: z.number().min(2020).max(2100),
+        month: z.number().min(1).max(12),
+        teamName: z.string().optional(),
+      })
+    )
+    .query(async ({ input }) => {
+      return wrappedModel.getTeamWrapped(
+        input.userIds,
+        input.year,
+        input.month,
+        input.teamName
+      );
+    }),
+
+  /**
+   * Get custom period wrapped for authenticated user
+   */
+  customPeriod: protectedProcedure
+    .input(
+      z.object({
+        startDate: z.date(),
+        endDate: z.date(),
+        periodLabel: z.string().optional(),
+      })
+    )
+    .query(async ({ input, ctx }) => {
+      return wrappedModel.getForCustomPeriod(
+        ctx.user.id,
+        input.startDate,
+        input.endDate,
+        input.periodLabel
+      );
+    }),
 });

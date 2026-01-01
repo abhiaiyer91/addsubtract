@@ -40,6 +40,7 @@ import { marketingRouter } from './marketing';
 import { planningRouter } from './planning';
 import { gamificationRouter } from './gamification';
 import { mcpRouter } from './mcp';
+import { statsRouter } from './stats';
 
 /**
  * Main application router
@@ -87,6 +88,7 @@ export const appRouter = router({
   planning: planningRouter,
   gamification: gamificationRouter,
   mcp: mcpRouter,
+  stats: statsRouter,
 });
 
 /**
@@ -136,4 +138,5 @@ export {
   planningRouter,
   gamificationRouter,
   mcpRouter,
+  statsRouter,
 };

@@ -232,3 +232,19 @@ export {
   type FindingStats,
   type ScanWithStats,
 } from './sentinel';
+
+// Repository statistics model (comprehensive analytics)
+export {
+  repoStatsModel,
+  type StatsPeriod,
+  type CommitFrequency,
+  type ContributorStat,
+  type CodeChurn,
+  type FileHotspot,
+  type PRMetrics,
+  type IssueMetrics,
+  type BranchStats,
+  type CIStats as RepoCIStats,
+  type HourlyActivity,
+  type RepoStatistics,
+} from './repo-stats';
