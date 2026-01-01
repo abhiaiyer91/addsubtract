@@ -12,18 +12,48 @@ import { resolveDiskPath, BareRepository } from '../../../server/storage/repos';
 import { exists } from '../../../utils/fs';
 // isAIAvailable is available but semantic search uses direct embedding check
 // import { isAIAvailable } from '../../../ai/mastra';
-import { generateEmbedding, detectLanguage, cosineSimilarity } from '../../../search/embeddings';
+
+// Lazy-load embeddings module to avoid errors when 'ai' package is not installed
+let _embeddingsModule: typeof import('../../../search/embeddings') | null = null;
+let _embeddingsFailed = false;
+
+async function getEmbeddingsModule() {
+  if (_embeddingsFailed) return null;
+  if (_embeddingsModule) return _embeddingsModule;
+
+  try {
+    _embeddingsModule = await import('../../../search/embeddings');
+    if (!_embeddingsModule.isAIPackageAvailable()) {
+      _embeddingsFailed = true;
+      return null;
+    }
+    return _embeddingsModule;
+  } catch {
+    _embeddingsFailed = true;
+    return null;
+  }
+}
+
+// Import detectLanguage directly as it doesn't require the 'ai' package
+import { detectLanguage } from '../../../search/embeddings';
 
 /**
  * Check if semantic search is available for a user
  * Requires OpenAI key (for embeddings) - either user's own or server-level
+ * AND the 'ai' package must be installed
  */
 async function canUseSemanticSearch(userId?: string): Promise<boolean> {
+  // First check if the 'ai' package is available
+  const embeddingsModule = await getEmbeddingsModule();
+  if (!embeddingsModule) {
+    return false;
+  }
+
   // Check server-level OpenAI key first
   if (process.env.OPENAI_API_KEY) {
     return true;
   }
-  
+
   // Check user-level OpenAI key
   if (userId) {
     const userKey = await userAiKeyModel.getDecryptedKey(userId, 'openai');
@@ -31,7 +61,7 @@ async function canUseSemanticSearch(userId?: string): Promise<boolean> {
       return true;
     }
   }
-  
+
   return false;
 }
 
@@ -502,30 +532,33 @@ export const searchRouter = router({
 
       // If semantic search is requested and AI is available, enhance with semantic ranking
       if (useSemanticSearch && semanticAvailable && filteredResults.length > 0) {
-        try {
-          // Generate query embedding
-          const queryEmbedding = await generateEmbedding(input.query);
-          
-          // Generate embeddings for each result and compute similarity
-          const resultsWithScores = await Promise.all(
-            filteredResults.map(async (result) => {
-              try {
-                const contentEmbedding = await generateEmbedding(
-                  `File: ${result.path}\nLanguage: ${result.language}\n\nCode:\n${result.content}`
-                );
-                const score = cosineSimilarity(queryEmbedding, contentEmbedding);
-                return { ...result, score };
-              } catch {
-                return { ...result, score: 0 };
-              }
-            })
-          );
-          
-          // Sort by semantic similarity
-          filteredResults = resultsWithScores.sort((a, b) => (b.score || 0) - (a.score || 0));
-        } catch (error) {
-          console.error('[search.codeSearch] Semantic ranking failed:', error);
-          // Fall back to text results without semantic ranking
+        const embeddingsModule = await getEmbeddingsModule();
+        if (embeddingsModule) {
+          try {
+            // Generate query embedding
+            const queryEmbedding = await embeddingsModule.generateEmbedding(input.query);
+
+            // Generate embeddings for each result and compute similarity
+            const resultsWithScores = await Promise.all(
+              filteredResults.map(async (result) => {
+                try {
+                  const contentEmbedding = await embeddingsModule.generateEmbedding(
+                    `File: ${result.path}\nLanguage: ${result.language}\n\nCode:\n${result.content}`
+                  );
+                  const score = embeddingsModule.cosineSimilarity(queryEmbedding, contentEmbedding);
+                  return { ...result, score };
+                } catch {
+                  return { ...result, score: 0 };
+                }
+              })
+            );
+
+            // Sort by semantic similarity
+            filteredResults = resultsWithScores.sort((a, b) => (b.score || 0) - (a.score || 0));
+          } catch (error) {
+            console.error('[search.codeSearch] Semantic ranking failed:', error);
+            // Fall back to text results without semantic ranking
+          }
         }
       }
 
@@ -544,8 +577,10 @@ export const searchRouter = router({
         repoId: input.repoId,
         mode: useSemanticSearch ? 'semantic' : 'text',
         aiAvailable: semanticAvailable,
-        message: !semanticAvailable 
-          ? 'Text search results. Add an OpenAI API key in Settings > AI for semantic code search.'
+        message: !semanticAvailable
+          ? (_embeddingsFailed
+            ? 'Text search results. Semantic search requires the \'ai\' package (npm install ai @ai-sdk/openai).'
+            : 'Text search results. Add an OpenAI API key in Settings > AI for semantic code search.')
           : undefined,
       };
     }),

@@ -303,6 +303,8 @@ The goal: the build should "just work" without module-related warnings or errors
     category: 'Infrastructure',
     priority: 'P1',
     tags: ['ai', 'error-handling', 'dx'],
+    completed: true,
+    completedPr: 288,
     prompt: `I'm contributing to wit, an AI-native Git platform. Please help me add a check for the 'ai' package dependency so semantic search works on fresh installs.
 
 1. Understand the problem:

@@ -1,11 +1,8 @@
 /**
  * Embedding Generation for Semantic Code Search
- * 
+ *
  * Uses @mastra/rag and the AI SDK for generating embeddings from code.
  */
-
-import { embed, embedMany } from 'ai';
-import { openai } from '@ai-sdk/openai';
 
 /**
  * Default embedding model
@@ -16,6 +13,74 @@ const DEFAULT_MODEL = 'text-embedding-3-small';
  * Embedding dimensions for text-embedding-3-small
  */
 export const EMBEDDING_DIMENSIONS = 1536;
+
+/**
+ * Error thrown when the 'ai' package is not available
+ */
+export class AIPackageNotAvailableError extends Error {
+  constructor() {
+    super(
+      'Semantic search requires the \'ai\' package.\n\n' +
+      'To install it, run:\n' +
+      '  npm install ai @ai-sdk/openai\n\n' +
+      'This is an optional dependency for AI-powered features.'
+    );
+    this.name = 'AIPackageNotAvailableError';
+  }
+}
+
+/**
+ * Check if the 'ai' package is available
+ */
+let _aiPackageAvailable: boolean | null = null;
+
+export function isAIPackageAvailable(): boolean {
+  if (_aiPackageAvailable !== null) {
+    return _aiPackageAvailable;
+  }
+
+  try {
+    require.resolve('ai');
+    require.resolve('@ai-sdk/openai');
+    _aiPackageAvailable = true;
+  } catch {
+    _aiPackageAvailable = false;
+  }
+
+  return _aiPackageAvailable;
+}
+
+/**
+ * Lazy-loaded AI SDK modules
+ */
+let _embed: typeof import('ai').embed | null = null;
+let _embedMany: typeof import('ai').embedMany | null = null;
+let _openai: typeof import('@ai-sdk/openai').openai | null = null;
+
+async function loadAIModules(): Promise<{
+  embed: typeof import('ai').embed;
+  embedMany: typeof import('ai').embedMany;
+  openai: typeof import('@ai-sdk/openai').openai;
+}> {
+  if (_embed && _embedMany && _openai) {
+    return { embed: _embed, embedMany: _embedMany, openai: _openai };
+  }
+
+  try {
+    const [aiModule, openaiModule] = await Promise.all([
+      import('ai'),
+      import('@ai-sdk/openai'),
+    ]);
+
+    _embed = aiModule.embed;
+    _embedMany = aiModule.embedMany;
+    _openai = openaiModule.openai;
+
+    return { embed: _embed, embedMany: _embedMany, openai: _openai };
+  } catch (error) {
+    throw new AIPackageNotAvailableError();
+  }
+}
 
 /**
  * Context for code embedding generation
@@ -30,6 +95,8 @@ export interface CodeContext {
  * Generate embedding for a single text
  */
 export async function generateEmbedding(text: string): Promise<number[]> {
+  const { embed, openai } = await loadAIModules();
+
   const { embedding } = await embed({
     model: openai.embedding(DEFAULT_MODEL),
     value: text,
@@ -44,6 +111,8 @@ export async function generateEmbeddings(texts: string[]): Promise<number[][]> {
   if (texts.length === 0) {
     return [];
   }
+
+  const { embedMany, openai } = await loadAIModules();
 
   const { embeddings } = await embedMany({
     model: openai.embedding(DEFAULT_MODEL),
