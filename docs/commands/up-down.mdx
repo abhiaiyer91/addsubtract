@@ -1,0 +1,394 @@
+---
+title: Platform Commands
+description: "Start and stop the wit platform with one command"
+---
+
+The `wit up` and `wit down` commands provide a simple way to start and stop the complete wit platform, including the database, API server, and web UI.
+
+## wit up
+
+Start the complete wit platform with a single command.
+
+```bash
+wit up [options]
+```
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `--port <port>` | API server port (default: 3000) |
+| `--db-port <port>` | Database port (default: 5432) |
+| `--no-web` | Don't start the web UI |
+| `--no-db` | Use external database (requires DATABASE_URL) |
+| `--data-dir <dir>` | Data directory (default: ~/.wit) |
+| `-h, --help` | Show help message |
+
+### Examples
+
+```bash
+# Start everything with defaults
+wit up
+
+# Start on custom port
+wit up --port 8080
+
+# Start without web UI
+wit up --no-web
+
+# Use custom data directory
+wit up --data-dir ./my-data
+
+# Use external database
+DATABASE_URL=postgresql://... wit up --no-db
+```
+
+### What wit up Does
+
+When you run `wit up`, it:
+
+1. **Starts PostgreSQL** (via Docker) - unless `--no-db` is specified
+2. **Runs database migrations** - ensures schema is up to date
+3. **Starts the API server** - Git HTTP server and tRPC API
+4. **Starts the web UI** - React development server (unless `--no-web`)
+
+### Example Output
+
+```
+Starting wit platform...
+
+  Starting database...
+  Database started
+  Running migrations...
+  Migrations complete
+  Starting API server...
+  API server started
+  Starting web UI...
+  Web UI started
+
+wit is running!
+
+  Services:
+    API:      http://localhost:3000
+    Web UI:   http://localhost:5173
+    Database: localhost:5432
+
+  Stop with: wit down
+  Logs at:   ~/.wit/logs
+```
+
+---
+
+## wit down
+
+Stop all wit platform services.
+
+```bash
+wit down [options]
+```
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `--keep-db` | Don't stop the database |
+| `--remove-data` | Remove all data (DESTRUCTIVE) |
+| `-h, --help` | Show help message |
+
+### Examples
+
+```bash
+# Stop everything
+wit down
+
+# Stop but keep database running
+wit down --keep-db
+
+# Stop and remove all data
+wit down --remove-data
+```
+
+### Example Output
+
+```
+Stopping wit platform...
+
+  Web UI stopped
+  API server stopped
+  Database stopped
+
+wit stopped
+```
+
+---
+
+## Data Directory
+
+By default, wit stores all data in `~/.wit/`:
+
+```
+~/.wit/
+  repos/       # Git repositories
+  db/          # PostgreSQL data
+  logs/        # Server and web logs
+  wit.pid      # Process IDs for cleanup
+```
+
+### Custom Data Directory
+
+```bash
+# Use a custom location
+wit up --data-dir /path/to/data
+
+# This creates:
+# /path/to/data/repos/
+# /path/to/data/db/
+# /path/to/data/logs/
+```
+
+---
+
+## Requirements
+
+### Docker
+
+`wit up` uses Docker to run PostgreSQL. Ensure Docker is installed and running:
+
+```bash
+# Check Docker is available
+docker --version
+
+# If Docker isn't installed, either:
+# 1. Install Docker Desktop
+# 2. Use --no-db with an external database
+```
+
+### External Database
+
+If you can't use Docker or prefer an external database:
+
+```bash
+# Set DATABASE_URL
+export DATABASE_URL=postgresql://user:pass@host:5432/wit
+
+# Start without Docker database
+wit up --no-db
+```
+
+---
+
+## Ports
+
+Default ports used by wit:
+
+| Service | Default Port | Environment Variable |
+|---------|--------------|---------------------|
+| API Server | 3000 | `PORT` |
+| Web UI (Vite) | 5173 | - |
+| PostgreSQL | 5432 | - |
+
+### Custom Ports
+
+```bash
+# API on 8080, database on 5433
+wit up --port 8080 --db-port 5433
+```
+
+---
+
+## Process Management
+
+wit runs services in the background and tracks their process IDs:
+
+```bash
+# Check if wit is running
+ls ~/.wit/wit.pid
+
+# View the PID file
+cat ~/.wit/wit.pid
+```
+
+### Checking Status
+
+```bash
+# See what's running
+ps aux | grep wit
+
+# Check logs
+tail -f ~/.wit/logs/server.log
+tail -f ~/.wit/logs/web.log
+```
+
+---
+
+## Logs
+
+Logs are stored in `~/.wit/logs/`:
+
+| File | Contents |
+|------|----------|
+| `server.log` | API server output |
+| `web.log` | Web UI (Vite) output |
+
+### Viewing Logs
+
+```bash
+# Follow server logs
+tail -f ~/.wit/logs/server.log
+
+# View recent web logs
+tail -100 ~/.wit/logs/web.log
+
+# Search for errors
+grep -i error ~/.wit/logs/*.log
+```
+
+---
+
+## Workflow Examples
+
+### Daily Development
+
+```bash
+# Start of day: start wit
+wit up
+
+# ... work on your projects ...
+
+# End of day: stop wit
+wit down
+```
+
+### Quick API Testing
+
+```bash
+# Start just the API (no web UI)
+wit up --no-web
+
+# Test the API
+curl http://localhost:3000/health
+
+# Stop when done
+wit down
+```
+
+### Fresh Start
+
+```bash
+# Stop and remove all data
+wit down --remove-data
+
+# Start fresh
+wit up
+```
+
+### Keep Database Between Restarts
+
+```bash
+# Stop server but keep data
+wit down --keep-db
+
+# Later, start again (faster startup)
+wit up
+```
+
+---
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="wit is already running">
+    ```
+    wit is already running
+    Stop it with: wit down
+    ```
+
+    Either stop the existing instance:
+    ```bash
+    wit down
+    wit up
+    ```
+
+    Or if the PID file is stale:
+    ```bash
+    rm ~/.wit/wit.pid
+    wit up
+    ```
+  </Accordion>
+
+  <Accordion title="Docker not found">
+    ```
+    Docker not found
+    Docker is required to run the database.
+    ```
+
+    Either install Docker or use an external database:
+    ```bash
+    export DATABASE_URL=postgresql://...
+    wit up --no-db
+    ```
+  </Accordion>
+
+  <Accordion title="Database failed to start">
+    Check if the port is in use:
+    ```bash
+    lsof -i :5432
+    ```
+
+    Either stop the conflicting process or use a different port:
+    ```bash
+    wit up --db-port 5433
+    ```
+  </Accordion>
+
+  <Accordion title="Web UI failed to start">
+    Check if port 5173 is in use:
+    ```bash
+    lsof -i :5173
+    ```
+
+    Check the web logs:
+    ```bash
+    cat ~/.wit/logs/web.log
+    ```
+
+    Try without web UI:
+    ```bash
+    wit up --no-web
+    ```
+  </Accordion>
+
+  <Accordion title="Server won't stop">
+    If `wit down` doesn't stop services:
+    ```bash
+    # Force kill by PID
+    cat ~/.wit/wit.pid | jq -r '.server, .web' | xargs kill -9
+
+    # Or stop Docker container manually
+    docker stop wit-postgres
+    docker rm wit-postgres
+
+    # Clean up PID file
+    rm ~/.wit/wit.pid
+    ```
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `DATABASE_URL` | PostgreSQL connection string (when using --no-db) |
+| `PORT` | API server port (alternative to --port) |
+| `REPOS_DIR` | Repository storage directory |
+| `BETTER_AUTH_SECRET` | Authentication secret (for production) |
+
+---
+
+## Related Commands
+
+- [`wit serve`](/commands/serve) - Start just the API server
+- [`wit token`](/commands/token) - Create API tokens
+- [`wit collaborator`](/commands/collaborator) - Manage collaborators

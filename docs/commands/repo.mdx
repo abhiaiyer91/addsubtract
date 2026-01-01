@@ -1,0 +1,258 @@
+---
+title: Repository Management
+description: "Transfer and manage repository ownership"
+---
+
+The `wit repo` command provides repository management operations, including transferring repositories between users and organizations.
+
+## Overview
+
+```bash
+wit repo <command> [options]
+```
+
+## Commands
+
+### transfer
+
+Transfer repository ownership to another user or organization.
+
+```bash
+wit repo transfer <owner/repo> <new-owner> [options]
+```
+
+#### Arguments
+
+| Argument | Description |
+|----------|-------------|
+| `owner/repo` | Current repository path (e.g., `alice/myproject`) |
+| `new-owner` | Username or organization slug to transfer to |
+
+#### Options
+
+| Option | Description |
+|--------|-------------|
+| `--org` | Transfer to an organization (instead of a user) |
+
+#### Examples
+
+```bash
+# Transfer to another user
+wit repo transfer alice/myrepo bob
+
+# Transfer to an organization
+wit repo transfer alice/myrepo acme-corp --org
+
+# Transfer from one org to another
+wit repo transfer old-org/project new-org --org
+```
+
+#### Example Output
+
+```
+Transferring alice/myrepo to bob...
+
+Repository transferred successfully!
+  From: alice/myrepo
+  To:   bob/myrepo
+
+Note: Update your git remotes to use the new URL:
+  git remote set-url origin <server>/bob/myrepo.git
+```
+
+---
+
+## Requirements
+
+### Permissions
+
+To transfer a repository:
+
+1. **To a user**: You must be the repository owner
+2. **To an organization**: You must be the repository owner AND an admin/owner of the target organization
+
+### Authentication
+
+Repository transfer requires authentication:
+
+```bash
+# Set your token
+export WIT_TOKEN=your-token-here
+
+# Or authenticate via the CLI
+wit auth login
+```
+
+---
+
+## What Gets Transferred
+
+When you transfer a repository, the following are preserved:
+
+| Item | Preserved? |
+|------|------------|
+| All commits and branches | Yes |
+| Tags | Yes |
+| Pull requests | Yes |
+| Issues | Yes |
+| Collaborators | Yes |
+| Settings | Yes |
+| Webhooks | Yes |
+| Stars | No |
+| Forks | Remain linked |
+
+---
+
+## Workflow Examples
+
+### Personal to Organization
+
+Move a personal project to your company:
+
+```bash
+# Transfer the repository
+wit repo transfer yourname/project company-org --org
+
+# Update your local remote
+git remote set-url origin https://wit.example.com/company-org/project.git
+
+# Verify the new remote
+git remote -v
+```
+
+### Hand Off to New Maintainer
+
+Transfer ownership of a project:
+
+```bash
+# Transfer to the new maintainer
+wit repo transfer yourname/project newmaintainer
+
+# They now have full ownership
+```
+
+### Organizational Restructure
+
+Move repositories between organizations:
+
+```bash
+# Transfer from old org to new org
+wit repo transfer legacy-org/service modern-org --org
+
+# Update CI/CD configurations
+# Update documentation
+# Notify team members of the new URL
+```
+
+---
+
+## After Transfer Checklist
+
+After transferring a repository, update:
+
+- [ ] Local git remotes (`git remote set-url origin ...`)
+- [ ] CI/CD configurations (GitHub Actions, Jenkins, etc.)
+- [ ] Documentation links
+- [ ] Package registry references (npm, PyPI, etc.)
+- [ ] Dependency URLs in other projects
+- [ ] Bookmarks and saved links
+- [ ] Deployment scripts
+- [ ] Monitoring and alerting configurations
+
+---
+
+## Error Handling
+
+### Common Errors
+
+<AccordionGroup>
+  <Accordion title="Repository not found">
+    ```
+    Repository not found: alice/myrepo
+    ```
+    - Verify the repository path is correct
+    - Ensure you have access to the repository
+    - Check that you're authenticated
+  </Accordion>
+
+  <Accordion title="User/Organization not found">
+    ```
+    User not found: newuser
+    Organization not found: neworg
+    ```
+    - Verify the username or organization slug
+    - Use `--org` flag when transferring to an organization
+    - Check that the target account exists
+  </Accordion>
+
+  <Accordion title="Permission denied">
+    ```
+    Permission denied: Only the repository owner can transfer it.
+    Permission denied: You must be an admin or owner of the target organization.
+    ```
+    - Only repository owners can initiate transfers
+    - You need admin/owner role in the target organization
+    - Check your permissions in both source and target
+  </Accordion>
+
+  <Accordion title="Repository already exists">
+    ```
+    A repository named 'project' already exists for newowner
+    ```
+    - The target owner already has a repository with that name
+    - Rename one of the repositories before transferring
+    - Or delete the existing repository if it's not needed
+  </Accordion>
+
+  <Accordion title="Authentication required">
+    ```
+    Authentication required. Please log in first.
+    ```
+    Set your authentication token:
+    ```bash
+    export WIT_TOKEN=your-token-here
+    ```
+    Or authenticate via the web UI and create a token.
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Notify collaborators">
+    Before transferring, inform all collaborators about the upcoming change and the new URL they'll need to use.
+  </Accordion>
+
+  <Accordion title="Update CI/CD first">
+    If possible, update CI/CD configurations before the transfer or have them ready to deploy immediately after.
+  </Accordion>
+
+  <Accordion title="Check dependencies">
+    If other projects depend on this repository, plan how you'll update those references.
+  </Accordion>
+
+  <Accordion title="Test access after transfer">
+    After transferring, verify that:
+    - Collaborators can still access the repository
+    - CI/CD pipelines work with new URLs
+    - Webhooks are firing correctly
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `WIT_TOKEN` | Authentication token for API access |
+
+---
+
+## Related Commands
+
+- [`wit collaborator`](/commands/collaborator) - Manage repository collaborators
+- [`wit clone`](/commands/remotes#clone) - Clone a repository
+- [`wit remote`](/commands/remotes) - Manage remotes
