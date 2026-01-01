@@ -178,6 +178,8 @@ The goal: 'curl ... | sh' should just work and get someone to 'wit --version' in
 6. Test each example in the docs actually works
 
 The goal: any wit command should have clear, helpful documentation.`,
+    completed: true,
+    completedPr: 285,
   },
   {
     id: 'fix-integration-tests',
