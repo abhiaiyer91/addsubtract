@@ -10,7 +10,7 @@
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import {
-  startTestServer,
+  setupIntegrationTest,
   stopTestServer,
   createTestClient,
   createAuthenticatedClient,
@@ -20,6 +20,8 @@ import {
 } from './setup';
 
 describe('Admin', () => {
+  setupIntegrationTest();
+
   let adminToken: string;
   let adminId: string;
   let regularUserToken: string;
@@ -27,8 +29,6 @@ describe('Admin', () => {
   let regularUsername: string;
 
   beforeAll(async () => {
-    await startTestServer();
-
     const api = createTestClient();
 
     // Create admin user (first user might be admin)
@@ -51,7 +51,7 @@ describe('Admin', () => {
     });
     regularUserToken = regularResult.sessionId;
     regularUserId = regularResult.user.id;
-  }, 30000);
+  });
 
   afterAll(async () => {
     await stopTestServer();

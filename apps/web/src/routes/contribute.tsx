@@ -189,7 +189,7 @@ The goal: any wit command should have clear, helpful documentation.`,
 
 1. Run the full test suite and identify failures:
    npm test 2>&1 | tee test-output.txt
-   
+
 2. Categorize the failures:
    - Look at tests/integration/ for integration tests
    - Check src/__tests__/ for unit tests

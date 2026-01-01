@@ -10,7 +10,7 @@
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import {
-  startTestServer,
+  setupIntegrationTest,
   stopTestServer,
   createTestClient,
   createAuthenticatedClient,
@@ -20,6 +20,8 @@ import {
 } from './setup';
 
 describe('Webhooks Flow', () => {
+  setupIntegrationTest();
+
   let ownerToken: string;
   let collaboratorToken: string;
   let ownerId: string;
@@ -28,7 +30,6 @@ describe('Webhooks Flow', () => {
   let ownerUsername: string;
 
   beforeAll(async () => {
-    await startTestServer();
 
     const api = createTestClient();
 
@@ -62,7 +63,7 @@ describe('Webhooks Flow', () => {
       isPrivate: false,
     });
     repoId = repo.id;
-  }, 30000);
+  });
 
   afterAll(async () => {
     await stopTestServer();

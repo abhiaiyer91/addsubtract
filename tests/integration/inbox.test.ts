@@ -11,7 +11,7 @@
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import {
-  startTestServer,
+  setupIntegrationTest,
   stopTestServer,
   createTestClient,
   createAuthenticatedClient,
@@ -21,19 +21,20 @@ import {
 } from './setup';
 
 describe('PR Inbox', () => {
+  setupIntegrationTest();
+
   let authorToken: string;
   let authorId: string;
   let authorUsername: string;
-  
+
   let reviewerToken: string;
   let reviewerId: string;
   let reviewerUsername: string;
-  
+
   let repoId: string;
   let prId: string;
 
   beforeAll(async () => {
-    await startTestServer();
 
     const api = createTestClient();
 
@@ -67,7 +68,7 @@ describe('PR Inbox', () => {
       isPrivate: false,
     });
     repoId = repo.id;
-  }, 30000);
+  });
 
   afterAll(async () => {
     await stopTestServer();

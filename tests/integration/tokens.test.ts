@@ -10,7 +10,7 @@
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import {
-  startTestServer,
+  setupIntegrationTest,
   stopTestServer,
   createTestClient,
   createAuthenticatedClient,
@@ -19,12 +19,13 @@ import {
 } from './setup';
 
 describe('Tokens Flow', () => {
+  setupIntegrationTest();
+
   let userToken: string;
   let userId: string;
   let username: string;
 
   beforeAll(async () => {
-    await startTestServer();
 
     const api = createTestClient();
 
@@ -38,7 +39,7 @@ describe('Tokens Flow', () => {
     });
     userToken = result.sessionId;
     userId = result.user.id;
-  }, 30000);
+  });
 
   afterAll(async () => {
     await stopTestServer();

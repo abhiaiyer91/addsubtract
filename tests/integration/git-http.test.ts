@@ -6,7 +6,7 @@
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import {
-  startTestServer,
+  setupIntegrationTest,
   stopTestServer,
   API_URL,
   createTestClient,
@@ -17,13 +17,14 @@ import {
 } from './setup';
 
 describe('Git HTTP Protocol', () => {
+  setupIntegrationTest();
+
   let sessionToken: string;
   let testUsername: string;
   let repoName: string;
 
   beforeAll(async () => {
-    await startTestServer();
-    
+
     // Create a test user
     testUsername = uniqueUsername('githttp');
     const api = createTestClient();
@@ -44,7 +45,7 @@ describe('Git HTTP Protocol', () => {
       description: 'Test repo for git protocol tests',
       isPrivate: false,
     });
-  }, 30000);
+  });
 
   afterAll(async () => {
     await stopTestServer();

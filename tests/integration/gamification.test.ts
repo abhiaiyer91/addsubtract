@@ -6,7 +6,7 @@
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import {
-  startTestServer,
+  setupIntegrationTest,
   stopTestServer,
   createTestClient,
   createAuthenticatedClient,
@@ -16,6 +16,8 @@ import {
 } from './setup';
 
 describe('Gamification', () => {
+  setupIntegrationTest();
+
   let userToken: string;
   let userId: string;
   let username: string;
@@ -24,7 +26,6 @@ describe('Gamification', () => {
   let secondUsername: string;
 
   beforeAll(async () => {
-    await startTestServer();
 
     const api = createTestClient();
 
@@ -49,7 +50,7 @@ describe('Gamification', () => {
     });
     secondUserToken = result2.sessionId;
     secondUserId = result2.user.id;
-  }, 30000);
+  });
 
   afterAll(async () => {
     await stopTestServer();
@@ -123,7 +124,7 @@ describe('Gamification', () => {
     it('gets achievements for a user by username', async () => {
       const api = createTestClient();
 
-      const achievements = await api.gamification.userAchievements.query({ username });
+      const achievements = await api.gamification.getAchievements.query({ username });
 
       expect(Array.isArray(achievements)).toBe(true);
     });
@@ -131,7 +132,7 @@ describe('Gamification', () => {
     it('gets all achievement definitions', async () => {
       const api = createTestClient();
 
-      const definitions = await api.gamification.allAchievements.query();
+      const definitions = await api.gamification.achievementDefinitions.query();
 
       expect(Array.isArray(definitions)).toBe(true);
       if (definitions.length > 0) {
@@ -230,7 +231,7 @@ describe('Gamification', () => {
     let repoId: string;
 
     beforeAll(async () => {
-      const authApi = createAuthenticatedClient(userToken);
+        const authApi = createAuthenticatedClient(userToken);
       const repo = await authApi.repos.create.mutate({
         name: uniqueRepoName('gamification-activity'),
         description: 'Repo for gamification activity tests',

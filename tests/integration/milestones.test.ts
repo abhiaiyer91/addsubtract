@@ -11,7 +11,7 @@
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import {
-  startTestServer,
+  setupIntegrationTest,
   stopTestServer,
   createTestClient,
   createAuthenticatedClient,
@@ -21,6 +21,8 @@ import {
 } from './setup';
 
 describe('Milestones Flow', () => {
+  setupIntegrationTest();
+
   let ownerToken: string;
   let collaboratorToken: string;
   let ownerId: string;
@@ -29,7 +31,6 @@ describe('Milestones Flow', () => {
   let ownerUsername: string;
 
   beforeAll(async () => {
-    await startTestServer();
 
     const api = createTestClient();
 
@@ -63,7 +64,7 @@ describe('Milestones Flow', () => {
       isPrivate: false,
     });
     repoId = repo.id;
-  }, 30000);
+  });
 
   afterAll(async () => {
     await stopTestServer();
@@ -272,7 +273,7 @@ describe('Milestones Flow', () => {
     let milestoneId: string;
 
     beforeEach(async () => {
-      const authApi = createAuthenticatedClient(ownerToken);
+        const authApi = createAuthenticatedClient(ownerToken);
 
       // Create a milestone
       const milestone = await authApi.milestones.create.mutate({
@@ -381,7 +382,7 @@ describe('Milestones Flow', () => {
     let milestoneId: string;
 
     beforeEach(async () => {
-      const authApi = createAuthenticatedClient(ownerToken);
+        const authApi = createAuthenticatedClient(ownerToken);
 
       // Create a milestone
       const milestone = await authApi.milestones.create.mutate({

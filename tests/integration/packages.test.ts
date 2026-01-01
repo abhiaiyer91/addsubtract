@@ -13,7 +13,7 @@
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import {
-  startTestServer,
+  setupIntegrationTest,
   stopTestServer,
   createTestClient,
   API_URL,
@@ -22,6 +22,8 @@ import {
 } from './setup';
 
 describe('Package Registry Integration', () => {
+  setupIntegrationTest();
+
   let sessionToken: string;
   let userId: string;
   let testUsername: string;
@@ -50,7 +52,6 @@ describe('Package Registry Integration', () => {
   }
 
   beforeAll(async () => {
-    await startTestServer();
 
     // Create a test user and authenticated client
     const api = createTestClient();
@@ -66,7 +67,7 @@ describe('Package Registry Integration', () => {
 
     // Create authenticated client
     authApi = createTestClient(sessionToken);
-  }, 30000);
+  });
 
   afterAll(async () => {
     await stopTestServer();
