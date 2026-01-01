@@ -26,6 +26,7 @@ export { uncommit, handleUncommit } from './uncommit';
 export { analyzeBranches, deleteBranches, handleCleanup } from './cleanup';
 export { blame, handleBlame } from './blame';
 export { collectStats, handleStats } from './stats';
+export { handleStatsDashboard, collectLocalStats } from './stats-dashboard';
 export { fixup, handleFixup } from './fixup';
 export { handleSnapshot, SnapshotManager } from './snapshot';
 
