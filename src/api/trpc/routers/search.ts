@@ -2,6 +2,7 @@
  * Search Router
  * 
  * tRPC router for search functionality including text-based and semantic code search.
+ * Includes usage-based billing via Autumn for semantic search.
  */
 
 import { z } from 'zod';
@@ -13,6 +14,7 @@ import { exists } from '../../../utils/fs';
 // isAIAvailable is available but semantic search uses direct embedding check
 // import { isAIAvailable } from '../../../ai/mastra';
 import { generateEmbedding, detectLanguage, cosineSimilarity } from '../../../search/embeddings';
+import { checkUsageLimit, trackUsageAfterSuccess } from '../../../server/middleware/usage';
 
 /**
  * Check if semantic search is available for a user
@@ -502,6 +504,24 @@ export const searchRouter = router({
 
       // If semantic search is requested and AI is available, enhance with semantic ranking
       if (useSemanticSearch && semanticAvailable && filteredResults.length > 0) {
+        // Check usage limit for semantic search (AI-powered)
+        const usageCheck = await checkUsageLimit(ctx.user.id, 'search');
+        
+        if (!usageCheck.allowed) {
+          // Return text results with a warning about usage limit
+          return {
+            results: filteredResults.map(r => ({
+              ...r,
+              repoOwner: ownerUsername,
+            })),
+            query: input.query,
+            mode: 'text' as const,
+            semanticAvailable: false,
+            usageLimitReached: true,
+            upgradeUrl: '/settings/billing',
+          };
+        }
+
         try {
           // Generate query embedding
           const queryEmbedding = await generateEmbedding(input.query);
@@ -523,6 +543,9 @@ export const searchRouter = router({
           
           // Sort by semantic similarity
           filteredResults = resultsWithScores.sort((a, b) => (b.score || 0) - (a.score || 0));
+          
+          // Track usage after successful semantic search
+          await trackUsageAfterSuccess(ctx.user.id, 'search');
         } catch (error) {
           console.error('[search.codeSearch] Semantic ranking failed:', error);
           // Fall back to text results without semantic ranking

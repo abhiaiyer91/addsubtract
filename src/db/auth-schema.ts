@@ -4,6 +4,10 @@ import { pgTable, text, timestamp, boolean, index } from "drizzle-orm/pg-core";
 // User roles for admin portal
 export type UserRole = 'user' | 'admin' | 'superadmin';
 
+// Subscription tiers for monetization
+export type SubscriptionTier = 'free' | 'pro' | 'team' | 'enterprise';
+export type SubscriptionStatus = 'active' | 'past_due' | 'canceled' | 'trialing' | 'inactive';
+
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
@@ -26,6 +30,12 @@ export const user = pgTable("user", {
   suspended: boolean("suspended").default(false).notNull(),
   suspendedAt: timestamp("suspended_at"),
   suspendedReason: text("suspended_reason"),
+  // Subscription fields for monetization
+  tier: text("tier").$type<SubscriptionTier>().default('free').notNull(),
+  stripeCustomerId: text("stripe_customer_id"),
+  stripeSubscriptionId: text("stripe_subscription_id"),
+  subscriptionStatus: text("subscription_status").$type<SubscriptionStatus>().default('inactive'),
+  subscriptionPeriodEnd: timestamp("subscription_period_end"),
 });
 
 export const session = pgTable(
