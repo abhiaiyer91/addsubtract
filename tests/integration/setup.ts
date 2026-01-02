@@ -1,6 +1,6 @@
 /**
  * Integration test setup
- * 
+ *
  * This file provides utilities for setting up and tearing down
  * the test environment for integration tests.
  */
@@ -11,12 +11,85 @@ import { startServer, WitServer } from '../../src/server';
 import { initDatabase, closeDatabase, getDb, getPool } from '../../src/db';
 import * as fs from 'fs';
 import superjson from 'superjson';
+import { Pool } from 'pg';
 
 const TEST_PORT = 3456;
 const TEST_REPOS_DIR = '/tmp/wit-test-repos';
 export const API_URL = `http://localhost:${TEST_PORT}`;
 
 let server: WitServer | null = null;
+
+/**
+ * Check if the database is available
+ * This is used to gracefully skip integration tests when the database is not running
+ */
+let _databaseAvailable: boolean | null = null;
+
+export async function isDatabaseAvailable(): Promise<boolean> {
+  if (_databaseAvailable !== null) {
+    return _databaseAvailable;
+  }
+
+  const databaseUrl = process.env.DATABASE_URL || 'postgresql://wit:wit@localhost:5432/wit';
+  const pool = new Pool({ connectionString: databaseUrl, connectionTimeoutMillis: 2000 });
+
+  try {
+    const client = await pool.connect();
+    client.release();
+    await pool.end();
+    _databaseAvailable = true;
+    return true;
+  } catch {
+    await pool.end();
+    _databaseAvailable = false;
+    return false;
+  }
+}
+
+/**
+ * Error message for when database is unavailable
+ */
+export const DB_UNAVAILABLE_MESSAGE = `
+================================================================================
+DATABASE NOT AVAILABLE
+
+Integration tests require PostgreSQL to be running. Please start it with:
+
+  npm run docker:db    # Start PostgreSQL container
+  npm run db:push      # Push schema to database
+
+Then run tests again:
+
+  npm test
+
+To stop the database when done:
+
+  npm run docker:down
+================================================================================
+`;
+
+/**
+ * A beforeAll hook that starts the test server.
+ * Fails with a clear error if the database is not available.
+ *
+ * Usage in test files:
+ *
+ *   import { setupIntegrationTest, stopTestServer } from './setup';
+ *
+ *   describe('My Tests', () => {
+ *     setupIntegrationTest();
+ *     afterAll(() => stopTestServer());
+ *
+ *     it('test', ...);
+ *   });
+ */
+import { beforeAll } from 'vitest';
+
+export function setupIntegrationTest(): void {
+  beforeAll(async () => {
+    await startTestServer();
+  }, 30000);
+}
 
 /**
  * Check if a table exists in the database
@@ -148,17 +221,34 @@ async function ensurePackagesSchema(): Promise<void> {
   console.log('[test-setup] Packages schema created successfully');
 }
 
+// Track whether the test server was started successfully
+let _serverStarted = false;
+
+/**
+ * Check if the test server is running
+ */
+export function isTestServerRunning(): boolean {
+  return _serverStarted;
+}
+
 /**
  * Start the test server
+ * @throws Error if the database is not available
  */
 export async function startTestServer(): Promise<void> {
+  // Check database availability first
+  const dbAvailable = await isDatabaseAvailable();
+  if (!dbAvailable) {
+    throw new Error(DB_UNAVAILABLE_MESSAGE);
+  }
+
   // Set up test database
   const databaseUrl = process.env.DATABASE_URL || 'postgresql://wit:wit@localhost:5432/wit';
   initDatabase(databaseUrl);
-  
+
   // Ensure packages schema exists (handles db:push vs db:migrate scenarios)
   await ensurePackagesSchema();
-  
+
   // Clean up test repos directory
   if (fs.existsSync(TEST_REPOS_DIR)) {
     fs.rmSync(TEST_REPOS_DIR, { recursive: true, force: true });
@@ -175,18 +265,24 @@ export async function startTestServer(): Promise<void> {
 
   // Wait for server to be ready
   await waitForServer();
+  _serverStarted = true;
 }
 
 /**
  * Stop the test server
  */
 export async function stopTestServer(): Promise<void> {
+  _serverStarted = false;
+
   if (server) {
     await server.stop();
     server = null;
   }
-  
-  await closeDatabase();
+
+  // Only close database if it was ever connected
+  if (_databaseAvailable) {
+    await closeDatabase();
+  }
 
   // Clean up test repos
   if (fs.existsSync(TEST_REPOS_DIR)) {

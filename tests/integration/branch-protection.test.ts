@@ -10,7 +10,7 @@
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import {
-  startTestServer,
+  setupIntegrationTest,
   stopTestServer,
   createTestClient,
   createAuthenticatedClient,
@@ -20,6 +20,8 @@ import {
 } from './setup';
 
 describe('Branch Protection Flow', () => {
+  setupIntegrationTest();
+
   let ownerToken: string;
   let collaboratorToken: string;
   let ownerId: string;
@@ -28,8 +30,6 @@ describe('Branch Protection Flow', () => {
   let ownerUsername: string;
 
   beforeAll(async () => {
-    await startTestServer();
-
     const api = createTestClient();
 
     // Create repo owner
@@ -62,7 +62,7 @@ describe('Branch Protection Flow', () => {
       isPrivate: false,
     });
     repoId = repo.id;
-  }, 30000);
+  });
 
   afterAll(async () => {
     await stopTestServer();

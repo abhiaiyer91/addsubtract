@@ -10,7 +10,7 @@
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import {
-  startTestServer,
+  setupIntegrationTest,
   stopTestServer,
   createTestClient,
   createAuthenticatedClient,
@@ -19,6 +19,8 @@ import {
 } from './setup';
 
 describe('Organizations Flow', () => {
+  setupIntegrationTest();
+
   let ownerToken: string;
   let memberToken: string;
   let ownerId: string;
@@ -27,7 +29,6 @@ describe('Organizations Flow', () => {
   let memberUsername: string;
 
   beforeAll(async () => {
-    await startTestServer();
 
     // Create owner user
     ownerUsername = uniqueUsername('orgowner');
@@ -51,7 +52,7 @@ describe('Organizations Flow', () => {
     });
     memberToken = memberResult.sessionId;
     memberId = memberResult.user.id;
-  }, 30000);
+  });
 
   afterAll(async () => {
     await stopTestServer();
@@ -270,7 +271,7 @@ describe('Organizations Flow', () => {
     const uniqueOrgName = () => `memberorg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
     beforeEach(async () => {
-      const authApi = createAuthenticatedClient(ownerToken);
+        const authApi = createAuthenticatedClient(ownerToken);
       const org = await authApi.organizations.create.mutate({
         name: uniqueOrgName(),
         displayName: 'Member Test Org',
@@ -453,7 +454,7 @@ describe('Organizations Flow', () => {
     const uniqueOrgName = () => `teamorg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
     beforeEach(async () => {
-      const authApi = createAuthenticatedClient(ownerToken);
+        const authApi = createAuthenticatedClient(ownerToken);
       const org = await authApi.organizations.create.mutate({
         name: uniqueOrgName(),
         displayName: 'Team Test Org',

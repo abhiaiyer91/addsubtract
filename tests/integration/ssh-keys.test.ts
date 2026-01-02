@@ -10,7 +10,7 @@
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import {
-  startTestServer,
+  setupIntegrationTest,
   stopTestServer,
   createTestClient,
   createAuthenticatedClient,
@@ -24,12 +24,13 @@ const VALID_ED25519_KEY = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIxxxxxxxxxxxxxxxx
 const INVALID_KEY = 'not-a-valid-ssh-key';
 
 describe('SSH Keys Flow', () => {
+  setupIntegrationTest();
+
   let userToken: string;
   let userId: string;
   let username: string;
 
   beforeAll(async () => {
-    await startTestServer();
 
     const api = createTestClient();
 
@@ -43,7 +44,7 @@ describe('SSH Keys Flow', () => {
     });
     userToken = result.sessionId;
     userId = result.user.id;
-  }, 30000);
+  });
 
   afterAll(async () => {
     await stopTestServer();

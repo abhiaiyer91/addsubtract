@@ -1,20 +1,18 @@
 /**
  * Health Check Integration Tests
- * 
+ *
  * Quick sanity tests for server health and basic endpoints.
  */
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, afterAll } from 'vitest';
 import {
-  startTestServer,
+  setupIntegrationTest,
   stopTestServer,
   API_URL,
 } from './setup';
 
 describe('Health Check', () => {
-  beforeAll(async () => {
-    await startTestServer();
-  }, 30000);
+  setupIntegrationTest();
 
   afterAll(async () => {
     await stopTestServer();

@@ -10,7 +10,7 @@
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import {
-  startTestServer,
+  setupIntegrationTest,
   stopTestServer,
   createTestClient,
   createAuthenticatedClient,
@@ -20,13 +20,14 @@ import {
 } from './setup';
 
 describe('Releases Flow', () => {
+  setupIntegrationTest();
+
   let ownerToken: string;
   let ownerId: string;
   let repoId: string;
   let ownerUsername: string;
 
   beforeAll(async () => {
-    await startTestServer();
 
     const api = createTestClient();
 
@@ -49,7 +50,7 @@ describe('Releases Flow', () => {
       isPrivate: false,
     });
     repoId = repo.id;
-  }, 30000);
+  });
 
   afterAll(async () => {
     await stopTestServer();
@@ -339,7 +340,7 @@ describe('Releases Flow', () => {
     let releaseId: string;
 
     beforeEach(async () => {
-      const authApi = createAuthenticatedClient(ownerToken);
+        const authApi = createAuthenticatedClient(ownerToken);
       const tagName = `v${Date.now()}.${Math.floor(Math.random() * 100)}`;
 
       const release = await authApi.releases.create.mutate({

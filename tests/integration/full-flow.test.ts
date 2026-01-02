@@ -7,7 +7,7 @@
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import {
-  startTestServer,
+  setupIntegrationTest,
   stopTestServer,
   createTestClient,
   createAuthenticatedClient,
@@ -18,9 +18,7 @@ import {
 } from './setup';
 
 describe('E2E Integration', () => {
-  beforeAll(async () => {
-    await startTestServer();
-  }, 30000);
+  setupIntegrationTest();
 
   afterAll(async () => {
     await stopTestServer();
@@ -175,17 +173,17 @@ describe('E2E Integration', () => {
     let repoName: string;
 
     beforeAll(async () => {
-      // Create a test user for repository tests
+        // Create a test user for repository tests
       testUsername = uniqueUsername('repouser');
       const api = createTestClient();
-      
+
       const result = await api.auth.register.mutate({
         username: testUsername,
         email: uniqueEmail('repouser'),
         password: 'password123',
         name: 'Repo Test User',
       });
-      
+
       sessionToken = result.sessionId;
     });
 
@@ -324,10 +322,10 @@ describe('E2E Integration', () => {
     let testUsername: string;
 
     beforeAll(async () => {
-      // Create a test user and repo
+        // Create a test user and repo
       testUsername = uniqueUsername('issueuser');
       const api = createTestClient();
-      
+
       const result = await api.auth.register.mutate({
         username: testUsername,
         email: uniqueEmail('issueuser'),
@@ -452,10 +450,10 @@ describe('E2E Integration', () => {
     let testUsername: string;
 
     beforeAll(async () => {
-      // Create a test user and repo
+        // Create a test user and repo
       testUsername = uniqueUsername('pruser');
       const api = createTestClient();
-      
+
       const result = await api.auth.register.mutate({
         username: testUsername,
         email: uniqueEmail('pruser'),
@@ -597,10 +595,10 @@ describe('E2E Integration', () => {
     let testUsername: string;
 
     beforeAll(async () => {
-      // Create a test user
+        // Create a test user
       testUsername = uniqueUsername('activityuser');
       const api = createTestClient();
-      
+
       const result = await api.auth.register.mutate({
         username: testUsername,
         email: uniqueEmail('activityuser'),
@@ -650,10 +648,10 @@ describe('E2E Integration', () => {
     const searchableRepoName = `searchable-${Date.now()}`;
 
     beforeAll(async () => {
-      // Create a test user and searchable repo
+        // Create a test user and searchable repo
       testUsername = uniqueUsername('searchuser');
       const api = createTestClient();
-      
+
       const result = await api.auth.register.mutate({
         username: testUsername,
         email: uniqueEmail('searchuser'),

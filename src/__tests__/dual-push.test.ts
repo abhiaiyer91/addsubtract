@@ -11,6 +11,7 @@ describe('Dual-Push', () => {
   let repoDir: string;
   let remote1Dir: string;
   let remote2Dir: string;
+  let repo: Repository;
 
   beforeEach(() => {
     // Create temp directory structure

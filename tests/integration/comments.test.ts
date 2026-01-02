@@ -10,7 +10,7 @@
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import {
-  startTestServer,
+  setupIntegrationTest,
   stopTestServer,
   createTestClient,
   createAuthenticatedClient,
@@ -20,6 +20,8 @@ import {
 } from './setup';
 
 describe('Comments Flow', () => {
+  setupIntegrationTest();
+
   let ownerToken: string;
   let userToken: string;
   let ownerId: string;
@@ -28,8 +30,6 @@ describe('Comments Flow', () => {
   let repoId: string;
 
   beforeAll(async () => {
-    await startTestServer();
-
     const api = createTestClient();
 
     // Create repo owner
@@ -61,7 +61,7 @@ describe('Comments Flow', () => {
       isPrivate: false,
     });
     repoId = repo.id;
-  }, 30000);
+  });
 
   afterAll(async () => {
     await stopTestServer();
