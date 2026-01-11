@@ -53,7 +53,8 @@ describe('Dual-Push', () => {
 \tbare = true
 `);
 
-    repo = new Repository(repoDir);
+    // Initialize repository to ensure it's in a valid state
+    new Repository(repoDir);
   });
 
   afterEach(() => {
